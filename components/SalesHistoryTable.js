@@ -1,4 +1,4 @@
-import { formatKr, formatDate, formatM2, formatMillions } from "@/lib/format";
+import { formatDate, formatM2, formatMillions } from "@/lib/format";
 
 export default function SalesHistoryTable({ rows }) {
   return (
@@ -40,7 +40,7 @@ export default function SalesHistoryTable({ rows }) {
                   {formatMillions(r.kaupverd_real)}
                 </Td>
                 <Td right className="tabular">
-                  {formatKr(r.kaupverd_nominal * 1000)}
+                  {formatMillions(r.kaupverd_nominal)}
                 </Td>
                 <Td right>{formatM2(r.einflm_at_sale)}</Td>
                 <Td right>{r.byggar_at_sale ? Math.round(r.byggar_at_sale) : "—"}</Td>

@@ -33,10 +33,18 @@ export default function SearchAutocomplete() {
       let query = supabase
         .from("properties")
         .select("fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm")
+        .eq("is_residential", true)
         .limit(8);
 
       if (/^\d+$/.test(term)) {
-        query = query.eq("fastnum", Number(term));
+        // If searching by fastnum, don't filter residential — user may look up a
+        // specific fastnum that's non-residential (detail page shows info but
+        // omits the valuation card for non-residential).
+        query = supabase
+          .from("properties")
+          .select("fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm")
+          .eq("fastnum", Number(term))
+          .limit(8);
       } else {
         const pattern = `%${term}%`;
         query = query.or(

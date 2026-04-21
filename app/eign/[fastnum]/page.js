@@ -186,16 +186,56 @@ export default async function PropertyPage({ params }) {
         </div>
       </section>
 
-      {/* Row 2 — Prediction card */}
-      {prediction && (
+      {/* Row 2 — Non-residential notice (suppresses prediction/SHAP/comps) */}
+      {!property.is_residential && (
+        <section
+          className="vm-card vm-card-elevated"
+          style={{
+            marginBottom: "2rem",
+            borderTop: "3px solid var(--vm-neutral)",
+            padding: "1.75rem 2rem",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "0.8rem",
+              color: "var(--vm-neutral)",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              marginBottom: "0.6rem",
+            }}
+          >
+            Ekki í boði
+          </div>
+          <h2
+            className="display"
+            style={{ fontSize: "1.35rem", marginBottom: "0.5rem" }}
+          >
+            Verðmat er ekki í boði fyrir þessa eign
+          </h2>
+          <p style={{ color: "var(--vm-ink-muted)", lineHeight: 1.6 }}>
+            Þessi eign er flokkuð sem{" "}
+            <strong style={{ color: "var(--vm-ink)" }}>
+              {formatSegment(property.canonical_code)}
+            </strong>
+            . verdmat.is sérhæfir sig í íbúðarhúsnæði (íbúðir, einbýli, raðhús
+            o.s.frv.). Fyrir atvinnuhúsnæði eða ótilgreindar eignir er
+            verðmatsmódelið ekki kvarðað.
+          </p>
+        </section>
+      )}
+
+      {/* Row 2 — Prediction card (residential only) */}
+      {property.is_residential && prediction && (
         <PredictionCard
           prediction={prediction}
           fasteignamat={property.fasteignamat}
         />
       )}
 
-      {/* Row 3 — SHAP waterfall */}
-      {attributions && attributions.length > 0 && (
+      {/* Row 3 — SHAP waterfall (residential only) */}
+      {property.is_residential && attributions && attributions.length > 0 && (
         <section
           className="vm-card vm-card-elevated"
           style={{ marginBottom: "2rem" }}
@@ -239,8 +279,8 @@ export default async function PropertyPage({ params }) {
         </section>
       )}
 
-      {/* Row 5 — Comps */}
-      {comps.length > 0 && (
+      {/* Row 5 — Comps (residential only) */}
+      {property.is_residential && comps.length > 0 && (
         <section style={{ marginBottom: "2rem" }}>
           <h2
             className="display"
@@ -265,8 +305,8 @@ export default async function PropertyPage({ params }) {
         </section>
       )}
 
-      {/* Row 7 — Market context */}
-      {marketRows.length > 0 && (
+      {/* Row 7 — Market context (residential only) */}
+      {property.is_residential && marketRows.length > 0 && (
         <section style={{ marginBottom: "2rem" }}>
           <h2
             className="display"

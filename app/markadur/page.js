@@ -12,12 +12,16 @@ export const metadata = {
 
 export default async function MarketPage() {
   const [{ data: index }, { data: atsRows }] = await Promise.all([
+    // Supabase defaults to a 1000-row cap for anon/authenticated reads;
+    // repeat_sale_index has ~2,673 rows (segments × regions × quarters), so
+    // bypass the default via .range(0, 9999).
     supabase
       .from("repeat_sale_index")
       .select("*")
       .order("year", { ascending: true })
-      .order("quarter", { ascending: true }),
-    supabase.from("ats_lookup").select("*"),
+      .order("quarter", { ascending: true })
+      .range(0, 9999),
+    supabase.from("ats_lookup").select("*").range(0, 999),
   ]);
 
   return (
