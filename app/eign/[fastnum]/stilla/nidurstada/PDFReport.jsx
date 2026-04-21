@@ -6,41 +6,13 @@ import {
   Text,
   View,
   StyleSheet,
-  Font,
 } from "@react-pdf/renderer";
 
-// Google Fonts direct TTF links — cover Icelandic latin-ext (þ æ ð ö á ú)
-Font.register({
-  family: "Inter",
-  fonts: [
-    {
-      src: "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.ttf",
-      fontWeight: 400,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2ZL7.ttf",
-      fontWeight: 500,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7.ttf",
-      fontWeight: 700,
-    },
-  ],
-});
-
-Font.register({
-  family: "Fraunces",
-  fonts: [
-    {
-      src: "https://fonts.gstatic.com/s/fraunces/v39/6NUh8FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe_A.ttf",
-      fontWeight: 500,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/fraunces/v39/6NUh8FyLNQOQZAnv9ZwNjucMHVn85Ni7f2Ae_A.ttf",
-      fontWeight: 700,
-    },
-  ],
-});
+// Use PDF's built-in Type 1 standard fonts. Helvetica and Times-Roman
+// cover Latin-1 Supplement (includes Icelandic: þ æ ð ö á ú þorn/eth/etc).
+// No external font fetches — reliable offline, fast render.
+const FONT_BODY = "Helvetica";
+const FONT_DISPLAY = "Times-Roman";
 
 const C = {
   ink: "#13243b",
@@ -58,7 +30,7 @@ const C = {
 const s = StyleSheet.create({
   page: {
     padding: 44,
-    fontFamily: "Inter",
+    fontFamily: FONT_BODY,
     fontSize: 10,
     color: C.ink,
     backgroundColor: "#ffffff",
@@ -72,7 +44,7 @@ const s = StyleSheet.create({
     borderBottom: `1px solid ${C.border}`,
   },
   brand: {
-    fontFamily: "Fraunces",
+    fontFamily: FONT_DISPLAY,
     fontSize: 18,
     fontWeight: 500,
     color: C.ink,
@@ -89,9 +61,9 @@ const s = StyleSheet.create({
     marginBottom: 6,
     textTransform: "uppercase",
   },
-  h1: { fontFamily: "Fraunces", fontSize: 20, fontWeight: 500, marginBottom: 2 },
+  h1: { fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, marginBottom: 2 },
   h2: {
-    fontFamily: "Fraunces",
+    fontFamily: FONT_DISPLAY,
     fontSize: 13,
     fontWeight: 500,
     marginBottom: 6,
@@ -123,7 +95,7 @@ const s = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 4,
   },
-  summaryValue: { fontFamily: "Fraunces", fontSize: 20, fontWeight: 500 },
+  summaryValue: { fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500 },
   summaryValueMuted: { color: C.inkMuted },
 
   deltaBox: {
