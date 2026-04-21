@@ -1,6 +1,6 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 20. apríl 2026 21:10 (refresh_dashboard_tables orchestrator LOKIÐ. Monthly cycle nú 6-skref með cross-script atomicity milli repeat-sale og ATS. Runtime 65-81 sec, idempotency staðfest. Áfangi 7 rollfixture í production.)
+**Síðast uppfært:** 22. apríl 2026 23:40 (Sprint 2 Áfangi 4 Fasi A+B LOKIÐ í production — dashboard tables + views í Supabase, /markadur landing live. Tvö mid-flight bug-fixes: Bug 1 regime pill hybrid rule (momentum + pooled z_3v12), Bug 2 `effective_date_latest` column fyrir /eign listing date. Fasi C drill-downs næst.)
 
 **Verkefnisstaða heildar: ~82%**
 

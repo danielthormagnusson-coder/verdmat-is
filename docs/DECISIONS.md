@@ -4,6 +4,44 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-22 — Bug 2 fix: effective_date_latest replaces scraped_at_latest fyrir listing display
+
+**Hvað**: Ný DATE-column `properties.effective_date_latest` drífur "Nýleg auglýsing ([date])" á `/eign/[fastnum]`. Kemur frá `listings_v2.effective_date` (raunverulegur auglýsingardagur) en ekki `listings_v2.scraped_at` (pipeline-keyrslutími).
+
+**Root cause**: `precompute/build_precompute.py` var `sort_values("scraped_at").drop_duplicates("fastnum", keep="last")`. Innan einnar scrape-keyrslu eru ÖLL rows með sama `scraped_at` (tíminn þegar job keyrði), svo tied-values sort fellur aftur til DataFrame row-index sem picking-strategy. Fyrir fastnum=2008647 (9 rows, effective_date 2017-08-22 → 2019-09-06) var picked 2017-row (price 64.9 M kr) og displayed "11. apr. 2026" scrape-date. Danni screenshot stakk á þetta.
+
+**Fix**:
+1. `build_precompute.py`: sort með `effective_date` (fallback `scraped_at` ef null). Export `effective_date_latest` alongside.
+2. `properties` schema: `ADD COLUMN effective_date_latest DATE` (idempotent migration `20260422_effective_date_latest.sql`).
+3. Targeted backfill `precompute/fix_latest_listing_per_fastnum.py` — re-derives per-fastnum latest frá listings_v2.pkl og uppsertar via psycopg2 TEMP table + UPDATE FROM. 58.437 rows updated í 23 sec, engin full-pipeline re-run þörf.
+4. `/eign/[fastnum]/page.js`: display `effective_date_latest`; fallback `scraped_at_latest` with "skráð" prefix svo það er unambiguous.
+
+**Verify**: fastnum=2008647 displays now "48,9 M kr (6. sep. 2019)" (augl_id=874137). Previously: "64,9 M kr (11. apr. 2026)".
+
+**Follow-up**: next full `build_precompute.py` run will use updated logic and include `effective_date_latest` í CSV export. Existing properties.csv á /d/verdmat-is/precompute/exports/ is stale wrt this column; not blocking because live DB is patched.
+
+---
+
+## 2026-04-22 — Bug 1 fix: regime pill rule revised to hybrid (12m + pooled z_3v12)
+
+**Hvað**: Landing pill `/markadur` regla breytt frá "≥8 af 12 cells hot/cold → pill" í:
+
+- 12m real change ≤ −1,0 % AND pooled z_3v12 < +0,5 → `KALDUR`
+- 12m real change ≥ +1,0 % AND pooled z_3v12 > −0,5 → `HEITUR`
+- Annars → `HLUTLAUS`
+
+Pooled z_3v12 er `n_month`-weighted mean across 12 main-residential cells (latest month per cell).
+
+**Root cause**: Fyrri reglan aggregated heat_bucket counts úr `latest_regime_per_cell` view. Heat-bucket er per-cell p33/p67 threshold on `median_month` — lítið correlated með pooled 12m real change. Við 2026-04 data (12m = −2,00 %), cells split 3 hot / 5 neutral / 2 cold / 2 unknown → ekki 8-of-12, pill HLUTLAUS. User screenshot: red −2,0 % hero beside neutral pill = cognitive mismatch.
+
+**Rationale**: Hybrid lets either signal (momentum OR current trend) pull pillinn off neutral, en requires agreement (no veto) áður en committing to hot/cold. Momentum (12m change) matches user expectation frá the hero number; trend (z_3v12) matches ATS-scoring methodology. Thresholds (±1,0 % / ±0,5) chosen svo neutral band er breitt enough to avoid flicker en tight enough to catch real moves.
+
+**Implementation**: `latest_regime_per_cell` view now exposes `z_3v12`. `lib/dashboard-queries.js::computeHeroB` re-written. Spec §2.2 Metric B updated in lockstep så future chats see the authoritative rule.
+
+**Verify** (production): 12m = −2,00 %, pooled z_3v12 ≈ −0,08 → pill `KALDUR` (vm-badge-cold, blue). Matches red hero number.
+
+---
+
 ## 2026-04-23 — Áfangi 3 closed: PDF export með built-in PDF fonts
 
 **Hvað**: Public downloadable PDF á nidurstaða-síðu. Lazy-loaded `@react-pdf/renderer` + Document/Page/Text layout með Helvetica + Times-Roman (built-in Type 1 standard fonts).
