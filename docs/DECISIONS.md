@@ -4,6 +4,30 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-23 — Manual Q effects v1.1 calibration refinement (additive)
+
+**Hvað**: 6-item calibration update til `data/manual_q_effects.json`. Backwards-compatible: old share URLs still work via legacy-key translation in both API og results page.
+
+**Rationale per fix**:
+
+1. **Flooring type → renovation trilemma**: Parket vs teppi er US-suburban price signal. Íslandi notar báðar lausnir alongside each other; gólfefni-type dispersion er stödd cross-buyer-pool and doesn't systematically move price. Recent-renovation er raunverulegt signal instead.
+
+2. **Garage split by segment**: Single garage question allowed "tvofalt +4.5%" on APT_FLOOR, gerir flat-buyer confused og overstates effect. SFH/ROW/SEMI fá actual-bílskúr enum (einfaldur/tvöfaldur); APT fá bílastæði enum (sameign/tryggt_utanhuss/bilskyli_kjallari). Canonical-gated UI rendering + API validation enforce.
+
+3. **Condition 4 stages**: v1 jumped 3% → 0% → −5% med engin middle stage for minor work. `smavagilegar_framkvaemdir` (−2%) fills gap; most Icelandic properties sit in medium-minor range. More granular user experience.
+
+4. **proximity_school raised**: Real-estate literature used in v1 was US-sub; Icelandic barnafjölskyldu-markaðir í Kópavogi/Hafnarfirði price-a skólanálægð sterkar. 1.5% er Iceland-realistic.
+
+5. **kjallari and floor4+**: Hedonic studies á íslenskum markaði suggest 3-5% kjallari penalty and +2-3% premium á hærri hæðum. v1.0 values were mildir; v1.1 aligns better.
+
+6. **ovisst defaults halved**: v1 had ovisst as weak positive (≈0.3× of "ja" effect) sem meant user clicking "ovisst" through alls 5 questions fékk +1.5% stacked boost. Halving gerir ovisst accept-default-gracefully option, ekki stealth-bonus.
+
+**Still hardcoded**: Sprint 3 PDP-based refresh á iter4a booster supersedear þetta alveg. Þessi refinement er interim pending real data-driven calibration.
+
+**Coverage**: stacked worst-case −10 to −11%, best-case +24 to +27% (SFH vs APT). Real dispersion narrower.
+
+---
+
 ## 2026-04-22 — Sprint 2 Áfangi 2 decisions
 
 **Hvað**: Public manual questionnaire shipped (no auth required). Baseline + persónulegt verðmat med 11-spurning flow, link-shareable results, CTA card on main eign page.

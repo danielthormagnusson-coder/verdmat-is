@@ -1919,3 +1919,16 @@ Sprint 2 breaks into 4 áfangar × 17 skref, ~50-70 klst active work over 4 cale
 - APT_HOTEL no-comps (2169101): 200, renders (works since is_residential=true) ✓
 
 Áfangi 2 closed. Áfangi 3 (PDF export + saved valuations) is next.
+
+### Sprint 2 Áfangi 2 v1.1 (2026-04-23): Effects calibration refinement
+Additive update til v1 (no rollback). Live og verified via API test.
+- `flooring` 4-option enum → `flooring_renovated` trilemma (US-market artifact removed)
+- `garage` split into `garage_sfh_row` (SFH/ROW/SEMI) og `garage_apt` (APT_*) með canonical-gated UI og API validation
+- `condition_overall` 3→4 stig: gott / medal / smavagilegar_framkvaemdir (−2%) / mikilvirk_vidgerd (−5%)
+- `proximity_school` raised 0.7→1.5% (Iceland family-market)
+- `view.gras` −0.5→0 (Iceland grass not penalty)
+- `floor_position.kjallari` −2→−3%, `floor4plus` +2→+2.5%
+- `ovisst` defaults halved (0.5% kitchen, 0.4% bath, 0.2% flooring) so stacked-ovisst doesn't accidentally add up
+- Legacy URL compat: v1 `thorfVidgerd` → `mikilvirk_vidgerd`, v1 `flooring:X` silently dropped
+
+API verification: `{kitchen_renovated:ja, condition:smavagilegar_framkvaemdir, garage_apt:sameign, view:sjor, proximity_school:ja}` produces multiplier 1.1000 (expected 1.098) med 5 breakdown items each matching hardcoded values line-by-line. `garage_sfh_row` on APT_FLOOR returns HTTP 400 med clear error message.
