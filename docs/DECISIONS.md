@@ -4,6 +4,35 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-21 — iter4 production rollout (Áfangi 2-5 closed)
+
+**Hvað**: Switched production prediction model from iter3v2 to iter4a (standalone, no fasteignamat input). iter3v2 archived in Supabase as `predictions_iter3v2` + `feature_attributions_iter3v2`. Frontend default view reads iter4 (`predictions` table post-rename). Debug mode `?mode=debug` loads both for side-by-side comparison.
+
+**Metrics**:
+- iter4a held MAPE: 8.19% (iter3v2 baseline 7.97%, delta +0.22 pp)
+- Per-segment: APT_STANDARD 6.37%, APT_FLOOR 8.55%, ROW_HOUSE 7.24%, APT_BASEMENT 10.90%, SFH_DETACHED 16.29% (small N=106)
+- Calibration: `iter4_segcal_v1` JSON, per-segment k-factors similar to iter3v2's
+- 80% PI coverage 68% (target 80%) — known undercoverage, deferred to Sprint 2+
+- Training time: 9.4 min (iter4a), 26 min (iter4 precompute rebuild with SHAP)
+
+**Impact**:
+- Annual HMS fasteignamat updates (júní ár hvert) **no longer cause prediction jumps** — iter4 is fully decoupled.
+- Feature importance redistribution healthy: EINFLM 34.5%, sale_year 19.6%, matsvaediNUMER 17.6%, matsvaedi_bucket 14.2%, BYGGAR 4.5% (vs iter3v2's 77.9% fastmat dominance).
+- DB size grew to 561 MB (was 424) due to iter3v2 archive retention. Still well within Pro tier (8 GB).
+- iter4b via `init_model` fine-tune abandoned: LightGBM requires feature compatibility with init_model, so dropping FASTEIGNAMAT is infeasible without workarounds that preserve iter3v2's fastmat dependence.
+- LLM extraction feature selection (Skref 5-6) was a no-op: all 136 extraction features were already joined into training_data_v2 and used by iter3v2. iter4a inherits them automatically.
+
+**Not tripped stop-conditions**:
+- Skref 4 MAPE > 15%: iter4a at 8.19% (well under).
+- Skref 8 Bakkastígur 1 delta > 30%: actual +2.2%.
+
+**Deferred to future sprints**:
+- PI coverage undercoverage on held (68% vs 80% target).
+- Manual-layer questionnaire (Áfangi 9 / Sprint 3).
+- SUMMERHOUSE model quality (175% MAPE — iter3v2 has same issue).
+
+---
+
 ## 2026-04-21 — iter4a validated as production candidate; iter4b (init_model) abandoned
 
 **Hvað**: iter4a training complete. Held MAPE 8.19% vs iter3v2 baseline 7.97% — a +0.22 pp cost for full fasteignamat independence. iter4b (LightGBM `init_model` fine-tune) was abandoned due to technical infeasibility.

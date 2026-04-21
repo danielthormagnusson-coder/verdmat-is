@@ -1809,3 +1809,15 @@ Iter4 standalone training. LLM extraction audit passed — reusing existing 40.8
 - iter4b (init_model fine-tune) skipped: LightGBM requires feature compatibility with init_model, so dropping FASTEIGNAMAT is incompatible. Winner = iter4a by default.
 - Training time: 9.4 min (vs 60-90 min estimate)
 - Status: Stop-conditions not tripped (MAPE < 15%). Proceed to Skref 5 (LLM features already joined in training_data_v2; verify coverage).
+
+### Áfangi 2-5 KLÁRAÐ (2026-04-21)
+iter4 standalone í production. Held MAPE 8.19% (iter3v2: 7.97%, delta +0.22 pp) — cost-of-stability aðeins 1/14 af því sem áætlað var (3-5 pp). DB size 561 MB (Pro tier, plenty of headroom). iter3v2 archived í `predictions_iter3v2` og `feature_attributions_iter3v2`. Debug mode á `/eign/[fastnum]?mode=debug` sýnir samanburð.
+
+**Sanity:** fastnum 2000281 (Bakkastígur 1): iter4 91.6 M kr (80% PI 81.5–105.3), iter3v2 var 89.6 M kr, delta +2.2%.
+
+**Known gap:** 80% PI coverage á held er 68% (target 80%). Segment stretch calibration hjálpar ekki meira á þessum predictions — quantile spread er ekki nógu breitt. Sprint 2+ fix: conformal prediction eða retrain quantile módelin með bigger bagging.
+
+**Frontend additions:**
+- HMS-fasteignamat relabeled með reference-only caveat
+- `?mode=debug` sýnir iter4 vs iter3v2 samanburðartöflu
+- Landing hero italic note "iter4 standalone módel — óháður fasteignamati HMS"
