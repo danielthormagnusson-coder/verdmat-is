@@ -1,66 +1,179 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import SearchAutocomplete from "@/components/SearchAutocomplete";
+import FeaturedProperties from "@/components/FeaturedProperties";
+import { formatSegment, formatM2, formatMillions } from "@/lib/format";
 
-export default function Home() {
+export const revalidate = 600;
+
+async function loadFeatured() {
+  // Three handpicked canonical codes across three regions for the hero strip.
+  const picks = [
+    { code: "APT_FLOOR", region: "RVK_core" },
+    { code: "SFH_DETACHED", region: "Capital_sub" },
+    { code: "ROW_HOUSE", region: "Country" },
+  ];
+  const results = [];
+  for (const p of picks) {
+    const { data } = await supabase
+      .from("properties")
+      .select(
+        "fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm, first_photo_url, n_photos"
+      )
+      .eq("canonical_code", p.code)
+      .eq("region_tier", p.region)
+      .not("first_photo_url", "is", null)
+      .order("n_photos", { ascending: false })
+      .limit(1);
+    if (data && data.length) {
+      const prop = data[0];
+      const { data: pred } = await supabase
+        .from("predictions")
+        .select("real_pred_mean, real_pred_lo80, real_pred_hi80")
+        .eq("fastnum", prop.fastnum)
+        .maybeSingle();
+      results.push({ ...prop, prediction: pred });
+    }
+  }
+  return results;
+}
+
+export default async function Home() {
+  let featured = [];
+  try {
+    featured = await loadFeatured();
+  } catch {
+    // Supabase not configured yet — show empty state.
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.js file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main>
+      <section
+        style={{
+          padding: "5rem 0 4rem",
+          background:
+            "linear-gradient(180deg, var(--vm-bg) 0%, rgba(245,240,230,0.4) 100%)",
+        }}
+      >
+        <div className="vm-container-narrow" style={{ textAlign: "left" }}>
+          <p
+            style={{
+              fontSize: "0.85rem",
+              color: "var(--vm-accent)",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              marginBottom: "1rem",
+            }}
+          >
+            ÍSLENSKT FASTEIGNAVERÐMAT · 2026
+          </p>
+          <h1
+            className="display"
+            style={{
+              fontSize: "clamp(2.5rem, 5.5vw, 4.2rem)",
+              marginBottom: "1.25rem",
+              fontWeight: 500,
+            }}
+          >
+            Hvað kostar eignin þín?
+          </h1>
+          <p
+            style={{
+              fontSize: "1.15rem",
+              color: "var(--vm-ink-muted)",
+              marginBottom: "2.5rem",
+              maxWidth: 620,
+              lineHeight: 1.55,
+            }}
+          >
+            AI-studdur verðmatsvettvangur byggður á 226.000 þinglýstum
+            kaupsamningum og LightGBM-módelum kvarðaðum á íslenska markaðnum.
+            Fáðu verðmat með raunverulegu vissubili — ekki bara tölu.
+          </p>
+          <SearchAutocomplete />
+          <p
+            style={{
+              marginTop: "1rem",
+              fontSize: "0.85rem",
+              color: "var(--vm-ink-faint)",
+            }}
+          >
+            Sláðu inn heimilisfang eða fastanúmer.
           </p>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </section>
+
+      {featured.length > 0 && (
+        <section style={{ padding: "2rem 0 3rem" }}>
+          <div className="vm-container">
+            <h2
+              className="display"
+              style={{ fontSize: "1.6rem", marginBottom: "1.5rem" }}
+            >
+              Dæmi um nýleg verðmöt
+            </h2>
+            <FeaturedProperties items={featured} />
+          </div>
+        </section>
+      )}
+
+      <section style={{ padding: "4rem 0", background: "var(--vm-surface)" }}>
+        <div className="vm-container">
+          <h2
+            className="display"
+            style={{
+              fontSize: "1.9rem",
+              marginBottom: "2.5rem",
+              textAlign: "center",
+            }}
           >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            Hvað getur verdmat.is?
+          </h2>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: "1.75rem",
+            }}
+          >
+            <FeatureCard
+              title="Raunsæ spágildi"
+              body="Verðmat per eign með 80% og 95% vissubilum — byggt á 124.835 þinglýstum sölum og quantile-módelum kvarðaðum per segment."
             />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <FeatureCard
+              title="Feature attribution"
+              body="Sjáðu nákvæmlega hvers vegna verðið er þetta. SHAP-greining sýnir hvaða eiginleikar hækka og lækka matið, mældir í krónum."
+            />
+            <FeatureCard
+              title="Markaðsyfirlit"
+              body="Repeat-sale vísitala frá 2006, markaðshiti per segment og hverfi. Skoðaðu raunverulegt verðhrun 2008–2011 á rauntölum."
+            />
+          </div>
         </div>
-      </main>
+      </section>
+    </main>
+  );
+}
+
+function FeatureCard({ title, body }) {
+  return (
+    <div className="vm-card vm-card-elevated">
+      <h3
+        className="display"
+        style={{ fontSize: "1.2rem", marginBottom: "0.75rem", fontWeight: 600 }}
+      >
+        {title}
+      </h3>
+      <p
+        style={{
+          color: "var(--vm-ink-muted)",
+          fontSize: "0.95rem",
+          lineHeight: 1.6,
+        }}
+      >
+        {body}
+      </p>
     </div>
   );
 }
