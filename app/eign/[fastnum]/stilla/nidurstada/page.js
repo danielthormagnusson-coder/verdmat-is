@@ -9,6 +9,53 @@ import {
   formatPercent,
 } from "@/lib/format";
 import ShareButton from "./ShareButton";
+import PDFDownloadButton from "./PDFDownloadButton";
+
+const PDF_ANSWER_LABELS = {
+  kitchen_renovated: { ja: "Já", nei: "Nei", ovisst: "Ekki viss" },
+  bathroom_renovated: { ja: "Já", nei: "Nei", ovisst: "Ekki viss" },
+  flooring_renovated: { ja: "Já", nei: "Nei", ovisst: "Ekki viss" },
+  view: {
+    sjor: "Sjór",
+    fjoll: "Fjöll",
+    borg: "Borg",
+    gras: "Gras/garður",
+    takmarkat: "Takmarkað",
+  },
+  balcony: {
+    engar: "Engar",
+    litlar: "Litlar",
+    storar: "Stórar",
+    verond: "Verönd",
+  },
+  garage_sfh_row: {
+    enginn: "Enginn",
+    einstaett: "Einfaldur bílskúr",
+    tvofalt: "Tvöfaldur bílskúr",
+  },
+  garage_apt: {
+    enginn: "Ekkert",
+    sameign: "Í sameign",
+    tryggt_utanhuss: "Tryggt utanhúss",
+    bilskyli_kjallari: "Bílskýli í kjallara",
+  },
+  elevator: { ja: "Já", nei: "Nei" },
+  condition_overall: {
+    gott: "Gott",
+    medal: "Meðal",
+    smavagilegar_framkvaemdir: "Smávægar framkvæmdir",
+    mikilvirk_vidgerd: "Mikilvirk viðgerð",
+  },
+  floor_position: {
+    kjallari: "Kjallari",
+    jardhed: "Jarðhæð",
+    floor1_3: "1.–3. hæð",
+    floor4plus: "4. hæð eða hærra",
+    ris: "Rishæð",
+  },
+  proximity_school: { ja: "Já", nei: "Nei", ovisst: "Ekki viss" },
+  proximity_store: { ja: "Já", nei: "Nei", ovisst: "Ekki viss" },
+};
 
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
@@ -272,9 +319,26 @@ export default async function NidurstadaPage({ params, searchParams }) {
         >
           Stilla aftur
         </Link>
-        <button className="vm-btn-secondary" disabled style={{ opacity: 0.5 }}>
-          Sækja PDF (koma síðar)
-        </button>
+        <PDFDownloadButton
+          property={{
+            fastnum: property.fastnum,
+            heimilisfang: property.heimilisfang,
+            postnr: property.postnr,
+            postheiti: property.postheiti,
+            canonical_code: property.canonical_code,
+            einflm: property.einflm ? Number(property.einflm) : null,
+            byggar: property.byggar ? Number(property.byggar) : null,
+            fjherb: null,
+          }}
+          baseline={baseline}
+          adjusted={adjusted}
+          breakdown={withImpact}
+          answerLabels={PDF_ANSWER_LABELS}
+          model={{
+            version: prediction.model_version,
+            calibration: prediction.calibration_version,
+          }}
+        />
         <ShareButton packed={sp.a || ""} />
       </section>
 
