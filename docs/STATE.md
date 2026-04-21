@@ -1821,3 +1821,8 @@ iter4 standalone í production. Held MAPE 8.19% (iter3v2: 7.97%, delta +0.22 pp)
 - HMS-fasteignamat relabeled með reference-only caveat
 - `?mode=debug` sýnir iter4 vs iter3v2 samanburðartöflu
 - Landing hero italic note "iter4 standalone módel — óháður fasteignamati HMS"
+
+### Sprint 2 byrjað (2026-04-21)
+Pro-user track fyrst: PI cal + auth + manual Q + PDF. Invite-only. Pro users: fasteignasali + bankamaður (2 boð).
+Public dashboard track second: custom domain verdmat.is + hverfi pages + journalistic stories.
+Sprint 2 breaks into 4 áfangar × 17 skref, ~50-70 klst active work over 4 calendar weeks.
