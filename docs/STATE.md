@@ -1932,3 +1932,23 @@ Additive update til v1 (no rollback). Live og verified via API test.
 - Legacy URL compat: v1 `thorfVidgerd` → `mikilvirk_vidgerd`, v1 `flooring:X` silently dropped
 
 API verification: `{kitchen_renovated:ja, condition:smavagilegar_framkvaemdir, garage_apt:sameign, view:sjor, proximity_school:ja}` produces multiplier 1.1000 (expected 1.098) med 5 breakdown items each matching hardcoded values line-by-line. `garage_sfh_row` on APT_FLOOR returns HTTP 400 med clear error message.
+
+### Sprint 2 Áfangi 3 KLÁRAÐ (2026-04-23): PDF export
+
+Public downloadable PDF á niðurstöðusíðu. `@react-pdf/renderer` lazy-importaður á click.
+
+**PDF layout (A4):**
+- Header: verdmat.is merki + útgefið dagsetning + fastnum + model version
+- Heimilisfang line með segment / m² / byggt / herb
+- Summary: 2-col grunn vs persónulegt + delta box
+- PI tafla: 80% og 95% bil
+- Breakdown: Q / value / impact (color-coded green/red/faint)
+- Markaðssamhengi placeholder (ítarlegri í Sprint 3)
+- Disclaimer: AI-verðmat ekki bindandi
+- Footer: pinned model metadata
+
+**Íslenskt letur fix:** Upphaflega prófaði ég að register-a Inter + Fraunces frá Google Fonts CDN, en þessir URL-ar voru made-up og 404'ðu — PDF generation throw-aði. Skipti yfir í PDF standard Type 1 fonts (Helvetica body, Times-Roman display) sem cover-a Latin-1 Supplement, sem inniheldur alla íslenska stafi (þ æ ð ö á ú). Engin network fetch, reliable offline, faster render.
+
+**Filename:** `verdmat_<fastnum>_<YYYY-MM-DD>.pdf`
+
+Áfangi 3 closed. Áfangi 4 (saved searches + custom domain + SEO pages) og Áfangi 5 (auth re-activation) eftir.

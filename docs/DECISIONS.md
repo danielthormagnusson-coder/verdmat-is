@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-23 — Áfangi 3 closed: PDF export með built-in PDF fonts
+
+**Hvað**: Public downloadable PDF á nidurstaða-síðu. Lazy-loaded `@react-pdf/renderer` + Document/Page/Text layout með Helvetica + Times-Roman (built-in Type 1 standard fonts).
+
+**Font decision**: Reyndi first að registerá Inter + Fraunces frá Google Fonts CDN, en placeholder TTF URLs voru 404, PDF generation failed silent í client. Switched to PDF standard fonts (Helvetica body, Times-Roman display) sem báðir styðja Latin-1 Supplement (includes þ æ ð ö á ú via WinAnsiEncoding). Trade-off: display-heading serif er Times-Roman í staðinn fyrir Fraunces — web og PDF typography mismatch, en web brand retained og PDF letur er stable + offline.
+
+**Lazy-load strategy**: `@react-pdf/renderer` er ~450 KB gzipped. Initial bundle er óbreytt frá Áfanga 2 af því PDFDownloadButton dynamic-importar renderer + PDFReport á fyrsta click. Second click er instant (modules cached). Accept loading state "Býr til PDF..." sem user feedback.
+
+**Disclaimer**: Explicit text í PDF footer stating "AI-verðmat, not legally binding" — important fyrir ef fasteignasalar prenta og deila með viðskiptavinum.
+
+---
+
 ## 2026-04-23 — Manual Q effects v1.1 calibration refinement (additive)
 
 **Hvað**: 6-item calibration update til `data/manual_q_effects.json`. Backwards-compatible: old share URLs still work via legacy-key translation in both API og results page.
