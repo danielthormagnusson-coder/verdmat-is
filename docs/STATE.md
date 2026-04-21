@@ -1862,3 +1862,23 @@ Sprint 2 breaks into 4 áfangar × 17 skref, ~50-70 klst active work over 4 cale
 5. Supabase → Project Settings → Auth → SMTP settings: configure custom SMTP með Resend credentials (smtp.resend.com:587)
 6. Invite-user flow: Supabase dashboard → Authentication → Users → Invite user með email
 7. Eftir user signar inn í fyrsta sinn, keyra SQL: `INSERT INTO pro_users (id, email, role, company) VALUES ('<uuid>', '<email>', 'fasteignasali'/'banki', '<company>');`
+
+### Sprint 2 Áfangi 1 CLOSED (2026-04-21)
+
+**Skref 1.5 — Conformal PI verification: PASS**
+- Pooled residential (N=2,084): 80% PI coverage **79.08%** (target 80, delta -0.92), 95% PI **94.63%** (target 95, delta -0.37)
+- Per-segment: most within ±5 pp; APT_STANDARD×Country -10.9 pp (N=81, small), ROW_HOUSE×Capital_sub +12.2 pp (over-covers with wider than needed)
+- Criteria met: pooled ∈ [78, 82] and [93, 96]. Conformal correction is validated.
+
+**Skref 1.6 — Auth UI frozen**
+- `/login` replaced med "Pro útgáfan er á leiðinni" static landing med mailto CTA
+- `/auth/callback`, `middleware.js`, `/pro/*` routes retained (functional when re-enabled í Áfanga 5)
+
+**Skref 1.7 — Edge-case audit: 5/5 PASS**
+- No photos (fastnum 2354868 ROW_HOUSE): "Engar myndir" placeholder, verðmat renders ✓
+- New build no sales (2503822 byggt 2024): page loads, sölusaga section hidden ✓
+- Non-residential (2516150 EXCLUDE): "atvinnuhúsnæði · Verðmat ekki í boði" notice ✓
+- No comps (2169101 APT_HOTEL): prediction 21.9 M kr rendered, comps section hidden cleanly ✓
+- Single-word heimilisfang (2085524 "Gil" APT_FLOOR): renders as-is, no fallback needed ✓
+
+Áfangi 1 er klárað. Áfangi 2 (manual questionnaire + live scoring) er next.

@@ -4,6 +4,23 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-22 — Sprint 2 Áfangi 1 QA findings
+
+Edge case audit á 5 scenarios fyrir eign detail page:
+1. No photos → "Engar myndir" placeholder í gallery. PASS.
+2. New build (2024+, no sales) → sölusaga section renders conditional (`salesHistory.length > 0`), hidden when empty. PASS.
+3. Non-residential (EXCLUDE canonical_code) → "Verðmat ekki í boði" notice; prediction/SHAP/comps/market sections all gated on `is_residential`. PASS.
+4. No comps (APT_HOTEL fastnum 2169101) → prediction + SHAP render (21.9 M kr, 10 SHAP rows); comps section conditional, hidden cleanly. PASS.
+5. Single-word heimilisfang (e.g. "Gil", "Mörk") → used as-is in heading; no fallback needed since all residential have at least short address. PASS.
+
+No fixes required — existing conditional rendering handles all 5 gracefully.
+
+**Known remaining issues** (carried into Sprint 2 Áfangi 2):
+- APT_STANDARD × Country 80% PI coverage 69.1% (11 pp under, N=81). Small-sample noise; conformal quantile for this cell is below true residual distribution. Candidate fix: pool with Capital_sub, or increase MIN_N threshold.
+- ROW_HOUSE × Capital_sub 80% PI coverage 92.2% (+12.2 pp over). PI widths too wide for this cell. Cosmetic issue, not functional.
+
+---
+
 ## 2026-04-21 — Sprint 2 Skref 1: Switched to conformal PI calibration
 
 **Hvað**: Replaced iter4 segment-stretch calibration (`iter4_segcal_v1`) with split-conformal prediction intervals (`iter4_conformal_v1`). Per (canonical_code × region_tier) quantiles of |log-residual| from the test split define symmetric half-widths; held coverage jumped from 68% → 79.1% on 80% PI.

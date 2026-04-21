@@ -1,48 +1,14 @@
-"use client";
+export const metadata = {
+  title: "Pro aðgangur — verdmat.is",
+};
 
-import { useState } from "react";
-import { createSupabaseBrowser } from "@/lib/supabase-browser";
+const CONTACT_EMAIL = "hello@verdmat.is";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState("idle");
-  const [msg, setMsg] = useState("");
-
-  async function onSubmit(e) {
-    e.preventDefault();
-    if (!email || !email.includes("@")) return;
-    setStatus("sending");
-    setMsg("");
-    const supabase = createSupabaseBrowser();
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "";
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: {
-        emailRedirectTo: `${origin}/auth/callback`,
-        shouldCreateUser: false,
-      },
-    });
-    if (error) {
-      setStatus("error");
-      setMsg(
-        error.message.includes("not allowed") ||
-          error.message.toLowerCase().includes("sign")
-          ? "Netfang er ekki í boði. Hafðu samband ef þú heldur þetta sé mistök."
-          : `Villa: ${error.message}`
-      );
-    } else {
-      setStatus("sent");
-      setMsg(
-        'Tengill sendur — opnaðu póstinn þinn og smelltu á „Staðfesta“ til að skrá þig inn.'
-      );
-    }
-  }
-
   return (
     <main
       className="vm-container-narrow"
-      style={{ padding: "4rem 0 6rem", maxWidth: 520 }}
+      style={{ padding: "4rem 0 6rem", maxWidth: 560 }}
     >
       <p
         style={{
@@ -60,77 +26,79 @@ export default function LoginPage() {
         className="display"
         style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}
       >
-        Skrá sig inn
+        Pro útgáfan er á leiðinni
       </h1>
       <p
         style={{
           color: "var(--vm-ink-muted)",
-          marginBottom: "2rem",
-          lineHeight: 1.55,
+          marginBottom: "1.5rem",
+          lineHeight: 1.6,
+          fontSize: "1.05rem",
         }}
       >
-        Þessi vettvangur er í boði með boði. Sláðu inn netfang sem þú varst
-        boðaður með — þú færð tölvupóst með tengli til að staðfesta innskráningu.
+        Pro-útgáfan er í þróun og verður opnuð með boði á næstu vikum. Hún er
+        gerð fyrir fasteignasala og bankastarfsmenn sem þurfa að búa til
+        persónuleg verðmöt með spurningalista, vista eignir, og flytja út
+        verðmötin á PDF.
       </p>
 
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.85rem" }}>
-        <input
-          className="vm-input"
-          type="email"
-          placeholder="netfang@fyrirtaeki.is"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          required
-        />
-        <button
-          type="submit"
-          className="vm-btn"
-          disabled={status === "sending" || status === "sent"}
-          style={{ opacity: status === "sending" ? 0.7 : 1 }}
-        >
-          {status === "sending"
-            ? "Sendi tengli..."
-            : status === "sent"
-            ? "Tengill sendur"
-            : "Senda tengli"}
-        </button>
-      </form>
-
-      {msg && (
+      <div
+        className="vm-card vm-card-elevated"
+        style={{ marginBottom: "1.5rem", padding: "1.5rem 1.75rem" }}
+      >
         <div
           style={{
-            marginTop: "1.25rem",
-            padding: "0.9rem 1.1rem",
-            background:
-              status === "error"
-                ? "rgba(176, 78, 78, 0.08)"
-                : "rgba(93, 127, 86, 0.08)",
-            border: `1px solid ${
-              status === "error" ? "var(--vm-danger)" : "var(--vm-success)"
-            }`,
-            borderRadius: 8,
-            fontSize: "0.92rem",
-            color: status === "error" ? "var(--vm-danger)" : "var(--vm-success)",
-            lineHeight: 1.55,
+            fontSize: "0.75rem",
+            color: "var(--vm-accent)",
+            fontWeight: 600,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            marginBottom: "0.5rem",
           }}
         >
-          {msg}
+          Snemma-boð
         </div>
-      )}
+        <h2
+          className="display"
+          style={{ fontSize: "1.3rem", marginBottom: "0.75rem" }}
+        >
+          Viltu prófa fyrstur?
+        </h2>
+        <p
+          style={{
+            color: "var(--vm-ink-muted)",
+            marginBottom: "1.25rem",
+            lineHeight: 1.6,
+          }}
+        >
+          Ef þú ert fasteignasali eða bankastarfsmaður og hefur áhuga á að
+          prófa Pro-útgáfuna sem snemma notandi, sendu mér póst og ég bæti þér
+          í boðslistann.
+        </p>
+        <a
+          href={`mailto:${CONTACT_EMAIL}?subject=Pro%20sn%C3%A6ma-bo%C3%B0%20verdmat.is`}
+          className="vm-btn"
+          style={{ display: "inline-block", textDecoration: "none" }}
+        >
+          Senda póst
+        </a>
+      </div>
 
       <div
         style={{
-          marginTop: "3rem",
-          paddingTop: "1.5rem",
-          borderTop: "1px solid var(--vm-border)",
-          fontSize: "0.85rem",
-          color: "var(--vm-ink-faint)",
+          fontSize: "0.9rem",
+          color: "var(--vm-ink-muted)",
+          lineHeight: 1.6,
         }}
       >
-        Ertu fasteignasali eða bankastarfsmaður sem vill aðgang?{" "}
-        <a href="/um#pro" style={{ color: "var(--vm-primary)" }}>
-          Lærðu meira um Pro aðgang
+        Í millitíðinni er grunn-útgáfan af verdmat.is opin öllum — leitaðu að
+        eign á{" "}
+        <a href="/" style={{ color: "var(--vm-primary)" }}>
+          forsíðunni
+        </a>{" "}
+        eða skoðaðu{" "}
+        <a href="/markadur" style={{ color: "var(--vm-primary)" }}>
+          markaðsyfirlitið
         </a>
         .
       </div>
