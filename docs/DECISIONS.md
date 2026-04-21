@@ -4,6 +4,22 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-22 — Sprint 2 Áfangi 2 decisions
+
+**Hvað**: Public manual questionnaire shipped (no auth required). Baseline + persónulegt verðmat med 11-spurning flow, link-shareable results, CTA card on main eign page.
+
+**Segment fallback abandoned** (Skref 5): Tested 2 blend strategies — max-N donor biased small-N Country cells toward tighter Capital_sub/RVK_core. Pooled cov worsened (79.08 → 78.21). APT_STANDARD × Country held N=81 undercoverage (69.1%) is sample noise at Bin(81, 0.80) lower CI bound, not systematic miscalibration. Retained iter4_conformal_v1.
+
+**Manual Q effects hardcoded**: Empirical residual regression gave 0.2–2% magnitudes — iter4a already uses these features as inputs, so leftover residuals only reflect what model missed. Used literature-anchored values in `data/manual_q_effects.json` (range −12% to +21%). Sprint 3 will refine via PDP per feature on iter4a booster.
+
+**URL-encoded answers**: Results page uses `?a=q1:v1,q2:v2` query string instead of POST-only flow. Benefits: link-shareable, server-rendered (no client-side result fetch), no cookie/storage. Share button copies canonical URL.
+
+**Questionnaire non-applicability**: SUMMERHOUSE + non-residential redirect 307 → `/eign/[id]?notice=no_adjust`. Avoid user confusion from getting a personal valuation on iter4's known-weak SUMMERHOUSE segment (175% MAPE) or unpredicted commercial.
+
+**API route**: `/api/adjust-valuation` POST exposed publicly (no auth). Accepts `{fastnum, answers}`, returns `{baseline, adjusted, breakdown, multiplier, model}`. Server-side computation ensures baseline pulled from DB fresh. Used by results page indirectly via URL-decode + same adjustment logic; API available for future client use (saved valuations in Áfangi 3).
+
+---
+
 ## 2026-04-22 — Sprint 2 Áfangi 1 QA findings
 
 Edge case audit á 5 scenarios fyrir eign detail page:

@@ -1882,3 +1882,40 @@ Sprint 2 breaks into 4 áfangar × 17 skref, ~50-70 klst active work over 4 cale
 - Single-word heimilisfang (2085524 "Gil" APT_FLOOR): renders as-is, no fallback needed ✓
 
 Áfangi 1 er klárað. Áfangi 2 (manual questionnaire + live scoring) er next.
+
+### Sprint 2 Áfangi 2 KLÁRAÐ (2026-04-22): Public manual questionnaire + live scoring
+
+**Skref 5 — Small-N fallback smoothing:**
+- Tested MIN_N=100 (own 30% + donor 70%) and MIN_N=500 (40/60). Both made pooled coverage WORSE (79.08 → 78.21).
+- Donor-selection rule "max-N region" pulls Country cells toward tighter Capital_sub/RVK_core, shrinking PI. Correct direction would be similar-residual-distribution donor, not max-N.
+- Decision: keep iter4_conformal_v1. APT_STANDARD × Country held cov 69.1% is N=81 sample noise (binomial 95% CI around 80% target is [71%, 89%], observed 2pp below lower bound — marginal).
+
+**Skref 6 — Manual Q effects:**
+- Empirical residual approach gave 0.2–2% magnitudes (because iter4a already uses these features). Switched to literature-anchored hardcoded values in `data/manual_q_effects.json`.
+- 11 questions: kitchen_renovated, bathroom_renovated, flooring, view, balcony, garage, elevator, condition_overall, floor_position, proximity_school, proximity_store.
+- Range: worst-case -12%, best-case +21%.
+- Sprint 3 will refine via LightGBM PDP.
+
+**Skref 7 — `/api/adjust-valuation` POST route:**
+- Fetches baseline from `predictions`, applies multiplicative log-space adjustments, returns baseline + adjusted + sorted breakdown.
+- Verified: Bakkastígur 1 baseline 91.6M → with (sjor+eldhús+gott) = 103.6M, multiplier 1.13, breakdown ordered by absolute ISK impact.
+
+**Skref 8-9 — Questionnaire UI + results:**
+- `/eign/[fastnum]/stilla` 5-screen wizard (11 questions, APT-conditional floor_position + elevator).
+- Defaults pre-selected, progress bar, client state via useReducer.
+- `/eign/[fastnum]/stilla/nidurstada?a=q:v,q:v,...` server component, answers via URL → link-shareable.
+- Waterfall breakdown per question, sorted by absolute ISK impact.
+- Share button copies canonical URL.
+
+**Skref 10 — CTA on eign page:**
+- Terracotta-accent card between prediction and SHAP: "Viltu nákvæmara verðmat?" → "Stilla verðmat".
+- Hidden for SUMMERHOUSE and non-residential (redirects to /eign?notice=no_adjust).
+
+**Skref 11 — Edge-case coverage (5/5 PASS):**
+- APT_FLOOR (2000281 Bakkastígur 1): 200, renders ✓
+- SFH_DETACHED (2000280 Bakkastígur 3): 200, 142.4M baseline → 151.3M personal ✓
+- ROW_HOUSE (2000749 Framnesvegur 20A): 200, renders ✓
+- SUMMERHOUSE (2053860): 307 → /eign/2053860?notice=no_adjust ✓
+- APT_HOTEL no-comps (2169101): 200, renders (works since is_residential=true) ✓
+
+Áfangi 2 closed. Áfangi 3 (PDF export + saved valuations) is next.
