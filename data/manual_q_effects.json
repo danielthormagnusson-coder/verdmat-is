@@ -1,108 +1,79 @@
 {
-  "version": "sprint2_v1_hardcoded",
-  "note": "Multiplicative effect on baseline prediction. Effect is stored as fractional adjustment (0.042 = +4.2%). Values are literature-anchored estimates; Sprint 3 will refine via LightGBM partial-dependence plots on iter4a.",
-  "source": "real-estate literature + sanity-checked magnitudes; empirical residual regression gave noisy ~<2% values because iter4a already uses these features as inputs, so residuals only capture what the model missed.",
-  "calibrated_on": "2026-04-22",
+  "version": "sprint2_v1.1_hardcoded",
+  "note": "Multiplicative effect on baseline prediction. Sprint 3 refines via LightGBM partial-dependence plots on iter4a.",
+  "source": "literature + Iceland-specific judgment. Hard-coded for v1.1, data-calibrated in Sprint 3.",
+  "calibrated_on": "2026-04-23",
+  "v1_1_changelog": "Removed US-market flooring-type distinction (replaced with renovation trilemma). Split garage into segment-specific variants. Expanded condition to 4 stages. Recalibrated school proximity, kjallari, floor4+, view.gras, ovisst defaults.",
   "questions": {
     "kitchen_renovated": {
       "label": "Endurnýjað eldhús síðustu 5 ár",
-      "effects": {
-        "ja": 0.035,
-        "ovisst": 0.010,
-        "nei": 0.0
-      }
+      "effects": {"ja": 0.035, "ovisst": 0.005, "nei": 0.0}
     },
     "bathroom_renovated": {
       "label": "Endurnýjað baðherbergi síðustu 5 ár",
-      "effects": {
-        "ja": 0.025,
-        "ovisst": 0.008,
-        "nei": 0.0
-      }
+      "effects": {"ja": 0.025, "ovisst": 0.004, "nei": 0.0}
     },
-    "flooring": {
-      "label": "Gólfefni",
-      "effects": {
-        "parket": 0.010,
-        "flisar": 0.0,
-        "teppi": -0.010,
-        "blanda": 0.003
-      }
+    "flooring_renovated": {
+      "label": "Endurnýjað gólfefni síðustu 5 ár",
+      "effects": {"ja": 0.012, "ovisst": 0.002, "nei": 0.0}
     },
     "view": {
       "label": "Útsýni",
-      "effects": {
-        "sjor": 0.060,
-        "fjoll": 0.025,
-        "borg": 0.005,
-        "gras": -0.005,
-        "takmarkat": -0.025
-      }
+      "effects": {"sjor": 0.060, "fjoll": 0.025, "borg": 0.005, "gras": 0.0, "takmarkat": -0.025}
     },
     "balcony": {
       "label": "Svalir/verönd",
-      "effects": {
-        "engar": 0.0,
-        "litlar": 0.005,
-        "storar": 0.015,
-        "verond": 0.025
-      }
+      "effects": {"engar": 0.0, "litlar": 0.005, "storar": 0.015, "verond": 0.025}
     },
-    "garage": {
+    "garage_sfh_row": {
       "label": "Bílskúr",
-      "effects": {
-        "enginn": 0.0,
-        "einstaett": 0.025,
-        "tvofalt": 0.045,
-        "sameign": 0.008
-      }
+      "applies_to_canonical": ["SFH_DETACHED", "ROW_HOUSE", "SEMI_DETACHED"],
+      "effects": {"enginn": 0.0, "einstaett": 0.025, "tvofalt": 0.045}
+    },
+    "garage_apt": {
+      "label": "Bílastæði",
+      "applies_to_canonical": ["APT_STANDARD", "APT_FLOOR", "APT_ATTIC", "APT_BASEMENT"],
+      "effects": {"enginn": 0.0, "sameign": 0.008, "tryggt_utanhuss": 0.012, "bilskyli_kjallari": 0.020}
     },
     "elevator": {
       "label": "Lyfta í húsi",
-      "effects": {
-        "ja": 0.015,
-        "nei": 0.0,
-        "na": 0.0
-      }
+      "applies_to_canonical": ["APT_STANDARD", "APT_FLOOR", "APT_ATTIC", "APT_BASEMENT"],
+      "effects": {"ja": 0.015, "nei": 0.0}
     },
     "condition_overall": {
       "label": "Heildar ástand eignar",
       "effects": {
         "gott": 0.030,
         "medal": 0.0,
-        "thorfVidgerd": -0.050
+        "smavagilegar_framkvaemdir": -0.020,
+        "mikilvirk_vidgerd": -0.050
       }
     },
     "floor_position": {
-      "label": "Hæð í byggingu (apartments only)",
+      "label": "Hæð í byggingu",
+      "applies_to_canonical": ["APT_STANDARD", "APT_FLOOR", "APT_ATTIC", "APT_BASEMENT"],
       "effects": {
-        "kjallari": -0.020,
+        "kjallari": -0.030,
         "jardhed": 0.0,
         "floor1_3": 0.008,
-        "floor4plus": 0.020,
+        "floor4plus": 0.025,
         "ris": 0.010
       }
     },
     "proximity_school": {
-      "label": "Skóli innan 1 km",
-      "effects": {
-        "ja": 0.007,
-        "nei": 0.0,
-        "ovisst": 0.003
-      }
+      "label": "Grunnskóli innan 1 km",
+      "effects": {"ja": 0.015, "ovisst": 0.005, "nei": 0.0}
     },
     "proximity_store": {
-      "label": "Verslun innan 500 m",
-      "effects": {
-        "ja": 0.005,
-        "nei": 0.0,
-        "ovisst": 0.002
-      }
+      "label": "Matvöruverslun innan 500 m",
+      "effects": {"ja": 0.005, "ovisst": 0.002, "nei": 0.0}
     }
   },
   "ranges": {
-    "worst_case_total_effect": -0.12,
-    "best_case_total_effect": 0.21,
-    "note": "Worst = all negatives stacked (teppi + takmarkat + engar + enginn + na + thorfVidgerd + kjallari + nei + nei). Best = all positives stacked max."
+    "worst_case_SFH_stack": -0.10,
+    "best_case_SFH_stack": 0.24,
+    "worst_case_APT_stack": -0.11,
+    "best_case_APT_stack": 0.27,
+    "note": "Stacking assumes all extreme responses. Real-world dispersion is narrower."
   }
 }

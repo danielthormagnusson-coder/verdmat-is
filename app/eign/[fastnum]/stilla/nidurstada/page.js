@@ -19,10 +19,20 @@ export const metadata = {
 
 function parseAnswers(a) {
   if (!a) return {};
-  const out = {};
+  const raw = {};
   for (const pair of a.split(",")) {
     const [k, v] = pair.split(":");
-    if (k && v) out[k.trim()] = v.trim();
+    if (k && v) raw[k.trim()] = v.trim();
+  }
+  // Legacy compat: v1 → v1.1
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (k === "flooring") continue; // old enum dropped; renovation trilemma replaced it
+    if (k === "condition_overall" && v === "thorfVidgerd") {
+      out[k] = "mikilvirk_vidgerd";
+      continue;
+    }
+    out[k] = v;
   }
   return out;
 }
@@ -362,12 +372,7 @@ function formatValueLabel(question, value) {
   const map = {
     kitchen_renovated: { ja: "Já", nei: "Nei", ovisst: "Ekki viss" },
     bathroom_renovated: { ja: "Já", nei: "Nei", ovisst: "Ekki viss" },
-    flooring: {
-      parket: "Parket",
-      flisar: "Flísar",
-      teppi: "Teppi",
-      blanda: "Blanda",
-    },
+    flooring_renovated: { ja: "Já", nei: "Nei", ovisst: "Ekki viss" },
     view: {
       sjor: "Sjór",
       fjoll: "Fjöll",
@@ -381,17 +386,23 @@ function formatValueLabel(question, value) {
       storar: "Stórar",
       verond: "Verönd",
     },
-    garage: {
+    garage_sfh_row: {
       enginn: "Enginn",
-      einstaett: "Einstætt",
-      tvofalt: "Tvöfaldur",
-      sameign: "Í sameign",
+      einstaett: "Einfaldur bílskúr",
+      tvofalt: "Tvöfaldur bílskúr",
     },
-    elevator: { ja: "Já", nei: "Nei", na: "Á ekki við" },
+    garage_apt: {
+      enginn: "Ekkert",
+      sameign: "Í sameign",
+      tryggt_utanhuss: "Tryggt utanhúss",
+      bilskyli_kjallari: "Bílskýli í kjallara",
+    },
+    elevator: { ja: "Já", nei: "Nei" },
     condition_overall: {
       gott: "Gott",
       medal: "Meðal",
-      thorfVidgerd: "Þarf viðgerða",
+      smavagilegar_framkvaemdir: "Smávægar framkvæmdir",
+      mikilvirk_vidgerd: "Mikilvirk viðgerð",
     },
     floor_position: {
       kjallari: "Kjallari",

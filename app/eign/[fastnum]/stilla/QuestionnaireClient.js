@@ -3,43 +3,58 @@
 import { useReducer, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const SCREENS = [
-  {
-    key: "condition",
-    label: "Ástand eignar",
-    questions: ["condition_overall", "kitchen_renovated", "bathroom_renovated"],
-  },
-  {
-    key: "interior",
-    label: "Innréttingar og frágangur",
-    questions: ["flooring"],
-  },
-  {
-    key: "location",
-    label: "Staðsetning og útsýni",
-    questions: ["view", "proximity_school", "proximity_store"],
-  },
-  {
-    key: "outside",
-    label: "Útiþættir",
-    questions: ["balcony", "garage"],
-  },
-  {
-    key: "building",
-    label: "Byggingareiginleikar",
-    questions: ["elevator", "floor_position"],
-    apt_only: true,
-  },
-];
+const APT_CODES = new Set(["APT_STANDARD", "APT_FLOOR", "APT_ATTIC", "APT_BASEMENT"]);
+const SFH_CODES = new Set(["SFH_DETACHED", "ROW_HOUSE", "SEMI_DETACHED"]);
+
+function screensFor(canonical) {
+  const isApt = APT_CODES.has(canonical);
+  const isSfh = SFH_CODES.has(canonical);
+  return [
+    {
+      key: "condition",
+      label: "Ástand eignar",
+      questions: ["condition_overall", "kitchen_renovated", "bathroom_renovated"],
+    },
+    {
+      key: "interior",
+      label: "Innréttingar og frágangur",
+      questions: ["flooring_renovated"],
+    },
+    {
+      key: "location",
+      label: "Staðsetning og útsýni",
+      questions: ["view", "proximity_school", "proximity_store"],
+    },
+    {
+      key: "outside",
+      label: "Útiþættir",
+      questions: ["balcony", isApt ? "garage_apt" : isSfh ? "garage_sfh_row" : null].filter(Boolean),
+    },
+    {
+      key: "building",
+      label: "Byggingareiginleikar",
+      questions: isApt ? ["elevator", "floor_position"] : [],
+      hideIfEmpty: true,
+    },
+  ].filter((s) => !s.hideIfEmpty || s.questions.length > 0);
+}
 
 const Q = {
   condition_overall: {
     label: "Hvert er heildarástand eignarinnar?",
-    help: "Miðað við útlit, ástand innréttinga og viðhald.",
     options: [
-      { value: "gott", label: "Gott — vel viðhaldið, lítið sem ekkert þarf að gera" },
-      { value: "medal", label: "Meðal — stendst kröfur, einhver slit eðlilegt" },
-      { value: "thorfVidgerd", label: "Þarf viðgerða — stærri endurbætur nauðsynlegar" },
+      { value: "gott", label: "Gott", hint: "Move-in klár, engin vinna eftir" },
+      { value: "medal", label: "Meðal", hint: "Stöðluð slit, kannski málning" },
+      {
+        value: "smavagilegar_framkvaemdir",
+        label: "Þarf smávægar framkvæmdir",
+        hint: "Gólf, eldhús-facelift, minni lagfæringar",
+      },
+      {
+        value: "mikilvirk_vidgerd",
+        label: "Þarf mikilvirka viðgerð",
+        hint: "Vot rými, rafmagn, structural",
+      },
     ],
     default: "medal",
   },
@@ -61,15 +76,15 @@ const Q = {
     ],
     default: "ovisst",
   },
-  flooring: {
-    label: "Hvernig er gólfefni eignarinnar?",
+  flooring_renovated: {
+    label: "Hefur gólfefni verið endurnýjað síðustu 5 ár?",
+    help: "Nýtt parket, flísar eða annað gólfefni lagt innan 5 ára.",
     options: [
-      { value: "parket", label: "Parket (einkum)" },
-      { value: "flisar", label: "Flísar (einkum)" },
-      { value: "teppi", label: "Teppi (einkum)" },
-      { value: "blanda", label: "Blanda af mismunandi" },
+      { value: "ja", label: "Já" },
+      { value: "nei", label: "Nei" },
+      { value: "ovisst", label: "Ekki viss" },
     ],
-    default: "blanda",
+    default: "ovisst",
   },
   view: {
     label: "Hvernig er útsýnið?",
@@ -110,13 +125,26 @@ const Q = {
     ],
     default: "litlar",
   },
-  garage: {
-    label: "Bílgeymsla eða bílskúr?",
+  garage_sfh_row: {
+    label: "Bílskúr",
     options: [
       { value: "enginn", label: "Enginn" },
-      { value: "einstaett", label: "Einstætt bilstæði/bílskúr" },
+      { value: "einstaett", label: "Einfaldur bílskúr" },
       { value: "tvofalt", label: "Tvöfaldur bílskúr" },
-      { value: "sameign", label: "Bílastæði í sameign" },
+    ],
+    default: "enginn",
+  },
+  garage_apt: {
+    label: "Bílastæði",
+    options: [
+      { value: "enginn", label: "Ekkert bílastæði" },
+      { value: "sameign", label: "Bílastæði í sameign", hint: "Opin sameiginleg stæði" },
+      { value: "tryggt_utanhuss", label: "Tryggt bílastæði utanhúss" },
+      {
+        value: "bilskyli_kjallari",
+        label: "Bílskýli í kjallara",
+        hint: "Tryggt stæði í sameiginlegu bílskýli í byggingunni",
+      },
     ],
     default: "enginn",
   },
@@ -125,7 +153,6 @@ const Q = {
     options: [
       { value: "ja", label: "Já" },
       { value: "nei", label: "Nei" },
-      { value: "na", label: "Á ekki við" },
     ],
     default: "nei",
   },
@@ -134,7 +161,7 @@ const Q = {
     options: [
       { value: "kjallari", label: "Kjallari" },
       { value: "jardhed", label: "Jarðhæð" },
-      { value: "floor1_3", label: "1. til 3. hæð" },
+      { value: "floor1_3", label: "1.–3. hæð" },
       { value: "floor4plus", label: "4. hæð eða hærra" },
       { value: "ris", label: "Rishæð" },
     ],
@@ -149,28 +176,23 @@ function reducer(state, action) {
   return state;
 }
 
-export default function QuestionnaireClient({ fastnum, isApt }) {
+export default function QuestionnaireClient({ fastnum, canonical }) {
   const router = useRouter();
   const [screenIdx, setScreenIdx] = useState(0);
   const [answers, dispatch] = useReducer(reducer, {});
   const [submitting, setSubmitting] = useState(false);
 
-  const applicableScreens = SCREENS.filter(
-    (s) => !s.apt_only || isApt
-  );
+  const applicableScreens = screensFor(canonical);
   const screen = applicableScreens[screenIdx];
   const totalScreens = applicableScreens.length;
 
-  const questionsOnScreen = screen.questions.filter(
-    (q) => Q[q] != null
-  );
+  const questionsOnScreen = screen.questions.filter((q) => Q[q] != null);
   const allAnswered = questionsOnScreen.every(
     (q) => answers[q] != null || Q[q].default != null
   );
 
   async function onSubmit() {
     setSubmitting(true);
-    // Fill in defaults for anything not explicitly answered
     const finalAnswers = {};
     for (const s of applicableScreens) {
       for (const q of s.questions) {
@@ -179,7 +201,6 @@ export default function QuestionnaireClient({ fastnum, isApt }) {
         }
       }
     }
-    // Pack into short query string: q1=v1,q2=v2...
     const packed = Object.entries(finalAnswers)
       .map(([k, v]) => `${k}:${v}`)
       .join(",");
@@ -205,7 +226,6 @@ export default function QuestionnaireClient({ fastnum, isApt }) {
 
   return (
     <div>
-      {/* Progress */}
       <div
         style={{
           marginBottom: "2rem",
@@ -240,7 +260,6 @@ export default function QuestionnaireClient({ fastnum, isApt }) {
         </div>
       </div>
 
-      {/* Questions on this screen */}
       <div style={{ display: "grid", gap: "2rem", marginBottom: "2.5rem" }}>
         {questionsOnScreen.map((qKey) => (
           <Question
@@ -255,7 +274,6 @@ export default function QuestionnaireClient({ fastnum, isApt }) {
         ))}
       </div>
 
-      {/* Nav */}
       <div
         style={{
           display: "flex",
@@ -320,19 +338,15 @@ function Question({ qKey, def, current, onChange }) {
               key={opt.value}
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: "0.75rem",
                 padding: "0.75rem 1rem",
                 border: `1px solid ${
-                  selected
-                    ? "var(--vm-primary)"
-                    : "var(--vm-border-strong)"
+                  selected ? "var(--vm-primary)" : "var(--vm-border-strong)"
                 }`,
                 borderRadius: 8,
                 cursor: "pointer",
-                background: selected
-                  ? "rgba(31, 58, 95, 0.04)"
-                  : "transparent",
+                background: selected ? "rgba(31, 58, 95, 0.04)" : "transparent",
                 transition: "background 120ms, border-color 120ms",
               }}
             >
@@ -342,11 +356,23 @@ function Question({ qKey, def, current, onChange }) {
                 value={opt.value}
                 checked={selected}
                 onChange={(e) => onChange(e.target.value)}
-                style={{ accentColor: "var(--vm-primary)" }}
+                style={{ accentColor: "var(--vm-primary)", marginTop: "0.2rem" }}
               />
-              <span style={{ fontSize: "0.95rem", color: "var(--vm-ink)" }}>
-                {opt.label}
-              </span>
+              <div style={{ display: "grid", gap: "0.15rem" }}>
+                <span style={{ fontSize: "0.95rem", color: "var(--vm-ink)" }}>
+                  {opt.label}
+                </span>
+                {opt.hint && (
+                  <span
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "var(--vm-ink-muted)",
+                    }}
+                  >
+                    {opt.hint}
+                  </span>
+                )}
+              </div>
             </label>
           );
         })}

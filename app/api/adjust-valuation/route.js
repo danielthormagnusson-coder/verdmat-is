@@ -5,6 +5,76 @@ import effects from "@/data/manual_q_effects.json";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const APT_CODES = new Set(["APT_STANDARD", "APT_FLOOR", "APT_ATTIC", "APT_BASEMENT"]);
+const SFH_CODES = new Set(["SFH_DETACHED", "ROW_HOUSE", "SEMI_DETACHED"]);
+
+// Legacy key normalization for backwards-compat with v1 share URLs
+function normalizeAnswers(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (k === "flooring") {
+      // Old flooring enum (parket/flisar/teppi/blanda) no longer maps — drop
+      // silently; user will lose that adjustment on legacy URLs.
+      continue;
+    }
+    if (k === "condition_overall" && v === "thorfVidgerd") {
+      out[k] = "mikilvirk_vidgerd";
+      continue;
+    }
+    if (k === "garage") {
+      // v1 had a single "garage" key; cannot route without canonical context.
+      // Preserve as raw key; resolver below will translate.
+      out._legacy_garage = v;
+      continue;
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
+function validateAnswers(answers, canonical) {
+  // Enforce: garage variant matches canonical family.
+  const hasSfh = "garage_sfh_row" in answers;
+  const hasApt = "garage_apt" in answers;
+  if (hasSfh && hasApt) {
+    return "garage_sfh_row and garage_apt cannot both be provided";
+  }
+  if (hasSfh && !SFH_CODES.has(canonical)) {
+    return `garage_sfh_row provided but property canonical_code is ${canonical}`;
+  }
+  if (hasApt && !APT_CODES.has(canonical)) {
+    return `garage_apt provided but property canonical_code is ${canonical}`;
+  }
+  return null;
+}
+
+function translateLegacyGarage(answers, canonical) {
+  if (!answers._legacy_garage) return answers;
+  const value = answers._legacy_garage;
+  const copy = { ...answers };
+  delete copy._legacy_garage;
+  if (APT_CODES.has(canonical)) {
+    // Map old garage enum to new garage_apt
+    const map = {
+      enginn: "enginn",
+      sameign: "sameign",
+      einstaett: "tryggt_utanhuss",
+      tvofalt: "bilskyli_kjallari",
+    };
+    if (map[value]) copy.garage_apt = map[value];
+  } else if (SFH_CODES.has(canonical)) {
+    const map = {
+      enginn: "enginn",
+      einstaett: "einstaett",
+      tvofalt: "tvofalt",
+      sameign: "enginn",
+    };
+    if (map[value]) copy.garage_sfh_row = map[value];
+  }
+  return copy;
+}
+
 export async function POST(request) {
   let body;
   try {
@@ -12,9 +82,29 @@ export async function POST(request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { fastnum, answers } = body || {};
+  const { fastnum, answers: rawAnswers } = body || {};
   if (!Number.isFinite(Number(fastnum))) {
     return NextResponse.json({ error: "fastnum required" }, { status: 400 });
+  }
+
+  const { data: property, error: propErr } = await supabase
+    .from("properties")
+    .select("canonical_code")
+    .eq("fastnum", Number(fastnum))
+    .maybeSingle();
+  if (propErr || !property) {
+    return NextResponse.json(
+      { error: "Property not found" },
+      { status: 404 }
+    );
+  }
+
+  let answers = normalizeAnswers(rawAnswers);
+  answers = translateLegacyGarage(answers, property.canonical_code);
+
+  const validationError = validateAnswers(answers, property.canonical_code);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
   const { data: prediction, error } = await supabase
@@ -44,22 +134,11 @@ export async function POST(request) {
   const breakdown = [];
   const qMap = effects.questions || {};
 
-  for (const [question, value] of Object.entries(answers || {})) {
+  for (const [question, value] of Object.entries(answers)) {
     const q = qMap[question];
     if (!q || value == null) continue;
     const e = q.effects?.[value];
-    if (typeof e !== "number" || e === 0) {
-      if (typeof e === "number") {
-        breakdown.push({
-          question,
-          label: q.label,
-          value,
-          effect: 0,
-          impact_isk: 0,
-        });
-      }
-      continue;
-    }
+    if (typeof e !== "number") continue;
     logAdjustment += Math.log(1 + e);
     const impact = baseline.mean * e;
     breakdown.push({
@@ -93,5 +172,6 @@ export async function POST(request) {
       calibration: prediction.calibration_version,
       segment: prediction.segment,
     },
+    effects_version: effects.version,
   });
 }

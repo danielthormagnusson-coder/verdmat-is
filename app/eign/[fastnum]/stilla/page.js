@@ -47,8 +47,6 @@ export default async function StillaPage({ params }) {
     .eq("fastnum", fnum)
     .maybeSingle();
 
-  const isApt = property.canonical_code?.startsWith("APT_");
-
   return (
     <main className="vm-container" style={{ padding: "2.5rem 0 4rem", maxWidth: 780 }}>
       <section style={{ marginBottom: "2rem" }}>
@@ -106,7 +104,7 @@ export default async function StillaPage({ params }) {
         )}
       </section>
 
-      <QuestionnaireClient fastnum={fnum} isApt={isApt} />
+      <QuestionnaireClient fastnum={fnum} canonical={property.canonical_code} />
     </main>
   );
 }
