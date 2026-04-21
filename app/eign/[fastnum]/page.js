@@ -16,6 +16,7 @@ import SalesHistoryTable from "@/components/SalesHistoryTable";
 import MarketContextCard from "@/components/MarketContextCard";
 import PhotoGallery from "@/components/PhotoGallery";
 import PropertyMap from "@/components/PropertyMapClient";
+import Link from "next/link";
 
 export const revalidate = 600;
 
@@ -259,6 +260,37 @@ export default async function PropertyPage({ params, searchParams }) {
           prediction={prediction}
           fasteignamat={property.fasteignamat}
         />
+      )}
+
+      {/* CTA — Stilla verðmat (residential, non-summer only) */}
+      {property.is_residential && property.canonical_code !== "SUMMERHOUSE" && prediction && (
+        <section
+          className="vm-card vm-card-elevated"
+          style={{
+            marginBottom: "2rem",
+            background: "rgba(229, 183, 158, 0.22)",
+            borderColor: "var(--vm-accent-soft)",
+            padding: "1.5rem 1.75rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "1.25rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h3 className="display" style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>
+              Viltu nákvæmara verðmat?
+            </h3>
+            <p style={{ color: "var(--vm-ink-muted)", fontSize: "0.92rem", lineHeight: 1.55, maxWidth: 540 }}>
+              Svaraðu nokkrum spurningum um ástand, útsýni og útiþætti — ég reikna
+              persónulegt verðmat byggt á þínum upplýsingum.
+            </p>
+          </div>
+          <Link href={`/eign/${fnum}/stilla`} className="vm-btn" style={{ textDecoration: "none" }}>
+            Stilla verðmat
+          </Link>
+        </section>
       )}
 
       {/* Row 3 — SHAP waterfall (residential only) */}
