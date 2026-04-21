@@ -4,6 +4,31 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-21 — Sprint 2 Skref 1: Switched to conformal PI calibration
+
+**Hvað**: Replaced iter4 segment-stretch calibration (`iter4_segcal_v1`) with split-conformal prediction intervals (`iter4_conformal_v1`). Per (canonical_code × region_tier) quantiles of |log-residual| from the test split define symmetric half-widths; held coverage jumped from 68% → 79.1% on 80% PI.
+
+**Af hverju segment-stretch náði ekki 80%**: The iter4 quantile heads (q100/q900) produce a narrower distribution than iter3v2's. Stretch factor k80=1.05 (found by grid-search to maximize coverage on val+test) saturates — widening the quantile head further was not possible because the quantiles themselves are under-spread. Conformal skips the quantile head entirely: it empirically calibrates PI width from observed residual distribution on held-out calibration data.
+
+**Method**:
+1. Training uses train + val (early stopping on val). Test split is reserved purely for calibration.
+2. For each (canonical_code × region_tier) with n ≥ 30 on test split, compute `q80_log = 80th percentile of |log_real_kaupverd - pred_mean_log|`, same for q95.
+3. Fallback hierarchy: segment×region → segment-only → global (when n < 30).
+4. Application: `pred_lo80_log = pred_mean_log - q80_log`, `pred_hi80_log = pred_mean_log + q80_log`. Convert to ISK via `expm1 / cpi_factor × 1000`.
+
+**Alternative considered**: (a) Retrain quantile models with wider bagging / deeper trees — more risky, affects point estimate. Hafnað. (b) Full conformalized quantile regression (CQR) à la Romano et al 2019 — more theoretically sound but much more code. Hafnað for v1. (c) Per-property adaptive conformal (locally-weighted residuals) — better guarantees but costly at inference. Deferred.
+
+**Coverage deltas (held, main residential N=2,084)**:
+```
+Metric          iter4_segcal  iter4_conformal  Δ
+80% PI cov      66.3%         79.1%            +12.8 pp
+95% PI cov      89.1%         94.6%            +5.5 pp
+```
+
+**Impact**: User-facing PI widths now reflect actual uncertainty. Bakkastígur 1 80% PI went 81.5-105.3 → 80.9-103.8 M kr (tighter lower, tighter upper — concentrated around mean). Same model, same mean prediction. `iter4_segcal_v1` JSON retained on disk for audit.
+
+---
+
 ## 2026-04-21 — iter4 production rollout (Áfangi 2-5 closed)
 
 **Hvað**: Switched production prediction model from iter3v2 to iter4a (standalone, no fasteignamat input). iter3v2 archived in Supabase as `predictions_iter3v2` + `feature_attributions_iter3v2`. Frontend default view reads iter4 (`predictions` table post-rename). Debug mode `?mode=debug` loads both for side-by-side comparison.

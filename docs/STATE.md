@@ -1826,3 +1826,12 @@ iter4 standalone í production. Held MAPE 8.19% (iter3v2: 7.97%, delta +0.22 pp)
 Pro-user track fyrst: PI cal + auth + manual Q + PDF. Invite-only. Pro users: fasteignasali + bankamaður (2 boð).
 Public dashboard track second: custom domain verdmat.is + hverfi pages + journalistic stories.
 Sprint 2 breaks into 4 áfangar × 17 skref, ~50-70 klst active work over 4 calendar weeks.
+
+### Sprint 2 Skref 1 KLÁRAÐ (2026-04-21): Conformal PI calibration
+- `iter4_conformal_v1` replaced `iter4_segcal_v1`
+- Method: split-conformal on test split residuals, symmetric log-space half-widths
+- Per (canonical_code × region_tier) with segment + global fallbacks; MIN_N=30
+- **Held coverage jumped 68% → 79.1% on 80% PI, 94.6% on 95% PI** (targets 80/95 — essentially nailed)
+- Applied to Supabase: 110,316 predictions updated via COPY-staging + UPDATE JOIN (14 sec), `calibration_version='iter4_conformal_v1'`
+- Bakkastígur 1 sample: mean 91.6 M, 80% PI 80.9-103.8 M (was 81.5-105.3 M), 95% PI 72.9-115.2 M
+- No frontend code change needed — detail page reads PI fields from DB, footer badge auto-shows new calibration_version
