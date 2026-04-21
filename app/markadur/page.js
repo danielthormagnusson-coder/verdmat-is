@@ -10,18 +10,30 @@ export const metadata = {
     "Repeat-sale vísitala, markaðshiti og afar áhrifamikil 2008-hrun-dýfa raunverðsins.",
 };
 
-export default async function MarketPage() {
-  const [{ data: index }, { data: atsRows }] = await Promise.all([
-    // Supabase defaults to a 1000-row cap for anon/authenticated reads;
-    // repeat_sale_index has ~2,673 rows (segments × regions × quarters), so
-    // bypass the default via .range(0, 9999).
-    supabase
+async function fetchAllRepeatSaleIndex() {
+  // PostgREST enforces max-rows=1000 on Supabase free tier even with .range().
+  // repeat_sale_index has ~2,673 rows — paginate manually.
+  const pageSize = 1000;
+  let all = [];
+  for (let from = 0; from < 10000; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
       .from("repeat_sale_index")
       .select("*")
       .order("year", { ascending: true })
       .order("quarter", { ascending: true })
-      .range(0, 9999),
-    supabase.from("ats_lookup").select("*").range(0, 999),
+      .range(from, to);
+    if (error || !data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+  }
+  return all;
+}
+
+export default async function MarketPage() {
+  const [index, { data: atsRows }] = await Promise.all([
+    fetchAllRepeatSaleIndex(),
+    supabase.from("ats_lookup").select("*"),
   ]);
 
   return (
@@ -84,7 +96,7 @@ export default async function MarketPage() {
           eignar. Raunlína (CPI-deflated) sýnir raunverðsdýfu 2008–2011; nominal
           lína sýnir hvar peningaverð hefur lent.
         </p>
-        <RepeatSaleChart series={index || []} />
+        <RepeatSaleChart series={index} />
       </section>
     </main>
   );
