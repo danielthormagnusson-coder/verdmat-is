@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-21 — iter4a validated as production candidate; iter4b (init_model) abandoned
+
+**Hvað**: iter4a training complete. Held MAPE 8.19% vs iter3v2 baseline 7.97% — a +0.22 pp cost for full fasteignamat independence. iter4b (LightGBM `init_model` fine-tune) was abandoned due to technical infeasibility.
+
+**Af hverju iter4a virkar svona vel**: The 77.9% gain iter3v2 attributed to `real_fasteignamat` + `FASTEIGNAMAT` was largely **collinear** with underlying features (size, location, age, time). LightGBM re-learns the signal from EINFLM + matsvaedi_bucket + matsvaediNUMER + sale_year + BYGGAR without the fastmat mediator. Feature importance in iter4a is healthily distributed across size/geography/time primitives.
+
+**Af hverju iter4b sleppt**: LightGBM `init_model` parameter requires feature-set compatibility between the init booster and the new Dataset. Dropping `FASTEIGNAMAT` from iter4b features violates this contract. Workarounds (keeping feature as NaN constant) preserve iter3v2's existing NaN-path decisions on those features, not truly decoupling from fastmat. Clean "iter4b via fine-tune" is not feasible with feature-drop semantics.
+
+**Alternative considered**: Train iter4a with alternative hyperparameters (more trees, deeper) as an iter4a_deep variant. Deferred — iter4a baseline already at 8.19% on held, diminishing returns from tuning.
+
+**Consequence**: iter4a is the winner by default. PI coverage (66.3% on 80% PI vs target 78%) requires calibration-stretch in Skref 7 (follow iter3v2's `iter3v2_segcal_v1` pattern).
+
+---
+
 ## 2026-04-21 — Switched production target from Streamlit prototype to Next.js+Supabase+Vercel
 
 **Hvað**: Eftir Áfangi 7 completion var byggt Streamlit `app.py` sem Áfangi 5 v1. Danni hafnaði því sem prototype-quality (1990-style search bar, no feature attribution UI, no market integration). Switch yfir í production-grade Next.js stack byggt á sister project heyaskr (sama höfund, existing deploy).

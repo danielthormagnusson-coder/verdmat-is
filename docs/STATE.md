@@ -1801,3 +1801,11 @@ Current_heat_bucket ákvarðast af latest quarter's row í Table A (retrospectiv
 
 ### Áfangi 2-5 byrjað (2026-04-21)
 Iter4 standalone training. LLM extraction audit passed — reusing existing 40.814 rows v0.2.2. iter3v2 stays as production archive until Áfangi 2-5 Skref 10 import swaps in iter4.
+
+### iter4 structured-only result (2026-04-21, Skref 4)
+- **iter4a held MAPE: 8.19%** (iter3v2 baseline: 7.97%, delta +0.22 pp)
+- PI coverage undercoverage: 80% PI = 66.3% (target 78%), 95% PI = 89.1% (target 94%) — calibration pending in Skref 7
+- Feature importance redistribution: EINFLM 34.5% + sale_year 19.6% + matsvaediNUMER 17.6% + matsvaedi_bucket 14.2% + BYGGAR 4.5% replaces iter3v2's 77.9% fastmat dominance
+- iter4b (init_model fine-tune) skipped: LightGBM requires feature compatibility with init_model, so dropping FASTEIGNAMAT is incompatible. Winner = iter4a by default.
+- Training time: 9.4 min (vs 60-90 min estimate)
+- Status: Stop-conditions not tripped (MAPE < 15%). Proceed to Skref 5 (LLM features already joined in training_data_v2; verify coverage).
