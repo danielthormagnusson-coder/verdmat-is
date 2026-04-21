@@ -95,6 +95,16 @@ export default async function Home() {
           <p
             style={{
               marginTop: "1rem",
+              fontSize: "0.8rem",
+              color: "var(--vm-ink-faint)",
+              fontStyle: "italic",
+            }}
+          >
+            iter4 standalone módel — óháður fasteignamati HMS.
+          </p>
+          <p
+            style={{
+              marginTop: "0.5rem",
               fontSize: "0.85rem",
               color: "var(--vm-ink-faint)",
             }}

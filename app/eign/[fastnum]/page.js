@@ -33,18 +33,14 @@ export async function generateMetadata({ params }) {
   };
 }
 
-export default async function PropertyPage({ params }) {
+export default async function PropertyPage({ params, searchParams }) {
   const { fastnum } = await params;
+  const sp = (await searchParams) || {};
+  const showDebug = sp.mode === "debug";
   const fnum = Number(fastnum);
   if (!Number.isFinite(fnum)) notFound();
 
-  const [
-    { data: property },
-    { data: prediction },
-    { data: attributions },
-    { data: compsRaw },
-    { data: salesHistory },
-  ] = await Promise.all([
+  const queries = [
     supabase.from("properties").select("*").eq("fastnum", fnum).maybeSingle(),
     supabase.from("predictions").select("*").eq("fastnum", fnum).maybeSingle(),
     supabase
@@ -63,7 +59,24 @@ export default async function PropertyPage({ params }) {
       .select("*")
       .eq("fastnum", fnum)
       .order("thinglystdags", { ascending: false }),
-  ]);
+  ];
+  if (showDebug) {
+    queries.push(
+      supabase
+        .from("predictions_iter3v2")
+        .select("*")
+        .eq("fastnum", fnum)
+        .maybeSingle()
+    );
+  }
+
+  const results = await Promise.all(queries);
+  const { data: property } = results[0];
+  const { data: prediction } = results[1];
+  const { data: attributions } = results[2];
+  const { data: compsRaw } = results[3];
+  const { data: salesHistory } = results[4];
+  const iter3Prediction = showDebug ? results[5]?.data : null;
 
   if (!property) notFound();
 
@@ -155,7 +168,7 @@ export default async function PropertyPage({ params }) {
               value={property.fjherb != null ? property.fjherb : "—"}
             />
             <Stat
-              label="Fasteignamat"
+              label="HMS-fasteignamat"
               value={
                 property.fasteignamat
                   ? formatMillions(property.fasteignamat * 1000, 1)
@@ -164,6 +177,20 @@ export default async function PropertyPage({ params }) {
             />
             <Stat label="Matsvæði" value={property.matsvaedi_nafn ?? "—"} />
           </div>
+          {property.fasteignamat ? (
+            <div
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--vm-ink-faint)",
+                marginBottom: "0.9rem",
+                lineHeight: 1.5,
+                fontStyle: "italic",
+              }}
+            >
+              Opinber HMS-eignamat er viðmiðun. verdmat.is spá er reiknuð
+              sjálfstætt, án fasteignamats-inntaks.
+            </div>
+          ) : null}
           {property.augl_id_latest && property.list_price_latest ? (
             <div
               style={{
@@ -319,6 +346,107 @@ export default async function PropertyPage({ params }) {
             segment={property.canonical_code}
             region={property.region_tier}
           />
+        </section>
+      )}
+
+      {/* Row 8 — Debug mode: model comparison */}
+      {showDebug && property.is_residential && prediction && (
+        <section
+          className="vm-card"
+          style={{
+            marginTop: "3rem",
+            background: "var(--vm-surface)",
+            border: "1px dashed var(--vm-border-strong)",
+            padding: "1.5rem 1.75rem",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--vm-ink-faint)",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              marginBottom: "0.5rem",
+            }}
+          >
+            DEBUG MODE
+          </div>
+          <h2
+            className="display"
+            style={{ fontSize: "1.3rem", marginBottom: "1rem" }}
+          >
+            Samanburður módela
+          </h2>
+          <table
+            style={{
+              width: "100%",
+              fontSize: "0.92rem",
+              borderCollapse: "collapse",
+            }}
+          >
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--vm-border)" }}>
+                <th style={{ textAlign: "left", padding: "0.5rem 0", color: "var(--vm-ink-muted)", fontWeight: 600 }}>Model</th>
+                <th style={{ textAlign: "right", padding: "0.5rem 0", color: "var(--vm-ink-muted)", fontWeight: 600 }}>Mean spá</th>
+                <th style={{ textAlign: "right", padding: "0.5rem 0", color: "var(--vm-ink-muted)", fontWeight: 600 }}>80% PI</th>
+                <th style={{ textAlign: "left", padding: "0.5rem 0", color: "var(--vm-ink-muted)", fontWeight: 600, paddingLeft: "1rem" }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ borderBottom: "1px solid var(--vm-border)" }}>
+                <td style={{ padding: "0.6rem 0", fontWeight: 500 }}>iter4 (production)</td>
+                <td className="tabular" style={{ textAlign: "right", padding: "0.6rem 0" }}>
+                  {formatMillions(prediction.real_pred_mean)}
+                </td>
+                <td className="tabular" style={{ textAlign: "right", padding: "0.6rem 0" }}>
+                  {formatMillions(prediction.real_pred_lo80)} – {formatMillions(prediction.real_pred_hi80)}
+                </td>
+                <td style={{ padding: "0.6rem 0", paddingLeft: "1rem", color: "var(--vm-success)" }}>
+                  standalone · no fastmat input
+                </td>
+              </tr>
+              {iter3Prediction ? (
+                <tr style={{ borderBottom: "1px solid var(--vm-border)" }}>
+                  <td style={{ padding: "0.6rem 0" }}>iter3v2 (archived)</td>
+                  <td className="tabular" style={{ textAlign: "right", padding: "0.6rem 0" }}>
+                    {formatMillions(iter3Prediction.real_pred_mean)}
+                  </td>
+                  <td className="tabular" style={{ textAlign: "right", padding: "0.6rem 0" }}>
+                    {formatMillions(iter3Prediction.real_pred_lo80)} – {formatMillions(iter3Prediction.real_pred_hi80)}
+                  </td>
+                  <td style={{ padding: "0.6rem 0", paddingLeft: "1rem", color: "var(--vm-ink-muted)" }}>
+                    fastmat-dependent
+                  </td>
+                </tr>
+              ) : null}
+              {property.fasteignamat ? (
+                <tr>
+                  <td style={{ padding: "0.6rem 0", color: "var(--vm-ink-muted)" }}>HMS fasteignamat</td>
+                  <td className="tabular" style={{ textAlign: "right", padding: "0.6rem 0", color: "var(--vm-ink-muted)" }}>
+                    {formatMillions(property.fasteignamat * 1000)}
+                  </td>
+                  <td></td>
+                  <td style={{ padding: "0.6rem 0", paddingLeft: "1rem", color: "var(--vm-ink-faint)", fontStyle: "italic" }}>
+                    reference only
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+          {iter3Prediction ? (
+            <p style={{ marginTop: "1rem", color: "var(--vm-ink-muted)", fontSize: "0.88rem", lineHeight: 1.55 }}>
+              Delta iter4 vs iter3v2:{" "}
+              <strong className="tabular" style={{ color: "var(--vm-ink)" }}>
+                {(
+                  (100 * (prediction.real_pred_mean - iter3Prediction.real_pred_mean)) /
+                  iter3Prediction.real_pred_mean
+                ).toFixed(1)}
+                %
+              </strong>
+              . iter4 er óháður fasteignamati HMS — árleg HMS-uppfærsla (júní) breytir spánni ekki.
+            </p>
+          ) : null}
         </section>
       )}
     </main>
