@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS properties (
   list_price_latest      NUMERIC,
   lysing_truncated       TEXT,
   scraped_at_latest      TIMESTAMPTZ,
+  effective_date_latest  DATE,            -- listing date (not scrape date)
   first_photo_url        TEXT,
   photo_urls_json        JSONB,
   n_photos               INT

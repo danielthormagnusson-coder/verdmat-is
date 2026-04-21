@@ -206,8 +206,10 @@ export default async function PropertyPage({ params, searchParams }) {
               >
                 {formatMillions(property.list_price_latest * 1000)}
               </strong>
-              {property.scraped_at_latest
-                ? ` (${formatDate(property.scraped_at_latest)})`
+              {property.effective_date_latest
+                ? ` (${formatDate(property.effective_date_latest)})`
+                : property.scraped_at_latest
+                ? ` (skráð ${formatDate(property.scraped_at_latest)})`
                 : ""}
             </div>
           ) : null}
