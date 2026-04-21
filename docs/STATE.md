@@ -1835,3 +1835,30 @@ Sprint 2 breaks into 4 áfangar × 17 skref, ~50-70 klst active work over 4 cale
 - Applied to Supabase: 110,316 predictions updated via COPY-staging + UPDATE JOIN (14 sec), `calibration_version='iter4_conformal_v1'`
 - Bakkastígur 1 sample: mean 91.6 M, 80% PI 80.9-103.8 M (was 81.5-105.3 M), 95% PI 72.9-115.2 M
 - No frontend code change needed — detail page reads PI fields from DB, footer badge auto-shows new calibration_version
+
+### Sprint 2 Skref 2-4 KLÁRAÐ (2026-04-21): Auth infrastructure + Pro dashboard skeleton
+
+**Database (applied til Supabase):**
+- `pro_users` — invite-only Pro-user registry með RLS "read own"
+- `saved_properties` — watchlist per user
+- `saved_valuations` — persisted baseline + adjusted values með answers_json
+- `saved_searches` — search criteria í JSONB fyrir Áfanga 3
+- All tables með RLS policies locked til `auth.uid()`
+
+**Next.js auth stack:**
+- `@supabase/ssr` installed
+- `lib/supabase-server.js` + `lib/supabase-browser.js` helpers
+- `/login` magic-link form (invite-only messaging)
+- `/auth/callback` route handler (token exchange → /pro redirect)
+- `middleware.js` á `/pro/*` — unauth → /login, no pro_row → /pro/pending
+- `/pro` dashboard skeleton: greeting + role badge + 3 CTA cards + saved properties grid + recent valuations table (all með empty states)
+- `/pro/pending` page fyrir users sem eru innskráðir en ekki í pro_users yet
+
+**Manual steps eftir (Danni þarf að gera í Supabase/Resend dashboards áður en login virkar):**
+1. Supabase → Authentication → Providers → Email: enable Magic Link
+2. Supabase → Authentication → URL Configuration: add `https://verdmat-is.vercel.app/auth/callback` og `http://localhost:3000/auth/callback`
+3. Supabase → Authentication → Providers → Email: disable signups (invite-only)
+4. Búa Resend account (resend.com, free tier 3K emails/mán), verify domain, get API key
+5. Supabase → Project Settings → Auth → SMTP settings: configure custom SMTP með Resend credentials (smtp.resend.com:587)
+6. Invite-user flow: Supabase dashboard → Authentication → Users → Invite user með email
+7. Eftir user signar inn í fyrsta sinn, keyra SQL: `INSERT INTO pro_users (id, email, role, company) VALUES ('<uuid>', '<email>', 'fasteignasali'/'banki', '<company>');`
