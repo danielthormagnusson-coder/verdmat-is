@@ -1798,3 +1798,6 @@ Current_heat_bucket ákvarðast af latest quarter's row í Table A (retrospectiv
 - Plan: iter4 standalone (no fastmat input) + selected LLM features from existing extraction
 - LLM extraction audit 2026-04-21: existing `batch_extraction_propagated.csv` (40.814 listings, v0.2.2, quality validated) is sufficient — no re-extraction needed. Property-level coverage 27% (28.546 / 105.803 residential). Gap extraction only if Áfangi 2-5 Skref 6a feature selection identifies LLM features as critical.
 - Feature selection approach: structured features only for iter4 v1, add LLM features in v2, manual-layer questionnaire in Áfangi 9 (Sprint 3)
+
+### Áfangi 2-5 byrjað (2026-04-21)
+Iter4 standalone training. LLM extraction audit passed — reusing existing 40.814 rows v0.2.2. iter3v2 stays as production archive until Áfangi 2-5 Skref 10 import swaps in iter4.
