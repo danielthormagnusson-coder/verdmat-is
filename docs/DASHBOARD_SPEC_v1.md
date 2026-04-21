@@ -196,12 +196,22 @@ FROM
 Fallback if < 5 non-null quarters available: hide hero, show
 "Ekki tiltæk ennþá" sub-headline and push copy up.
 
-Metric B — Regime:
+Metric B — Regime (revised 2026-04-22 after Bug 1 fix):
 Read latest (year, quarter) per main-residential cell from
-`ats_dashboard_monthly_heat` or a derived `latest_regime_per_cell` view, then
-aggregate: `hot` if ≥ 8 of 12 cells are hot; `cold` if ≥ 8 are cold; otherwise
-`neutral`. Rule documented in view definition comment for auditability.
-Fallback: pill reads `HLUTLAUS` with faint `(gögn ekki fersk)` tooltip.
+`ats_dashboard_monthly_heat` or a derived `latest_regime_per_cell` view. Aggregate
+using BOTH the 12-month real price change (same signal the hero number uses) and
+the `n_month`-weighted mean of `z_3v12` across the 12 cells:
+
+- 12m ≤ −1,0 % AND pooled z_3v12 < +0,5 → `KALDUR`
+- 12m ≥ +1,0 % AND pooled z_3v12 > −0,5 → `HEITUR`
+- Otherwise → `HLUTLAUS`
+
+Rationale: the earlier 8-of-12-cells aggregation often produced a `HLUTLAUS`
+pill even when the hero number was clearly negative/positive, creating a
+cognitive mismatch for the user. The hybrid lets either signal (momentum or
+trend) pull the pill off neutral, but requires agreement (no veto) before
+committing to hot/cold. Fallback: pill reads `HLUTLAUS` with faint
+`(gögn ekki fersk)` tooltip.
 
 ### 2.3 Secondary metrics row — 3 cards CONFIRMED
 

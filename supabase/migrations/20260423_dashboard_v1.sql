@@ -148,6 +148,10 @@ WHERE canonical_code IN ('APT_STANDARD','SFH_DETACHED','ROW_HOUSE')
 GROUP BY canonical_code, year, quarter, period;
 
 -- Latest regime per (seg × region) — for landing hero B pill + heat-map default.
+-- Bug 1 fix (2026-04-22): expose z_3v12 so the landing regime pill can combine
+-- momentum (12m real price change from the pooled view) with current trend
+-- (z_3v12) instead of reading an aggregate-of-heat_buckets count that often
+-- disagreed with the 12m hero number.
 CREATE OR REPLACE VIEW latest_regime_per_cell AS
 SELECT DISTINCT ON (canonical_code, region_tier)
        canonical_code,
@@ -155,7 +159,8 @@ SELECT DISTINCT ON (canonical_code, region_tier)
        month,
        heat_bucket,
        above_list_rate,
-       n_month
+       n_month,
+       z_3v12
 FROM ats_dashboard_monthly_heat
 WHERE canonical_code IN ('APT_FLOOR','APT_STANDARD','SFH_DETACHED','ROW_HOUSE')
   AND region_tier IN ('RVK_core','Capital_sub','Country')
