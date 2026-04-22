@@ -4,6 +4,29 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-22 — Bug 5 fix: expand Step 2 requested non-existent `merking` column
+
+**Hvað**: Bug 4's expand-path (SearchAutocomplete.js → Step 2 unit list) select-ar `merking` column sem er ekki til í Supabase `properties` tafla. PostgREST skilaði `42703: column properties.merking does not exist`; client-kóðinn ate error silently með `(data || [])` pattern og renderaði "Engar einingar tilheyra þessu heimilisfangi" fyrir hverja multi-unit address. Regression á allri Bug 4 UX — Miðbraut 1 Seltjarnarnes, Egilsgata 10, Bakkastígur, öll multi-unit-address matches broken.
+
+**Root cause**: `properties_v2.pkl` hefur `merking` text column, en `precompute/build_precompute.py` exportar það ekki í Supabase. HMS "merking" fyrir multi-unit byggingar er hins vegar þegar í `properties.unit_category` ("0100", "0101", "0102", …) sem er exact same concept. Bug var copy-paste frá Danni's spec-query og ég missaði að cross-reference við actual schema fyrir deploy.
+
+**Hypothesis eliminations** (Danni listaði 4, öll ruled out):
+- (A) postnr null — nei, postnr=101 int fyrir alla 3 rows.
+- (B) type mismatch — nei, postnr_type=integer og JS number hvor tveggja.
+- (C) case sensitivity — nei, "Egilsgata 10" stafrétt.
+- (D) trailing whitespace — nei, addr_len=12 = exact length "Egilsgata 10".
+
+**Fix**:
+1. Remove `merking` úr Step 2 SELECT. Skipta fyrir `unit_category` sem er already í select-inu og contains exact sama semantic ("0100" = kjallari, "0101" = 1st floor unit 1, o.s.frv.).
+2. Surface PostgREST errors í client — `const { data, error } = ...` + `if (error) console.error(...)` frekar en silent `(data || [])`. Sama class af bug getur ekki falið sig aftur.
+3. UI render sýnir nú "merking 0101" per unit sem er skýrara fyrir users en rå unit_category.
+
+**Process lesson**: Bug 4 smoke test dekkaði Step 1 RPC output (group-by count) en ekki Step 2 expand path. Fyrir tvíþrepa UX patterns, must test both tiers end-to-end áður en deploy. Saved til memory sem generic learning.
+
+**Verify** (production post-fix): `properties?select=fastnum,tegund_raw,canonical_code,unit_category,einflm&heimilisfang=eq.Egilsgata%2010&postnr=eq.101&is_residential=eq.true` skilar 3 rows (APT_BASEMENT 0100 52.4 m², APT_FLOOR 0101 108.4 m², APT_FLOOR 0102 99.0 m²). Miðbraut 1 Seltjarnarnes skilar 5 rows.
+
+---
+
 ## 2026-04-22 — Bug 4 + search UX overhaul: two-tier autocomplete, HMS-gap caveat, Leið B launch
 
 **Hvað**: `SearchAutocomplete.js` endurskrifaður frá flat unit-list yfir í tveggja-þrepa pattern. Nýr RPC `search_properties_grouped(term)` í Supabase aggregerar matches eftir `(heimilisfang, postnr, postheiti)` og skilar `n_units` + `tegund_summary`. Þrep 2 er inline-expand sem sækir units per address á klicki. 7-stafa fastnum queries fá beina leit án address-groupings. Empty state skilar HMS-gap-caveat-copy. Nýr `SearchDataGapBanner` (localStorage-persistent) á homepage undir search.

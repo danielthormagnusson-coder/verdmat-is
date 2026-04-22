@@ -146,12 +146,24 @@ export default function SearchAutocomplete() {
     }
     setExpandedKey(key);
     setExpandedLoading(true);
-    const { data } = await supabase
+    // unit_category ("0100", "0101", "0102", …) is the HMS merking for a unit
+    // inside a multi-unit building. properties.merking isn't exported from the
+    // precompute pipeline, so requesting it used to silently error out and
+    // surface as "Engar einingar" in the dropdown (Bug 5, 2026-04-22).
+    const { data, error } = await supabase
       .from("properties")
-      .select("fastnum, tegund_raw, canonical_code, merking, einflm, unit_category")
+      .select(
+        "fastnum, tegund_raw, canonical_code, unit_category, einflm",
+      )
       .eq("heimilisfang", row.heimilisfang)
       .eq("postnr", row.postnr)
       .eq("is_residential", true);
+    if (error) {
+      console.error("[SearchAutocomplete] expand failed", error);
+      setExpandedUnits([]);
+      setExpandedLoading(false);
+      return;
+    }
     const units = (data || []).slice().sort((a, b) => {
       // Basement units first per spec §Þrep 2, then by einflm desc.
       const aBase = a.canonical_code === "APT_BASEMENT" ? 0 : 1;
@@ -412,7 +424,9 @@ export default function SearchAutocomplete() {
                               <UnitIcon code={u.canonical_code} />
                               {u.tegund_raw || formatSegment(u.canonical_code)}
                               {u.einflm != null ? ` · ${formatM2(u.einflm)}` : ""}
-                              {u.merking ? ` · ${u.merking}` : ""}
+                              {u.unit_category
+                                ? ` · merking ${u.unit_category}`
+                                : ""}
                             </span>
                             <span
                               style={{
