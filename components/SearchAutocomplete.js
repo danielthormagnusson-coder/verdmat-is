@@ -5,13 +5,54 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { formatSegment, formatM2 } from "@/lib/format";
 
+// Bug 4 + Search UX overhaul (2026-04-22):
+//   * Two-tier pattern — address-row groups first (one per
+//     heimilisfang × postnr), inline-expand to unit rows on click.
+//   * 7-digit fastnum queries bypass grouping and resolve directly.
+//   * Empty state surfaces the HMS-data-gap caveat copy.
+
+const FASTNUM_PATTERN = /^\d{7}$/;
+
+function UnitIcon({ code }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-block",
+        width: 8,
+        height: 8,
+        borderRadius: 2,
+        background:
+          code === "APT_BASEMENT"
+            ? "var(--vm-cold)"
+            : code === "APT_FLOOR" || code === "APT_STANDARD"
+            ? "var(--vm-primary)"
+            : code === "SFH_DETACHED"
+            ? "var(--vm-accent)"
+            : code === "ROW_HOUSE" || code === "SEMI_DETACHED"
+            ? "var(--vm-success)"
+            : "var(--vm-ink-faint)",
+        marginRight: 8,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
 export default function SearchAutocomplete() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [active, setActive] = useState(-1);
+  const [emptyState, setEmptyState] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+
+  // expandedKey = `${heimilisfang}|${postnr}` of the currently-expanded row (or null).
+  const [expandedKey, setExpandedKey] = useState(null);
+  const [expandedUnits, setExpandedUnits] = useState([]);
+  const [expandedLoading, setExpandedLoading] = useState(false);
+
   const wrapRef = useRef(null);
 
   useEffect(() => {
@@ -25,72 +66,134 @@ export default function SearchAutocomplete() {
   useEffect(() => {
     if (!q || q.trim().length < 2) {
       setResults([]);
+      setEmptyState(false);
       return;
     }
     const handle = setTimeout(async () => {
       setLoading(true);
+      setExpandedKey(null);
+      setExpandedUnits([]);
       const term = q.trim();
-      // Ordering: alphabetical by heimilisfang then fastnum so every unit of a
-      // fjölbýli at a matched address clusters together at the top. Limit 15
-      // (was 8) so a 5-10-unit fjölbýli does not displace all other matches.
-      // Bug 3a fix (2026-04-22): previously no ORDER BY, so PostgREST returned
-      // rows in arbitrary insertion order and multi-unit buildings added to
-      // HMS in later updates (higher fastnum range) never reached the LIMIT 8
-      // window when the prefix also matched older addresses.
-      let query = supabase
-        .from("properties")
-        .select("fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm")
-        .eq("is_residential", true)
-        .order("heimilisfang", { ascending: true })
-        .order("fastnum", { ascending: true })
-        .limit(15);
 
-      if (/^\d+$/.test(term)) {
-        // If searching by fastnum, don't filter residential — user may look up a
-        // specific fastnum that's non-residential (detail page shows info but
-        // omits the valuation card for non-residential).
-        query = supabase
+      // Fastnum direct lookup (7-digit Icelandic fastnum).
+      if (FASTNUM_PATTERN.test(term)) {
+        const { data } = await supabase
           .from("properties")
-          .select("fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm")
+          .select(
+            "fastnum, heimilisfang, postnr, postheiti, tegund_raw, canonical_code, einflm",
+          )
           .eq("fastnum", Number(term))
-          .limit(8);
-      } else {
-        const pattern = `%${term}%`;
-        query = query.or(
-          `heimilisfang.ilike.${pattern},postheiti.ilike.${pattern}`
-        );
+          .maybeSingle();
+        if (data) {
+          // Surface as a pseudo address-row with n_units = 1 so the existing
+          // renderer reuses its single-unit (direct-navigate) path.
+          setResults([
+            {
+              heimilisfang: data.heimilisfang,
+              postnr: data.postnr,
+              postheiti: data.postheiti,
+              n_units: 1,
+              anchor_fastnum: data.fastnum,
+              tegund_summary: data.tegund_raw || formatSegment(data.canonical_code),
+              _prefetchedUnit: {
+                fastnum: data.fastnum,
+                tegund_raw: data.tegund_raw,
+                canonical_code: data.canonical_code,
+                einflm: data.einflm,
+              },
+            },
+          ]);
+          setEmptyState(false);
+        } else {
+          setResults([]);
+          setEmptyState(true);
+        }
+        setLoading(false);
+        setOpen(true);
+        setActiveIdx(-1);
+        return;
       }
-      const { data } = await query;
-      setResults(data || []);
+
+      // Grouped address search via RPC.
+      const { data, error } = await supabase.rpc("search_properties_grouped", {
+        term,
+      });
+      if (error) {
+        setResults([]);
+        setEmptyState(true);
+      } else {
+        const rows = (data || []).map((r) => ({
+          ...r,
+          sveitarfelag: r.sveitarfelag ? r.sveitarfelag.trim() : r.sveitarfelag,
+          n_units: Number(r.n_units),
+        }));
+        setResults(rows);
+        setEmptyState(rows.length === 0);
+      }
       setLoading(false);
       setOpen(true);
-      setActive(-1);
+      setActiveIdx(-1);
     }, 220);
     return () => clearTimeout(handle);
   }, [q]);
 
-  function choose(r) {
+  async function expand(row) {
+    const key = `${row.heimilisfang}|${row.postnr}`;
+    if (expandedKey === key) {
+      setExpandedKey(null);
+      setExpandedUnits([]);
+      return;
+    }
+    setExpandedKey(key);
+    setExpandedLoading(true);
+    const { data } = await supabase
+      .from("properties")
+      .select("fastnum, tegund_raw, canonical_code, merking, einflm, unit_category")
+      .eq("heimilisfang", row.heimilisfang)
+      .eq("postnr", row.postnr)
+      .eq("is_residential", true);
+    const units = (data || []).slice().sort((a, b) => {
+      // Basement units first per spec §Þrep 2, then by einflm desc.
+      const aBase = a.canonical_code === "APT_BASEMENT" ? 0 : 1;
+      const bBase = b.canonical_code === "APT_BASEMENT" ? 0 : 1;
+      if (aBase !== bBase) return aBase - bBase;
+      return (Number(b.einflm) || 0) - (Number(a.einflm) || 0);
+    });
+    setExpandedUnits(units);
+    setExpandedLoading(false);
+  }
+
+  function chooseAddress(row) {
+    if (Number(row.n_units) <= 1) {
+      setOpen(false);
+      router.push(`/eign/${row.anchor_fastnum}`);
+      return;
+    }
+    expand(row);
+  }
+
+  function chooseUnit(u) {
     setOpen(false);
-    router.push(`/eign/${r.fastnum}`);
+    router.push(`/eign/${u.fastnum}`);
   }
 
   function onKey(e) {
     if (!open || results.length === 0) {
-      if (e.key === "Enter" && /^\d+$/.test(q.trim())) {
+      if (e.key === "Enter" && FASTNUM_PATTERN.test(q.trim())) {
         router.push(`/eign/${q.trim()}`);
       }
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((a) => Math.min(a + 1, results.length - 1));
+      setActiveIdx((a) => Math.min(a + 1, results.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((a) => Math.max(a - 1, 0));
+      setActiveIdx((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const idx = active >= 0 ? active : 0;
-      if (results[idx]) choose(results[idx]);
+      const idx = activeIdx >= 0 ? activeIdx : 0;
+      if (results[idx]) chooseAddress(results[idx]);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -102,7 +205,7 @@ export default function SearchAutocomplete() {
         <input
           className="vm-input"
           type="text"
-          placeholder="Leita að heimilisfangi eða fastanúmeri..."
+          placeholder="Heimilisfang eða fastanúmer"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKey}
@@ -113,14 +216,16 @@ export default function SearchAutocomplete() {
           className="vm-btn"
           style={{ whiteSpace: "nowrap" }}
           onClick={() => {
-            if (results[0]) choose(results[0]);
-            else if (/^\d+$/.test(q.trim())) router.push(`/eign/${q.trim()}`);
+            if (results[0]) chooseAddress(results[0]);
+            else if (FASTNUM_PATTERN.test(q.trim()))
+              router.push(`/eign/${q.trim()}`);
           }}
         >
           Fá verðmat
         </button>
       </div>
-      {open && (loading || results.length > 0) && (
+
+      {open && (loading || results.length > 0 || emptyState) && (
         <div
           style={{
             position: "absolute",
@@ -146,55 +251,196 @@ export default function SearchAutocomplete() {
               Leita...
             </div>
           )}
-          {!loading &&
-            results.map((r, i) => (
-              <div
-                key={r.fastnum}
-                onMouseEnter={() => setActive(i)}
-                onClick={() => choose(r)}
+
+          {!loading && emptyState && (
+            <div style={{ padding: "0.95rem 1.1rem" }}>
+              <p
                 style={{
-                  padding: "0.75rem 1rem",
-                  borderTop: i === 0 ? "none" : "1px solid var(--vm-border)",
-                  cursor: "pointer",
-                  background:
-                    active === i ? "var(--vm-surface)" : "transparent",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "1rem",
+                  margin: 0,
+                  fontSize: "0.9rem",
+                  color: "var(--vm-ink)",
+                  lineHeight: 1.5,
                 }}
               >
-                <div>
-                  <div
-                    style={{
-                      fontWeight: 500,
-                      color: "var(--vm-ink)",
-                      marginBottom: "0.15rem",
-                    }}
-                  >
-                    {r.heimilisfang}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "0.85rem",
-                      color: "var(--vm-ink-muted)",
-                    }}
-                  >
-                    {r.postnr} {r.postheiti} · {formatSegment(r.canonical_code)}{" "}
-                    {r.einflm ? `· ${formatM2(r.einflm)}` : ""}
-                  </div>
-                </div>
+                Engin eign fannst. Eignin er kannski ekki í gagnasafninu okkar
+                enn. Við byggjum á HMS fasteignaskrá sem vantar sumar nýjar
+                eignir og nýbyggingar — við erum að byggja fyllra gagnasafn.
+              </p>
+              <a
+                href="/um#gagnasafn"
+                style={{
+                  display: "inline-block",
+                  marginTop: "0.45rem",
+                  fontSize: "0.82rem",
+                  color: "var(--vm-primary)",
+                }}
+              >
+                Skoða aðferðafræði →
+              </a>
+            </div>
+          )}
+
+          {!loading &&
+            !emptyState &&
+            results.map((r, i) => {
+              const key = `${r.heimilisfang}|${r.postnr}`;
+              const isExpanded = expandedKey === key;
+              const nUnits = Number(r.n_units);
+              const isMulti = nUnits > 1;
+              return (
                 <div
+                  key={key}
                   style={{
-                    fontSize: "0.75rem",
-                    color: "var(--vm-ink-faint)",
-                    fontFamily: "var(--font-mono)",
+                    borderTop: i === 0 ? "none" : "1px solid var(--vm-border)",
                   }}
                 >
-                  {r.fastnum}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onMouseEnter={() => setActiveIdx(i)}
+                    onClick={() => chooseAddress(r)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        chooseAddress(r);
+                      }
+                    }}
+                    style={{
+                      padding: "0.75rem 1rem",
+                      cursor: "pointer",
+                      background:
+                        activeIdx === i ? "var(--vm-surface)" : "transparent",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "1rem",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontWeight: 500,
+                          color: "var(--vm-ink)",
+                          marginBottom: "0.15rem",
+                        }}
+                      >
+                        {r.heimilisfang} · {r.postnr} {r.postheiti}
+                        {isMulti && (
+                          <span
+                            style={{
+                              marginLeft: "0.5rem",
+                              fontSize: "0.85rem",
+                              color: "var(--vm-ink-muted)",
+                              fontWeight: 400,
+                            }}
+                          >
+                            ({nUnits} íbúðir)
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "var(--vm-ink-muted)",
+                        }}
+                      >
+                        {r.tegund_summary || "—"}
+                        {r.sveitarfelag ? ` · ${r.sveitarfelag}` : ""}
+                      </div>
+                    </div>
+                    <div
+                      aria-hidden
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "var(--vm-ink-faint)",
+                        fontFamily: "var(--font-mono)",
+                      }}
+                    >
+                      {isMulti ? (isExpanded ? "▾" : "▸") : "→"}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div
+                      style={{
+                        padding: "0.25rem 0 0.4rem",
+                        background: "var(--vm-surface)",
+                        borderTop: "1px solid var(--vm-border)",
+                      }}
+                    >
+                      {expandedLoading && (
+                        <div
+                          style={{
+                            padding: "0.5rem 1.25rem",
+                            fontSize: "0.85rem",
+                            color: "var(--vm-ink-faint)",
+                          }}
+                        >
+                          Sæki einingar...
+                        </div>
+                      )}
+                      {!expandedLoading &&
+                        expandedUnits.map((u) => (
+                          <div
+                            key={u.fastnum}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => chooseUnit(u)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                chooseUnit(u);
+                              }
+                            }}
+                            style={{
+                              padding: "0.5rem 1.25rem 0.5rem 2rem",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: "1rem",
+                              cursor: "pointer",
+                              fontSize: "0.88rem",
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                color: "var(--vm-ink)",
+                              }}
+                            >
+                              <UnitIcon code={u.canonical_code} />
+                              {u.tegund_raw || formatSegment(u.canonical_code)}
+                              {u.einflm != null ? ` · ${formatM2(u.einflm)}` : ""}
+                              {u.merking ? ` · ${u.merking}` : ""}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "var(--vm-ink-faint)",
+                                fontFamily: "var(--font-mono)",
+                              }}
+                            >
+                              {u.fastnum}
+                            </span>
+                          </div>
+                        ))}
+                      {!expandedLoading && expandedUnits.length === 0 && (
+                        <div
+                          style={{
+                            padding: "0.5rem 1.25rem",
+                            fontSize: "0.85rem",
+                            color: "var(--vm-ink-faint)",
+                          }}
+                        >
+                          Engar einingar tilheyra þessu heimilisfangi.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       )}
     </div>

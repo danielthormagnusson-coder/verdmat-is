@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
+import SearchDataGapBanner from "@/components/SearchDataGapBanner";
 import FeaturedProperties from "@/components/FeaturedProperties";
 import { formatSegment, formatM2, formatMillions } from "@/lib/format";
 
@@ -92,6 +93,7 @@ export default async function Home() {
             Fáðu verðmat með raunverulegu vissubili — ekki bara tölu.
           </p>
           <SearchAutocomplete />
+          <SearchDataGapBanner />
           <p
             style={{
               marginTop: "1rem",
@@ -101,15 +103,6 @@ export default async function Home() {
             }}
           >
             iter4 standalone módel — óháður fasteignamati HMS.
-          </p>
-          <p
-            style={{
-              marginTop: "0.5rem",
-              fontSize: "0.85rem",
-              color: "var(--vm-ink-faint)",
-            }}
-          >
-            Sláðu inn heimilisfang eða fastanúmer.
           </p>
         </div>
       </section>

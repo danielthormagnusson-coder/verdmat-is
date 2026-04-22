@@ -43,10 +43,31 @@ Paste-a selected planning prompt hér fyrir neðan.
 Planning promptir skulu takast í þessari röð, ekki parallel:
 
 1. **Sprint 2 Áfangi 4**: dashboard + markaðsyfirlit (public)
-2. **Sprint 3 Áfangi 5a**: pro foundation (auth, profile, saved valuations)
-3. **Sprint 3 Áfangi 5b**: pro tooling (manual override, attributed PDF, audit log)
+2. **Sprint 3 Áfangi 0 (scraper upgrade)**: comprehensive properties scraper — top-priority (Bug 4 follow-up)
+3. **Sprint 3 Áfangi 5a**: pro foundation (auth, profile, saved valuations)
+4. **Sprint 3 Áfangi 5b**: pro tooling (manual override, attributed PDF, audit log)
 
-Áfangi 5a krefur að Áfangi 4 sé a.m.k. í framkvæmd. Áfangi 5b krefur að Áfangi 5a sé lokinn.
+Áfangi 5a krefur að Áfangi 4 sé a.m.k. í framkvæmd. Áfangi 5b krefur að Áfangi 5a sé lokinn. Áfangi 0 scraper er independent af 5a/5b og má run parallel eftir að Fasi E launch polish fyrir Áfangi 4 er lokið.
+
+---
+
+## Sprint 3 Áfangi 0 — Scraper upgrade (top-priority per Bug 4 follow-up, 2026-04-22)
+
+**Why**: Bug 4 smoke-test leiddi í ljós að HMS Fasteignaskrá er ekki nægjanlega comprehensive source fyrir public search coverage. Sævargarðar 7 á Seltjarnarnesi (landnum 117661 vantar upstream), plus nýbyggingar sem hafa ekki fengið endanlegt fastnum úthlutað, plus eignir sem seldust pre-HMS-digital-era og aldrei síðan — allar þessar eignir skila "engin niðurstaða" á verdmat.is leit.
+
+Launch strategy Leið B ships dashboard með transparent HMS-gap caveat (`SearchDataGapBanner` + empty-state copy), en caveat-ið er aðeins stop-gap: Sprint 3 Áfangi 0 verður að catch-a up með comprehensive scraper sem complements HMS með live listings-source data (líkast evalue.is eða fasteignir.is).
+
+**Deliverables (fyrir planning-session að fleshe-a út)**:
+- Source selection: evalue.is vs fasteignir.is vs blanda
+- Scraper arkitektúr: incremental (nightly) vs full (weekly)
+- Storage: new `properties_supplement` tafla eða merge inn í existing `properties`?
+- Dedup logic: match á (heimilisfang, postnr) eða fuzzy match á adress?
+- UI integration: search RPC needs to include supplemented rows; `/eign/[fastnum]` must render gracefully fyrir supplement-only properties (engin HMS fasteignamat, engin iter4 prediction — show "verðmat ekki tiltækt ennþá" state)
+- Orchestrator integration: passa inn í monthly refresh pipeline alongside refresh_kaupskra + refresh_cpi
+
+**Planning prompt**: Danni skrifar eftir Fasi E launch polish á Áfanga 4.
+
+**Timing**: Parallel með Áfanga 5a/5b, ekki blocked af þeim.
 
 ---
 

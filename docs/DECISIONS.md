@@ -4,6 +4,31 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-22 — Bug 4 + search UX overhaul: two-tier autocomplete, HMS-gap caveat, Leið B launch
+
+**Hvað**: `SearchAutocomplete.js` endurskrifaður frá flat unit-list yfir í tveggja-þrepa pattern. Nýr RPC `search_properties_grouped(term)` í Supabase aggregerar matches eftir `(heimilisfang, postnr, postheiti)` og skilar `n_units` + `tegund_summary`. Þrep 2 er inline-expand sem sækir units per address á klicki. 7-stafa fastnum queries fá beina leit án address-groupings. Empty state skilar HMS-gap-caveat-copy. Nýr `SearchDataGapBanner` (localStorage-persistent) á homepage undir search.
+
+**Launch strategy Leið B (Danni)**: ship dashboard og pro-questionnaire með transparent HMS-gap caveat, byggja comprehensive scraper (e-value.is eða equivalent) í parallel sem Sprint 3 top-priority. Dashboard ekki blocked af properties-completeness; search-leki er acknowledged í UI svo users skilja af hverju sumar eignir vantar.
+
+**Performance fix (samhliða RPC)**: EXPLAIN ANALYZE sýndi 3.072 ms execution fyrir ILIKE-prefix á 125K-row properties tafla — planner valdi `idx_properties_residential` partial index og seq-filteraði 105K rows. Trigram GIN á heimilisfang var ekki pickað. Lausn: ný B-tree `text_pattern_ops` indexes á `lower(heimilisfang)` og `lower(postheiti)`, og rewrite-a RPC til að nota `lower(col) LIKE lower($1) || '%'`. Eftir fix: 10 ms execution með Bitmap Index Scan + BitmapOr combining báðum indexes. Function sett med `SET statement_timeout TO '10s'` sem safety net fyrir cold plan-cache calls.
+
+**UI patterns**:
+- **Þrep 1 address-row**: `heimilisfang · postnr postheiti` + optional `(N íbúðir)` count ef n_units > 1 + `tegund_summary` í undir-línu. Single-unit rows nav-a beint við klick; multi-unit rows expand inline. Chevron glyph `▸`/`▾`/`→` gefur hint um behaviour.
+- **Þrep 2 unit-row**: tegund_raw + einflm + merking, sortað APT_BASEMENT fyrst, svo einflm desc (matches spec intent, stable across HMS tegund variants).
+- **Empty state**: explicit HMS-fasteignaskrá caveat + link á `/um#gagnasafn`. Frekar en silent "engin niðurstaða", útskýrir af hverju eign gæti vantað.
+- **Persistent banner**: `SearchDataGapBanner.js` birtist undir search og dismiss-ast með × — localStorage (ekki session), þannig user dismissar einu sinni per browser. SSR-renders visible svo non-JS + SEO crawlers sjá caveat-ið á first paint.
+- **Fastnum direct search**: regex `/^\d{7}$/` triggerar bypass — single-row result með pseudo-address-row shape svo sama renderer virkar.
+
+**Indexes hafa áhrif**: Bæði B-tree indexes bætast á properties (2 × ~1 MB á 125K rows). Insignificant vs 8 GB Supabase cap.
+
+**Verify** (production):
+- EXPLAIN á `search_properties_grouped('miðbraut 1')`: 10 ms execution, Bitmap Index Scan + BitmapOr beggja lower-prefix indexes.
+- Anon REST call cold: ~2,4 s (pgBouncer + plan cache cold), warm: 700–1000 ms. Innan statement_timeout og user-perceivable latency.
+- `miðbraut 1` search skilar nú 6 address-rows: Miðbraut 1 Seltjarnarnes (5 íbúðir), Miðbraut 1 Búðardalur (einbýli), Miðbraut 10–13 etc.
+- `Sævargarðar 7` skilar `[]` og UI birta empty-state caveat.
+
+---
+
 ## 2026-04-22 — Bug 3 fix: autocomplete ordering for fjölbýli coverage
 
 **Hvað**: `SearchAutocomplete.js` færir `ORDER BY heimilisfang ASC, fastnum ASC` í autocomplete-fyrirspurnina og hækkar `LIMIT` frá 8 í 15. Fjölbýli með fleiri en eina íbúð á sama heimilisfang birta nú allar sínar einingar fyrstar.

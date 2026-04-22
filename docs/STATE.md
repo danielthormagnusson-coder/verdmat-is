@@ -1,6 +1,6 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 22. apríl 2026 (Sprint 2 Áfangi 4 Fasi A+B LOKIÐ + Fasi C-1 og C-2 í production — /markadur/visitala og /markadur/markadsstada live. Þrjú mid-flight bug-fixes: Bug 1 regime pill hybrid rule, Bug 2 `effective_date_latest` column fyrir /eign listing date, Bug 3 autocomplete ORDER BY fyrir fjölbýli coverage. Fasi C-3 og C-4 næst.)
+**Síðast uppfært:** 22. apríl 2026 (Sprint 2 Áfangi 4 Fasi A+B+C1+C2 LOKIÐ í production. Fjórir mid-flight bug-fixes: Bug 1 regime pill, Bug 2 `effective_date_latest`, Bug 3 autocomplete ORDER BY, Bug 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes. Launch strategy Leið B locked: ship dashboard með HMS-gap acknowledgement, scraper er Sprint 3 top-priority. Fasi C-3 og C-4 næst.)
 
 **Verkefnisstaða heildar: ~82%**
 
