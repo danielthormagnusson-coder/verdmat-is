@@ -30,11 +30,20 @@ export default function SearchAutocomplete() {
     const handle = setTimeout(async () => {
       setLoading(true);
       const term = q.trim();
+      // Ordering: alphabetical by heimilisfang then fastnum so every unit of a
+      // fjölbýli at a matched address clusters together at the top. Limit 15
+      // (was 8) so a 5-10-unit fjölbýli does not displace all other matches.
+      // Bug 3a fix (2026-04-22): previously no ORDER BY, so PostgREST returned
+      // rows in arbitrary insertion order and multi-unit buildings added to
+      // HMS in later updates (higher fastnum range) never reached the LIMIT 8
+      // window when the prefix also matched older addresses.
       let query = supabase
         .from("properties")
         .select("fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm")
         .eq("is_residential", true)
-        .limit(8);
+        .order("heimilisfang", { ascending: true })
+        .order("fastnum", { ascending: true })
+        .limit(15);
 
       if (/^\d+$/.test(term)) {
         // If searching by fastnum, don't filter residential — user may look up a

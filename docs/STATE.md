@@ -1,6 +1,6 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 22. apríl 2026 23:40 (Sprint 2 Áfangi 4 Fasi A+B LOKIÐ í production — dashboard tables + views í Supabase, /markadur landing live. Tvö mid-flight bug-fixes: Bug 1 regime pill hybrid rule (momentum + pooled z_3v12), Bug 2 `effective_date_latest` column fyrir /eign listing date. Fasi C drill-downs næst.)
+**Síðast uppfært:** 22. apríl 2026 (Sprint 2 Áfangi 4 Fasi A+B LOKIÐ + Fasi C-1 og C-2 í production — /markadur/visitala og /markadur/markadsstada live. Þrjú mid-flight bug-fixes: Bug 1 regime pill hybrid rule, Bug 2 `effective_date_latest` column fyrir /eign listing date, Bug 3 autocomplete ORDER BY fyrir fjölbýli coverage. Fasi C-3 og C-4 næst.)
 
 **Verkefnisstaða heildar: ~82%**
 

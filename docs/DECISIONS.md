@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-22 — Bug 3 fix: autocomplete ordering for fjölbýli coverage
+
+**Hvað**: `SearchAutocomplete.js` færir `ORDER BY heimilisfang ASC, fastnum ASC` í autocomplete-fyrirspurnina og hækkar `LIMIT` frá 8 í 15. Fjölbýli með fleiri en eina íbúð á sama heimilisfang birta nú allar sínar einingar fyrstar.
+
+**Root cause 3a — Miðbraut 1 fjölbýli birti bara eitt hit**: Fyrirspurnin hafði ekkert `ORDER BY`, svo PostgREST skilaði rows í arbitrary insertion-order (≈ fastnum asc fyrir gömul rows). `%Miðbraut 1%` ilike pattern matches líka Miðbraut 10/11/12/17/18/19. Með `LIMIT 8` birtust bara einingar með lægri fastnum (2067xxx-svæði) — #1's yngri einingar (2220441–2220444, bættar við HMS síðar) komust aldrei í fyrstu 8. Fix: `ORDER BY heimilisfang` collatar alphabetically svo "Miðbraut 1" < "Miðbraut 10" (styttra string með sömu prefix vinnur), og öll 6 Miðbraut 1 hits klessa saman efst. `LIMIT 15` er valið svo fjölbýli með <10 einingum taki ekki öll sæti fyrir aðra staði.
+
+**Root cause 3b — Sævargarðar 7 vantar alveg**: **Ekki bug í okkar kóða.** HMS Fasteignaskrá (raw `properties_v2.pkl`) inniheldur ekki Sævargarðar 7. Landnum-röð fer 117655→117660 (Sævargarðar 1-6), svo 117662 (Sævargarðar 8+10 sameiginlegir raðhús). Landnum 117661 vantar alveg upstream — líklega demólað, endurnúmerað eða ekki skráð enn. Sprint 3 `refresh_kaupskra.py` companion mun pick-a upp framtíðarskráningar.
+
+**Hypothesis B ruled out**: Autocomplete filter-ar bara á `is_residential = true` — engin prediction-háðsía. Eign getur birst í search áður en iter4 pred er computed.
+
+**Verify** (post-fix query): `ORDER BY heimilisfang, fastnum LIMIT 15` á `%Miðbraut 1%` skilar 6 Miðbraut 1 rows efst (5 Seltjarnarnes + 1 Búðardalur), svo Miðbraut 10/11/12/13. Matches expected coverage.
+
+---
+
 ## 2026-04-22 — Bug 2 fix: effective_date_latest replaces scraped_at_latest fyrir listing display
 
 **Hvað**: Ný DATE-column `properties.effective_date_latest` drífur "Nýleg auglýsing ([date])" á `/eign/[fastnum]`. Kemur frá `listings_v2.effective_date` (raunverulegur auglýsingardagur) en ekki `listings_v2.scraped_at` (pipeline-keyrslutími).
