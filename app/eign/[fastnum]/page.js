@@ -319,6 +319,7 @@ export default async function PropertyPage({ params, searchParams }) {
           <AttributionWaterfall
             attributions={attributions}
             predMean={prediction?.real_pred_mean}
+            showDebug={showDebug}
           />
         </section>
       )}
