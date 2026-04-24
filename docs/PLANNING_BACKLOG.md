@@ -51,6 +51,31 @@ Planning promptir skulu takast í þessari röð, ekki parallel:
 
 ---
 
+## Sprint 3 Áfangi 4.5 — Price map dashboard (v1.1, estimated 1-2 days)
+
+**Route**: new `/markadur/kort` in the `/markadur/*` family.
+
+**What**: €/m² choropleth heatmap for höfuðborgarsvæðið. For each postnr on SV-landi:
+- Run iter4 prediction for a 100 m² APT_STANDARD with average byggingarár for that postnr
+- Divide by 100 → €/m² anchor value
+- Render as a color-graded choropleth polygon per postnr
+
+**Interactions**: slider controls for `einflm` (floor area), `byggar` (building year), and `canonical_code` (APT_STANDARD / SFH_DETACHED / ROW_HOUSE). Re-render triggers a batch prediction for all postnr at the selected preset and re-paints the map.
+
+**Data**:
+- `predictions.predict_for_hypothetical` RPC or Edge Function that takes (postnr, einflm, byggar, canonical_code) and returns `real_pred_mean`. Wraps the iter4 scoring pipeline so we don't reimplement feature engineering in JS.
+- postnr geometry — reuse the same GeoJSON source we pick for Addendum 1 (Fasi E).
+
+**Caveats**:
+- Cold-start cost: 30+ postnr × one prediction each on slider move = meaningful latency unless we cache. Options: (a) precompute a grid of (postnr × size × byggingarår × seg) and store in a `price_map_precompute` table, (b) do server-side batch on-demand with short cache.
+- Privacy / misuse: €/m² published at postnr granularity is less sensitive than address-level, but worth a DECISIONS note before ship.
+
+**Planning prompt**: to be written by Danni after Sprint 2 launch (post-Fasi-E polish). Spec-doc should cover data-path choice (precompute vs on-demand), interaction budget, caveat copy, and integration with `/markadur` drill-down CTAs.
+
+**Timing**: v1.1, not blocking. Independent of Áfangi 0 scraper and Áfangar 5a/5b. Most valuable marketing asset after the core dashboard ships.
+
+---
+
 ## Sprint 3 Áfangi 0 — Scraper upgrade (top-priority per Bug 4 follow-up, 2026-04-22)
 
 **Why**: Bug 4 smoke-test leiddi í ljós að HMS Fasteignaskrá er ekki nægjanlega comprehensive source fyrir public search coverage. Sævargarðar 7 á Seltjarnarnesi (landnum 117661 vantar upstream), plus nýbyggingar sem hafa ekki fengið endanlegt fastnum úthlutað, plus eignir sem seldust pre-HMS-digital-era og aldrei síðan — allar þessar eignir skila "engin niðurstaða" á verdmat.is leit.
