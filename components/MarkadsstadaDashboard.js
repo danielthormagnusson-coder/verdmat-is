@@ -14,7 +14,11 @@ import {
 } from "recharts";
 import { formatSegment } from "@/lib/format";
 
-// Spec §4 — client orchestrator for slider + heat-map + above-list timeline.
+// DASHBOARD_SPEC_v1 §4 + Bug 6 methodology refinement (2026-04-24):
+//   * Primary display is quarterly per-cell regime (stable, long-window method).
+//   * Monthly toggle exposes the z_3v12-smoothed regime for advanced drill-down.
+//   * Per-cell sample-size fallback: if monthly n < 50, display falls back to
+//     the quarterly regime inline, with a "Ársfjórðungslegt" disclosure.
 
 const SEGMENTS = [
   "APT_FLOOR",
@@ -33,12 +37,12 @@ const REGION_LABEL = {
 };
 const MAIN_RESIDENTIAL = ["APT_FLOOR", "APT_STANDARD", "SFH_DETACHED", "ROW_HOUSE"];
 
-// Scrape-gap starts 2025-07 per STATE.md + DECISIONS.
 const GAP_START = "2025-07";
 
 function pillClass(bucket) {
   if (bucket === "hot") return "vm-badge-hot";
   if (bucket === "cold") return "vm-badge-cold";
+  if (bucket === "neutral") return "vm-badge-neutral";
   return "vm-badge-neutral";
 }
 function pillLabel(bucket) {
@@ -48,16 +52,26 @@ function pillLabel(bucket) {
   return "—";
 }
 
+function monthToQuarter(m) {
+  if (!m) return null;
+  const [y, mm] = m.split("-");
+  const q = Math.ceil(Number(mm) / 3);
+  return `${y}Q${q}`;
+}
 function formatMonth(m) {
-  // "YYYY-MM" → "MMM YYYY" (Icelandic short month)
   const months = ["jan","feb","mar","apr","maí","jún","júl","ágú","sep","okt","nóv","des"];
   if (!m) return "—";
   const [y, mm] = m.split("-");
   return `${months[Number(mm) - 1]} ${y}`;
 }
+function formatQuarter(q) {
+  if (!q) return "—";
+  const [y, qq] = q.split("Q");
+  const monthsInQ = { 1: "jan–mar", 2: "apr–jún", 3: "júl–sep", 4: "okt–des" };
+  return `${q} · ${monthsInQ[Number(qq)]} ${y}`;
+}
 
 function PoolMonthlyTimeline({ rows, selectedMonth, allMonths }) {
-  // rows shape: precomputed {month, pooled_rate} objects (one per distinct month)
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={rows} margin={{ top: 8, right: 24, bottom: 24, left: 0 }}>
@@ -115,13 +129,13 @@ function PoolMonthlyTimeline({ rows, selectedMonth, allMonths }) {
   );
 }
 
-function CellPopover({ cellRows, segment, region, onClose }) {
-  // Show last 12 months of above_list_rate for this cell as a mini chart.
-  const mini = cellRows.slice(-12).map((r) => ({
-    month: r.month,
-    rate: r.above_list_rate != null ? Number(r.above_list_rate) : null,
-  }));
-  const latest = cellRows[cellRows.length - 1];
+function CellPopover({ cellRows, segment, region, selectedMonth, mode, onClose }) {
+  // cellRows = all regime_per_cell_monthly rows for this cell (asc by month)
+  // + quarterlyByCell map — this component receives both.
+  const mini = cellRows
+    .slice(-12)
+    .map((r) => ({ month: r.month, rate: r.above_list_rate != null ? Number(r.above_list_rate) : null }));
+  const latestForMonth = cellRows.find((r) => r.month === selectedMonth) ?? cellRows[cellRows.length - 1];
   return (
     <div
       role="dialog"
@@ -131,7 +145,7 @@ function CellPopover({ cellRows, segment, region, onClose }) {
         top: "calc(100% + 6px)",
         left: 0,
         zIndex: 10,
-        minWidth: 240,
+        minWidth: 260,
         background: "var(--vm-surface-elevated)",
         border: "1px solid var(--vm-border-strong)",
         borderRadius: 6,
@@ -168,20 +182,41 @@ function CellPopover({ cellRows, segment, region, onClose }) {
       >
         {formatSegment(segment)} · {REGION_LABEL[region] || region}
       </p>
-      {latest ? (
-        <p style={{ fontSize: "0.8rem", color: "var(--vm-ink-muted)", margin: "0.35rem 0 0.5rem" }}>
-          <span className="tabular">
-            {(Number(latest.above_list_rate) * 100).toFixed(0)} %
-          </span>{" "}
-          yfirboð · median log-ratio{" "}
-          <span className="tabular">
-            {latest.median_month != null
-              ? Number(latest.median_month).toFixed(3).replace(".", ",")
-              : "—"}
-          </span>
-        </p>
+      {latestForMonth ? (
+        <>
+          <p
+            style={{
+              fontSize: "0.8rem",
+              color: "var(--vm-ink-muted)",
+              margin: "0.45rem 0 0.2rem",
+            }}
+          >
+            <strong style={{ color: "var(--vm-ink)" }}>
+              {pillLabel(
+                mode === "quarterly"
+                  ? latestForMonth.quarterly_regime
+                  : latestForMonth.display_regime,
+              )}
+            </strong>
+            {" · "}
+            {mode === "quarterly"
+              ? `ársfj. ${latestForMonth.quarterly_period ?? "—"} (n=${latestForMonth.quarterly_n_pairs ?? "—"})`
+              : latestForMonth.regime_source === "quarterly_fallback"
+              ? `fallback til ársfj. ${latestForMonth.quarterly_period ?? "—"} (n mán ${latestForMonth.n_month ?? "—"} < 50)`
+              : `smoothed z=${
+                  latestForMonth.z_3v12 != null
+                    ? Number(latestForMonth.z_3v12).toFixed(2).replace(".", ",")
+                    : "—"
+                } (n mán ${latestForMonth.n_month ?? "—"})`}
+          </p>
+          {latestForMonth.above_list_rate != null && (
+            <p style={{ fontSize: "0.78rem", color: "var(--vm-ink-muted)", margin: 0 }}>
+              Yfirboð: {(Number(latestForMonth.above_list_rate) * 100).toFixed(0)} %
+            </p>
+          )}
+        </>
       ) : null}
-      <div style={{ width: "100%", height: 80 }}>
+      <div style={{ width: "100%", height: 80, marginTop: "0.5rem" }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={mini} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
             <XAxis dataKey="month" hide />
@@ -198,7 +233,7 @@ function CellPopover({ cellRows, segment, region, onClose }) {
         </ResponsiveContainer>
       </div>
       <p style={{ fontSize: "0.7rem", color: "var(--vm-ink-faint)", margin: "0.35rem 0 0" }}>
-        12 mán. Yfirboð
+        12 mán. yfirboð
       </p>
       <Link
         href={`/markadur/visitala#${segment}.${region}`}
@@ -210,8 +245,39 @@ function CellPopover({ cellRows, segment, region, onClose }) {
   );
 }
 
+function ModeToggle({ value, onChange }) {
+  const Btn = ({ v, label }) => (
+    <button
+      type="button"
+      onClick={() => onChange(v)}
+      aria-pressed={value === v}
+      style={{
+        padding: "0.35rem 0.85rem",
+        border: "1px solid var(--vm-border-strong)",
+        borderLeftWidth: v === "quarterly" ? 1 : 0,
+        background: value === v ? "var(--vm-primary)" : "var(--vm-surface)",
+        color: value === v ? "var(--vm-surface)" : "var(--vm-ink-muted)",
+        fontSize: "0.82rem",
+        cursor: "pointer",
+        borderRadius: v === "quarterly" ? "4px 0 0 4px" : "0 4px 4px 0",
+        fontFamily: "var(--font-body)",
+        fontWeight: 500,
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div role="group" aria-label="Tímaupplausn">
+      <Btn v="quarterly" label="Ársfjórðungslegt" />
+      <Btn v="monthly" label="Mánaðarlegt (smoothed)" />
+    </div>
+  );
+}
+
 export default function MarkadsstadaDashboard({ monthlyRows }) {
-  // monthlyRows: raw rows from ats_dashboard_monthly_heat (2501 rows)
+  // monthlyRows: rows from regime_per_cell_monthly view. Contains raw_regime,
+  // smoothed_regime, quarterly_regime, display_regime, regime_source.
 
   const allMonths = useMemo(
     () => Array.from(new Set(monthlyRows.map((r) => r.month))).sort(),
@@ -219,9 +285,9 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
   );
   const latestMonth = allMonths[allMonths.length - 1];
   const [selectedMonth, setSelectedMonth] = useState(latestMonth || "");
-  const [openCell, setOpenCell] = useState(null); // "seg|region"
+  const [mode, setMode] = useState("quarterly"); // default per Bug 6 fix
+  const [openCell, setOpenCell] = useState(null);
 
-  // Pre-index rows: by (seg|region) sorted asc, and by month for grid lookup.
   const byCell = useMemo(() => {
     const m = new Map();
     for (const r of monthlyRows) {
@@ -235,7 +301,6 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
 
   const cellAt = (seg, reg, month) => {
     const arr = byCell.get(`${seg}|${reg}`) || [];
-    // Latest row at or before month.
     let best = null;
     for (const r of arr) {
       if (r.month <= month) best = r;
@@ -244,7 +309,6 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
     return best;
   };
 
-  // Above-list pooled monthly — precomputed across main residential cells.
   const pooledAboveList = useMemo(() => {
     const m = new Map();
     for (const r of monthlyRows) {
@@ -264,12 +328,17 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
       .sort((a, b) => a.month.localeCompare(b.month));
   }, [monthlyRows]);
 
+  const selectedQuarter = monthToQuarter(selectedMonth);
   const inGap = selectedMonth >= GAP_START;
   const monthIndex = allMonths.indexOf(selectedMonth);
+  const headerDate =
+    mode === "quarterly"
+      ? formatQuarter(selectedQuarter)
+      : formatMonth(selectedMonth);
 
   return (
     <>
-      {/* Slider */}
+      {/* Slider + mode toggle */}
       <section
         className="vm-card"
         style={{ marginBottom: "1.5rem", padding: "1.25rem 1.5rem" }}
@@ -280,17 +349,19 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
             justifyContent: "space-between",
             alignItems: "baseline",
             marginBottom: "0.5rem",
+            gap: "1rem",
+            flexWrap: "wrap",
           }}
         >
           <span style={{ fontSize: "0.8rem", color: "var(--vm-ink-muted)", fontWeight: 600 }}>
             Tímabil
           </span>
+          <ModeToggle value={mode} onChange={setMode} />
           <span className="tabular" style={{ fontSize: "0.95rem", color: "var(--vm-ink)" }}>
-            {formatMonth(selectedMonth)}
+            {headerDate}
           </span>
         </div>
         <div style={{ position: "relative" }}>
-          {/* Yellow-hatched overlay for the gap window */}
           <div
             aria-hidden
             style={{
@@ -311,7 +382,7 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
             max={Math.max(allMonths.length - 1, 0)}
             value={Math.max(monthIndex, 0)}
             onChange={(e) => setSelectedMonth(allMonths[Number(e.target.value)])}
-            aria-label="Veldu mánuð"
+            aria-label="Veldu tímabil"
             style={{
               width: "100%",
               position: "relative",
@@ -341,9 +412,20 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
 
       {/* Heat-map grid */}
       <section style={{ marginBottom: "2rem" }}>
-        <h2 className="display" style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>
-          Ástand per {formatMonth(selectedMonth)}
+        <h2 className="display" style={{ fontSize: "1.25rem", marginBottom: "0.25rem" }}>
+          Ástand per {headerDate}
         </h2>
+        <p
+          style={{
+            fontSize: "0.82rem",
+            color: "var(--vm-ink-muted)",
+            margin: "0 0 0.75rem",
+          }}
+        >
+          {mode === "quarterly"
+            ? "Ársfjórðungsleg regime-lesning — stöðugri fyrir lítil segment."
+            : "Mánaðarlegt smoothed regime (z₃v₁₂ ± 0,5). Reiti með n < 50 eru birt sem ársfjórðungsleg fallback."}
+        </p>
         <div
           style={{
             overflowX: "auto",
@@ -361,30 +443,9 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
           >
             <thead>
               <tr style={{ background: "var(--vm-surface)" }}>
-                <th
-                  style={{
-                    padding: "0.6rem 0.85rem",
-                    textAlign: "left",
-                    fontWeight: 600,
-                    color: "var(--vm-ink-muted)",
-                    fontSize: "0.75rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                />
+                <th style={thStyle} />
                 {REGIONS.map((r) => (
-                  <th
-                    key={r}
-                    style={{
-                      padding: "0.6rem 0.85rem",
-                      textAlign: "left",
-                      fontWeight: 600,
-                      color: "var(--vm-ink-muted)",
-                      fontSize: "0.75rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
+                  <th key={r} style={thStyle}>
                     {REGION_LABEL[r]}
                   </th>
                 ))}
@@ -407,7 +468,13 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
                   </td>
                   {REGIONS.map((reg) => {
                     const r = cellAt(seg, reg, selectedMonth);
-                    const bucket = r?.heat_bucket;
+                    const bucket =
+                      mode === "quarterly"
+                        ? r?.quarterly_regime
+                        : r?.display_regime;
+                    const isFallback =
+                      mode === "monthly" &&
+                      r?.regime_source === "quarterly_fallback";
                     const key = `${seg}|${reg}`;
                     const isOpen = openCell === key;
                     return (
@@ -437,16 +504,18 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
                         >
                           {pillLabel(bucket)}
                         </button>
-                        {r && r.n_month != null && r.n_month < 10 && (
+                        {isFallback && bucket && (
                           <span
+                            title={"Mánaðartölur eru ekki áreiðanlegar fyrir þetta segment (n<50). Sýnir ársfjórðungslegt mat í staðinn."}
                             style={{
                               display: "inline-block",
                               marginLeft: "0.35rem",
-                              fontSize: "0.7rem",
+                              fontSize: "0.68rem",
                               color: "var(--vm-ink-faint)",
+                              fontStyle: "italic",
                             }}
                           >
-                            (small n)
+                            ársfj.
                           </span>
                         )}
                         {isOpen && r && (
@@ -454,6 +523,8 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
                             cellRows={byCell.get(key) || []}
                             segment={seg}
                             region={reg}
+                            selectedMonth={selectedMonth}
+                            mode={mode}
                             onClose={() => setOpenCell(null)}
                           />
                         )}
@@ -473,7 +544,9 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
           Yfirboð yfir tíma
         </h2>
         <p style={{ fontSize: "0.85rem", color: "var(--vm-ink-muted)", marginBottom: "0.75rem" }}>
-          Pooled yfir main residential cells — blá lína bendir á valið tímabil.
+          Pooled yfir main residential cells. Gögn enda{" "}
+          {allMonths.length ? formatMonth(allMonths[allMonths.length - 1]) : "—"} vegna
+          scrape-gap frá júlí 2025 — gula borðið hér að neðan markar gap-tímabilið.
         </p>
         <PoolMonthlyTimeline
           rows={pooledAboveList}
@@ -484,3 +557,13 @@ export default function MarkadsstadaDashboard({ monthlyRows }) {
     </>
   );
 }
+
+const thStyle = {
+  padding: "0.6rem 0.85rem",
+  textAlign: "left",
+  fontWeight: 600,
+  color: "var(--vm-ink-muted)",
+  fontSize: "0.75rem",
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+};

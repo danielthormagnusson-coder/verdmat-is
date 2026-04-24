@@ -1,6 +1,6 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 22. apríl 2026 (Sprint 2 Áfangi 4 Fasi A+B+C1+C2 LOKIÐ í production. Fimm mid-flight bug-fixes: Bug 1 regime pill, Bug 2 `effective_date_latest`, Bug 3 autocomplete ORDER BY, Bug 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, Bug 5 expand-query missing-column regression. Launch strategy Leið B locked: ship dashboard með HMS-gap acknowledgement, scraper er Sprint 3 top-priority. Fasi C-3 og C-4 næst.)
+**Síðast uppfært:** 24. apríl 2026 (Sprint 2 Áfangi 4 Fasi A+B+C LOKIÐ í production — allir fjórir drill-downs live. Sex mid-flight bug-fixes: Bug 1 regime pill, Bug 2 `effective_date_latest`, Bug 3 autocomplete ORDER BY, Bug 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, Bug 5 expand-query missing-column regression, Bug 6 quarterly/smoothed-monthly regime methodology + ats_lookup_by_quarter import. Launch strategy Leið B locked: ship dashboard með HMS-gap acknowledgement, scraper er Sprint 3 top-priority. Fasi D waterfall fix og Fasi E launch polish næst.)
 
 **Verkefnisstaða heildar: ~82%**
 

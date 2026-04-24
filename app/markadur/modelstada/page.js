@@ -196,6 +196,59 @@ export default async function ModelstadaPage() {
       <SegmentTable segments={history} />
       <PipelineHealthPanel health={health} />
 
+      <section
+        className="vm-card"
+        style={{ marginBottom: "1.5rem" }}
+      >
+        <p
+          style={{
+            fontSize: "0.75rem",
+            color: "var(--vm-ink-faint)",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            margin: 0,
+          }}
+        >
+          Aðferðafræði markaðsstöðu
+        </p>
+        <p
+          style={{
+            fontSize: "0.9rem",
+            color: "var(--vm-ink-muted)",
+            lineHeight: 1.55,
+            margin: "0.6rem 0 0.35rem",
+          }}
+        >
+          Markaðsstaða er reiknuð á tvo vegu:
+        </p>
+        <ul
+          style={{
+            fontSize: "0.9rem",
+            color: "var(--vm-ink-muted)",
+            lineHeight: 1.55,
+            margin: 0,
+            paddingLeft: "1.25rem",
+          }}
+        >
+          <li style={{ marginBottom: "0.45rem" }}>
+            <strong style={{ color: "var(--vm-ink)" }}>Ársfjórðungslega:</strong>{" "}
+            samanburður við sögulegar percentile tölur síðustu 20 ára (p33/p67
+            per segment × svæði). Stable fyrir langtíma trend.
+          </li>
+          <li>
+            <strong style={{ color: "var(--vm-ink)" }}>
+              Mánaðarlega (smoothed):
+            </strong>{" "}
+            samanburður við rolling 12-mán baseline (z<sub>3v12</sub>{" "}
+            ± 0,5 þröskuldur). Responsive fyrir nýlegar breytingar en krefst{" "}
+            <span className="tabular">n ≥ 50</span> sölu í mánuðinum fyrir
+            áreiðanleika. Ef sample er of lítið, fall-ar kerfið til
+            ársfjórðungslegrar tölu.
+          </li>
+        </ul>
+      </section>
+
       <p
         style={{
           marginTop: "1.5rem",

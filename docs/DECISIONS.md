@@ -4,6 +4,43 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-24 — Bug 6 + smoothing refinement: asymmetric monthly/quarterly regime methodology on /markadsstada
+
+**Hvað**: `/markadur/markadsstada` skiptir um regime-source logic:
+- **Default view**: ársfjórðungslegt per-cell regime úr nýju `ats_lookup_by_quarter` töflunni (913 rows; derived úr Áfanga 7 `build_ats_lookup.py` step 6, en ekki importað í Supabase fyrr en núna). Stöðugri fyrir langtíma trend.
+- **Monthly (smoothed) drill-down**: z₃v₁₂ ± 0,5 þröskuldur á `ats_dashboard_monthly_heat`. Responsive fyrir nýlegar breytingar.
+- **Per-cell fallback**: ef `n_month < 50` OR `z_3v12 IS NULL` í selected month, displayed regime fellur til ársfjórðungslegu heat_bucket, með "ársfj." disclosure label á pill + popover tooltip copy.
+
+Slider heldur sama formi (velur mánuð); data-source breytist eftir mode. Methodology paragraph bætist á `/markadur/modelstada` fjórðu card-ið til að útskýra asymmetry.
+
+**Root causes**:
+1. **Stale data display** — bæði monthly heat og quarterly table eru derived úr `paired_fresh` subset sem ekki inniheldur `in_scrape_gap=True` rows (per build_ats_lookup.py step 1). Max month er 2025-06 fyrir báðar tables (quarterly = 2025Q2). Monthly default birti user-um 2025-06 sem "núverandi", sem er misleading; quarterly 2025Q2 er sama date-reach en með pooled 3 mán → fewer flips. Full recency (2025-Q3+) krefst Sprint 3 scraper.
+2. **Month-to-month flip-flop** — thin-sample cells (t.d. SFH_DETACHED × Capital_sub með avg n=15/mán) sýndu 17 raw-regime-flips á 24 mánuðum vegna sampling noise. 3-mo smoothing dregur þetta niður í ~9 flips (still noisy), en quarterly fallback við n<50 dregur það niður í 0 spurious flips (quarter heat_bucket er stable per quarter). Matches user expectation.
+
+**Methodology asymmetry — rökstuðningur**:
+- Monthly regime = z₃v₁₂ ± 0,5 (current-relative): user mental model "er markaðurinn heitur **núna**?" kallar á samanburð við rolling 12-mán baseline. z-score er zero-mean og scale-free → sama þröskuldur fyrir öll segment.
+- Quarterly regime = median_log_ratio vs p33/p67 (historical-relative): fyrir langtíma trend þarf fixed reference frame. Áfangi 7 byggði p33/p67 á whole-sample quarterly medians; að endurnýta það fyrir quarterly view tryggir consistency með scoring table B.
+- Mismunandi tímaupplausnir kalla á mismunandi referansaramma. Þetta er ekki bug heldur by-design.
+
+**Threshold choice**:
+- **Smoothed ± 0,5 SD**: ~38 % af z-scores fyrir normal distribution falla utan |z|>0,5, sem passar við "notable shift from 12-mo baseline" án að vera of sensitive. ±1,0 væri of strict (fáir flaggaðir hot/cold); ±0,3 væri of loose (flip-flop á normal variation).
+- **Fallback n<50**: matchar Áfanga 6 `MIN_PAIRS_PER_CELL=50` all-time inclusion filter og Áfanga 7 Table B `TABLE_B_MIN_N=10` per-bucket threshold — consistent með existing pipeline methodology. Under 50 pairs per month er too thin fyrir stabilan z-score (CI ±15 pp á above-list rate).
+
+**Implementation path** (hybrid upstream/downstream per Danni confirmation 2026-04-24):
+1. Upstream: import `ats_lookup_by_quarter.csv` (913 rows, ~90 KB) í new Supabase table. One-time data load; build script unchanged.
+2. Upstream: new SQL view `regime_per_cell_monthly` — join-ar monthly heat við quarterly lookup, emitterar `raw_regime / smoothed_regime / quarterly_regime / display_regime / regime_source` columns í einni fetch. Engin materialization; view-time CASE computation.
+3. Downstream: `MarkadsstadaDashboard.js` mode toggle (quarterly default / monthly drill-down), fallback disclosure label, tooltip copy update.
+
+**Flip-frequency verify (2024-07 → 2025-06, 24 mán)**:
+- APT_STANDARD × RVK_core (avg n=82): raw 4 flips → smoothed (display) 2 flips. One clean regime transition Jan 2025 (hot→cold).
+- SFH_DETACHED × Capital_sub (avg n=15, all 24 months fallback): raw 17 flips → display regime follows quarterly (~2 flips over 24 months matching 2024Q4 hot → 2025Q1 neutral → 2025Q2 hot transitions).
+
+**Timeline yfirboð-chart**: augar scrape-gap (2025-07→latest) með yellow ReferenceArea + caveat "Gögn enda {latest month} vegna scrape-gap frá júlí 2025". Fully transparent.
+
+**Methodology statement** á `/modelstada` pipeline health card: útskýrir tvennar tímaupplausnir svo pro-users skilji af hverju pill fyrir sömu (seg × reg) cell er kannski mismunandi milli quarterly view og monthly drill-down.
+
+---
+
 ## 2026-04-22 — Bug 5 fix: expand Step 2 requested non-existent `merking` column
 
 **Hvað**: Bug 4's expand-path (SearchAutocomplete.js → Step 2 unit list) select-ar `merking` column sem er ekki til í Supabase `properties` tafla. PostgREST skilaði `42703: column properties.merking does not exist`; client-kóðinn ate error silently með `(data || [])` pattern og renderaði "Engar einingar tilheyra þessu heimilisfangi" fyrir hverja multi-unit address. Regression á allri Bug 4 UX — Miðbraut 1 Seltjarnarnes, Egilsgata 10, Bakkastígur, öll multi-unit-address matches broken.

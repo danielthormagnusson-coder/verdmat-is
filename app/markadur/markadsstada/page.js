@@ -19,20 +19,30 @@ export const metadata = {
 };
 
 async function fetchMonthlyHeat() {
+  // Reads the regime_per_cell_monthly view so the client gets raw, smoothed,
+  // quarterly, display regime, and the regime_source label in one round-trip.
+  // See migration 20260424_ats_lookup_by_quarter_and_regime_view.sql.
   const pageSize = 1000;
   let all = [];
   for (let from = 0; from < 10000; from += pageSize) {
     const to = from + pageSize - 1;
     const { data, error } = await supabase
-      .from("ats_dashboard_monthly_heat")
+      .from("regime_per_cell_monthly")
       .select(
-        "canonical_code, region_tier, month, n_month, median_month, above_list_rate, heat_bucket, z_3v12",
+        "canonical_code, region_tier, month, n_month, median_month, " +
+          "above_list_rate, z_3v12, raw_regime, smoothed_regime, " +
+          "quarterly_regime, quarterly_n_pairs, quarterly_period, " +
+          "quarterly_data_quality, display_regime, regime_source",
       )
       .order("canonical_code", { ascending: true })
       .order("region_tier", { ascending: true })
       .order("month", { ascending: true })
       .range(from, to);
-    if (error || !data || data.length === 0) break;
+    if (error) {
+      console.error("[markadsstada] regime view fetch failed", error);
+      break;
+    }
+    if (!data || data.length === 0) break;
     all = all.concat(data);
     if (data.length < pageSize) break;
   }
