@@ -146,12 +146,27 @@ export default async function IbudirPage() {
           fontSize: "0.85rem",
           color: "var(--vm-ink-faint)",
           maxWidth: 720,
-          marginBottom: "2.5rem",
+          marginBottom: "1.25rem",
         }}
       >
         Byggt á AI-greiningu á 37.544 sölulýsingum úr íslenskum
         fasteignaauglýsingum 2006–2025. Metric 5 (orðatíðni) er áformuð í
         v1.1 uppfærslu.
+      </p>
+      <p
+        style={{
+          fontSize: "0.85rem",
+          color: "var(--vm-ink-muted)",
+          maxWidth: 720,
+          marginBottom: "2.5rem",
+          lineHeight: 1.55,
+        }}
+      >
+        Aðstæður endurspegla mismunandi sample sizes per segment. Íbúð
+        (sameinað fjölbýli + íbúðir á hæð) er fjölmennsta segmentið og því
+        nær lengra fram í tímann. Raðhús og einbýli eru lágvolumi á íslenska
+        markaðnum og endast fyrr í charts vegna takmörkunar á paired sales
+        eftir júlí 2025 (scrape-gap).
       </p>
 
       <Section

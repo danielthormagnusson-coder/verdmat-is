@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/search?q=warm",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

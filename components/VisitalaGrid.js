@@ -140,12 +140,28 @@ function ChartTooltip({ active, payload, label, segment, region, mode }) {
   );
 }
 
+// Bug 12 fix (2026-04-27): some cells (e.g. APT_BASEMENT × RVK_core) take a
+// sharp cliff in the most recent quarter because n_pairs_in_period drops to
+// 1-3 paired sales after the scrape gap, and a single outlier resale can
+// move the BMN index 50 % in one step. Drop the index value (set null) when
+// n_pairs_in_period < MIN_N_PAIRS so the line ends cleanly before the cliff
+// rather than spiking.
+const MIN_N_PAIRS = 10;
+function pruneThinPoints(rows, dataKey) {
+  return rows.map((r) =>
+    r.n_pairs_in_period != null && Number(r.n_pairs_in_period) < MIN_N_PAIRS
+      ? { ...r, [dataKey]: null }
+      : r,
+  );
+}
+
 function SubChart({ segment, region, rows, mode }) {
   const insufficient = insufficientCell(rows);
   const band = crashBandStyle(currentQuality(rows));
   const color = SEGMENT_COLOR[segment] || "var(--vm-ink-muted)";
   const dataKey = mode === "real" ? "index_value_real" : "index_value_nominal";
-  const currentIdx = latestIndex(rows, dataKey);
+  const prunedRows = pruneThinPoints(rows, dataKey);
+  const currentIdx = latestIndex(prunedRows, dataKey);
 
   return (
     <div
@@ -176,7 +192,7 @@ function SubChart({ segment, region, rows, mode }) {
       </div>
       <div style={{ width: "100%", height: 130 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows} margin={{ top: 2, right: 6, bottom: 16, left: 0 }}>
+          <LineChart data={prunedRows} margin={{ top: 2, right: 6, bottom: 16, left: 0 }}>
             <XAxis
               dataKey="period"
               ticks={["2006Q2", "2015Q1", "2026Q2"]}
@@ -335,6 +351,19 @@ export default function VisitalaGrid({ allRows }) {
           81 ársfjórðungar · {fittedCells.fitted}/{fittedCells.total} reitir pöruðir
         </span>
       </div>
+
+      <p
+        style={{
+          fontSize: "0.78rem",
+          color: "var(--vm-ink-faint)",
+          fontStyle: "italic",
+          margin: "0 0 0.85rem",
+          maxWidth: 760,
+        }}
+      >
+        Punktum sleppt þar sem n &lt; 10 paired sales (þunn ársfjórðungs-gögn í
+        scrape-gap eða lágvolumi-segmentum).
+      </p>
 
       <div
         style={{

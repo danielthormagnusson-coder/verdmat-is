@@ -49,6 +49,7 @@ export default function PhotoGallery({ photos, title }) {
           style={{ objectFit: "cover" }}
           unoptimized
           priority
+          fetchPriority="high"
         />
       </div>
       {safe.length > 1 && (
