@@ -1,0 +1,206 @@
+{
+  "metric": "pct_unregistered_space_sqm_gt5",
+  "description": "Hlutfall sölulýsinga 2018+ þar sem unregistered_space_sqm > 5",
+  "computed_at": "2026-04-27T09:42:36.377995+00:00Z",
+  "min_n_threshold": 20,
+  "data": [
+    {
+      "postnr": 101,
+      "heiti": "Reykjavík (miðbær)",
+      "lat": 64.14613,
+      "lng": -21.93778,
+      "n": 415,
+      "n_qual": 46,
+      "pct": 11.1
+    },
+    {
+      "postnr": 102,
+      "heiti": "Reykjavík (miðbær)",
+      "lat": 64.13183,
+      "lng": -21.94546,
+      "n": 54,
+      "n_qual": 6,
+      "pct": 11.1
+    },
+    {
+      "postnr": 103,
+      "heiti": "Reykjavík (Hlíðar)",
+      "lat": 64.12709,
+      "lng": -21.89248,
+      "n": 85,
+      "n_qual": 4,
+      "pct": 4.7
+    },
+    {
+      "postnr": 104,
+      "heiti": "Reykjavík (Laugardalur)",
+      "lat": 64.13875,
+      "lng": -21.85815,
+      "n": 172,
+      "n_qual": 34,
+      "pct": 19.8
+    },
+    {
+      "postnr": 105,
+      "heiti": "Reykjavík (Háaleiti)",
+      "lat": 64.13955,
+      "lng": -21.90248,
+      "n": 405,
+      "n_qual": 53,
+      "pct": 13.1
+    },
+    {
+      "postnr": 107,
+      "heiti": "Reykjavík (Vesturbær)",
+      "lat": 64.14427,
+      "lng": -21.96412,
+      "n": 156,
+      "n_qual": 24,
+      "pct": 15.4
+    },
+    {
+      "postnr": 108,
+      "heiti": "Reykjavík (Háaleiti)",
+      "lat": 64.12503,
+      "lng": -21.87196,
+      "n": 178,
+      "n_qual": 32,
+      "pct": 18.0
+    },
+    {
+      "postnr": 109,
+      "heiti": "Reykjavík (Breiðholt)",
+      "lat": 64.10065,
+      "lng": -21.83897,
+      "n": 196,
+      "n_qual": 56,
+      "pct": 28.6
+    },
+    {
+      "postnr": 110,
+      "heiti": "Reykjavík (Árbær)",
+      "lat": 64.11449,
+      "lng": -21.79913,
+      "n": 227,
+      "n_qual": 36,
+      "pct": 15.9
+    },
+    {
+      "postnr": 111,
+      "heiti": "Reykjavík (Breiðholt)",
+      "lat": 64.10514,
+      "lng": -21.81664,
+      "n": 103,
+      "n_qual": 11,
+      "pct": 10.7
+    },
+    {
+      "postnr": 112,
+      "heiti": "Reykjavík (Grafarvogur)",
+      "lat": 64.14378,
+      "lng": -21.79101,
+      "n": 235,
+      "n_qual": 25,
+      "pct": 10.6
+    },
+    {
+      "postnr": 113,
+      "heiti": "Reykjavík (Grafarholt)",
+      "lat": 64.13003,
+      "lng": -21.74402,
+      "n": 117,
+      "n_qual": 5,
+      "pct": 4.3
+    },
+    {
+      "postnr": 170,
+      "heiti": "Seltjarnarnes",
+      "lat": 64.15338,
+      "lng": -21.99411,
+      "n": 78,
+      "n_qual": 17,
+      "pct": 21.8
+    },
+    {
+      "postnr": 200,
+      "heiti": "Kópavogur",
+      "lat": 64.11151,
+      "lng": -21.8949,
+      "n": 233,
+      "n_qual": 44,
+      "pct": 18.9
+    },
+    {
+      "postnr": 201,
+      "heiti": "Kópavogur",
+      "lat": 64.09791,
+      "lng": -21.87227,
+      "n": 186,
+      "n_qual": 9,
+      "pct": 4.8
+    },
+    {
+      "postnr": 203,
+      "heiti": "Kópavogur",
+      "lat": 64.08726,
+      "lng": -21.8189,
+      "n": 101,
+      "n_qual": 6,
+      "pct": 5.9
+    },
+    {
+      "postnr": 210,
+      "heiti": "Garðabær",
+      "lat": 64.08759,
+      "lng": -21.9156,
+      "n": 331,
+      "n_qual": 37,
+      "pct": 11.2
+    },
+    {
+      "postnr": 220,
+      "heiti": "Hafnarfjörður",
+      "lat": 64.06816,
+      "lng": -21.95927,
+      "n": 332,
+      "n_qual": 54,
+      "pct": 16.3
+    },
+    {
+      "postnr": 221,
+      "heiti": "Hafnarfjörður",
+      "lat": 64.04783,
+      "lng": -21.96286,
+      "n": 248,
+      "n_qual": 19,
+      "pct": 7.7
+    },
+    {
+      "postnr": 225,
+      "heiti": "Garðabær (Álftanes)",
+      "lat": 64.1048,
+      "lng": -22.0192,
+      "n": 27,
+      "n_qual": 4,
+      "pct": 14.8
+    },
+    {
+      "postnr": 270,
+      "heiti": "Mosfellsbær",
+      "lat": 64.16902,
+      "lng": -21.69299,
+      "n": 128,
+      "n_qual": 22,
+      "pct": 17.2
+    },
+    {
+      "postnr": 276,
+      "heiti": "Mosfellsdalur",
+      "lat": 64.31579,
+      "lng": -21.58715,
+      "n": 23,
+      "n_qual": 10,
+      "pct": 43.5
+    }
+  ]
+}

@@ -9,6 +9,7 @@ export const metadata = {
   title: "Raunverðs vísitala — Fasteignaverð á Íslandi 2006–2026",
   description:
     "Paired-resale vísitala fyrir íslenska fasteignamarkaðinn eftir segmenti og svæði. Raunverð vs nominal 2006Q2–nú.",
+  alternates: { canonical: "https://verdmat-is.vercel.app/markadur/visitala" },
   openGraph: {
     title: "Raunverðs vísitala — Verdmat",
     description:

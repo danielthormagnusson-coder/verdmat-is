@@ -51,6 +51,26 @@ Planning promptir skulu takast í þessari röð, ekki parallel:
 
 ---
 
+## Sprint 3 Áfangi 4.6 — New-build share tracker (v1.1, estimated half-day, post-Bug-7 follow-up)
+
+**Where**: 7th metric on `/markadur/ibudir` (next to Endurnýjunartíðni so the two read in tandem — high new-build share explains why renovation rate dips even when absolute renovations rise; surfaced during Bug 7 fix discussion 2026-04-27).
+
+**What**: Share of arm's-length sales per ársfjórðung × region where the property is flagged as new-build.
+
+**Implementation**:
+- Source: `pairs_v1.pkl` filtered to arm's-length paired sales
+- Dedup on `fastnum` (count each fastnum once per quarter to avoid double-counting flips)
+- `new_build_pct = N(is_new_build=true) / N(total)` per (ársfjórðung × region_tier)
+- Output: new Supabase table `new_build_share_quarterly` (ár, ársfjórðungur, region_tier, n_new, n_total, pct_new) — fits the existing monthly orchestrator pattern
+- Render: stacked area or 3-line chart (Höfuðborg / Suðurnes / Landsbyggð) OR aggregate single line, decided at planning
+- Editorial framing: byggingariðnaðar pipeline indicator, peaks í 2022-2024
+
+**Why useful**: explains the renovation-rate dilution Bug 7 surfaced. Also marketing-relevant standalone metric — building permits and new-build absorption is reported regularly by Hagstofa but never visualised at this granularity for the public.
+
+**Planning prompt**: written by Danni after Sprint 2 launch.
+
+---
+
 ## Sprint 3 Áfangi 4.5 — Price map dashboard (v1.1, estimated 1-2 days)
 
 **Route**: new `/markadur/kort` in the `/markadur/*` family.

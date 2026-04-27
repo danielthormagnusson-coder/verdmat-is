@@ -347,8 +347,10 @@ export default function VisitalaGrid({ allRows }) {
           background: "var(--vm-surface-elevated)",
         }}
       >
-        {/* Header row of region labels */}
+        {/* Header row of region labels — hidden on narrow viewports because
+            the row collapses to single-column there. */}
         <div
+          className="vm-visitala-row vm-visitala-header"
           style={{
             display: "grid",
             gridTemplateColumns: "200px repeat(3, 1fr)",
@@ -370,6 +372,7 @@ export default function VisitalaGrid({ allRows }) {
         {rows.map((seg, i) => (
           <div
             key={`${seg}-${i}`}
+            className="vm-visitala-row"
             style={{
               display: "grid",
               gridTemplateColumns: "200px repeat(3, 1fr)",

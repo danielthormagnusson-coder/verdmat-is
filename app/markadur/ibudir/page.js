@@ -7,6 +7,7 @@ import {
   SerlodSmallMultiples,
   FramingStackedArea,
 } from "@/components/IbudirCharts";
+import UnregisteredSpaceMapClient from "@/components/UnregisteredSpaceMapClient";
 
 export const revalidate = 600;
 
@@ -14,6 +15,7 @@ export const metadata = {
   title: "Íbúðaástand á Íslandi — AI-greining á 37.544 sölulýsingum",
   description:
     "Ástandsvísitala, endurnýjunartíðni, óskráð rými, sérlóðir og agent-framing yfir 20 ára tímabil. Gögn úr AI-greiningu á lýsingum úr íslenskum fasteignaauglýsingum.",
+  alternates: { canonical: "https://verdmat-is.vercel.app/markadur/ibudir" },
   openGraph: {
     title: "Íbúðaástand á Íslandi — Verdmat",
     description:
@@ -170,6 +172,20 @@ export default async function IbudirPage() {
         callout="Key callout (TBD): benda á peak-ár + samhengi við regime cycle."
       >
         <RenovationChart pooled={pooled} />
+        <p
+          style={{
+            fontSize: "0.85rem",
+            color: "var(--vm-ink-muted)",
+            lineHeight: 1.55,
+            marginTop: "0.85rem",
+            maxWidth: 760,
+          }}
+        >
+          Hlutfall miðar við endurbættar eldri eignir. Nýbyggingar teljast ekki
+          sem „endurnýjaðar" í þessari greiningu, svo aukin nýbygginga-bylgja
+          getur dregið hlutfall niður jafnvel þegar absolute fjöldi endurbóta
+          vex.
+        </p>
       </Section>
 
       <Section
@@ -180,6 +196,31 @@ export default async function IbudirPage() {
         callout="Key callout (TBD): staðfesta SFH_DETACHED Country hlutfall með raun-tölu þegar v1.1 editorial drög eru skrifuð."
       >
         <UnregisteredBarChart perRegion={perRegion} />
+
+        <div style={{ marginTop: "1.75rem" }}>
+          <h3
+            className="display"
+            style={{ fontSize: "1.05rem", margin: "0 0 0.4rem" }}
+          >
+            Höfuðborgarsvæðið — per póstnúmer
+          </h3>
+          <UnregisteredSpaceMapClient />
+          <p
+            style={{
+              fontSize: "0.82rem",
+              color: "var(--vm-ink-muted)",
+              lineHeight: 1.55,
+              marginTop: "0.6rem",
+              maxWidth: 760,
+            }}
+          >
+            Hringir sýna meðaltal hlutfalls auglýsinga með óskráð rými stærra
+            en 5 m² á hverju póstnúmeri. Stærð hringsins endurspeglar fjölda
+            auglýsinga sem flokkun byggir á (n). Eldri hverfi með
+            kjallari-conversions sem ekki eru vitnaðar í lýsingu eru því
+            undertöld — þetta er lágmark, ekki hámark.
+          </p>
+        </div>
       </Section>
 
       <Section

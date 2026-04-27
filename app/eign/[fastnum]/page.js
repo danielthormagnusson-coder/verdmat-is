@@ -28,9 +28,18 @@ export async function generateMetadata({ params }) {
     .eq("fastnum", fastnum)
     .maybeSingle();
   if (!data) return { title: "Eign ekki fundin — verdmat.is" };
+  const title = `${data.heimilisfang}, ${data.postnr} ${data.postheiti} — verdmat.is`;
+  const description = `AI-verðmat fyrir ${data.heimilisfang} (${formatSegment(data.canonical_code)}) byggt á þinglýstum kaupsamningum.`;
   return {
-    title: `${data.heimilisfang}, ${data.postnr} ${data.postheiti} — verdmat.is`,
-    description: `AI-verðmat fyrir ${data.heimilisfang} (${formatSegment(data.canonical_code)}) byggt á þinglýstum kaupsamningum.`,
+    title,
+    description,
+    alternates: { canonical: `https://verdmat-is.vercel.app/eign/${fastnum}` },
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      locale: "is_IS",
+    },
   };
 }
 

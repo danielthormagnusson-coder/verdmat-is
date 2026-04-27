@@ -19,6 +19,16 @@ import { formatSegment } from "@/lib/format";
 
 // DASHBOARD_SPEC_v1 §5 — five LLM-derived aggregate charts. Metric 5
 // (orðatíðni) is deferred to v1.1 per §5.1; this file ships the other five.
+//
+// Bug 7 fix (2026-04-27): all per-(segment × quarter) aggregates drop cells
+// where the metric's denominator is below MIN_N_PER_CELL. Without this,
+// post-2025-07 scrape-gap quarters with n=2-5 produced spurious 40%+ spikes
+// or step-down drops on the Einbýli/Raðhús lines. Simpler than the regime
+// quarterly-fallback used on /markadsstada — for aggregate trends a shorter
+// line is acceptable. Disclosure footnote shows on each affected chart.
+const MIN_N_PER_CELL = 30;
+const MIN_N_DISCLOSURE =
+  "Punktum sleppt þar sem n<30 (þunn gögn í scrape-gap).";
 
 const HEADLINE_SEGS = ["APT_STANDARD", "SFH_DETACHED", "ROW_HOUSE"];
 const APT_SEGS_FOR_SERLOD = ["APT_FLOOR", "APT_STANDARD"];
@@ -61,17 +71,37 @@ function periodToSort(p) {
 const sortByPeriod = (a, b) => periodToSort(a.period) - periodToSort(b.period);
 const yearOnly = (p) => (p && p.length >= 4 ? p.slice(0, 4) : p);
 
-function pivotTimeSeries(rows, valueKey, segments) {
-  // rows already filtered to pooled-per-segment. Pivot to {period, [seg]: val}
+function pivotTimeSeries(rows, valueKey, segments, nKey = null) {
+  // Pivot to {period, [seg]: val}; drop a (segment × period) cell when the
+  // metric's per-cell n falls below MIN_N_PER_CELL. Resulting line will end
+  // earlier for thin segments but never spike on n=2-5 outliers.
   const byPeriod = new Map();
   for (const r of rows) {
     if (!segments.includes(r.canonical_code)) continue;
     if (r[valueKey] == null) continue;
+    if (nKey && r[nKey] != null && Number(r[nKey]) < MIN_N_PER_CELL) continue;
     if (!byPeriod.has(r.period))
       byPeriod.set(r.period, { period: r.period });
     byPeriod.get(r.period)[r.canonical_code] = Number(r[valueKey]);
   }
   return Array.from(byPeriod.values()).sort(sortByPeriod);
+}
+
+function ChartNote({ children }) {
+  return (
+    <p
+      style={{
+        fontSize: "0.75rem",
+        color: "var(--vm-ink-faint)",
+        fontStyle: "italic",
+        marginTop: "0.4rem",
+        marginBottom: 0,
+        lineHeight: 1.4,
+      }}
+    >
+      {children}
+    </p>
+  );
 }
 
 function pctFormatter(v, digits = 0) {
@@ -117,10 +147,17 @@ function Tooltip3Series({ active, payload, label, valueKey, formatValue }) {
 // ── Metric 1 ──────────────────────────────────────────────────────────────
 export function ConditionChart({ pooled }) {
   const data = useMemo(
-    () => pivotTimeSeries(pooled, "mean_interior_condition_score", HEADLINE_SEGS),
+    () =>
+      pivotTimeSeries(
+        pooled,
+        "mean_interior_condition_score",
+        HEADLINE_SEGS,
+        "n_listings_condition",
+      ),
     [pooled],
   );
   return (
+    <>
     <div style={{ width: "100%", height: 260 }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 24, left: 0 }}>
@@ -171,16 +208,25 @@ export function ConditionChart({ pooled }) {
         </LineChart>
       </ResponsiveContainer>
     </div>
+    <ChartNote>{MIN_N_DISCLOSURE}</ChartNote>
+    </>
   );
 }
 
 // ── Metric 2 ──────────────────────────────────────────────────────────────
 export function RenovationChart({ pooled }) {
   const data = useMemo(
-    () => pivotTimeSeries(pooled, "pct_recently_renovated", HEADLINE_SEGS),
+    () =>
+      pivotTimeSeries(
+        pooled,
+        "pct_recently_renovated",
+        HEADLINE_SEGS,
+        "n_listings_renovation",
+      ),
     [pooled],
   );
   return (
+    <>
     <div style={{ width: "100%", height: 240 }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 24, left: 0 }}>
@@ -228,26 +274,28 @@ export function RenovationChart({ pooled }) {
         </LineChart>
       </ResponsiveContainer>
     </div>
+    <ChartNote>{MIN_N_DISCLOSURE}</ChartNote>
+    </>
   );
 }
 
 // ── Metric 3 ──────────────────────────────────────────────────────────────
 export function UnregisteredBarChart({ perRegion }) {
-  // perRegion: rows with region_tier != 'POOLED'. Group by canonical_code,
-  // average pct_has_unregistered_space across periods weighted by n_listings,
-  // then render bar chart per region with segments as grouped bars.
+  // Aggregate weighted across periods, but skip a (region × segment × period)
+  // contribution if its n is below MIN_N_PER_CELL — Bug 7 fix prevents thin
+  // post-gap quarters from polluting the rolled-up bar.
   const data = useMemo(() => {
-    // Structure: [{region, APT_STANDARD: pct, SFH_DETACHED: pct, ROW_HOUSE: pct}]
     const byRegSeg = new Map();
     for (const r of perRegion) {
       if (!REGIONS.includes(r.region_tier)) continue;
       if (!HEADLINE_SEGS.includes(r.canonical_code)) continue;
       if (r.pct_has_unregistered_space == null) continue;
+      const n = Number(r.n_listings_unregistered) || 0;
+      if (n < MIN_N_PER_CELL) continue;
       const k = `${r.region_tier}|${r.canonical_code}`;
       if (!byRegSeg.has(k))
         byRegSeg.set(k, { weighted: 0, total: 0 });
       const agg = byRegSeg.get(k);
-      const n = Number(r.n_listings_unregistered) || 0;
       agg.weighted += Number(r.pct_has_unregistered_space) * n;
       agg.total += n;
     }
@@ -263,6 +311,7 @@ export function UnregisteredBarChart({ perRegion }) {
   }, [perRegion]);
 
   return (
+    <>
     <div style={{ width: "100%", height: 260 }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 8, right: 16, bottom: 24, left: 0 }}>
@@ -303,18 +352,30 @@ export function UnregisteredBarChart({ perRegion }) {
         </BarChart>
       </ResponsiveContainer>
     </div>
+    <ChartNote>
+      Tölurnar pool-a yfir öll ársfjórðungs-tímabil 2018+. Reitir með n &lt; 30
+      eru sleppt til að forðast skekkju frá þunnum scrape-gap mánuðum.
+    </ChartNote>
+    </>
   );
 }
 
 // ── Metric 4 ──────────────────────────────────────────────────────────────
 export function SerlodSmallMultiples({ perRegion }) {
   // Per region, line chart of pct_apt_with_serlod over time for APT segments.
+  // Bug 7: drop (region × segment × quarter) cells where n_listings_serlod < 30
+  // so a thin scrape-gap quarter doesn't spike one of the small-multiple lines.
   const byRegion = useMemo(() => {
     const map = new Map();
     for (const r of perRegion) {
       if (!REGIONS.includes(r.region_tier)) continue;
       if (!APT_SEGS_FOR_SERLOD.includes(r.canonical_code)) continue;
       if (r.pct_apt_with_serlod == null) continue;
+      if (
+        r.n_listings_serlod != null &&
+        Number(r.n_listings_serlod) < MIN_N_PER_CELL
+      )
+        continue;
       if (!map.has(r.region_tier)) map.set(r.region_tier, new Map());
       const inner = map.get(r.region_tier);
       if (!inner.has(r.period))
@@ -328,6 +389,7 @@ export function SerlodSmallMultiples({ perRegion }) {
   }, [perRegion]);
 
   return (
+    <>
     <div
       style={{
         display: "grid",
@@ -395,6 +457,8 @@ export function SerlodSmallMultiples({ perRegion }) {
         </div>
       ))}
     </div>
+    <ChartNote>{MIN_N_DISCLOSURE}</ChartNote>
+    </>
   );
 }
 
@@ -404,6 +468,11 @@ export function FramingStackedArea({ pooled }) {
     return pooled
       .filter((r) => r.canonical_code === "APT_STANDARD")
       .filter((r) => r.pct_framing_standard != null)
+      .filter(
+        (r) =>
+          r.n_listings_total == null ||
+          Number(r.n_listings_total) >= MIN_N_PER_CELL,
+      )
       .map((r) => ({
         period: r.period,
         pct_framing_terse: Number(r.pct_framing_terse || 0),
@@ -414,6 +483,7 @@ export function FramingStackedArea({ pooled }) {
       .sort(sortByPeriod);
   }, [pooled]);
   return (
+    <>
     <div style={{ width: "100%", height: 260 }}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 24, left: 0 }}>
@@ -469,5 +539,7 @@ export function FramingStackedArea({ pooled }) {
         </AreaChart>
       </ResponsiveContainer>
     </div>
+    <ChartNote>{MIN_N_DISCLOSURE}</ChartNote>
+    </>
   );
 }

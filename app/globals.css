@@ -164,6 +164,18 @@ a:hover {
   margin: 0 auto;
   padding: 0 1.5rem;
 }
+
+/* Visitala 4×3 grid collapses to single column on mobile per spec §3.1 — the
+   inline `gridTemplateColumns: "200px repeat(3, 1fr)"` would otherwise squeeze
+   3 charts + a 200 px label column into 375 px. */
+@media (max-width: 600px) {
+  .vm-visitala-row {
+    grid-template-columns: 1fr !important;
+  }
+  .vm-visitala-header {
+    display: none !important;
+  }
+}
 .vm-container-narrow {
   max-width: 820px;
   margin: 0 auto;

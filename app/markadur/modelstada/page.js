@@ -13,6 +13,7 @@ export const metadata = {
   title: "Líkansstaða — Hversu nákvæmt er iter4 verðmatslíkanið?",
   description:
     "Held-set MAPE, vissubil og per-segment skekkja fyrir iter4 verðmatslíkanið. Uppfært mánaðarlega með transparent aðferðafræði.",
+  alternates: { canonical: "https://verdmat-is.vercel.app/markadur/modelstada" },
   openGraph: {
     title: "Líkansstaða — Verdmat",
     description:

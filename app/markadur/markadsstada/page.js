@@ -9,6 +9,7 @@ export const metadata = {
   title: "Markaðsstaða — Heitt eða kalt á íslenska fasteignamarkaðnum",
   description:
     "Regime indicator fyrir íslenska fasteignamarkaðinn: 23 cells af 33 fitted. Above-list rate timeline, heat map og back-projection per eign.",
+  alternates: { canonical: "https://verdmat-is.vercel.app/markadur/markadsstada" },
   openGraph: {
     title: "Markaðsstaða — Verdmat",
     description:

@@ -11,6 +11,7 @@ export const metadata = {
   title: "Fasteignamarkaðurinn á Íslandi — Verdmat",
   description:
     "Hlutlægt yfirlit yfir íslenska fasteignamarkaðinn: verðvísitala, markaðshiti, söluhraði. Byggt á 226.000+ kaupsamningum og 471.000+ auglýsingum.",
+  alternates: { canonical: "https://verdmat-is.vercel.app/markadur" },
   openGraph: {
     title: "Fasteignamarkaðurinn á Íslandi — Verdmat",
     description:
