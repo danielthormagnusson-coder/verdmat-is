@@ -69,59 +69,73 @@ export default function SearchAutocomplete() {
       setEmptyState(false);
       return;
     }
+
+    // Bug 9 + 10 fix (2026-04-27): a slow cold RPC (~5 s) for an earlier prefix
+    // was overwriting the correct fast result for a longer, fresher prefix
+    // (e.g. typing "viðjugerði" briefly returned 15 Viðarás rows from the
+    // older "viðar..." request resolving last). Two-layer guard:
+    //   1. AbortController so Supabase's fetch is cancelled when q changes.
+    //   2. `cancelled` flag + term-still-current check before any setState,
+    //      so even if abort doesn't take effect (older clients) we never
+    //      apply stale results.
+    let cancelled = false;
+    const controller = new AbortController();
+    const term = q.trim();
+
     const handle = setTimeout(async () => {
+      if (cancelled) return;
       setLoading(true);
       setExpandedKey(null);
       setExpandedUnits([]);
-      const term = q.trim();
 
-      // Fastnum direct lookup (7-digit Icelandic fastnum).
-      if (FASTNUM_PATTERN.test(term)) {
-        const { data } = await supabase
-          .from("properties")
-          .select(
-            "fastnum, heimilisfang, postnr, postheiti, tegund_raw, canonical_code, einflm",
-          )
-          .eq("fastnum", Number(term))
-          .maybeSingle();
-        if (data) {
-          // Surface as a pseudo address-row with n_units = 1 so the existing
-          // renderer reuses its single-unit (direct-navigate) path.
-          setResults([
-            {
-              heimilisfang: data.heimilisfang,
-              postnr: data.postnr,
-              postheiti: data.postheiti,
-              n_units: 1,
-              anchor_fastnum: data.fastnum,
-              tegund_summary: data.tegund_raw || formatSegment(data.canonical_code),
-              _prefetchedUnit: {
-                fastnum: data.fastnum,
-                tegund_raw: data.tegund_raw,
-                canonical_code: data.canonical_code,
-                einflm: data.einflm,
+      try {
+        // Fastnum direct lookup (7-digit Icelandic fastnum).
+        if (FASTNUM_PATTERN.test(term)) {
+          const { data, error } = await supabase
+            .from("properties")
+            .select(
+              "fastnum, heimilisfang, postnr, postheiti, tegund_raw, canonical_code, einflm",
+            )
+            .eq("fastnum", Number(term))
+            .abortSignal(controller.signal)
+            .maybeSingle();
+          if (cancelled) return;
+          if (error && error.name !== "AbortError") throw error;
+          if (data) {
+            setResults([
+              {
+                heimilisfang: data.heimilisfang,
+                postnr: data.postnr,
+                postheiti: data.postheiti,
+                n_units: 1,
+                anchor_fastnum: data.fastnum,
+                tegund_summary:
+                  data.tegund_raw || formatSegment(data.canonical_code),
+                _prefetchedUnit: {
+                  fastnum: data.fastnum,
+                  tegund_raw: data.tegund_raw,
+                  canonical_code: data.canonical_code,
+                  einflm: data.einflm,
+                },
               },
-            },
-          ]);
-          setEmptyState(false);
-        } else {
-          setResults([]);
-          setEmptyState(true);
+            ]);
+            setEmptyState(false);
+          } else {
+            setResults([]);
+            setEmptyState(true);
+          }
+          setLoading(false);
+          setOpen(true);
+          setActiveIdx(-1);
+          return;
         }
-        setLoading(false);
-        setOpen(true);
-        setActiveIdx(-1);
-        return;
-      }
 
-      // Grouped address search via RPC.
-      const { data, error } = await supabase.rpc("search_properties_grouped", {
-        term,
-      });
-      if (error) {
-        setResults([]);
-        setEmptyState(true);
-      } else {
+        // Grouped address search via RPC.
+        const { data, error } = await supabase
+          .rpc("search_properties_grouped", { term })
+          .abortSignal(controller.signal);
+        if (cancelled) return;
+        if (error && error.name !== "AbortError") throw error;
         const rows = (data || []).map((r) => ({
           ...r,
           sveitarfelag: r.sveitarfelag ? r.sveitarfelag.trim() : r.sveitarfelag,
@@ -129,12 +143,23 @@ export default function SearchAutocomplete() {
         }));
         setResults(rows);
         setEmptyState(rows.length === 0);
+        setLoading(false);
+        setOpen(true);
+        setActiveIdx(-1);
+      } catch (e) {
+        if (cancelled || e?.name === "AbortError") return;
+        console.error("[SearchAutocomplete] search failed", e);
+        setResults([]);
+        setEmptyState(true);
+        setLoading(false);
       }
-      setLoading(false);
-      setOpen(true);
-      setActiveIdx(-1);
     }, 220);
-    return () => clearTimeout(handle);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(handle);
+    };
   }, [q]);
 
   async function expand(row) {

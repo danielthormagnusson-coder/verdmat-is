@@ -5,7 +5,11 @@ import Image from "next/image";
 
 export default function PhotoGallery({ photos, title }) {
   const [active, setActive] = useState(0);
-  const safe = (photos || []).slice(0, 6);
+  // Bug 11 fix (2026-04-27): was hardcoded slice(0, 6) which truncated
+  // properties with up to 20 photos in DB down to 6 in the UI. Show all
+  // photos the property has. Upstream cap (build_precompute.MAX_PHOTOS_PER_PROP)
+  // is the source of any remaining truncation.
+  const safe = photos || [];
   if (!safe.length) {
     return (
       <div
