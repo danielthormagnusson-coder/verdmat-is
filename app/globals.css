@@ -165,6 +165,29 @@ a:hover {
   padding: 0 1.5rem;
 }
 
+/* Lighthouse / a11y: keyboard skip-link to bypass nav. Hidden until focused. */
+.vm-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.vm-skip-link:focus {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 0.85rem;
+  background: var(--vm-primary);
+  color: var(--vm-surface);
+  z-index: 9999;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
 /* Visitala 4×3 grid collapses to single column on mobile per spec §3.1 — the
    inline `gridTemplateColumns: "200px repeat(3, 1fr)"` would otherwise squeeze
    3 charts + a 200 px label column into 375 px. */

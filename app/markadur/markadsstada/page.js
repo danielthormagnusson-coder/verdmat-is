@@ -76,10 +76,27 @@ export default async function MarkadsstadaPage() {
           color: "var(--vm-ink-muted)",
           fontSize: "1rem",
           maxWidth: 720,
-          marginBottom: "2rem",
+          marginBottom: "0.75rem",
         }}
       >
         Hvaða segmentir eru heitir eða kaldir — tímabundið drífari í takt við slider-ið.
+      </p>
+      <p
+        style={{
+          fontSize: "0.85rem",
+          color: "var(--vm-ink-muted)",
+          background: "rgba(212, 179, 70, 0.10)",
+          border: "1px solid rgba(212, 179, 70, 0.35)",
+          borderRadius: 6,
+          padding: "0.55rem 0.85rem",
+          maxWidth: 760,
+          lineHeight: 1.5,
+          marginBottom: "2rem",
+        }}
+      >
+        Nýjustu áreiðanlegu gögn eru frá 2025-Q2 vegna tímabundinnar
+        takmörkunar á auglýsingaflæði. Fyllri gögn frá 2025-Q3 og áfram koma
+        þegar nýr scraper er kominn í gang (Sprint 3 forgangur).
       </p>
 
       <MarkadsstadaDashboard monthlyRows={monthlyRows} />

@@ -60,6 +60,8 @@ export default function PhotoGallery({ photos, title }) {
             <button
               key={i}
               onClick={() => setActive(i)}
+              aria-label={`Mynd ${i + 1} af ${safe.length}`}
+              aria-pressed={active === i}
               style={{
                 position: "relative",
                 height: 68,

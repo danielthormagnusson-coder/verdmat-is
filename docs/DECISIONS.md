@@ -4,6 +4,59 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-27 — Sprint 2 Áfangi 4 LOKIÐ: dashboard launch + Fasi E polish + Bug 8
+
+**Hvað**: Sprint 2 Áfangi 4 closed. Dashboard live á https://verdmat-is.vercel.app/markadur með öllum fimm route undirsíðum (`/`, `/visitala`, `/markadsstada`, `/ibudir`, `/modelstada`), eign-síðu waterfall fix og Fasi E launch polish (Addendum 1 unregistered-space map, Bug 7 thin-sample filter, Bug 8 nýbygging exclusion fyrir metric 1 & 2, Lighthouse a11y polish, scrape-gap disclosure copy).
+
+**Áfangi 4 deliverables — production**:
+- Fasi A — data pipeline infra (4 Supabase tables, 3 views, 4 build scripts, orchestrator v2)
+- Fasi B — `/markadur` landing (A+B hero, 3 cards, 3-line timeline, scrape-gap banner)
+- Fasi C-1 — `/markadur/visitala` (4×3 grid, per-row toggles, crash-band shading)
+- Fasi C-2 — `/markadur/markadsstada` (slider, heat-map, back-projection widget, regime view)
+- Fasi C-3 — `/markadur/ibudir` (5 LLM aggregates + Addendum 1 unregistered map)
+- Fasi C-4 — `/markadur/modelstada` (4 panels, Icelandic status labels, methodology card)
+- Fasi D — `/eign/[fastnum]` waterfall hides time anchors, Markaðsstaða footer
+- Fasi E — launch polish (canonical, og:, mobile collapse, skip link, gallery a11y, copy)
+
+**Bugs fixed mid-sprint (8 total)**:
+1. Regime pill hybrid rule (12m + pooled z_3v12)
+2. effective_date_latest column for /eign listing date
+3. Autocomplete ORDER BY for fjölbýli coverage
+4. Two-tier autocomplete + HMS-gap caveat banner + prefix indexes
+5. Step 2 expand SELECT non-existent merking column
+6. Quarterly + smoothed-monthly regime methodology
+7. n<30 filter on /ibudir aggregate charts
+8. is_new_build=False filter for metric 1 & 2 (this entry)
+
+**Bug 8 detail — is_new_build filter**:
+- Spot check 2026-04-27: interior_condition_score for new builds avg 2.47 vs 1.60 for existing stock, inflating APT_STANDARD quarterly mean by +0.10 to +0.33 points.
+- Renovation rate distorted because new builds get coded `has_any_recent_work=False` so a heavy new-build inflow drags the rate down even when absolute renovation count rises.
+- Fix: `build_llm_aggregates.py` filters `is_new_build=False` for metric 1 (interior_condition_score mean) and metric 2 (pct_recently_renovated). Other metrics unaffected.
+- Editorial copy on /ibudir Section 1 + 2 explains the filter explicitly: "Nýbyggingar útilokaðar úr greiningu (þær fá hátt ástandsstig per definition og myndu skekkja meðaltalið)."
+- Rebuilt + re-loaded llm_aggregates_quarterly via `load_dashboard_v1.py --tables llm` (1,450 rows, same shape, different values for metrics 1 & 2).
+
+**Fasi E launch polish**:
+- Addendum 1 unregistered-space graduated-symbol map on /ibudir (22 capital-region postnr from Stadfangaskra centroids + refined `unregistered_space_sqm > 5` rate; Leaflet circle markers with √n radius scaling; static JSON in `public/data/`).
+- True polygon choropleth deferred to v1.1 — LMÍ public shapefile requires browser-driven catalog navigation that cannot be programmatically fetched. Logged in PLANNING_BACKLOG Áfangi 4.5.
+- /markadsstada disclosure paragraph: "Nýjustu áreiðanlegu gögn eru frá 2025-Q2 vegna tímabundinnar takmörkunar á auglýsingaflæði..."
+- Lighthouse a11y polish: skip-to-content link in root layout (sr-only, focus-visible); gallery thumbnail buttons aria-label "Mynd N af M"; hero `<Image priority>` already in place; canonical URLs on all 5 dashboard routes + /eign metadata; /eign generateMetadata gains openGraph block.
+- VisitalaGrid 4×3 collapses to single column at <600 px viewport via `.vm-visitala-row` class + media query (was missed in C-1).
+- og:image fallback deferred — no static brand image asset exists; shipping a 404 reference is worse than absent meta. Queued for v1.1 OG generator polish.
+
+**Carry-overs to Sprint 3** (logged in PLANNING_BACKLOG, not blocking launch):
+- Áfangi 0 — comprehensive scraper to recover the post-July-2025 listing flow gap (top priority)
+- Áfangi 4.5 — €/m² price map dashboard (`/markadur/kort`), depends on LMÍ polygon download
+- Áfangi 4.6 — new-build share tracker (Bug 7 follow-up)
+- Áfangi 4.7 — new-build as a separate segment (Bug 8 follow-up; depends on Áfangi 4.8)
+- Áfangi 4.8 — eldri-stock calibration analysis (Egilsgata 10 7 % gap vs competitor; possible iter5 fasteignamat re-introduction)
+- Áfangi 4.9 — matsvæði-level polygon (Sérlóðir map upgrade, depends on HMS API access)
+- /markadur/markadsstada 1.14 MB payload (lazy-load candidate)
+- /eign dynamic 1.1 s server render
+
+**Lighthouse**: Danni runs in browser on `/markadur` and `/eign/2008647` post-deploy; thresholds (Performance ≥ 85, SEO ≥ 95, Accessibility ≥ 90, LCP < 1.8 s mobile) confirmed before announcement (or any sub-target documented in v1.1 backlog).
+
+---
+
 ## 2026-04-24 — Bug 6 + smoothing refinement: asymmetric monthly/quarterly regime methodology on /markadsstada
 
 **Hvað**: `/markadur/markadsstada` skiptir um regime-source logic:

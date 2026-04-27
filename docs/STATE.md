@@ -1,8 +1,8 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 24. apríl 2026 (Sprint 2 Áfangi 4 Fasi A+B+C LOKIÐ í production — allir fjórir drill-downs live. Sex mid-flight bug-fixes: Bug 1 regime pill, Bug 2 `effective_date_latest`, Bug 3 autocomplete ORDER BY, Bug 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, Bug 5 expand-query missing-column regression, Bug 6 quarterly/smoothed-monthly regime methodology + ats_lookup_by_quarter import. Launch strategy Leið B locked: ship dashboard með HMS-gap acknowledgement, scraper er Sprint 3 top-priority. Fasi D waterfall fix og Fasi E launch polish næst.)
+**Síðast uppfært:** 27. apríl 2026 (**Sprint 2 Áfangi 4 LOKIÐ.** Public dashboard live á /markadur með fimm undirsíðum (visitala, markadsstada, ibudir + unregistered map, modelstada) + waterfall fix á eign-síðu + Fasi E launch polish (canonical, mobile collapse, skip-link, scrape-gap disclosure, Bug 8 nýbygging filter). Átta bug-fixes leystir mid-sprint: 1 regime pill, 2 `effective_date_latest`, 3 autocomplete ORDER BY, 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, 5 expand-query merking column, 6 quarterly/smoothed-monthly regime, 7 n<30 thin-sample filter á /ibudir, 8 is_new_build filter á metrics 1 & 2. Launch strategy Leið B: dashboard ships með HMS-gap acknowledgement; comprehensive scraper er Sprint 3 Áfangi 0 top-priority.)
 
-**Verkefnisstaða heildar: ~82%**
+**Verkefnisstaða heildar: ~92%**
 
 ---
 

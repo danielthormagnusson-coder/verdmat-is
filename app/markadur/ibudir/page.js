@@ -156,12 +156,25 @@ export default async function IbudirPage() {
 
       <Section
         eyebrow="1. Ástandsvísitala"
-        title="Innra ástand íbúða yfir tíma"
-        editorialHook="Hefur ástand íbúða á íslenska markaðnum farið upp eða niður síðustu 20 ár?"
-        narrativeArc="Meðaltal innra-ástandsstig (-2 … 3 skali úr LLM-greiningu) per ársfjórðungi fyrir þrjú meginsegment. Hækkandi kúrfa vísar á sellera sem taka í gegn fyrir sölu."
+        title="Innra ástand eldri eigna yfir tíma"
+        editorialHook="Hefur ástand eldri eigna á íslenska markaðnum farið upp eða niður síðustu 20 ár?"
+        narrativeArc="Meðaltal innra-ástandsstig (-2 … 3 skali úr LLM-greiningu) per ársfjórðungi fyrir þrjú meginsegment, eldri eignir aðeins."
         callout="Key callout (TBD með rauntölum): segment × tímabil með mestri hækkun eða lækkun — fær final prose í v1.1."
       >
         <ConditionChart pooled={pooled} />
+        <p
+          style={{
+            fontSize: "0.85rem",
+            color: "var(--vm-ink-muted)",
+            lineHeight: 1.55,
+            marginTop: "0.6rem",
+            maxWidth: 760,
+          }}
+        >
+          Nýbyggingar útilokaðar úr greiningu (þær fá hátt ástandsstig per
+          definition og myndu skekkja meðaltalið). Tölur sýna eldri-stock
+          listings.
+        </p>
       </Section>
 
       <Section
@@ -181,10 +194,9 @@ export default async function IbudirPage() {
             maxWidth: 760,
           }}
         >
-          Hlutfall miðar við endurbættar eldri eignir. Nýbyggingar teljast ekki
-          sem „endurnýjaðar" í þessari greiningu, svo aukin nýbygginga-bylgja
-          getur dregið hlutfall niður jafnvel þegar absolute fjöldi endurbóta
-          vex.
+          Nýbyggingar útilokaðar úr greiningu (þær hafa engar „endurbætur" per
+          definition). Hlutfall sýnir endurbættar eldri eignir sem hluti af
+          eldri-stock listings.
         </p>
       </Section>
 

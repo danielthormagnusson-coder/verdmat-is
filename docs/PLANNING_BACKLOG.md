@@ -51,6 +51,62 @@ Planning promptir skulu takast í þessari röð, ekki parallel:
 
 ---
 
+## Sprint 3 Áfangi 4.8 — Eldri-stock calibration analysis (v1.1, estimated 1 day, post-launch competitive review)
+
+**Why**: Egilsgata 10 spot-check 2026-04-27 shows iter4 standalone prediction = 84,8 M kr, samkeppnisaðili (verdmat.is competitor) shows 91,25 M kr — a **7 % gap on the same property**. Hypothesis: the competitor either (a) uses HMS fasteignamat as a feature (which iter4 was deliberately decoupled from per Áfangi 2-5 DECISIONS), and/or (b) over-prices old-stock cells with an implicit renovation assumption that our LLM-extracted condition score already controls for.
+
+**What**:
+- Cross-validate iter4 predictions against the competitor on **50-100 properties in postnr 101 RVK with byggar < 1950**
+- Decompose the gap per-feature: fasteignamat dropping (Áfangi 2-5), segment × postnr × byggar cell sample size, calibration drift, condition signal contribution
+- **Decision**: re-introduce fasteignamat as a feature in iter5 with explicit guardrails (e.g. clipped at trailing 12-mo HMS values, weighted ≤ 0.2 of final), OR keep standalone and frame the 7 % undershoot as a credibility strength ("we don't blindly track HMS — when HMS overshoots, we hold")
+
+**Inputs needed**:
+- Competitor predictions for the test set (manual collection via competitor's public site, ~1 hour)
+- iter4 predictions table (already in Supabase)
+- HMS fasteignamat per fastnum (already in `properties.fasteignamat`)
+
+**Outputs**:
+- `audit_4_competitor_comparison.py` — runs the decomposition, writes a markdown report
+- DECISIONS entry locking the iter5-or-not choice
+- If fasteignamat re-introduced: iter5 spec doc
+
+**Marketing implication**: either way, this answers the inevitable "why is your number different from the other site?" question with data. Strong for credibility on launch.
+
+---
+
+## Sprint 3 Áfangi 4.7 — Nýbyggingar as a separate segment (v1.1, estimated 1-2 days)
+
+**Why**: Bug 8 fix (2026-04-27) excluded new builds from /ibudir metrics 1 & 2 because they distorted both. But nýbyggingar are a real ~9 % of LLM-extracted listings (1,570 of 17,449) and deserve their own analytics layer — they trade differently, they price differently, they carry different risk.
+
+**What**:
+- Add canonical codes `NEWBUILD_APT_FLOOR`, `NEWBUILD_APT_STANDARD`, `NEWBUILD_SFH`, `NEWBUILD_ROW` (or simpler binary partition: `*_NEWBUILD` suffix)
+- Re-train iter4 (or iter5 if Áfangi 4.8 decides on fasteignamat re-introduce) with new segment codes
+- Add a "Nýbyggingar" row to `/markadur/markadsstada` regime grid
+- Add a "Nýbyggingar" line to the /ibudir charts (now 4-line, comparing vs Íbúð / Einbýli / Raðhús)
+- Update `/markadur/visitala` 4×3 grid to allow swapping a row to NEWBUILD_*
+
+**Risk**: per-segment sample sizes will be ~9 % of the existing segments — Reykjavík NEWBUILD_APT_FLOOR ≈ 800 listings 2018+, sufficient for quarterly aggregates but thin for fine-grained ATS heat.
+
+**Planning prompt**: write after Áfangi 4.8 completes (depends on whether iter5 train happens).
+
+---
+
+## Sprint 3 Áfangi 4.9 — Matsvæði-level polygon shapefile (v1.1, depends on HMS API access)
+
+**Why**: /ibudir Sérlóðir bar chart (Metric 4) is currently a region × segment grid. A matsvæði-level polygon map would surface intra-region variation (matsvaedi 22 Háaleiti vs 47 Vesturbær within RVK 101-105) which the bar chart pools away. Same data is also relevant for Áfangi 4.5 price map dashboard (€/m²).
+
+**What**:
+- HMS internal shapefile for matsvæði borders — request via formal HMS API access. Public LMÍ release does not include matsvæði (they're an HMS taxation construct).
+- Convert to GeoJSON (TopoJSON for size if >5 MB)
+- Re-render Sérlóðir as polygon choropleth on the map; keep bar chart as alternate view
+- Reuse for /markadur/kort price map (Áfangi 4.5)
+
+**Blockers**: HMS API access. Mismeta-hraði: low; this is the longest-tail item in the v1.1 set.
+
+**Until matsvæði available**: Áfangi 4.5 + /ibudir map use postnr-level proxy from LMÍ (which itself awaits manual download at present — see Áfangi 4.5 polygon-upgrade note).
+
+---
+
 ## Sprint 3 Áfangi 4.6 — New-build share tracker (v1.1, estimated half-day, post-Bug-7 follow-up)
 
 **Where**: 7th metric on `/markadur/ibudir` (next to Endurnýjunartíðni so the two read in tandem — high new-build share explains why renovation rate dips even when absolute renovations rise; surfaced during Bug 7 fix discussion 2026-04-27).

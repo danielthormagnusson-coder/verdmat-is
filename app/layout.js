@@ -33,8 +33,11 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
+        <a href="#main-content" className="vm-skip-link">
+          Hoppa á aðalefni
+        </a>
         <Nav />
-        {children}
+        <div id="main-content">{children}</div>
         <Footer />
       </body>
     </html>
