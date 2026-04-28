@@ -19,10 +19,29 @@ export const runtime = "edge";
 const FALLBACK_SUPABASE_URL = "https://szzjsvmvxfrhyexblzvq.supabase.co";
 const FALLBACK_SUPABASE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6empzdm12eGZyaHlleGJsenZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NDI2NjIsImV4cCI6MjA5MjMxODY2Mn0.M7iIV87Xwtq4L1stPyU7hEuFfKcz_us6mDj9WSfqsqw";
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_SUPABASE_URL;
-const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_KEY;
+
+// Trim + validate env vars before use. The 2026-04-28 production diag
+// surfaced TWO env-var problems despite Vercel reporting them as "set":
+//   * URL had 2 trailing spaces → "Invalid URL string" inside fetch
+//   * Anon key was 46 chars (truncated; full JWT is 208) → would 401 anyway
+// `||` alone doesn't help because malformed-but-truthy strings beat the
+// fallback. Validate URL with `new URL()` and require key length > 100.
+function pickUrl(envVal) {
+  const trimmed = (envVal || "").trim();
+  if (!trimmed) return FALLBACK_SUPABASE_URL;
+  try {
+    new URL(trimmed);
+    return trimmed;
+  } catch {
+    return FALLBACK_SUPABASE_URL;
+  }
+}
+function pickKey(envVal) {
+  const trimmed = (envVal || "").trim();
+  return trimmed.length > 100 ? trimmed : FALLBACK_SUPABASE_KEY;
+}
+const SUPABASE_URL = pickUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const SUPABASE_KEY = pickKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 const FASTNUM_PATTERN = /^\d{7}$/;
 const HEADERS_BASE = {
   apikey: SUPABASE_KEY,
