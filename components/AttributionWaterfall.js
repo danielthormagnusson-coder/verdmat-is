@@ -23,7 +23,7 @@ const TIME_ANCHOR_FEATURES = new Set([
 ]);
 
 const FOOTER_TOOLTIP =
-  "Þessi leiðrétting endurspeglar markaðsaðstæður á þeim tíma sem verðmatið var gert (ekki eigninni sjálfri). Notaðu ?mode=debug til að sjá niðurbrot.";
+  "Þessi leiðrétting endurspeglar markaðsaðstæður á þeim tíma sem verðmatið var gert, ekki eigninni sjálfri.";
 
 export default function AttributionWaterfall({
   attributions,

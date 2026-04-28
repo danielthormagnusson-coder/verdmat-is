@@ -107,6 +107,41 @@ Planning promptir skulu takast í þessari röð, ekki parallel:
 
 ---
 
+## Sprint 3 Áfangi 4.11 — Time-anchor methodology section (v1.1, estimated 2-4 hours)
+
+**Why**: Surfaced 2026-04-28 during Bug 17 cleanup. The eign-page waterfall (`AttributionWaterfall.js`) has a footer reconciliation row labeled "Markaðsstaða" that pools `sale_year + sale_month + predicted_at` SHAP impacts. Reason: those three are pure time anchors (when the valuation was priced), not property attributes — surfacing them per-row would mislead a reader into thinking "your property loses 1,2 M kr because of sale_month". Pooling into a single "Markaðsstaða" row keeps the math reconciling without that misleading per-row attribution.
+
+The tooltip currently says "Þessi leiðrétting endurspeglar markaðsaðstæður á þeim tíma sem verðmatið var gert, ekki eigninni sjálfri." — correct as far as it goes, but there is **no user-facing methodology page that explains this mechanism in depth**. `/markadur/modelstada` has an "Aðferðafræði markaðsstöðu" section but that explains the **regime classification** for the `/markadur/markadsstada` dashboard (quarterly p33/p67 vs monthly z₃v₁₂), which is an adjacent-but-distinct mechanism that happens to share the word "Markaðsstaða".
+
+**What**: pick a home and write the methodology section.
+
+Options for the home:
+- (a) Add a "Tímalegri leiðrétting" subsection on `/um` (general-audience methodology page) — most user-friendly; keeps the topic together with "Verðbólguleiðrétting" which is the closest existing concept
+- (b) Add a second methodology card on `/markadur/modelstada` titled "Aðferðafræði tímaaðlögunar" alongside the existing regime card — keeps both Markaðsstaða-named mechanisms on one page so the namespace collision is at least co-located
+- (c) Build a dedicated `/markadur/adferdafraedi` route that consolidates ALL methodology (regime, time-anchor, conformal PI, segment definitions, fasteignamat exclusion) — most thorough; planning-session deliverable
+
+**Recommendation for planning**: option (a) is the cheapest correct answer. Time-anchor reconciliation is a **per-eign** mechanism, so the explanation belongs on the page users actually visit when they have one specific verðmat in front of them, not on a market-wide dashboard. /um is already linked from the eign page footer.
+
+**Once shipped**: re-link the eign-waterfall tooltip from the conservative single-sentence form (Bug 17 fix, 2026-04-28) back to a two-sentence form with `[Sjá aðferðafræði](/um#timaaðlogun)`.
+
+**Planning prompt**: not needed — small enough to spec inline in a Sprint 3 mini-PR if option (a) is chosen.
+
+---
+
+## Sprint 3 Bug 19 — broken /um#adferdafraedi anchor (v1.1, estimated 30 min)
+
+**Why**: Surfaced 2026-04-28 during Bug 17 investigation. `app/markadur/modelstada/page.js:260-265` renders a footer link `<Link href="/um#adferdafraedi">Aðferðafræði →</Link>`. The `/um` page (`app/um/page.js`, 93 lines) has no element with `id="adferdafraedi"` — the anchor is dead. Clicking the link lands the user on `/um` but doesn't scroll to any methodology section because none is anchor-tagged.
+
+**What**: pick one:
+- (a) Add `id="adferdafraedi"` to the appropriate `<h2>` on /um (likely the "Módelið" heading) so the existing link works.
+- (b) Change the link target on `modelstada/page.js:260-265` to `/um` (no anchor) so it just navigates to the page top.
+
+**Recommendation**: (a) if a methodology subsection is added on /um per Áfangi 4.11 — anchor it `#adferdafraedi` and the modelstada link works automatically. (b) if Áfangi 4.11 is deferred — drop the dead anchor in the meantime.
+
+**Single commit**: `fix(modelstada): /um#adferdafraedi anchor — either add target or drop anchor` (resolved depending on chosen branch).
+
+---
+
 ## Sprint 3 Áfangi 4.10 — Commercial-address empty-state UX (v1.1, estimated 2-4 hours)
 
 **Why**: Verified 2026-04-28 via Akralind 1-8 spot-check. The street is fully classified `is_residential = FALSE` (Iðnaður / Skrifstofa / Vörugeymsla / Vélaverkstæði / Verslun / Þvottahús) — same with neighbouring Askalind í Lindahverfi Kópavogi. `search_properties_grouped()` correctly filters these out (`WHERE is_residential = TRUE`) because the iter4 model is residential-only and a verðmat flow can't complete. But the user-facing copy is generic ("Engin eign fannst — eignin er kannski ekki í gagnasafninu okkar enn"), which mis-frames the situation: the address IS in the DB, it's just out-of-scope for this product.
