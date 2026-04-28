@@ -4,6 +4,66 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-04-28 — Methodology: Postgres LANGUAGE sql function plan-cache pitfall (Bug 13)
+
+**Hvað**: Latency-investigation á `LANGUAGE sql` Postgres functions með parameterized predicates skal ávallt bera saman `EXPLAIN ANALYZE` á function call vs sömu fyrirspurn með inline literal. Munur >2× = generic-plan-cache pitfall sem útilokar prefix index (`text_pattern_ops`, `varchar_pattern_ops`).
+
+**Af hverju**: Bug 13 latency root cause var `search_properties_grouped(term)` skilgreind sem `LANGUAGE sql STABLE` með `lower(p.heimilisfang) LIKE lower($1) || '%'`. Postgres parameterized $1 í generic plan sem féll back á sequential scan af ~125k rows (4207 ms). EXPLAIN á inline literal `LIKE 'akra%'` notaði `text_pattern_ops` btree index á 24 ms. Sama predicate, sama data — eingöngu munur er hvort planner sér literal eða parameter.
+
+**Lausn pattern**: rewrite-a function sem `LANGUAGE plpgsql STABLE` með `EXECUTE format('SELECT ... LIKE %1$L ...', pattern)` — `%L` injectar literal-quoted string sem planner getur index-matched. Nota `format()` með positional `%1$L` til að referencea sama pattern í multiple WHERE clauses án að passa term oftar í argument list.
+
+**Fallback ákvarðun**: ekki nota `LANGUAGE sql` fyrir functions sem þurfa að index-match á LIKE/ILIKE/regex predicates með parameterized strings. Nota plpgsql + EXECUTE format(), eða nota direct PostgREST query með filter ef function abstraction is overkill.
+
+**Verification recipe** (post-rewrite):
+```sql
+EXPLAIN ANALYZE SELECT * FROM search_properties_grouped('akra');
+EXPLAIN ANALYZE
+  SELECT * FROM properties
+  WHERE lower(heimilisfang) LIKE 'akra%' AND is_residential = TRUE
+  LIMIT 15;
+-- both should show "Index Scan using ix_properties_lower_heimilisfang"
+-- both should be < 50 ms on a warm cache
+```
+
+---
+
+## 2026-04-28 — Methodology: Edge Runtime env var validation pattern (Bug 13 / Bug 18)
+
+**Hvað**: Edge Runtime routes sem reiða sig á `process.env.NEXT_PUBLIC_*` skulu defensive-trim+validate með fallback constants. `||` á einum sér er ekki nóg, vegna þess að truthy-but-malformed strings (whitespace-padded URL, truncated JWT) beat `||` og leiða til downstream error sem er erfiðara að diagnose-a.
+
+**Af hverju**: Bug 13/18 root cause var Vercel dashboard sem reported env vars sem "set", en Edge runtime fékk:
+- `NEXT_PUBLIC_SUPABASE_URL` með **2 trailing spaces** → `fetch()` threw `TypeError: Invalid URL string`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` truncated til **46 chars** (full JWT er 208) → 401 á öllum requests jafnvel þó URL parse-aði
+
+`process.env.X || FALLBACK` skipti engu því bæði values voru truthy. Niðurstaða: Edge route skilaði `[]` á öllum search queries → UI sýndi "Engin eign fannst" empty-state á alvöru residential queries.
+
+**Lausn pattern**: defensive validators sem trim + structural-validate + fallback til hardcoded constants:
+
+```js
+const FALLBACK_SUPABASE_URL = "https://<ref>.supabase.co";
+const FALLBACK_SUPABASE_KEY = "<full-anon-jwt>";
+
+function pickUrl(envVal) {
+  const trimmed = (envVal || "").trim();
+  if (!trimmed) return FALLBACK_SUPABASE_URL;
+  try { new URL(trimmed); return trimmed; }
+  catch { return FALLBACK_SUPABASE_URL; }
+}
+
+function pickKey(envVal) {
+  const trimmed = (envVal || "").trim();
+  return trimmed.length > 100 ? trimmed : FALLBACK_SUPABASE_KEY;
+}
+```
+
+**Hvenær á við**: Edge Runtime routes (Vercel/Cloudflare Workers/Netlify Edge) þar sem env-var injection pipeline er meira fragile en Node serverless. Pattern á einnig við um SSR routes ef env vars eru fed gegnum CI/CD eða third-party tools sem geta whitespace-padded eða truncated values.
+
+**Hvenær EKKI við á**: server-side keys sem leyfast EKKI í client bundle (service-role keys, OAuth secrets). Fyrir þá values, fail-fast er better than fallback — láta route 500-a með skýru "config missing" message frekar en að silently use a public fallback.
+
+**Hvenær FALLBACK er öruggt**: aðeins þegar fallback value er already-public (NEXT_PUBLIC_* vars sem ship í client bundle). `FALLBACK_SUPABASE_URL` + `FALLBACK_SUPABASE_KEY` í þessu case eru bæði í `.env.example` og í the bundled JavaScript sem hver browser tab fær — þau eru ekki secrets.
+
+---
+
 ## 2026-04-27 — Sprint 2 Áfangi 4 LOKIÐ: dashboard launch + Fasi E polish + Bug 8
 
 **Hvað**: Sprint 2 Áfangi 4 closed. Dashboard live á https://verdmat-is.vercel.app/markadur með öllum fimm route undirsíðum (`/`, `/visitala`, `/markadsstada`, `/ibudir`, `/modelstada`), eign-síðu waterfall fix og Fasi E launch polish (Addendum 1 unregistered-space map, Bug 7 thin-sample filter, Bug 8 nýbygging exclusion fyrir metric 1 & 2, Lighthouse a11y polish, scrape-gap disclosure copy).

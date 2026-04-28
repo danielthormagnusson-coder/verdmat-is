@@ -1952,3 +1952,28 @@ Public downloadable PDF á niðurstöðusíðu. `@react-pdf/renderer` lazy-impor
 **Filename:** `verdmat_<fastnum>_<YYYY-MM-DD>.pdf`
 
 Áfangi 3 closed. Áfangi 4 (saved searches + custom domain + SEO pages) og Áfangi 5 (auth re-activation) eftir.
+
+### Sprint 2 Áfangi 4 — search latency closure (Bug 13 + Bug 18, 2026-04-28)
+
+**Bug 13 — search latency 5-7s → 300ms.**
+Two compounding root causes surfaced during launch-blocker investigation:
+
+1. **Postgres LANGUAGE sql function plan-cache pitfall.** `search_properties_grouped(term)` was originally a `LANGUAGE sql STABLE` function with parameterized `lower(p.heimilisfang) LIKE lower($1) || '%'`. Postgres parameterized that into a generic plan that didn't use the `text_pattern_ops` index — sequential scan of ~125k rows, 4207 ms cold / ~3000 ms warm. Inline literal (`EXPLAIN ANALYZE` on `... LIKE 'akra%'`) used the index in 24 ms.
+
+   **Fix:** rewrote as `LANGUAGE plpgsql STABLE` with `EXECUTE format('... LIKE %1$L ...', pattern)` so each call compiles a fresh literal-substituted plan that the planner can index-match. RPC end-to-end now ~24 ms.
+
+2. **Edge Runtime env var corruption.** Vercel dashboard reported `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` as set, but the Edge runtime received: URL with **2 trailing spaces** (`fetch` threw `TypeError: Invalid URL string`) and anon key truncated to **46 chars** (full JWT is 208 — would 401 even if URL parsed). Standard `||` fallback didn't help because both values were truthy-but-malformed.
+
+   **Fix:** defensive `pickUrl()` / `pickKey()` validators in `app/api/search/route.js` — `.trim()`, then `new URL()` validation for the URL and `length > 100` for the key, falling back to hardcoded `FALLBACK_SUPABASE_URL` / `FALLBACK_SUPABASE_KEY` constants if validation fails. Hardcoded constants are safe because both values are public (anon key + project URL ship in the client bundle).
+
+**Bug 18 — UI returned 0 results post-deploy.** Same root cause as Bug 13 cause #2: the Edge route was issuing requests with the malformed env vars, getting back HTTP errors, and `rpcGrouped()` was swallowing them via `if (!r.ok) return [];` — so the client saw an empty array and rendered the "Engin eign fannst" empty-state copy. `pickUrl()` / `pickKey()` fix resolves both bugs simultaneously.
+
+**Verification (2026-04-28):**
+- `curl /api/search?q=egilsgata` → 5 results, ~280 ms
+- `curl /api/search?q=akra` → 15 results (LIMIT cap), correct residential filter
+- `curl /api/search?q=akralind` → 0 results (correct — Akralind is industrial, `is_residential=FALSE`; v1.1 commercial empty-state UX queued in PLANNING_BACKLOG.md as Áfangi 4.10)
+
+**Files touched:**
+- `app/api/search/route.js` — pickUrl/pickKey + Edge runtime route
+- `supabase/migrations/*` — `search_properties_grouped` plpgsql rewrite
+- Diagnostic scaffolding (`__diag__` branch + verbose 500-payload) added during investigation, removed in same closure commit.

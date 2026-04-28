@@ -107,6 +107,26 @@ Planning promptir skulu takast í þessari röð, ekki parallel:
 
 ---
 
+## Sprint 3 Áfangi 4.10 — Commercial-address empty-state UX (v1.1, estimated 2-4 hours)
+
+**Why**: Verified 2026-04-28 via Akralind 1-8 spot-check. The street is fully classified `is_residential = FALSE` (Iðnaður / Skrifstofa / Vörugeymsla / Vélaverkstæði / Verslun / Þvottahús) — same with neighbouring Askalind í Lindahverfi Kópavogi. `search_properties_grouped()` correctly filters these out (`WHERE is_residential = TRUE`) because the iter4 model is residential-only and a verðmat flow can't complete. But the user-facing copy is generic ("Engin eign fannst — eignin er kannski ekki í gagnasafninu okkar enn"), which mis-frames the situation: the address IS in the DB, it's just out-of-scope for this product.
+
+**What**: when autocomplete returns zero residential matches, run a fallback query that includes `is_residential = FALSE`. If the fallback finds rows, render explicit copy:
+> "Þessi eign er skráð sem atvinnuhúsnæði (iðnaður / skrifstofa / verslun). Verdmat reiknar aðeins verðmat fyrir íbúðarhúsnæði — atvinnuhúsnæði er ekki í scope ennþá."
+
+If the fallback also returns zero, keep the existing HMS-gap copy. So the empty-state has three tiers: (a) residential match → results, (b) commercial-only match → out-of-scope copy, (c) no match at all → HMS-gap copy.
+
+**Implementation**:
+- Add `search_properties_grouped_commercial(term)` RPC (mirror of existing function with the `is_residential` predicate flipped) — keep separate so the fast path stays fast and the fallback only fires on empty
+- `/api/search` route: if main result is `[]` and `q.length >= 3`, fire the commercial RPC; tag the response shape `{ kind: "commercial", results: [...] }` so the client knows to render the explanatory empty-state instead of the generic one
+- `SearchAutocomplete.js`: render the new empty-state variant when the response is `kind: "commercial"`. Keep the same Skoða aðferðafræði → link
+
+**Risk**: low. Function-clone migration is reversible. Edge route fallback adds at most ~50ms on the cold-path (only fires when the main RPC returned 0 rows, which is the path that's already showing an empty state).
+
+**Planning prompt**: not needed — small enough to spec inline in a Sprint 3 mini-PR.
+
+---
+
 ## Sprint 3 Áfangi 4.6 — New-build share tracker (v1.1, estimated half-day, post-Bug-7 follow-up)
 
 **Where**: 7th metric on `/markadur/ibudir` (next to Endurnýjunartíðni so the two read in tandem — high new-build share explains why renovation rate dips even when absolute renovations rise; surfaced during Bug 7 fix discussion 2026-04-27).
@@ -152,9 +172,11 @@ Planning promptir skulu takast í þessari röð, ekki parallel:
 
 ---
 
-## Sprint 3 Áfangi 0 — Scraper upgrade (top-priority per Bug 4 follow-up, 2026-04-22)
+## Sprint 3 Áfangi 0 — Scraper upgrade (top-priority per Bug 4 + Akralind verification, 2026-04-22 / 2026-04-28)
 
 **Why**: Bug 4 smoke-test leiddi í ljós að HMS Fasteignaskrá er ekki nægjanlega comprehensive source fyrir public search coverage. Sævargarðar 7 á Seltjarnarnesi (landnum 117661 vantar upstream), plus nýbyggingar sem hafa ekki fengið endanlegt fastnum úthlutað, plus eignir sem seldust pre-HMS-digital-era og aldrei síðan — allar þessar eignir skila "engin niðurstaða" á verdmat.is leit.
+
+**Akralind staðfesting (2026-04-28)**: Akralind 1-8 í Lindahverfi Kópavogi staðfestu að HMS coverage gap er pattern, ekki isolated incident. Akralind / Askalind eru fully classified sem `is_residential = FALSE` (Iðnaður / Skrifstofa / Verslun / Vörugeymsla) — sem er rétt taxonomy-wise, en surfacar sömu UX failure: real address sem user man → "engin niðurstaða" empty-state. v1.1 commercial empty-state copy (Áfangi 4.10) leysir messaging-ið, en breikkar coverage-grunninn aðeins ef supplementary scraper bring-ar listings sem HMS fasteignaskrá vantar (nýbyggingar sem hafa engin fastnum, residential conversions sem eru ekki re-classified, etc.).
 
 Launch strategy Leið B ships dashboard með transparent HMS-gap caveat (`SearchDataGapBanner` + empty-state copy), en caveat-ið er aðeins stop-gap: Sprint 3 Áfangi 0 verður að catch-a up með comprehensive scraper sem complements HMS með live listings-source data (líkast evalue.is eða fasteignir.is).
 

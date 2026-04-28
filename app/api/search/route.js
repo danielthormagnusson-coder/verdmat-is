@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 
-// Bug 13 — latency optimization (2026-04-27).
-//   * Edge Runtime keeps a warm TCP connection from Vercel edge to Supabase
-//     pooler, so cold-start serverless penalty (1-2 s) is gone.
-//   * /api/search?q=warm is the cron warm-up endpoint — vercel.json schedules
-//     */5 m so pgBouncer + Postgres plan-cache stays hot.
-//   * The route mirrors the two SearchAutocomplete code paths: 7-digit fastnum
-//     direct lookup, otherwise the grouped RPC. Same JSON shape the client
-//     expected before, so SearchAutocomplete's render pipeline is unchanged.
+// Edge Runtime keeps a warm TCP connection from Vercel edge to Supabase
+// pooler, removing the 1-2s serverless cold-start. The route mirrors the two
+// SearchAutocomplete code paths: 7-digit fastnum direct lookup, otherwise the
+// grouped RPC. /api/search?q=warm is an idempotent warm-up endpoint usable by
+// any external warmer — no cron is wired up by default (Hobby plan).
 export const runtime = "edge";
 
 // Public values — same anon key + URL that ship in the client bundle and in
@@ -94,23 +91,6 @@ export async function GET(req) {
     return NextResponse.json([], { headers: { "Cache-Control": "no-store" } });
   }
 
-  // __diag__ branch — expose env + URL state so we can see what Edge sees.
-  if (q === "__diag__") {
-    return NextResponse.json(
-      {
-        SUPABASE_URL_typeof: typeof SUPABASE_URL,
-        SUPABASE_URL_value: SUPABASE_URL,
-        SUPABASE_URL_length: SUPABASE_URL ? SUPABASE_URL.length : 0,
-        SUPABASE_KEY_typeof: typeof SUPABASE_KEY,
-        SUPABASE_KEY_length: SUPABASE_KEY ? SUPABASE_KEY.length : 0,
-        env_url_present: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        env_key_present: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        constructed_rpc_url: `${SUPABASE_URL}/rest/v1/rpc/search_properties_grouped`,
-      },
-      { headers: { "Cache-Control": "no-store" } },
-    );
-  }
-
   try {
     if (FASTNUM_PATTERN.test(q)) {
       const d = await fastnumLookup(Number(q), req.signal);
@@ -139,12 +119,7 @@ export async function GET(req) {
       return new NextResponse(null, { status: 499 }); // client closed request
     }
     return NextResponse.json(
-      {
-        error: String(e),
-        stack: e?.stack ? String(e.stack).slice(0, 2000) : null,
-        SUPABASE_URL_value: SUPABASE_URL,
-        SUPABASE_URL_typeof: typeof SUPABASE_URL,
-      },
+      { error: String(e) },
       { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
