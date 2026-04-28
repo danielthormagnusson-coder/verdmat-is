@@ -75,6 +75,23 @@ export async function GET(req) {
     return NextResponse.json([], { headers: { "Cache-Control": "no-store" } });
   }
 
+  // __diag__ branch — expose env + URL state so we can see what Edge sees.
+  if (q === "__diag__") {
+    return NextResponse.json(
+      {
+        SUPABASE_URL_typeof: typeof SUPABASE_URL,
+        SUPABASE_URL_value: SUPABASE_URL,
+        SUPABASE_URL_length: SUPABASE_URL ? SUPABASE_URL.length : 0,
+        SUPABASE_KEY_typeof: typeof SUPABASE_KEY,
+        SUPABASE_KEY_length: SUPABASE_KEY ? SUPABASE_KEY.length : 0,
+        env_url_present: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        env_key_present: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        constructed_rpc_url: `${SUPABASE_URL}/rest/v1/rpc/search_properties_grouped`,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   try {
     if (FASTNUM_PATTERN.test(q)) {
       const d = await fastnumLookup(Number(q), req.signal);
@@ -103,7 +120,12 @@ export async function GET(req) {
       return new NextResponse(null, { status: 499 }); // client closed request
     }
     return NextResponse.json(
-      { error: String(e) },
+      {
+        error: String(e),
+        stack: e?.stack ? String(e.stack).slice(0, 2000) : null,
+        SUPABASE_URL_value: SUPABASE_URL,
+        SUPABASE_URL_typeof: typeof SUPABASE_URL,
+      },
       { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
