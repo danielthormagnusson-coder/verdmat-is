@@ -10,8 +10,19 @@ import { NextResponse } from "next/server";
 //     expected before, so SearchAutocomplete's render pipeline is unchanged.
 export const runtime = "edge";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Public values — same anon key + URL that ship in the client bundle and in
+// .env.example. Hardcoded with env-var override so the Edge route is
+// self-contained: even when Vercel project env vars don't reach the Edge
+// runtime (which happened on 2026-04-28 redeploys despite NEXT_PUBLIC_*
+// being set in the dashboard, producing TypeError: Invalid URL string),
+// the route still resolves a valid URL.
+const FALLBACK_SUPABASE_URL = "https://szzjsvmvxfrhyexblzvq.supabase.co";
+const FALLBACK_SUPABASE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6empzdm12eGZyaHlleGJsenZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NDI2NjIsImV4cCI6MjA5MjMxODY2Mn0.M7iIV87Xwtq4L1stPyU7hEuFfKcz_us6mDj9WSfqsqw";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_SUPABASE_URL;
+const SUPABASE_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_KEY;
 const FASTNUM_PATTERN = /^\d{7}$/;
 const HEADERS_BASE = {
   apikey: SUPABASE_KEY,
