@@ -128,6 +128,30 @@ Options for the home:
 
 ---
 
+## Sprint 3 Bug 22 — DRY refactor of cpi_factor lookup (v1.1, estimated 30 min)
+
+**Why**: Surfaced 2026-04-29 during Bug 15 root-fix. The `cpi_by_ym` lookup block (load `training_data_v2.pkl` → group by year/month → first → dict + `latest_factor`) is now duplicated between `build_comps` (`build_precompute.py:642-657`) and `build_sales_history` (`build_precompute.py:749-768`). Both produce the same dict from the same source, but if either diverges it'd silently re-introduce a Bug-15-class scale mismatch.
+
+**What**: factor into a shared helper:
+```python
+def _load_cpi_by_ym(data_dir: Path) -> tuple[dict, float]:
+    """Return ((year, month) → cpi_factor, latest_factor) from training_data_v2.pkl.
+    Canonical source — never use kaupverD_VISITALA_NEYSLUVERDS."""
+    td = pd.read_pickle(data_dir / "training_data_v2.pkl")
+    td["_yr"] = pd.to_datetime(td["THINGLYSTDAGS"]).dt.year
+    td["_mn"] = pd.to_datetime(td["THINGLYSTDAGS"]).dt.month
+    cpi_by_ym = td.groupby(["_yr", "_mn"])["cpi_factor"].first().to_dict()
+    latest = cpi_by_ym[max(cpi_by_ym.keys())]
+    return cpi_by_ym, latest
+```
+Both call sites become one line each. Total diff: −18 lines + helper.
+
+**Risk**: zero — pure refactor, both call sites already pass through the same data. Sanity check: invariant from Bug 15 (`comps_index.last_sale_price_real == sales_history.kaupverd_real`) must still hold post-refactor.
+
+**Planning prompt**: not needed — small enough to spec inline.
+
+---
+
 ## Sprint 3 Bug 19 — broken /um#adferdafraedi anchor (v1.1, estimated 30 min)
 
 **Why**: Surfaced 2026-04-28 during Bug 17 investigation. `app/markadur/modelstada/page.js:260-265` renders a footer link `<Link href="/um#adferdafraedi">Aðferðafræði →</Link>`. The `/um` page (`app/um/page.js`, 93 lines) has no element with `id="adferdafraedi"` — the anchor is dead. Clicking the link lands the user on `/um` but doesn't scroll to any methodology section because none is anchor-tagged.

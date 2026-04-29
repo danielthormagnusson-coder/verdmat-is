@@ -519,6 +519,18 @@ KAUPVERD er þegar pro-rata skipt milli rows í multi-unit samningum (998 af 100
 
 Validerað í audit 2.0: multi-unit samningar eru kerfisbundið lower pr-m² en single (Einbýli 0,91×, Fjölbýli 0,89×, Sérbýli 0,99×). Filter fjarlægir bundled-pricing bias.
 
+### HMS kaupskra column-naming gotchas
+
+Þrjú columns í HMS kaupskra hafa misleading nöfn sem hafa leitt til bugs:
+
+1. **`kaupverD_VISITALA_NEYSLUVERDS`** (raw kaupskra column): nafnið segir "vísitala neysluverðs" en raunin er CPI-treated price column í thousand-kr scale. Distribution: median 55.033, max 7,4M, lægsta 1. Ekki vísitala. Bug 15 (2026-04-29) var orsakast af því að `build_precompute.py` treat-aði þessa column sem CPI index (gefandi `cpi_latest / sale_cpi ≈ 0.0077`, collapsing real prices til ~650 K kr range). NEVER use directly í CPI calculations. Canonical CPI source er `cpi_verdtrygging.csv` (374 mánuðir, base 100 í 1988M05, núna 678,30) accessed via `cpi.py CPI.load() / .factor() / .deflate()`, eða `training_data_v2.cpi_factor` field (sem `build_sales_history` notar og er proven-correct).
+
+2. **`FASTEIGNAMAT_GILDANDI`**: frozen snapshot, ekki historical per-sale value. Use `FASTEIGNAMAT` í staðinn (sjá § *Frozen snapshot dálkar* hér að ofan, og field stability findings 1.4.1).
+
+3. **`FYRIRHUGAD_FASTEIGNAMAT`**: frozen snapshot, sömu reason.
+
+**Pattern**: HMS column nöfn sem suggest-a derived/computed values geta verið frozen snapshots eða wrongly-scaled. Verify distribution shape (`describe()`) áður en notkun.
+
 ---
 
 ## Stadfangaskra.csv

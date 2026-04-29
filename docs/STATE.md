@@ -1977,3 +1977,7 @@ Two compounding root causes surfaced during launch-blocker investigation:
 - `app/api/search/route.js` — pickUrl/pickKey + Edge runtime route
 - `supabase/migrations/*` — `search_properties_grouped` plpgsql rewrite
 - Diagnostic scaffolding (`__diag__` branch + verbose 500-payload) added during investigation, removed in same closure commit.
+
+### Sprint 2 Áfangi 4 — comps-pricing closure (Bug 15, 2026-04-29)
+
+Bug 15 (2026-04-29) leyst — `last_sale_price_real` CPI corruption í `comps_index`. Mitigation via direct UPDATE og root-fix í `build_precompute.py` shipped í sömu session. Invariant: `comps_index.last_sale_price_real == sales_history.kaupverd_real` WHERE matched on `(fastnum, thinglystdags) AND onothaefur=0`. Verified 100/100 sample bit-identical post-fix. Root cause: `kaupverD_VISITALA_NEYSLUVERDS` is a CPI-treated price column, not a CPI index — `build_comps` was using it as the denominator of a CPI ratio, collapsing real prices to ~650 K kr range. Fix: mirror `build_sales_history` pattern using `training_data_v2.cpi_factor`. See `docs/DATA_SCHEMA.md § HMS kaupskra column-naming gotchas` for the column-name pitfall.
