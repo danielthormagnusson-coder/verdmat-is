@@ -152,6 +152,62 @@ Both call sites become one line each. Total diff: −18 lines + helper.
 
 ---
 
+## Sprint 3 Bug 23 — precompute/ outside git source control (v1.1 reproducibility cleanup, 2026-04-29)
+
+**Why**: `D:\verdmat-is\precompute\` is not under git source control — only `app/` is tracked in the verdmat-is repo. Bug 15 root-fix in `build_precompute.py:642-648` lives on Danni's filesystem, not in any commit. Risk: redeploy, machine swap, or disaster recovery loses the CPI fix and the bug repríserast at the next orchestrator cycle.
+
+**Three fix-paths (cheapest to cleanest)**:
+
+(a) **Document precompute/ as manual filesystem state** in STATE.md plus copy-instructions in a redeploy runbook. Cheapest, fragilest. Works only as long as Danni's machine survives.
+
+(b) **Move `precompute/` into the `app/` tree** (e.g., `app/scripts/precompute/`), update orchestrator paths. Mid-effort — requires path adjustments in `refresh_dashboard_tables.py` and possibly other callers (`load_dashboard_v1.py`, any cron entrypoints, any CI). Side effect: bundles 200+ MB of intermediate pickles unless `.gitignore`'d carefully.
+
+(c) **`git init precompute/`** as a separate repo, push to `danielthormagnusson-coder/verdmat-is-precompute` or similar remote. Cleanest — establishes audit trail for all future precompute changes (CPI fixes, schema migrations, build-script tweaks). Aligns with Áfangi 0 scraper architecture decision (same principle: pipeline scripts deserve git history).
+
+**Recommendation**: (c). 3-min upfront cost, eliminates ongoing reproducibility risk.
+
+**Blocker on future precompute work**: ANY future `build_precompute.py` changes (Bug 22 DRY refactor, schema additions, CPI source updates, new precompute tables) must wait until this is addressed — otherwise they get lost on redeploy.
+
+**Flagged 2026-04-29 during Bug 15 root-fix completion.** Not launch blocker — production already mitigated via direct UPDATE; running CSV is correct.
+
+---
+
+## Sprint 3 Áfangi 0.x — Pre-load invariant assertion harness (defensive infrastructure, Sprint 3+)
+
+**Why**: Bug 15 root-fix had a Step 4 invariant check (build CSV vs Supabase `sales_history.kaupverd_real`, sample 100 rows, abort load if any mismatch > 1 kr tolerance). The pattern is generalizable and should run on every pre-load step in `refresh_dashboard_tables.py` to catch data corruption before it reaches production.
+
+**Generic helper signature**:
+```python
+def assert_load_invariant(
+    csv_path: Path,
+    db_query: str,
+    join_keys: list[str],
+    compare_columns: dict[str, str],   # csv_col -> db_col mapping
+    tolerance: float = 1.0,
+    sample_size: int = 100,
+) -> None:
+    """Sample N rows from CSV, fetch DB rows on join_keys, abort load if any
+    row deviates beyond tolerance. Logs first 5 mismatches before raising."""
+```
+
+**Use cases to harness**:
+- `comps_index.last_sale_price_real` == `sales_history.kaupverd_real` — Bug 15 invariant, eternal
+- `predictions.real_pred_mean` matches latest `model.predict()` from training_data_v2 features
+- `repeat_sale_index` pairs match `pairs_v1.pkl` post-filter cascade
+- `ats_lookup_by_heat` thresholds match `ats_heat_thresholds` reference table
+
+Each use case is a separate invariant call in `refresh_dashboard_tables.py`. Failure aborts the orchestrator and surfaces a clear error: *"INVARIANT FAILED: comps_index.last_sale_price_real diverges from sales_history.kaupverd_real on N/100 sample rows. Investigation required before proceeding."*
+
+**Implementation effort**: 1-2 days. Helper itself is ~50 lines. Per-invariant config registration is ~10 lines per check.
+
+**Value**: catches data corruption pre-production, before user sees nonsense prices on `/eign`. Bug 15 was discovered by Danni post-deploy; this harness would have caught it pre-deploy.
+
+**Depends on Bug 23**: precompute/ should be under git source control before adding this kind of safety infrastructure to it — otherwise the harness itself isn't reproducible.
+
+**Flagged 2026-04-29 during Bug 15 root-fix completion.** Sprint 3+ infrastructure pass.
+
+---
+
 ## Sprint 3 Bug 19 — broken /um#adferdafraedi anchor (v1.1, estimated 30 min)
 
 **Why**: Surfaced 2026-04-28 during Bug 17 investigation. `app/markadur/modelstada/page.js:260-265` renders a footer link `<Link href="/um#adferdafraedi">Aðferðafræði →</Link>`. The `/um` page (`app/um/page.js`, 93 lines) has no element with `id="adferdafraedi"` — the anchor is dead. Clicking the link lands the user on `/um` but doesn't scroll to any methodology section because none is anchor-tagged.
