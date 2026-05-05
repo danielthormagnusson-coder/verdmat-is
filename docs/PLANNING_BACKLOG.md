@@ -128,6 +128,59 @@ Options for the home:
 
 ---
 
+## Sprint 3 Áfangi 4.12 — Comparable Properties + Compare Tool (v1.1, estimated 1 week)
+
+**Why**: Núverandi sambærilegar-section á `/eign/[fastnum]` er placeholder — þrjár cards, 6 comps post Bug 14 partial fix (raised frá 6 til 10 — sjá "12-20 target dependencies" section neðar). Real Comparable Properties + Compare Tool spec replaces þetta með richer two-tier layout og side-by-side compare page. Tracked sem Bug 14 fyrir 12-20 comps target, plus expansion til pro-tier UX.
+
+### Á /eign/[fastnum] síðu
+
+**Tier 1 — Primary comparables** (top of section):
+- 6 eignir með photo thumbnail + key specs (heimilisfang, m², byggar, predicted/sold price)
+- Visual card layout, scannable
+- Highest-similarity matches (canonical_code + postnr + price ±15% + byggar ±10yr)
+
+**Tier 2 — Extended list** (below primary):
+- 14-20 fleiri eignir í dense tafla
+- Columns: heimilisfang, m², byggar, sold/predicted, m² verð, distance score
+- Hver row hefur checkbox til vinstri
+- Sortable columns
+
+**Compare button**:
+- "Bera saman" button efst á extended list
+- Disabled þar til 2+ checkboxes valdar (max 4)
+- Click → `/eign/[fastnum]/bera-saman?ids=[fastnum1,fastnum2,...]`
+
+**Compare page**:
+- Vertical columns per eign side-by-side
+- Photo carousel per eign efst
+- Key specs hlið við hlið (heimilisfang, tegund, m², byggar, herbergi, fasteignamat, predicted+PI, söluverð+dags, m² verð)
+- Highlight differences (anchor neutral, comps tinted)
+- Map view með öllum sjást á sama korti
+- URL shareable via `?ids=` param
+- Mobile: stack vertically, swipeable carousel
+
+**Plus**: Á location map á `/eign/[fastnum]`, bæta secondary markers fyrir top 6 comparables í öðrum lit (terracotta eða sage). Hover sýnir comp address + price differential. Click navigerar til `/eign/[comp_fastnum]`. Toggle "Sýna sambærilegar á korti".
+
+### Bug 14 (12-20 comps target) dependencies — added 2026-04-29
+
+Bug 14 quick-win partial fix shipped 2026-04-29 (commit hash to be filled): raised display limit frá 6 til 10. 67% bump með zero architectural cost. Real 12-20 target er hluti af þessari Áfangi 4.12 redesign vegna fjögurra blocking dependencies:
+
+1. **Precompute widening** — `build_precompute.py` currently writes top-10 nearest comps per residential. 12-20 target krefst widening til top-20 (eða configurable N). 5-10 line change í precompute, en blocks á Bug 23 (precompute er ekki git tracked).
+
+2. **DB size budget** — `comps_index` í dag er ~128 MB (1.1M rows × 10 comps × 11 cols). Top-20 doubles til ~256 MB. Supabase project sits at 424/500 MB free tier; doubling pushes total ~552 MB → yfir cap. Two paths: (a) paid tier (Supabase Pro $25/mán, 8GB DB), eða (b) eviction strategy (drop low-distance comps post-rank-10 fyrir bottom 90% af fastnums sem hafa good top-10 fit, keep top-20 only fyrir hard-to-match cases).
+
+3. **Pagination UI** — current `CompsGrid.js` notar `gridTemplateColumns: "repeat(3, 1fr)"` án dynamic row cap. 12 comps render-ar 4×3 grid, 20 comps render-ar ~7×3 (uneven). Áfangi 4.12 spec already calls for Tier 1 (6 photo cards) + Tier 2 (14 dense table rows) — sem natural splittar 20 comps í primary/extended layout.
+
+4. **Mobile grid responsiveness** — pre-existing concern á `CompsGrid.js` (`repeat(3, 1fr)` án media query er cramped jafnvel á 6 cards á smáum símum). Becomes worse með limit 10 (already shipped). Must be addressed sem hluti af Áfangi 4.12 redesign — Tier 1 fer í swipeable carousel (existing spec mention), Tier 2 fer í horizontally scrollable table eða responsive 1-col stack mobile / multi-col desktop.
+
+### Spec planning
+
+Medium-sized áfangi, 1-2 daga planning + 2-3 daga implementation = ~1 week total. Place í Sprint 3 forgangur, eftir Áfangi 0 scraper og 5a/5b foundation.
+
+**Planning prompt**: Danni skrifar þegar Áfangi 5a/5b are settled.
+
+---
+
 ## Sprint 3 Bug 22 — DRY refactor of cpi_factor lookup (v1.1, estimated 30 min)
 
 **Why**: Surfaced 2026-04-29 during Bug 15 root-fix. The `cpi_by_ym` lookup block (load `training_data_v2.pkl` → group by year/month → first → dict + `latest_factor`) is now duplicated between `build_comps` (`build_precompute.py:642-657`) and `build_sales_history` (`build_precompute.py:749-768`). Both produce the same dict from the same source, but if either diverges it'd silently re-introduce a Bug-15-class scale mismatch.

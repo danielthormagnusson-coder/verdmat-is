@@ -63,7 +63,7 @@ export default async function PropertyPage({ params, searchParams }) {
       .select("rank, comp_fastnum, distance_score, last_sale_date, last_sale_price_real")
       .eq("fastnum", fnum)
       .order("rank", { ascending: true })
-      .limit(6),
+      .limit(10),
     supabase
       .from("sales_history")
       .select("*")
