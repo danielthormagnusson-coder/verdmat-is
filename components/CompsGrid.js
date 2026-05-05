@@ -51,8 +51,8 @@ export default function CompsGrid({ comps }) {
                     src={p.first_photo_url}
                     alt={p.heimilisfang || ""}
                     fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
                     style={{ objectFit: "cover" }}
-                    unoptimized
                   />
                 </div>
               ) : (

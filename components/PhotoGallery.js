@@ -46,8 +46,8 @@ export default function PhotoGallery({ photos, title }) {
           src={safe[active]}
           alt={title || "Eign"}
           fill
+          sizes="(max-width: 768px) 100vw, 800px"
           style={{ objectFit: "cover" }}
-          unoptimized
           priority
           fetchPriority="high"
         />
@@ -81,7 +81,7 @@ export default function PhotoGallery({ photos, title }) {
                 background: "var(--vm-surface)",
               }}
             >
-              <Image src={url} alt="" fill style={{ objectFit: "cover" }} unoptimized />
+              <Image src={url} alt="" fill sizes="120px" style={{ objectFit: "cover" }} />
             </button>
           ))}
         </div>
