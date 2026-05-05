@@ -208,6 +208,32 @@ Each use case is a separate invariant call in `refresh_dashboard_tables.py`. Fai
 
 ---
 
+## Sprint 3 Bug 16 — FROZEN pending photo backfill (v1.1, frozen 2026-04-29)
+
+**Symptom**: `/eign/2008691` (Leifsgata 9, postnr 101 RVK) sýnir engar myndir í photo gallery þrátt fyrir 50-photo backfill (Bug 11 fix). Aðrar properties á sama svæði rendera 50+ thumbnails correctly. Diagnostic this session showed scope is class-wide: ~8,578 residential properties (8.1%) have `augl_id_latest` set but `n_photos = 0` and `photo_urls_json IS NULL`.
+
+**Status**: FROZEN. Diagnostic + fix work paused 2026-04-29 að beiðni Danni — hann er að græja síðasta pakka af myndum sem vantar locally, og rerunning Bug 16 diagnostic núna myndi hugsanlega clash-a við þann photo backfill work eða gefa stale niðurstöður.
+
+**Unfreeze trigger**: Þegar Danni hefur completed photo backfill round og pushed updated images til Supabase (líklega via `load_dashboard_v1.py --tables listings` eða svipaður path), þá run-a Bug 16 diagnostic queries á updated data. Líkleg outcome eitt af þrennu:
+
+1. **Photos appear post-backfill** → Bug 16 resolves sjálfkrafa, marka closed.
+2. **Photos still missing** → narrow hypothesis space (B legitimate empty source, eða C augl_id mapping bug), proceed með targeted fix.
+3. **Different fastnums missing photos than before** → broader pattern á filter scope, hypothesis A.
+
+**Kept í queue**: já. Ekki dropped sem bug, bara frozen með clear unfreeze condition. Status check expected innan 1-2 vikna.
+
+**Three working hypotheses (frá pre-frost diagnostic)**:
+- (A) Bug 11 backfill scope filter cut — rejected (NULL not clipped array; backfill operated on already-populated arrays).
+- (B) Legitimate empty source — partially possible but doesn't scale to 8.1%.
+- (C) Photo-extraction pipeline (`build_precompute.py:_load_photos_map()`) misses a class — strongest fit. To confirm, probe local `D:\fasteignir_merged.db` SQLite for `augl_id 1320064` (Leifsgata 9 listing) post-unfreeze. If photos exist locally → join bug; if not → upstream scraper bug (Áfangi 0).
+
+**Original symptom snapshot for posterity (frá BUGS_AND_FEATURES_QUEUE pre-frost)**:
+- `/eign/2008691` sýnir engar myndir þrátt fyrir 50-photo backfill (Bug 11 fix)
+- Aðrar properties á sama svæði rendera 50+ thumbnails correctly
+- Three working hypotheses: backfill scope filter cut, legitimate empty source, augl_id mapping broken
+
+---
+
 ## Sprint 3 Bug 19 — broken /um#adferdafraedi anchor (v1.1, estimated 30 min)
 
 **Why**: Surfaced 2026-04-28 during Bug 17 investigation. `app/markadur/modelstada/page.js:260-265` renders a footer link `<Link href="/um#adferdafraedi">Aðferðafræði →</Link>`. The `/um` page (`app/um/page.js`, 93 lines) has no element with `id="adferdafraedi"` — the anchor is dead. Clicking the link lands the user on `/um` but doesn't scroll to any methodology section because none is anchor-tagged.
