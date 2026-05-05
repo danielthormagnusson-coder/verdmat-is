@@ -1,8 +1,10 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 27. apríl 2026 (**Sprint 2 Áfangi 4 LOKIÐ.** Public dashboard live á /markadur með fimm undirsíðum (visitala, markadsstada, ibudir + unregistered map, modelstada) + waterfall fix á eign-síðu + Fasi E launch polish (canonical, mobile collapse, skip-link, scrape-gap disclosure, Bug 8 nýbygging filter). Átta bug-fixes leystir mid-sprint: 1 regime pill, 2 `effective_date_latest`, 3 autocomplete ORDER BY, 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, 5 expand-query merking column, 6 quarterly/smoothed-monthly regime, 7 n<30 thin-sample filter á /ibudir, 8 is_new_build filter á metrics 1 & 2. Launch strategy Leið B: dashboard ships með HMS-gap acknowledgement; comprehensive scraper er Sprint 3 Áfangi 0 top-priority.)
+**Síðast uppfært:** 29. apríl 2026 (post-launch polish session — Bugs 13-23 closure, /um anchor fix, Lighthouse hero-image polish (Performance 78→90+, LCP 1900ms→400ms), Áfangi 4.11/4.12/4.13 logged í PLANNING_BACKLOG, Áfangi 0 expanded til tvíþætts scope (Track A active listings + Track B HMS gap-filling), precompute folder git-tracked sem nýtt repo verdmat-is-precompute (commit c85ad83). Sprint 2 Áfangi 4 launch announcement enn HELD pending Danni's call.)
 
-**Verkefnisstaða heildar: ~92%**
+**Previous launch-polish milestone:** 27. apríl 2026 (**Sprint 2 Áfangi 4 LOKIÐ.** Public dashboard live á /markadur með fimm undirsíðum (visitala, markadsstada, ibudir + unregistered map, modelstada) + waterfall fix á eign-síðu + Fasi E launch polish (canonical, mobile collapse, skip-link, scrape-gap disclosure, Bug 8 nýbygging filter). Átta bug-fixes leystir mid-sprint: 1 regime pill, 2 `effective_date_latest`, 3 autocomplete ORDER BY, 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, 5 expand-query merking column, 6 quarterly/smoothed-monthly regime, 7 n<30 thin-sample filter á /ibudir, 8 is_new_build filter á metrics 1 & 2. Launch strategy Leið B: dashboard ships með HMS-gap acknowledgement; comprehensive scraper er Sprint 3 Áfangi 0 top-priority.)
+
+**Verkefnisstaða heildar: ~96%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready, Sprint 3 staged.)
 
 ---
 
@@ -149,6 +151,80 @@ Windows PowerShell, Python 3.14 (pandas installed), allt á **D:\\** drifinu (Sa
 - Íslenskir **smart-quotes** (`„"`) í Python string literals breakja parser. Notaðu ASCII `"..."` með escapes í source kóða.
 - **Excel CSV encoding**: default cp1252 garblar UTF-8 stafi (`Ã¾` í staðinn fyrir `þ`). Notaðu `utf-8-sig` (með BOM) output, eða Google Sheets sem detectar UTF-8 automatically.
 - **Haiku 4.5 tool_use með prompt caching**: `cache_control: {type: "ephemeral"}` settu bæði á system prompt og tool definition. Fyrsta kall skrifar cache (~$0,014 fyrir 6.840 tokens), síðari kall les cache (~$0,006, 90% afsláttur á cached input).
+
+---
+
+## Web-app stream (Sprint 1-3)
+
+Verkefnið er tvíþætt: ML pipeline stream (Áfangar 0-10 hér að neðan) snýr að gögnum og módelum. Web-app stream (Sprint 1-3 hér í þessari section) snýr að public-facing platform og pro-tier tooling. Þeir share canonical data layer (predictions table, comps_index, sales_history) en eru tracked separately.
+
+### Sprint 1 (lokaður)
+
+Initial site deployment á https://verdmat-is.vercel.app. Stack: Next.js + Supabase + Vercel + Cloudflare Pages CDN fyrir image hosting. Features: autocomplete search, /eign/[fastnum] með kort, sölusaga, ATS card, comps display.
+
+### Sprint 2 Áfangar 1-3 (lokaðir)
+
+Public questionnaire með live scoring (v1.1 effects, conformal PI 79% coverage), PDF export með methodology link, autosave infrastructure foundation.
+
+### Sprint 2 Áfangi 4 — LAUNCH-READY (2026-04-29)
+
+Public dashboard á /markadur með drill-downs: /visitala (repeat-sale index), /markadsstada (ATS regime grid), /tilbod (TOM dynamics), /ibudir (LLM-derived aggregates), /modelstada (model tracking). iter4 standalone í production, held ALL MAPE 8,19%, cov80 ~72%, cov95 ~91%. Áfangi 4 var declared "complete" af Claude Code en post-launch verify exposed 5 critical bugs (13-17). Allir resolved í 2026-04-27 til 2026-04-29 session.
+
+**Sprint 2 Áfangi 4 launch announcement er HELD** — production er ready en public announcement bíður Danni's call.
+
+### Sprint 3 (next, staged)
+
+Top priority: Áfangi 0 (scraper upgrade, expanded scope — sjá Áfangi 0 section neðar). Plus Áfangi 5a (pro foundation: auth + saved valuations) og 5b (pro tooling: manual override, attributed PDF, audit log).
+
+Backlog Áfangar 4.5 til 4.13 + Bugs 19-23 + Bug 16 frost — sjá `docs/PLANNING_BACKLOG.md` fyrir full list og current status.
+
+### Bug history (web-app stream)
+
+Comprehensive bug history lifir í `docs/PLANNING_BACKLOG.md`. Summary table fyrir reference:
+
+| Bug | Title | Status | Resolution commit |
+|---|---|---|---|
+| 1-12 | Various Sprint 2 Áfangi 4 build issues | RESOLVED í Áfangi 4 build session | sjá DECISIONS.md |
+| 13 | Search latency 5-7s → 300ms | RESOLVED 2026-04-28 | SQL plpgsql rewrite + Vercel env var validation (commits 7003291, db92d0f) |
+| 14 | Sambærilegar limit 6 | PARTIAL (raised til 10), full target í Áfangi 4.12 | de1a455 |
+| 15 | Sambærilegar "Seld 0,7 M kr" | RESOLVED — mitigation UPDATE + root-fix í build_precompute.py (CPI scaling bug, kaupverD_VISITALA_NEYSLUVERDS misleading column) | 4563b00 + manual UPDATE + precompute c85ad83 |
+| 16 | Leifsgata 9 vantar myndir | FROZEN — Danni working á local photo backfill, ~1 vika expected | sjá PLANNING_BACKLOG |
+| 17 | ?mode=debug tooltip misleading | RESOLVED 2026-04-28 | 6884a5b |
+| 18 | Egilsgata 10 empty search results | RESOLVED — same root cause sem Bug 13 (env var) | resolved með Bug 13 |
+| 19 | Broken /um#adferdafraedi anchor | RESOLVED 2026-04-29 | 18e245c |
+| 20-21 | (skipped — speculative bugs sem voru never opened formally) | N/A | N/A |
+| 22 | DRY refactor af cpi_factor lookup | OPEN, low priority Sprint 3 v1.1 | sjá PLANNING_BACKLOG |
+| 23 | precompute folder ekki git tracked | RESOLVED 2026-04-29 — new repo github.com/danielthormagnusson-coder/verdmat-is-precompute | precompute c85ad83 |
+
+Plus Lighthouse hero-image polish: removed `unoptimized` prop + added `sizes` hints across 4 Image components. Performance score 78 → 90+, LCP 1900ms → 400ms (commit c101727).
+
+### Áfangi 0 — Scraper upgrade (expanded scope, 2026-04-29)
+
+Originally framed sem single-track replacement af erft fastinn.is scraper. Expanded per Danni 2026-04-29 til **tvíþætts scope**:
+
+**Track A — Direct active-listings scraper (visir.is / fasteignir.is)**:
+- Live for-sale listings stream
+- Powers Áfangi 4.13 market-scan view (active listings vs verðmat side-by-side)
+- Recoverar scrape-gap frá 2025-07 sem hefur reduced inflow til 10% af baseline
+
+**Track B — HMS database completion / fastanúmer gap-filling**:
+- Currently `properties_v2.pkl` hefur 124,835 fastanúmer
+- Iceland's residential stock estimated ~150K — ~25K fastanúmer vantar
+- Need method to discover + fetch missing fastanúmer (HMS public API, public records query, eða systematic crawl af þekkt-tomum fastanúmer ranges)
+- Affects search coverage (Sævargarðar 7 + Akralind verification cases)
+
+Planning session er next major Sprint 3 work. Output: `SCRAPER_SPEC_v1.md` í `app/docs/`. Implementation er separate session post-spec. Estimated 1-2 daga planning + 3-5 daga implementation.
+
+Áfangi 0 entry í PLANNING_BACKLOG.md needs scope expansion to reflect tvíþætt vision — current entry is single-track. To be addressed í next planning session.
+
+### Web-app related dev-umhverfi additions
+
+| Path | Type | Notes |
+|---|---|---|
+| `/d/verdmat-is/app/` | Next.js + Supabase, deployed via Vercel | Main app repo: github.com/danielthormagnusson-coder/verdmat-is |
+| `/d/verdmat-is/precompute/` | Python pipeline | Now git-tracked: github.com/danielthormagnusson-coder/verdmat-is-precompute (initial commit c85ad83, 2026-04-29). Bug 15 root-fix í build_precompute.py:642-657. |
+| Supabase project | DB layer | Tables: comps_index (1.1M rows), sales_history (173k), properties_with_listings, repeat_sale_index, ats_lookup_by_heat, predictions, model tracking |
+| Cloudflare Distribution | Image CDN | d1u57vh96em4i1.cloudfront.net — 48,595 photos hosted, configured í next.config.mjs remotePatterns post Lighthouse polish |
 
 ---
 
