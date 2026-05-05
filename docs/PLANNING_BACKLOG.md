@@ -181,6 +181,43 @@ Medium-sized áfangi, 1-2 daga planning + 2-3 daga implementation = ~1 week tota
 
 ---
 
+## Sprint 3 Áfangi 4.13 — Market-scan view: active listings vs verðmat (v1.1, estimated 2-3 days post-Áfangi-0)
+
+**Why** (frá Danni's vision 2026-04-29): Þú vilt geta opnað sér glugga sem er með öllum virkum auglýsingum og þar til hliðar er verðmat okkar og ásett verð. Tvíþætt notkun:
+
+1. **Internal calibration** — checka okkar verðmat af móti real market asking prices á live listings. Sjáu hvort iter4 systematically over/under-shootar per genre, region, price band.
+
+2. **Public "best buy" / overpriced discovery** — sýna almenningi hvaða listings eru fyrir neðan okkar verðmat (best buys) og hvaða eru langt fyrir ofan (overpriced). Marketing-angle: viral content, drives launch traffic, generates trust.
+
+**Hard dependencies**:
+- **Áfangi 0 scraper (track A — active listings)** — must produce active listings feed með asking_price, list_date, source link. Without scraper, no live data.
+- **Per-listing iter4 scoring batch** — `score_new_listing.py` path verður að run á hverri active listing nightly. Currently scoring runs on-demand fyrir `/eign/[fastnum]`; here we need batch run á hundrum-til-þúsundum active listings per cycle.
+
+**Spec elements (fyrir planning session)**:
+
+- Route: `/markadur/auglysingar` (eða svipað navigeranlegt)
+- View: tafla með columns (heimilisfang, postnr, m², byggar, asking_price, verdmat_mean, verdmat_PI80, diff_pct, list_date, link til source listing)
+- Default sort: diff_pct ascending (largest negative gap first = best buy at top)
+- Filter controls: region, segment, price range, byggar range, diff_pct threshold (only show > X% gap í annaðhvort átt)
+- Refresh cadence: nightly batch aligned með scraper output
+- Row click: navigate til `/eign/[fastnum]` fyrir deep-dive ef fastnum er HMS-known. Ef fastnum vantar (supplement-only property), link til source listing instead
+
+**Open design questions (require Danni decision í planning session)**:
+
+1. **Public eða pro-only?** Public feature gives marketing value en raises stakes (mis-classification = reputational risk + agent friction). Pro-only gives same internal calibration value en loses public marketing angle. Hybrid: public sees top-10 sample, pro sees full filterable list?
+
+2. **Framing language** — "best buy" vs "best value" vs "below verðmat". "Overpriced" vs "above verðmat" vs neutral "diff vs verðmat". Tone affects legal exposure og agent relations. Iceland market is small — agents will recognize their own listings flagged as overpriced.
+
+3. **Confidence threshold** — should low-PI predictions (wide 80% spread) be hidden? Showing "this er overpriced 30%" when our 80% PI er ±25% er misleading. Possible rule: hide listings þar sem `|diff_pct| < width_PI80_pct`.
+
+4. **Scope phasing** — only Höfuðborgarsvæðið first (where HMS coverage er strongest), or all Iceland? Only APT_FLOOR/APT_STANDARD initially (where iter4 MAPE er lowest at 6-8%), or all residential including SFH (16% MAPE — looser confidence)?
+
+**Marketing implication**: this is potentially the strongest viral feature on the site. Once shipped, it becomes the natural anchor for social media content ("this week's best buys í 101", "5 most overpriced flats í Garðabær"). Worth careful design before public launch — design errors here are higher-stakes than typical UI work.
+
+**Planning prompt**: skrifa parallel við Áfangi 0 planning session, since they share data dependencies. Output: `MARKET_SCAN_SPEC_v1.md`.
+
+---
+
 ## Sprint 3 Bug 22 — DRY refactor of cpi_factor lookup (v1.1, estimated 30 min)
 
 **Why**: Surfaced 2026-04-29 during Bug 15 root-fix. The `cpi_by_ym` lookup block (load `training_data_v2.pkl` → group by year/month → first → dict + `latest_factor`) is now duplicated between `build_comps` (`build_precompute.py:642-657`) and `build_sales_history` (`build_precompute.py:749-768`). Both produce the same dict from the same source, but if either diverges it'd silently re-introduce a Bug-15-class scale mismatch.
@@ -267,7 +304,9 @@ Each use case is a separate invariant call in `refresh_dashboard_tables.py`. Fai
 
 **Status**: FROZEN. Diagnostic + fix work paused 2026-04-29 að beiðni Danni — hann er að græja síðasta pakka af myndum sem vantar locally, og rerunning Bug 16 diagnostic núna myndi hugsanlega clash-a við þann photo backfill work eða gefa stale niðurstöður.
 
-**Unfreeze trigger**: Þegar Danni hefur completed photo backfill round og pushed updated images til Supabase (líklega via `load_dashboard_v1.py --tables listings` eða svipaður path), þá run-a Bug 16 diagnostic queries á updated data. Líkleg outcome eitt af þrennu:
+**Unfreeze trigger** (updated 2026-04-29): Danni er working á local photo backfill í parallel við Sprint 3 Áfangi 0 planning. Expected timeline ~1 week. Status check áður en Áfangi 0 implementation phase byrjar — ef backfill er done, run diagnostic queries og resolve. Ef enn í gangi, halda Bug 16 frozen og adjust Áfangi 0 dependencies accordingly. Not blocking other Sprint 3 work.
+
+**Possible post-unfreeze outcomes (frá this session's diagnostic)**:
 
 1. **Photos appear post-backfill** → Bug 16 resolves sjálfkrafa, marka closed.
 2. **Photos still missing** → narrow hypothesis space (B legitimate empty source, eða C augl_id mapping bug), proceed með targeted fix.
