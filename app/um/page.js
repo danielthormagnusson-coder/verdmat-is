@@ -49,6 +49,7 @@ export default function AboutPage() {
         </p>
 
         <h2
+          id="adferdafraedi"
           className="display"
           style={{ fontSize: "1.5rem", marginTop: "2rem", marginBottom: "0.75rem" }}
         >
