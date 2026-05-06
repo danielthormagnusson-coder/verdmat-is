@@ -280,6 +280,40 @@ Implementation: 5-10 line addition til `WORKING_PROTOCOL.md` hard rule section. 
 
 ---
 
+## Sprint 3 Bug 25 — Postgres 15+ view security_invoker discipline (Áfangi 0 dependency, 2026-05-06)
+
+**Why**: Surfaced 2026-05-06 during RLS baseline audit. By default, views in Postgres 15+ run with the privileges of the view owner (typically `postgres` superuser), which means a view CAN bypass RLS on underlying tables if not configured with `security_invoker = true`. This is NOT a current security hole — the post-2026-05-06 RLS categorization has zero service-role-only tables, so no view can leak rows that anon doesn't already have access to via underlying `public_read` policies. **It becomes critical the moment Áfangi 0 ships `rejected_commercial_listings` as a service-role-only table.** Any view that joins service-role-only data must declare `security_invoker = true` or it will leak rows to anon callers via the view-as-bypass channel.
+
+**Fix**: Add to Áfangi 0 implementation checklist (Step 4 schema migrations per `SCRAPER_SPEC_v1.md` §8.2). Every CREATE VIEW that touches `rejected_commercial_listings` or any future service-role-only table must include `WITH (security_invoker = true)`. Audit pre-merge that no view in the new migration omits this clause. Existing 4 public views (latest_regime_per_cell, regime_per_cell_monthly, repeat_sale_index_by_segment, repeat_sale_index_main_pooled) do not need backporting because their underlying tables are all dashboard-public — the security_invoker flag is a no-op when the underlying RLS already permits anon SELECT.
+
+**Risk if missed**: silent data leak. A view joining `rejected_commercial_listings` would expose its rows to any anon caller, defeating the service-role-only categorization. Sentry would not catch this — it is a permissioning behavior, not an exception.
+
+**Flagged 2026-05-06 during RLS baseline audit Checkpoint 3 close-out.** Tracked as Áfangi 0 dependency, not standalone bug.
+
+---
+
+## Sprint 3 Bug 26 — `augl_id` back-link column exposure (v1.1 hardening, 2026-05-06)
+
+**Why**: Surfaced 2026-05-06 during RLS baseline audit Checkpoint 1 column inventory of `last_listing_text`. The `augl_id` column on `last_listing_text` and `augl_id_latest` on `properties` are per-source listing identifiers from mbl.is and fasteignir.visir.is. Exposing them to anon via the public read path enables third-party scrapers to back-link our data to source platforms — a brittleness we should not introduce (third-party tooling tracking our listings could fingerprint our scrape cadence and trigger source-side anti-bot measures aimed at the apparent back-linker, which is us). This is the same concern that drove `SCRAPER_SPEC_v1.md` §3.3 to REVOKE `listing_id` from `active_listings_public` view.
+
+**Status**: NOT a current alert. The exposure has been the status quo since Sprint 1 launch. The 2026-05-06 RLS audit did NOT address column-level exposure (alert was about RLS-disabled, not column visibility). `last_listing_text` is correctly tagged dashboard-public per Danni's decision 2026-05-06 because the broader concern is filed here for separate handling.
+
+**Fix (post-Áfangi-0)**: Introduce column-stripping public views and refactor frontend reads:
+
+1. `CREATE VIEW last_listing_text_public AS SELECT fastnum, sale_rank, thinglyst_dagur, lysing_plain, scraped_at FROM last_listing_text;` (drop `augl_id`)
+2. `CREATE VIEW properties_public AS SELECT <all properties columns except augl_id_latest> FROM properties;` (column-stripping)
+3. Refactor frontend reads (`lib/dashboard-queries.js`, `app/eign/[fastnum]/page.js`, search RPC) to use views instead of underlying tables. The conditional render at `app/eign/[fastnum]/page.js:204` (`{property.augl_id_latest && property.list_price_latest ? ...}`) needs special handling — replace `augl_id_latest` truthy check with a derived boolean column in the view (e.g., `has_listing` computed as `augl_id_latest IS NOT NULL`).
+4. `REVOKE SELECT ON last_listing_text, properties FROM anon, authenticated; GRANT SELECT ON last_listing_text_public, properties_public TO anon, authenticated;`
+5. Both new views must declare `WITH (security_invoker = true)` per Bug 25.
+
+**Effort**: ~4-6 hours including frontend refactor + view creation + verification suite + smoke test on dashboard pages. Single migration commit.
+
+**Why post-Áfangi-0**: Áfangi 0 implementation will introduce its own column-stripping pattern (`active_listings_public` view per `SCRAPER_SPEC_v1.md` §3.3). Better to ship that pattern first, validate it works, then backport to existing tables in a single follow-up rather than backport-now and re-touch when Áfangi 0 ships its own variant.
+
+**Flagged 2026-05-06 during RLS baseline audit Checkpoint 1 column inventory.** Estimated v1.1 hardening, post-Áfangi-0 implementation.
+
+---
+
 ## Sprint 3 Áfangi 0.x — Pre-load invariant assertion harness (defensive infrastructure, Sprint 3+)
 
 **Why**: Bug 15 root-fix had a Step 4 invariant check (build CSV vs Supabase `sales_history.kaupverd_real`, sample 100 rows, abort load if any mismatch > 1 kr tolerance). The pattern is generalizable and should run on every pre-load step in `refresh_dashboard_tables.py` to catch data corruption before it reaches production.

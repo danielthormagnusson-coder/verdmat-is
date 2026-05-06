@@ -1,0 +1,123 @@
+RLS BASELINE AUDIT — APPLY LOG
+================================
+Project: verdmat-is (szzjsvmvxfrhyexblzvq)
+Migration: supabase/migrations/20260506_rls_baseline_audit.sql
+Apply timestamp: 2026-05-06T14:50:00Z (approximate)
+Apply method: Supabase MCP execute_sql (single-shot BEGIN/COMMIT block)
+Operator: Claude Code (Opus 4.7) on Danni's go-ahead 2026-05-06
+
+================================
+APPLY RESULT: SUCCESS
+================================
+The migration body (BEGIN ... COMMIT block) executed without error.
+22 objects touched: 14 dashboard-public tables (RLS+policy+grants),
+4 user-owned tables (anon revoke), 4 views (write-priv revoke).
+Returned: empty result set (DDL does not return rows).
+
+================================
+VERIFICATION RESULT: ALL PASS
+================================
+
+[1] STATE DIFF
+  Pre-state: 14 tables RLS-disabled, 4 already RLS-enabled, 4 views.
+  Post-state: 18 tables RLS-enabled (14 changed), 4 views unchanged
+              kind (views inherit from underlying tables).
+  Policy count: every table now shows policy_count=1.
+  Result: PASS.
+
+[2] GRANTS REDUCTION
+  Pre-state: every object granted DELETE, INSERT, REFERENCES, SELECT,
+             TRIGGER, TRUNCATE, UPDATE to anon, authenticated, service_role.
+  Post-state:
+    - Dashboard-public (14 tables): anon, authenticated → SELECT only.
+    - User-owned (4 tables): anon → no entry (revoked); authenticated
+      retains full DML (RLS gates by auth.uid()).
+    - Views (4): anon, authenticated → REFERENCES, SELECT, TRIGGER (DML
+      revoked as planned; REFERENCES+TRIGGER residuals are noise, not
+      security gap — view inserts/updates/deletes/truncates are blocked).
+    - service_role: unchanged everywhere (full DML).
+  Result: PASS.
+
+[3] ANON SELECT ROW COUNTS (via SET LOCAL ROLE anon)
+  All 14 dashboard-public tables returned full row counts under anon:
+    properties:                    124,835 rows  (pre: 124,835)
+    predictions:                   110,316 rows  (pre: 110,316)
+    predictions_iter3v2:           110,316 rows  (pre: 110,316)
+    comps_index:                 1,101,454 rows  (pre: 1,101,454)
+    feature_attributions:        1,103,160 rows  (pre: 1,103,160)
+    feature_attributions_iter3v2: 1,103,160 rows  (pre: 1,103,160)
+    sales_history:                 173,081 rows  (pre: 173,081)
+    repeat_sale_index:               2,673 rows  (pre: 2,673)
+    last_listing_text:              60,807 rows  (pre: 60,807)
+    ats_lookup:                         65 rows  (pre: 65)
+    ats_lookup_by_quarter:             913 rows  (pre: 913)
+    ats_dashboard_monthly_heat:      2,501 rows  (pre: 2,501)
+    llm_aggregates_quarterly:        1,450 rows  (pre: 1,450)
+    model_tracking_history:             11 rows  (pre: -1 stat estimate;
+                                                  11 is real)
+  Result: PASS — every dashboard-public table remains anon-readable
+          with row counts matching pre-state.
+
+[4] ANON DML BLOCKED (empirical probe)
+  Probe: BEGIN; SET LOCAL ROLE anon;
+         INSERT INTO properties (fastnum, heimilisfang)
+           VALUES (-99999, 'audit_probe_should_fail');
+         ROLLBACK;
+  Result: ERROR 42501: permission denied for table properties
+          HINT: Grant the required privileges to the current role
+                with: GRANT INSERT ON public.properties TO anon;
+  Interpretation: PASS — Postgres blocked the INSERT at the privilege
+                  layer before any RLS policy check. This is the
+                  alert-resolution proof. The error code 42501
+                  ("insufficient_privilege") is the exact failure mode
+                  the migration was designed to produce.
+
+[5] LIVE-SITE SMOKE CHECK
+  HTTP 200 on every URL probed:
+    /                           → 200, 35 KB
+    /eign/2008647               → 200, 128 KB
+    /markadur                   → 200, 44 KB
+    /markadur/visitala          → 200, 964 KB
+    /markadur/markadsstada      → 200, 1.1 MB
+    /markadur/ibudir            → 200, 840 KB
+    /markadur/modelstada        → 200, 38 KB
+  Response times: 0.6s - 3.6s (no slowdown vs typical baseline).
+  Result: PASS — zero blank pages, zero 5xx, all dashboard pages
+          render. Vercel ISR cache (10-min TTL) may have served
+          partially-stale SSR output for some, but the absence of any
+          5xx is sufficient halt-on-failure pass criterion. Response
+          sizes match expected content density (visitala/markadsstada
+          have heavy chart payloads; landing+modelstada are lighter).
+
+================================
+NO ROLLBACK NEEDED
+================================
+All five verification steps passed. Migration stands. No follow-up
+remediation required. Original Supabase alert (rls_disabled_in_public,
+2026-05-03) is resolved.
+
+================================
+KNOWN RESIDUALS (non-blocker)
+================================
+[a] Views retain REFERENCES + TRIGGER privileges on anon/authenticated.
+    Cosmetic noise; can be cleaned up in a v1.1 hygiene pass alongside
+    the augl_id back-link concern (PLANNING_BACKLOG follow-up).
+
+[b] Postgres 15+ view security_invoker default — by default, views run
+    with the privileges of the view OWNER (typically postgres
+    superuser), which means a view CAN bypass RLS on underlying tables
+    if not explicitly configured with security_invoker=true. This is
+    NOT a current security hole because there are zero
+    service-role-only tables in the post-fix state, so no view can
+    "leak" data anon shouldn't see. But this becomes critical the
+    moment Áfangi 0 introduces rejected_commercial_listings as a
+    service-role-only table — any view that joins that table must
+    declare security_invoker=true. Logged in dry-run plan addendum and
+    will be added to Áfangi 0 implementation checklist.
+
+[c] augl_id back-link concern on last_listing_text and
+    properties.augl_id_latest — exposing per-source listing IDs to
+    anon enables third-party scrapers to back-link our data to source
+    platforms. Not in scope of this RLS audit (alert was about
+    RLS-disabled, not column exposure). Filed as PLANNING_BACKLOG v1.1
+    hardening item: column-stripping view-pattern post-Áfangi-0.

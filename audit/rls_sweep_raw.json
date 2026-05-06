@@ -1,0 +1,46 @@
+{
+  "generated_at": "2026-05-06T14:35:00Z",
+  "project": "verdmat-is (szzjsvmvxfrhyexblzvq)",
+  "schema": "public",
+  "sweep_method": "Supabase MCP execute_sql via service-role; pg_class + pg_policies + information_schema.role_table_grants",
+  "objects": [
+    {"object_name": "ats_dashboard_monthly_heat", "kind": "table", "rls_enabled": false, "row_count_estimate": 2501, "size": "624 kB", "category": "dashboard_public"},
+    {"object_name": "ats_lookup", "kind": "table", "rls_enabled": false, "row_count_estimate": 65, "size": "80 kB", "category": "dashboard_public"},
+    {"object_name": "ats_lookup_by_quarter", "kind": "table", "rls_enabled": false, "row_count_estimate": 913, "size": "360 kB", "category": "dashboard_public"},
+    {"object_name": "comps_index", "kind": "table", "rls_enabled": false, "row_count_estimate": 1101454, "size": "225 MB", "category": "dashboard_public"},
+    {"object_name": "feature_attributions", "kind": "table", "rls_enabled": false, "row_count_estimate": 1103160, "size": "119 MB", "category": "dashboard_public"},
+    {"object_name": "feature_attributions_iter3v2", "kind": "table", "rls_enabled": false, "row_count_estimate": 1103160, "size": "121 MB", "category": "dashboard_public"},
+    {"object_name": "last_listing_text", "kind": "table", "rls_enabled": false, "row_count_estimate": 60807, "size": "128 MB", "category": "dashboard_public"},
+    {"object_name": "llm_aggregates_quarterly", "kind": "table", "rls_enabled": false, "row_count_estimate": 1450, "size": "416 kB", "category": "dashboard_public"},
+    {"object_name": "model_tracking_history", "kind": "table", "rls_enabled": false, "row_count_estimate": -1, "size": "48 kB", "category": "service_role_only"},
+    {"object_name": "predictions", "kind": "table", "rls_enabled": false, "row_count_estimate": 110316, "size": "37 MB", "category": "dashboard_public"},
+    {"object_name": "predictions_iter3v2", "kind": "table", "rls_enabled": false, "row_count_estimate": 110316, "size": "18 MB", "category": "dashboard_public"},
+    {"object_name": "pro_users", "kind": "table", "rls_enabled": true, "row_count_estimate": -1, "size": "24 kB", "category": "user_owned_already_rls"},
+    {"object_name": "properties", "kind": "table", "rls_enabled": false, "row_count_estimate": 124835, "size": "206 MB", "category": "dashboard_public"},
+    {"object_name": "repeat_sale_index", "kind": "table", "rls_enabled": false, "row_count_estimate": 2673, "size": "584 kB", "category": "dashboard_public"},
+    {"object_name": "sales_history", "kind": "table", "rls_enabled": false, "row_count_estimate": 173081, "size": "24 MB", "category": "dashboard_public"},
+    {"object_name": "saved_properties", "kind": "table", "rls_enabled": true, "row_count_estimate": -1, "size": "16 kB", "category": "user_owned_already_rls"},
+    {"object_name": "saved_searches", "kind": "table", "rls_enabled": true, "row_count_estimate": -1, "size": "16 kB", "category": "user_owned_already_rls"},
+    {"object_name": "saved_valuations", "kind": "table", "rls_enabled": true, "row_count_estimate": -1, "size": "32 kB", "category": "user_owned_already_rls"},
+    {"object_name": "latest_regime_per_cell", "kind": "view", "rls_enabled": false, "row_count_estimate": -1, "size": "0 bytes", "category": "view"},
+    {"object_name": "regime_per_cell_monthly", "kind": "view", "rls_enabled": false, "row_count_estimate": -1, "size": "0 bytes", "category": "view"},
+    {"object_name": "repeat_sale_index_by_segment", "kind": "view", "rls_enabled": false, "row_count_estimate": -1, "size": "0 bytes", "category": "view"},
+    {"object_name": "repeat_sale_index_main_pooled", "kind": "view", "rls_enabled": false, "row_count_estimate": -1, "size": "0 bytes", "category": "view"}
+  ],
+  "policies": [
+    {"tablename": "pro_users", "policyname": "read own", "cmd": "SELECT", "roles": "{public}", "using_clause": "(auth.uid() = id)", "with_check_clause": null},
+    {"tablename": "saved_properties", "policyname": "own saves", "cmd": "ALL", "roles": "{public}", "using_clause": "(auth.uid() = user_id)", "with_check_clause": null},
+    {"tablename": "saved_searches", "policyname": "own searches", "cmd": "ALL", "roles": "{public}", "using_clause": "(auth.uid() = user_id)", "with_check_clause": null},
+    {"tablename": "saved_valuations", "policyname": "own valuations", "cmd": "ALL", "roles": "{public}", "using_clause": "(auth.uid() = user_id)", "with_check_clause": null}
+  ],
+  "grants_summary": {
+    "uniform_finding": "EVERY object (18 tables + 4 views) has anon, authenticated, AND service_role granted DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE — i.e. all privileges granted to all three roles uniformly. This is the default Supabase grant pattern and is the underlying severity multiplier behind the RLS alert.",
+    "implication": "Even with RLS enabled, the privilege model permits anon (publicly accessible key embedded in client code) to attempt DELETE/TRUNCATE on production tables. RLS policies must explicitly deny those operations OR the GRANTs must be REVOKED to restore defense-in-depth."
+  },
+  "categorization_summary": {
+    "dashboard_public": ["ats_dashboard_monthly_heat", "ats_lookup", "ats_lookup_by_quarter", "comps_index", "feature_attributions", "feature_attributions_iter3v2", "last_listing_text", "llm_aggregates_quarterly", "predictions", "predictions_iter3v2", "properties", "repeat_sale_index", "sales_history"],
+    "service_role_only": ["model_tracking_history"],
+    "user_owned_already_rls": ["pro_users", "saved_properties", "saved_searches", "saved_valuations"],
+    "view": ["latest_regime_per_cell", "regime_per_cell_monthly", "repeat_sale_index_by_segment", "repeat_sale_index_main_pooled"]
+  }
+}
