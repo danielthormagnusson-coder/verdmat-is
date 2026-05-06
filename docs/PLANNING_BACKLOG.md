@@ -260,6 +260,24 @@ Both call sites become one line each. Total diff: −18 lines + helper.
 
 **Flagged 2026-04-29 during Bug 15 root-fix completion.** Not launch blocker — production already mitigated via direct UPDATE; running CSV is correct.
 
+**RESOLVED 2026-04-29** — `precompute/` initialized as separate git repo, pushed to `github.com/danielthormagnusson-coder/verdmat-is-precompute` (initial commit `c85ad83`). Bug 15 root-fix in `build_precompute.py:642-657` now version-controlled.
+
+---
+
+## Sprint 3 Bug 24 — WORKING_PROTOCOL improvement: verbatim-check phrase fetching (v1.1, estimated 30 min)
+
+**Why**: Surfaced 2026-04-29 during STATE.md sync. Verbatim-check rule í WORKING_PROTOCOL prescriberar að logga distinctive phrases sem proof-of-version áður en str_replace edits. En current pattern hefur Claude (eða strategic chat draftar) often spec-a þessar phrases frá memory eða stale spec, ekki frá actual file fetch. Result: verification check fails með false positive þegar phrase var aldrei í file — like `'Áfangi 7 rollfixture í production'` sem var assumed-but-never-actual í STATE.md sync 2026-04-29.
+
+**Fix**: Update `WORKING_PROTOCOL.md` verbatim-check section til að explicitly require:
+
+1. Distinctive phrases fyrir verification MUST be fetched verbatim frá file í pre-edit state (via `grep` + `view` eða svipað)
+2. Phrases tekið úr memory eða previous spec drafts má ekki nota sem checks
+3. Ef Claude er ekki able til að fetch live file content, halt og bíða eftir upload
+
+Implementation: 5-10 line addition til `WORKING_PROTOCOL.md` hard rule section. Plus example í examples section.
+
+**Pattern lærdómur**: trust canonical over memory. Same lesson sem caught á 2026-04-29 með handoff text drift gegn STATE.md, og með numbering drift milli `BUGS_AND_FEATURES_QUEUE` og `PLANNING_BACKLOG`.
+
 ---
 
 ## Sprint 3 Áfangi 0.x — Pre-load invariant assertion harness (defensive infrastructure, Sprint 3+)
