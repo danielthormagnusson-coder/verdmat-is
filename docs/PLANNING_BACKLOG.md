@@ -443,6 +443,8 @@ Launch strategy Leið B ships dashboard með transparent HMS-gap caveat (`Search
 
 **Timing**: Parallel með Áfanga 5a/5b, ekki blocked af þeim.
 
+**Stretched scope per SCRAPER_SPEC_v1 (2026-05-06)**: This entry was originally scoped for Track B (HMS supplementary scraper) only. The 2026-05-06 planning session expanded scope to cover **Track A active-listings stream** (mbl.is/fasteignir + fasteignir.visir.is) alongside Track B. Track A powers the Áfangi 4.13 market-scan view and recovers the live-listings stream that died with the legacy scraper in mid-2025. Track B was simplified per Danni clarification 2026-05-06 — HMS Fasteignaskrá contains all ~150K fastanúmer; the 25K gap is incomplete-scrape, not fundamental data sourcing. See `app/docs/SCRAPER_SPEC_v1.md` for full deliverable, decision-points (#1A/#1B/#2A/#2B), and 10-step build order.
+
 ---
 
 # Prompt 1 — Sprint 2 Áfangi 4 planning

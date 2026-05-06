@@ -1,10 +1,12 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 29. apríl 2026 (post-launch polish session — Bugs 13-23 closure, /um anchor fix, Lighthouse hero-image polish (Performance 78→90+, LCP 1900ms→400ms), Áfangi 4.11/4.12/4.13 logged í PLANNING_BACKLOG, Áfangi 0 expanded til tvíþætts scope (Track A active listings + Track B HMS gap-filling), precompute folder git-tracked sem nýtt repo verdmat-is-precompute (commit c85ad83). Sprint 2 Áfangi 4 launch announcement enn HELD pending Danni's call.)
+**Síðast uppfært:** 6. maí 2026 (SCRAPER_SPEC_v1 committed, Sprint 3 Áfangi 0 planning lokið — Track A + Track B spec, 4 decision-points identified (#1A/#1B/#2A deferred, #2B locked), 10-step build order; previous 29. apríl milestone preserved.)
+
+**Previous post-launch polish milestone:** 29. apríl 2026 (post-launch polish session — Bugs 13-23 closure, /um anchor fix, Lighthouse hero-image polish (Performance 78→90+, LCP 1900ms→400ms), Áfangi 4.11/4.12/4.13 logged í PLANNING_BACKLOG, Áfangi 0 expanded til tvíþætts scope (Track A active listings + Track B HMS gap-filling), precompute folder git-tracked sem nýtt repo verdmat-is-precompute (commit c85ad83). Sprint 2 Áfangi 4 launch announcement enn HELD pending Danni's call.)
 
 **Previous launch-polish milestone:** 27. apríl 2026 (**Sprint 2 Áfangi 4 LOKIÐ.** Public dashboard live á /markadur með fimm undirsíðum (visitala, markadsstada, ibudir + unregistered map, modelstada) + waterfall fix á eign-síðu + Fasi E launch polish (canonical, mobile collapse, skip-link, scrape-gap disclosure, Bug 8 nýbygging filter). Átta bug-fixes leystir mid-sprint: 1 regime pill, 2 `effective_date_latest`, 3 autocomplete ORDER BY, 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, 5 expand-query merking column, 6 quarterly/smoothed-monthly regime, 7 n<30 thin-sample filter á /ibudir, 8 is_new_build filter á metrics 1 & 2. Launch strategy Leið B: dashboard ships með HMS-gap acknowledgement; comprehensive scraper er Sprint 3 Áfangi 0 top-priority.)
 
-**Verkefnisstaða heildar: ~96%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready, Sprint 3 staged.)
+**Verkefnisstaða heildar: ~96,5%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready, Sprint 3 Áfangi 0 spec lokið, implementation staged.)
 
 ---
 
@@ -246,11 +248,18 @@ Planning session er next major Sprint 3 work. Output: `SCRAPER_SPEC_v1.md` í `a
 
 ## Staða per áfanga
 
-### Áfangi 0 — Infrastructure: **0%**
+### Áfangi 0 — Infrastructure: **15%**
+
+- [x] Planning session lokið 2026-05-06 — `app/docs/SCRAPER_SPEC_v1.md` committed. Tvíþætt scope: Track A (mbl + visir active-listings stream) + Track B (HMS fastanúmera completion ~25K gap).
+- [ ] Step 1 (secrets + Hetzner deployment infra) — pending
+- [ ] Step 2 (mirror-investigation audit, gates #1A) — pending, parallel with Step 3
+- [ ] Step 3 (HMS dialogue, gates #1B) — pending, parallel with Step 2
+- [ ] Step 4-10 — see `SCRAPER_SPEC_v1.md` §8.2 for build order
+
+Open decision-points: #1A (Track A source pick), #1B (HMS access path), #2A (B1/B2/B3 pickle migration). #2B locked í §6.1 mixed approach (Track A: ii staging-sync, Track B: i direct write).
 
 Backlog:
-- Nýr scraper fyrir fastinn.is með monitoring og healthcheck (replace erft gat scraper sem dó 2025-07)
-- Scraper þarf að capture `landnum` field úr augl_json (testable Danni's pre-fastnum hypothesis)
+- Existing 1.8b backlog item (landnum-based pre-fastnum pairing): re-evaluate post-Track-A — Track A may surface listings before fastnum issuance, partial signal for the original hypothesis.
 
 ### Áfangi 1 — Segmentering og data audit: **~96%**
 
