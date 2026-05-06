@@ -162,28 +162,36 @@ Aldrei fyrir: STATE, DECISIONS, DATA_SCHEMA, TAXONOMY, GLOSSARY.
 
 ---
 
-## Document sync via GitHub (added 2026-04-21)
+## Document editing (updated 2026-05-06)
 
-Continuity files (STATE, DECISIONS, WORKING_PROTOCOL, TAXONOMY, GLOSSARY, DATA_SCHEMA, LABELING_GUIDE, GOLD_STANDARD_PROTOCOL, EXTRACTION_SCHEMA_v0_2_2, DATA_AUDIT_REPORT) exist í tveim stöðum:
+Continuity files (STATE, DECISIONS, WORKING_PROTOCOL, TAXONOMY, GLOSSARY, DATA_SCHEMA, LABELING_GUIDE, GOLD_STANDARD_PROTOCOL, EXTRACTION_SCHEMA_v0_2_2, DATA_AUDIT_REPORT) eru canonical í `D:\\verdmat-is\\app\\docs\\*.md`. Edits happen þar directly via Claude Code, þá commit + push origin main. **`docs/` folder ER source of truth.** `D:\\*.md` working copies frá pre-2026-05-06 era eru immutable historical snapshots — ekki touched, ekki canonical.
 
-1. **D:\\*.md** — working copy, where edits happen
-2. **D:\\verdmat-is\\app\\docs\\*.md** — git-tracked, canonical, pushed to GitHub
-
-### After any edit to D:\\ continuity files
+### Pattern fyrir hvert edit
 
 ```bash
-cp /d/STATE.md /d/verdmat-is/app/docs/STATE.md   # or whichever file changed
+# Edit docs/<file>.md directly via str_replace tool
 cd /d/verdmat-is/app
-git add docs/
+git add docs/<file>.md
 git commit -m "docs: <short description of change>"
 git push origin main
 ```
 
-### Never use create_file on D:\\ continuity files
-(existing rule, unchanged)
+### Verbatim-check rules (essential, applied til docs/)
 
-### Line count verification required
-(existing rule, unchanged)
+Áður en Claude skrifar `str_replace` (eða ANY edit) á canonical doc:
+
+1. **View** current file fyrst með Read tool á `/d/verdmat-is/app/docs/<file>.md`.
+2. **Keyra `wc -l`** á current file og logga niðurstöðuna.
+3. **Keyra `grep -c "^## "`** á current file til að telja top-level sections.
+4. **Bera saman við væntingar** — sjá distinctive thresholds í `Hard rule` section ofar. Counts hafa vaxið síðan 2026-04-19 entry (STATE núna 2.000+ línur, DECISIONS 1.800+ línur); flag ef substantially lower.
+5. **Spot-check distinctive phrases** — t.d. `grep -q "Áfangi 4c LOKIÐ"` á STATE eða `grep -q "Nýjar ákvarðanir bætast við efst"` á DECISIONS. Ef vantar, file is not at expected version — halt.
+
+Áður en `str_replace` er notað á neðri part af skjali, view lokadrög til að staðfesta að efni er óbreytt.
+
+Eftir str_replace, verify wc -l increased (additive principle). Negative line-count delta krefst eksplisít rationale — annars rollback frá pre-edit backup.
+
+### Never use create_file on existing canonical docs
+(existing rule, unchanged — `create_file` allowed only fyrir nýtt skjal sem ekki er til, sjá *Hvenær er OK að nota `create_file`* section ofar.)
 
 ### Canonical raw URLs (for chat-Claude reference)
 
@@ -191,3 +199,7 @@ git push origin main
 - https://raw.githubusercontent.com/danielthormagnusson-coder/verdmat-is/main/docs/DECISIONS.md
 - https://raw.githubusercontent.com/danielthormagnusson-coder/verdmat-is/main/docs/WORKING_PROTOCOL.md
 - (same pattern for TAXONOMY, GLOSSARY, DATA_SCHEMA, LABELING_GUIDE, GOLD_STANDARD_PROTOCOL, EXTRACTION_SCHEMA_v0_2_2, DATA_AUDIT_REPORT)
+
+### Changelog
+
+**2026-05-06**: D:\\ ↔ docs/ sync pattern retired. Canonical er `docs/` direct via Claude Code editing í `/d/verdmat-is/app/docs/`. D:\\ working copies frá pre-2026-05-06 era left as immutable historical snapshots, ekki touched. Reason: empirical drift Apr 21 → May 6 — all sessions edited docs/ directly without syncing back, D:\\ fell 392 lines behind across STATE+DECISIONS over 15 days. Pattern was solving problem that didn't exist í practice (D:\\ as separate working copy added overhead without preventing any actual data loss). Verbatim-check + line-count + create_file rules retained, just applied til docs/ instead of D:\\. Surfaced 2026-05-06 Bug-24-pattern halt during STATE+DECISIONS catch-up post RLS-baseline-audit — `cp D:\\<file> docs/<file>` would have destroyed 392 lines of recent work; halt + spec-revision averted.

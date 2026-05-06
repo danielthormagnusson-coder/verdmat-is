@@ -1877,6 +1877,12 @@ Current_heat_bucket ákvarðast af latest quarter's row í Table A (retrospectiv
 - GitHub `docs/` folder í verdmat-is repo creates single source of truth fyrir chat-Claude + Claude Code
 - WORKING_PROTOCOL.md updated með sync rule (D:\ → docs/ → git → origin)
 
+### Phase 1E — Security baseline (KLÁRAÐ 2026-05-06)
+
+RLS baseline audit + GRANT cleanup closur 2026-05-03 Supabase security alert (`rls_disabled_in_public`). Three-checkpoint audit workflow (sweep → migration draft → apply + verify) brought existing Sprint 1+2 tables upp í SCRAPER_SPEC_v1 §3.3 conformance pattern: ENABLE ROW LEVEL SECURITY á 14 dashboard-public tables með `public_read` SELECT-only policy, REVOKE ALL anon/authenticated DML + GRANT SELECT pattern, defense-in-depth REVOKE FROM anon á 4 user-owned tables (`saved_*`, `pro_users`) sem höfðu pre-existing `auth.uid()` RLS en héldu over-grants. Verification PASS á öll 5 steps: PostgreSQL error 42501 (insufficient_privilege) á anon INSERT probe áður en RLS policy check fer fram, 7/7 HTTP 200 á live-site smoke check (`/`, `/eign/2008647`, 5 × `/markadur/*`), row counts unchanged post-apply (124.835 properties / 1.101.454 comps_index / 110.316 predictions matching pre-state). Single-transaction migration á 22 objects, idempotent. Commit `1d61257` (a045f1a..1d61257), 9 files, +1.227 lines, includes `supabase/migrations/20260506_rls_baseline_audit.sql` plus full audit/ trail.
+
+**Sprint 2 Áfangi 4 launch-announcement unblocked.** Sjá `DECISIONS.md` 2026-05-06 entry fyrir full audit trail og Bug 25/26 follow-up flags (view security_invoker discipline + augl_id back-link column exposure).
+
 ### Áfangi 2-5 — Module Robustness (NÆSTA)
 - Target: remove `real_fasteignamat` dependence (currently 45-85% feature importance per prediction)
 - Reason: annual HMS fasteignamat updates cause 5-10% overnight jumps — not acceptable for bank/pro users
