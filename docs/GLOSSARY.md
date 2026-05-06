@@ -226,6 +226,10 @@ Skrá yfir lykilhugtök sem koma fyrir í verkefninu — bæði íslensk fasteig
 
 **paired_fresh / off_market / post_sale_only (pair_status taxonomy)** — sjá DATA_SCHEMA.md pairs_v1 section. Fyrir repeat-sale index nota allir pair_status sem eru arm's-length (pairs_v1 er þegar ONOTHAEFUR-filtered).
 
+**Track A** — Direct active-listings scraper í Sprint 3 Áfangi 0. Sources: mbl.is/fasteignir og fasteignir.visir.is. Fetches live for-sale listings nightly, lands í `active_listings` + `active_listings_history` tables. Powers Áfangi 4.13 market-scan view og recoverar live-listings stream sem dó 2025-07. Sjá `app/docs/SCRAPER_SPEC_v1.md` §1, §2, §5.4 fyrir details.
+
+**Track B** — HMS fastanúmera completion scraper í Sprint 3 Áfangi 0. Source: hms.is/fasteignaskra (canonical). Fyllir í ~25K fastanúmer gap í `properties_v2` (124,835 rows af ~150K total Iceland stock). Inserts canonical `properties` rows — engin supplement table. Sjá `app/docs/SCRAPER_SPEC_v1.md` §1, §2, §3.2 fyrir details.
+
 ---
 
 *Bætið við nýjum hugtökum eftir því sem þau koma upp.*

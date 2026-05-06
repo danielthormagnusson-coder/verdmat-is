@@ -683,3 +683,16 @@ Mest algengt MAIN residential: APT_FLOOR (50.795), APT_STANDARD (33.535), SFH_DE
 Messy encoding: `fjolb`, `einb`, `raðpar`/`radpar`, `atv`, `sumarhus`, `hæðir`/`haedir`, `fjölb`.
 
 **Regla**: Nota HMS tegund (properties_v2) fyrir flokkun, listings tegund er bara fallback.
+
+---
+
+## Track A + Track B scraper landing tables (SCRAPER_SPEC_v1, 2026-05-06)
+
+Fjórar nýjar storage artifacts kynntar í `app/docs/SCRAPER_SPEC_v1.md` §3 — listed hér fyrir single-source-of-truth reference. Sjá spec §3.1-3.4 fyrir full DDL, RLS policies, retention.
+
+- **`active_listings`** — Track A current-state landing tafla, active for-sale listings frá mbl.is/fasteignir og fasteignir.visir.is. Public-readable view `active_listings_public` exposed til UI consumers (`listing_id`, `agent_phone`, `raw_payload` REVOKED frá public per §3.3).
+- **`active_listings_history`** — Track A audit log, trigger-driven insert á insert/update í `active_listings`. Quarterly partitions á `observed_at`, indefinite retention.
+- **`rejected_commercial_listings`** — Track A audit sidecar fyrir commercial-listings filtered out af residential-only pipeline (3-level cascade, sjá spec §5.4). Internal-only, indefinite retention fyrir source-quality monitoring (Sentry-flag if rejection rate >5% week-over-week).
+- **`properties` audit columns** — Track B adds `hms_fetched_at` (timestamptz) + `hms_payload` (jsonb, REVOKED frá public view) á existing `properties` tafla. Engin ný tafla — Track B writes canonical `properties` rows.
+
+**Status (per 2026-05-06)**: tables ekki enn deployed — gates á SCRAPER_SPEC §8.2 Step 4 (schema migrations), post-Decision-point #1A og #1B closure.

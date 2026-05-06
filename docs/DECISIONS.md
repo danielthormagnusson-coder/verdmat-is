@@ -4,6 +4,34 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-06 — Sprint 3 Áfangi 0 SCRAPER_SPEC_v1 planning session decisions
+
+Eftirfarandi ákvarðanir voru lokaðar í planning session 2026-05-06 sem framleiddi `app/docs/SCRAPER_SPEC_v1.md`. Allar decisions eru sourced í þeim spec — þessi entry er audit-trail og rationale preservation, ekki re-spec.
+
+**Áfangi 0 scope stretching (Track A + Track B)**: Original PLANNING_BACKLOG entry var skrifað fyrir Track B eingöngu (supplementary HMS-gap scraper). 2026-05-06 stretched scope-ið til að inkludera Track A — direct active-listings scraper á mbl.is/fasteignir og fasteignir.visir.is sem powerar Áfangi 4.13 market-scan view og recoverar live-listings stream sem dó 2025-07. Tvær tracks share infrastructure (storage layer, orchestrator hook, health monitoring) en aðskildir í source endpoint, fields, refresh cadence, og downstream consumer.
+
+**Track B simplification**: HMS Fasteignaskrá er source-of-truth sem inniheldur öll ~150K fastanúmer í íslenska fasteignastofninum. 25K gap-ið í properties_v2 er incomplete-scrape-of-HMS, ekki fundamental data-sourcing problem. Track B er því full-scale HMS fastanúmera-extract sem inserts missing rows í canonical `properties` tafla — ekki supplement table, ekki fuzzy match, ekki manual review queue. Bug 4 case (Sævargarðar 7) er incomplete-scrape gap, ekki pre-fastnum hypothesis.
+
+**Mirror-investigation as Track A source-pick prerequisite** (Decision-point #1A): Whether mbl.is og fasteignir.visir.is mirror hvor aðra empirically er unknown. 5-7 daga audit script mælir overlap rate á `(heimilisfang_normalized, postnr, agent_listing_id)` match med fallback `(heimilisfang_normalized, postnr, byggar, einflm)`. Decision rule: ≥95% overlap → single-source, <95% → dual-scrape med cross-site dedup. Audit-script-first principle á source-pick stigi — ekki lock-a án empirical data.
+
+**HMS formal-API-first preferred over silent scrape** (Decision-point #1B preference): HMS er government body. Working dialogue er project asset, ekki friction-point. Áfangi 4.9 (matsvæði shapefile) hefur formal-HMS-request precedent — piggyback á þann dialogue. Reputational og legal hygiene plus relationship-as-asset rationale. Silent scrape er fallback eingöngu (Tier 3 í 4-tier ladder í `SCRAPER_SPEC_v1.md` §7.3).
+
+**Decision-point #2B locked — mixed write-path approach**: Track A → (ii) Hetzner-local-staging-then-sync (high-volume nightly, replay-safety valuable, decoupling frá Supabase availability). Track B → (i) direct write til Supabase (low-volume monthly, simplicity beats robustness). Asymmetría justified by volume + criticality profile. Lock í `SCRAPER_SPEC_v1.md` §6.1.
+
+**Inter-track sequencing í monthly cycle**: Track B steady-state runs AFTER `refresh_dashboard_tables` (which itself runs after `rebuild_training_data`). Reasoning: 0.04-0.16% marginal training-data gain frá including new fastnums vs cascade-risk yfir model refresh. Failure-isolation prioritized.
+
+**Public-view security pattern**: New tables ship med RLS enabled by default + explicit SELECT policy `USING (true)` fyrir public-readable + REVOKE á sensitive columns frá `anon`/`authenticated` (`raw_payload`, `agent_phone`, `listing_id`). `public_id uuid` surrogate column pattern reserved fyrir future v1.1 share-link addressability ef þörf krefst — ekki resolve-anlegt til source URLs. RLS-disabled-by-default er recurring failure mode í verkefninu (Bug 24 lesson + 2026-05-03 Supabase alert) sem SCRAPER_SPEC v1 explicit forðar.
+
+**Volume-based scraper health detection (rolling 7-day mean 70% threshold)**: Replaces fixed cycle-over-cycle threshold. Day-of-week seasonality (weekend vs weekday upload patterns) can cause ±15-20% swings without indicating malfunction; trailing 7-day mean normalizes. Direct response til 2025-07 silent-death incident (gamli scraperinn dó án warning, Danni vissi ekki í marga mánuði). Volume detection myndi hafa caught þetta á degi 8.
+
+**Separate scraper repo (`verdmat-is-scraper`)**: Mirroring `verdmat-is-precompute` pattern. Different deploy cadence (Hetzner vs Vercel), different secrets surface (HMS credentials, source-site cookies), different language-stack focus. SCRAPER_SPEC canonical í `verdmat-is/app/docs/`, scraper repo gets read-only mirror.
+
+**#2A pickle migration default fallback (B2 twin-write)**: Ef Áfangi 4.8 (competitor comparison) ekki resolved fyrir Áfangi 0 implementation kickoff, default leaning er B2 (twin-write Supabase + pickle) frekar en B3 (frozen pickle, refactor at iter5). Insurance gegn worst case: iter5 confirmed necessary en slips beyond pickle-empty window.
+
+Sjá `app/docs/SCRAPER_SPEC_v1.md` fyrir full deliverable, build order, og open decision-point status.
+
+---
+
 ## 2026-04-28 — Methodology: Postgres LANGUAGE sql function plan-cache pitfall (Bug 13)
 
 **Hvað**: Latency-investigation á `LANGUAGE sql` Postgres functions með parameterized predicates skal ávallt bera saman `EXPLAIN ANALYZE` á function call vs sömu fyrirspurn með inline literal. Munur >2× = generic-plan-cache pitfall sem útilokar prefix index (`text_pattern_ops`, `varchar_pattern_ops`).
