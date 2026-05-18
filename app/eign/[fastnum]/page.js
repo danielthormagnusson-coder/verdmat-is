@@ -214,7 +214,7 @@ export default async function PropertyPage({ params, searchParams }) {
             >
               Opinber HMS-eignamat er viðmiðun. verdmat.is spá er reiknuð
               sjálfstætt, án fasteignamats-inntaks.
-              {property.skodags
+              {property.skodags && property.skodags !== "1970-01-01"
                 ? ` Síðasta HMS úttekt: ${formatDateLong(property.skodags)}.`
                 : ""}
             </div>
