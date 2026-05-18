@@ -86,8 +86,8 @@ export default function Footer() {
                 lineHeight: 1.9,
               }}
             >
-              <li>Módel: iter3v2 · seg-calibrated</li>
-              <li>Uppfært: apríl 2026</li>
+              <li>Módel: iter4_final_v1 · conformal-calibrated</li>
+              <li>Uppfært: maí 2026</li>
               <li>124.835 eignir í gagnagrunni</li>
             </ul>
           </div>
