@@ -19,6 +19,7 @@ import MarketContextCard from "@/components/MarketContextCard";
 import PhotoGallery from "@/components/PhotoGallery";
 import PropertyMap from "@/components/PropertyMapClient";
 import ValuationStrip from "@/components/ValuationStrip";
+import LhlmatBar from "@/components/LhlmatBar";
 import Link from "next/link";
 
 export const revalidate = 600;
@@ -197,6 +198,7 @@ export default async function PropertyPage({ params, searchParams }) {
             brunabotamat={property.brunabotamat}
             fasteignamatNaestaAr={property.fasteignamat_naesta_ar}
           />
+          <LhlmatBar lhlmat={property.lhlmat} />
           {property.fasteignamat ? (
             <div
               style={{
