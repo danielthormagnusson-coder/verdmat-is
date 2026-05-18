@@ -7,6 +7,7 @@ import {
   formatM2,
   formatSegment,
   formatDate,
+  formatDateLong,
   heatBucketLabel,
   byggingarstigLabel,
   isByggingarstigVisible,
@@ -213,6 +214,9 @@ export default async function PropertyPage({ params, searchParams }) {
             >
               Opinber HMS-eignamat er viðmiðun. verdmat.is spá er reiknuð
               sjálfstætt, án fasteignamats-inntaks.
+              {property.skodags
+                ? ` Síðasta HMS úttekt: ${formatDateLong(property.skodags)}.`
+                : ""}
             </div>
           ) : null}
           {property.augl_id_latest && property.list_price_latest ? (
