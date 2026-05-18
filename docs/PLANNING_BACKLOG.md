@@ -51,6 +51,66 @@ Planning promptir skulu takast í þessari röð, ekki parallel:
 
 ---
 
+## Áfangi 4.x — iter5 spec re-frame (logged 2026-05-18, decision pending)
+
+**Context**: Eftir Áfangi 0 Stage 1 weekend run höfum við nýja HMS dálka (brunabotamat,
+lhlmat, fasteignamat_naesta_ar, matseiningar[].byggingarstig/gerd/matsstig, landeign_nr)
+sem voru ekki accessible þegar iter4 spec var lokað 2026-04-21.
+
+**Open question**: Iter4-spec ákvað að fjarlægja FASTEIGNAMAT vegna circularity og
+accepta 3-5 pp MAPE cost. Nokkrar af nýju HMS dálkum eru non-circular og gætu
+recoverað hluta af þeim MAPE cost án að undo iter4-rationale.
+
+**Non-circular subset (safe að adda)**: brunabotamat (top-level + per-matseining),
+byggingarstig (B0-B4 factual stage marker), gerd, texti, matsstig, landeign-density features.
+
+**Circular subset (cannot adda)**: lhlmat, fasteignamat_naesta_ar, matseiningar[].fasteignamat
+— allir derived úr fasteignamatinu og myndu fá sama instability vandamál.
+
+**Gut-check lift potential (empirically validated empirical pending)**:
+- brunabotamat: 1,5-2,5 pp MAPE recovery (non-circular size anchor)
+- byggingarstig: 0,5-1,5 pp lift, mest í nýbyggingum (5.909 properties B1/B2/B3 á 30K nýjum)
+- gerd/texti finer taxonomy: 0,2-0,5 pp
+- Samanlagt: 2,2-4,5 pp potential recovery vs iter4-spec baseline
+
+**Three decision scenarios (pending iter5 training)**:
+- Scenario A: iter5 = iter4 + non-circular subset, additive lift, iter4-rationale stenst
+- Scenario B: iter5 nær iter3v2-level performance með stability — iter4-decision upphafið,
+  iter3v2 retired
+- Scenario C: lift er marginal (0,5-1,5 pp), iter4-spec stenst as designed
+
+**Empirical inputs needed before C-decision**:
+- Train iter5 með non-circular subset, mæla held MAPE per segment
+- Probe brunabotamat stability: hvernig hreyfist brunabotamat per fastnum yfir 3 árlegar
+  HMS-updates? Ef stable, Scenario B er possible. Ef volatile, Scenario A/C.
+
+**Update 2026-05-18 (eftir að sjá live iter4 metrics á /markadur/modelstada)**:
+iter4 held MAPE er 8,2% í apríl 2026, ekki 11-13% sem projected var.
+iter4_conformal_v1 calibration appears doing substantially more work en segment-
+stretch alternative sem var spá'd. Per-segment matchar iter3v2 nánast exactly
+(Íbúð 6,4% vs 6,3%, Íbúð á hæð 8,6% vs 8,3%, Einbýli 16,3% vs 16,2%, Raðhús
+7,2% vs 7,5%).
+
+Þetta **reduces urgency** of iter5 strategic re-frame:
+- Non-circular HMS feature addition er nú incremental improvement question
+  (myndi iter5 nail 7,5% eða betur?), ekki strategic recovery (sem var
+  forsendan að iter4 væri 3-5 pp undir target).
+- Scenario B (iter4-decision endurmat með full iter5 substitute) er ennþá
+  á borðinu en miklu minni urgency.
+- Scenario A (additive lift) er primary motivation.
+
+**Caveat**: 8,2% er single-month tala (apríl 2026 eingöngu, sjá Líkansstaða
+page chart sem hefur eingöngu einn data-point). 12-mánaða rolling average
+verður tiltækt þegar monthly snapshot cycle hefur fyllt 2026Q3-Q4. Decision-
+point fyrir iter5 vinnu bíður þess data eða Phase D Supabase sync, hvort
+sem kemur fyrr.
+
+**Status**: Pending Phase D Supabase sync (training data inniheldur ekki nýju HMS dálka
+ennþá). Ef Phase D er done og train_iteration5.py er priority, þá er þetta næsta
+modelling-pickup.
+
+---
+
 ## Sprint 3 Áfangi 4.8 — Eldri-stock calibration analysis (v1.1, estimated 1 day, post-launch competitive review)
 
 **Why**: Egilsgata 10 spot-check 2026-04-27 shows iter4 standalone prediction = 84,8 M kr, samkeppnisaðili (verdmat.is competitor) shows 91,25 M kr — a **7 % gap on the same property**. Hypothesis: the competitor either (a) uses HMS fasteignamat as a feature (which iter4 was deliberately decoupled from per Áfangi 2-5 DECISIONS), and/or (b) over-prices old-stock cells with an implicit renovation assumption that our LLM-extracted condition score already controls for.
