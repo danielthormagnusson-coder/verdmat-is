@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { formatMillions, formatFeatureName } from "@/lib/format";
+import {
+  formatMillions,
+  formatFeatureName,
+  isHiddenShapFeature,
+} from "@/lib/format";
 
 // DASHBOARD_SPEC_v1 §8 waterfall fix (2026-04-24):
 //   * sale_year, sale_month, predicted_at are pure time anchors (WHEN the
@@ -33,10 +37,17 @@ export default function AttributionWaterfall({
   const [tooltipOpen, setTooltipOpen] = useState(false);
 
   // Split the full attribution set into visible + hidden so the footer row
-  // can reconcile the math for a reader who cross-checks sums.
+  // can reconcile the math for a reader who cross-checks sums. Per A5
+  // (2026-05-18), also drop internal-ID rows (landnum) entirely from the
+  // default top-10 — they have no narrative value. ?mode=debug bypasses both
+  // filters.
   const visible = showDebug
     ? [...attributions]
-    : attributions.filter((a) => !TIME_ANCHOR_FEATURES.has(a.feature_name));
+    : attributions.filter(
+        (a) =>
+          !TIME_ANCHOR_FEATURES.has(a.feature_name) &&
+          !isHiddenShapFeature(a.feature_name),
+      );
   const hidden = showDebug
     ? []
     : attributions.filter((a) => TIME_ANCHOR_FEATURES.has(a.feature_name));
@@ -88,11 +99,13 @@ export default function AttributionWaterfall({
               >
                 {label}
               </div>
-              <div
-                style={{ fontSize: "0.8rem", color: "var(--vm-ink-muted)" }}
-              >
-                {valueDisplay}
-              </div>
+              {valueDisplay ? (
+                <div
+                  style={{ fontSize: "0.8rem", color: "var(--vm-ink-muted)" }}
+                >
+                  {valueDisplay}
+                </div>
+              ) : null}
             </div>
             <div style={{ position: "relative", height: 28 }}>
               <div
@@ -267,16 +280,20 @@ export default function AttributionWaterfall({
 
 function formatFeatureValue(name, raw) {
   if (raw == null || raw === "" || raw === "nan") return "—";
-  if (name === "EINFLM") return `${parseFloat(raw).toFixed(1)} m²`;
-  if (name === "BYGGAR") return `${parseInt(raw, 10)}`;
-  if (name === "age_at_sale") return `${parseFloat(raw).toFixed(0)} ár`;
-  if (name === "FASTEIGNAMAT" || name === "real_fasteignamat") {
+  const key = name ? String(name).toLowerCase() : "";
+  if (key === "einflm") return `${parseFloat(raw).toFixed(1)} m²`;
+  if (key === "lod_flm") return `${parseFloat(raw).toFixed(0)} m²`;
+  if (key === "byggar") return `${parseInt(raw, 10)}`;
+  if (key === "age_at_sale") return `${parseFloat(raw).toFixed(0)} ár`;
+  if (key === "fasteignamat" || key === "real_fasteignamat") {
     const n = parseFloat(raw);
     return `${(n / 1000).toFixed(1)} M.kr`;
   }
-  if (name === "matsvaedi_bucket") return raw;
-  if (name === "sale_year" || name === "sale_month")
-    return parseInt(raw, 10);
+  if (key === "matsvaedi_bucket") return raw;
+  // A5: strip the trailing number from the Matsvæði (númer) row — the raw
+  // value is an internal integer ID that adds no narrative. Label retained.
+  if (key === "matsvaedinumer") return "";
+  if (key === "sale_year" || key === "sale_month") return parseInt(raw, 10);
   if (raw === "true") return "Já";
   if (raw === "false") return "Nei";
   return String(raw).substring(0, 40);

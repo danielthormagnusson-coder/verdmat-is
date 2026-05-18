@@ -7,7 +7,10 @@ import {
   formatM2,
   formatSegment,
   formatDate,
+  formatDateLong,
   heatBucketLabel,
+  byggingarstigLabel,
+  isByggingarstigVisible,
 } from "@/lib/format";
 import PredictionCard from "@/components/PredictionCard";
 import AttributionWaterfall from "@/components/AttributionWaterfall";
@@ -16,6 +19,9 @@ import SalesHistoryTable from "@/components/SalesHistoryTable";
 import MarketContextCard from "@/components/MarketContextCard";
 import PhotoGallery from "@/components/PhotoGallery";
 import PropertyMap from "@/components/PropertyMapClient";
+import ValuationStrip from "@/components/ValuationStrip";
+import LhlmatBar from "@/components/LhlmatBar";
+import ByggingarstigBadge from "@/components/ByggingarstigBadge";
 import Link from "next/link";
 
 export const revalidate = 600;
@@ -130,6 +136,7 @@ export default async function PropertyPage({ params, searchParams }) {
       >
         <PhotoGallery photos={photos} title={property.heimilisfang} />
         <div>
+          <ByggingarstigBadge stage={property.byggingarstig} />
           <div
             style={{
               fontSize: "0.8rem",
@@ -167,7 +174,7 @@ export default async function PropertyPage({ params, searchParams }) {
               background: "var(--vm-surface)",
               borderRadius: 10,
               border: "1px solid var(--vm-border)",
-              marginBottom: "1.25rem",
+              marginBottom: "0.9rem",
             }}
           >
             <Stat label="Gerð" value={formatSegment(property.canonical_code)} />
@@ -177,16 +184,24 @@ export default async function PropertyPage({ params, searchParams }) {
               label="Herbergi"
               value={property.fjherb != null ? property.fjherb : "—"}
             />
-            <Stat
-              label="HMS-fasteignamat"
-              value={
-                property.fasteignamat
-                  ? formatMillions(property.fasteignamat * 1000, 1)
-                  : "—"
-              }
-            />
-            <Stat label="Matsvæði" value={property.matsvaedi_nafn ?? "—"} />
+            {isByggingarstigVisible(property.byggingarstig) ? (
+              <>
+                <Stat
+                  label="Byggingarstig"
+                  value={`${property.byggingarstig} — ${byggingarstigLabel(property.byggingarstig)}`}
+                />
+                <Stat label="Matsvæði" value={property.matsvaedi_nafn ?? "—"} />
+              </>
+            ) : (
+              <Stat label="Matsvæði" value={property.matsvaedi_nafn ?? "—"} />
+            )}
           </div>
+          <ValuationStrip
+            fasteignamat={property.fasteignamat}
+            brunabotamat={property.brunabotamat}
+            fasteignamatNaestaAr={property.fasteignamat_naesta_ar}
+          />
+          <LhlmatBar lhlmat={property.lhlmat} />
           {property.fasteignamat ? (
             <div
               style={{
@@ -199,6 +214,9 @@ export default async function PropertyPage({ params, searchParams }) {
             >
               Opinber HMS-eignamat er viðmiðun. verdmat.is spá er reiknuð
               sjálfstætt, án fasteignamats-inntaks.
+              {property.skodags
+                ? ` Síðasta HMS úttekt: ${formatDateLong(property.skodags)}.`
+                : ""}
             </div>
           ) : null}
           {property.augl_id_latest && property.list_price_latest ? (
