@@ -20,6 +20,7 @@ import PhotoGallery from "@/components/PhotoGallery";
 import PropertyMap from "@/components/PropertyMapClient";
 import ValuationStrip from "@/components/ValuationStrip";
 import LhlmatBar from "@/components/LhlmatBar";
+import ByggingarstigBadge from "@/components/ByggingarstigBadge";
 import Link from "next/link";
 
 export const revalidate = 600;
@@ -134,6 +135,7 @@ export default async function PropertyPage({ params, searchParams }) {
       >
         <PhotoGallery photos={photos} title={property.heimilisfang} />
         <div>
+          <ByggingarstigBadge stage={property.byggingarstig} />
           <div
             style={{
               fontSize: "0.8rem",
