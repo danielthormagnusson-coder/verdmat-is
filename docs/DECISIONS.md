@@ -4,6 +4,42 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-18 — Áfangi 0 Stage 1 weekend run completed — registry-completion thesis revised
+
+**Hvað**: Two coordinated autonomous runs over 2026-05-08 → 2026-05-18 finished Áfangi 0 Stage 1 work. (1) Orchestrator (`weekend_run_orchestrator.py`) refreshed augl payloads for all 124,835 Supabase properties (`audit/stage_a_augl_staging.db`) and bootstrapped the image archive to 352.53 GB / 1,752,028 files at `D:\Gagnapakkar\images\` (canonical index `D:\Gagnapakkar\image_index.db`, 99.998% download success). (2) HMS full-scrape (`hms_full_scrape.py`, 58h 20m, 546,957 requests against `hms.is/api/fasteignaskra/fasteign/{nr}` via curl_cffi Chrome120 impersonation) ran sequential **Phase A → B → C**: backfill (kaupskra-only + 200-1000-wide gap ints, 8,897 requests, 2,059 hits at 23.1%), enrich (every existing Supabase fastnum, 124,835 requests, 124,738 hits at 99.92%), full-sweep (everything else in span 2,000,044..2,547,000, 413,225 requests, 28,134 hits at 6.81%). Total 154,931 HMS hits / 392,026 non-existent / 28.3% aggregate hit rate. **Result: 30,193 net-new HMS-only properties + 124,738 enriched rows + 97 deregistered ghosts.** All in staging; no Supabase writes performed.
+
+**Af hverju**: Pilot v3 (2026-05-07/08, documented in prior project memory `project_registry_completion_thesis_collapsed.md`) had reported three small-sample probes against the registry-completion target ranges — trailing 5,000 candidates returned 2 hits, sub-gap 100 candidates returned 0, 2.4M bucket 400 candidates returned 0. The conclusion at the time was: "the missing 25K hypothesis no longer has a credible target range" and "session-after-next should NOT plan a multi-night registry-completion sweep". This weekend's Phase C ran the full sweep anyway as a completeness pass. Phase C found 28,134 hits across 413,225 candidates (6.81% aggregate, ~9.0% excluding the confirmed-empty 100K-integer 2.4M bucket which contributed near-zero hits). The pilot's probe locations were unrepresentative — they happened to hit administratively-empty stretches while completely missing the intra-bucket sparse-hole population structure (countryside cultivated land, never-listed apartments at the end of numbered series, regional commercial buildings, sheep farms, horse barns, fishing-rights lots).
+
+**Strategic finding — pilot v3 thesis revised, lesson logged**: small-sample empirical probes are insufficient to scope full registry-completion work. Even three independent probes returning 0–2 hits each can mask a broader population structure 1-2 orders of magnitude denser. **For any backfill-style operation against an authoritative external registry, run a full-coverage sweep before concluding the scope is small.** Applied retroactively, this means the original 2026-04-29 Áfangi 0 25K-fastnum-gap estimate was directionally correct (actually 30K); the 2026-05-08 collapse of that thesis to "no credible target range" was wrong; the 2026-05-18 sweep restored the original direction with better empirical grounding.
+
+**HMS scraper engineering findings (locked, will be referenced in SCRAPER_SPEC v1.1)**:
+- Endpoint `https://hms.is/api/fasteignaskra/fasteign/{fastnum}` works for the full registry. Cloudflare WAF requires `curl_cffi` Chrome120 TLS impersonation; plain `aiohttp`, Python `requests`, and `Invoke-WebRequest` all get 429'd on the first request (including the public homepage).
+- "Property does not exist" signal is **HTTP 500 `{"error":"Internal server error"}`, not 404**. Any scraper that retries 500 as transient failure will livelock; treat 500 as terminal "not exists".
+- Realistic sustained throughput at concurrency=3 + 1.0±0.4s per-worker jittered delay: ~157 requests/minute = ~2.6 req/s. WAF backoff trigger (10 consecutive 429/403/503) never fired during the 58h run.
+- HMS payload includes 8+ fields not present in current Supabase `properties` schema: `lhlmat` (land share of fasteignamat — decomposes value into land + structure), `brunabotamat` (independent rebuild-cost valuation), `fasteignamat_naesta_ar` (next-year forecast), `matseiningar[]` array (sub-unit breakdown with own `einflm` / `byggingarar` / `byggingarstig` (B0–B4) / `gerd` (HMS internal class) / `matsstig` / `skodags` / `texti`), `landeign_nr` + `tengd_stadfang_nr[]` (lot cross-references for building-density features). These are high-value features for the valuation model upgrade.
+
+**Phase D scope (set; execution deferred to separate strategic chat session)**:
+1. Schema decision — new `hms_data` table (1:1 with `properties.fastnum` + denormalised `matseiningar` child table) vs widen `properties` in place. Separate table cleaner for HMS-refresh re-runs that should not touch prediction-eldsneyti columns; widening simpler for queries.
+2. New-property insertion path — 30,193 fastnums need full pipeline (coordinates from `Stadfangaskra.csv`, matsvaedi assignment, region_tier, canonical_code, is_residential classification) before joining `properties`, or land in HMS-only staging table first and graduate over time.
+3. Ghost handling — 97 Supabase fastnums that HMS no longer recognises: `mark deregistered=true` + retain history, soft-delete, or hard-delete; needs implications mapping for `sales_history`, `predictions`, model-training filters.
+
+**Artifacts (committed this entry)**:
+- `audit/weekend_run_inventory.md` — raw factual numbers per staging DB
+- `audit/weekend_run_summary.md` — narrative with strategic findings
+- `audit/weekend_run_status.md` — final orchestrator status surface
+- `audit/weekend_run.log` — full execution log
+
+**Staging databases (gitignored, retained locally on D:\\)**:
+- `audit/hms_archive_staging.db` (391 MB, 546,957 rows) — HMS scrape full output
+- `audit/stage_a_augl_staging.db` (2.55 GB, 124,835 rows) — orchestrator Phase 2 augl refresh
+- `D:\Gagnapakkar\image_index.db` (791 MB, 2,631,485 rows) — canonical image index
+- `D:\Gagnapakkar\images\` (352.53 GB, 1,752,028 files) — image archive
+- `audit/backfill_pilot.db` (2.7 MB, 5,415 rows) — pilot v1/v2/v3 historical record
+
+**Out-of-scope for this commit**: Phase D execution, image-bootstrap re-run (if ever needed for the 58 failed URLs), valuation-model upgrade work using the new HMS fields. All planned for separate strategic chat sessions.
+
+---
+
 ## 2026-05-06 — RLS baseline audit + GRANT cleanup closar 2026-05-03 alert (Sprint 2 unblock)
 
 **Hvað**: ENABLE ROW LEVEL SECURITY á 14 dashboard-public tables (`properties`, `predictions`, `predictions_iter3v2`, `comps_index`, `feature_attributions`, `feature_attributions_iter3v2`, `sales_history`, `repeat_sale_index`, `last_listing_text`, `ats_lookup`, `ats_lookup_by_quarter`, `ats_dashboard_monthly_heat`, `llm_aggregates_quarterly`, `model_tracking_history`) með `public_read FOR SELECT TO anon, authenticated USING (true)` policy. `REVOKE ALL FROM anon, authenticated` + `GRANT SELECT TO anon, authenticated` reduces hver dashboard-table grant frá full DML niður í SELECT-only. Defense-in-depth `REVOKE ALL ... FROM anon` á 4 user-owned tables (`pro_users`, `saved_properties`, `saved_searches`, `saved_valuations`) sem þegar höfðu RLS+`auth.uid()` policies en héldu over-grants. 4 views (`latest_regime_per_cell`, `regime_per_cell_monthly`, `repeat_sale_index_by_segment`, `repeat_sale_index_main_pooled`) lose write privileges en SELECT inheritance frá underlying RLS'd tables stays intact. Single-transaction migration `BEGIN ... COMMIT` á 22 objects, idempotent (DROP POLICY IF EXISTS + ALTER TABLE ENABLE RLS no-op á rerun).

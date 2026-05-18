@@ -360,11 +360,54 @@ Each use case is a separate invariant call in `refresh_dashboard_tables.py`. Fai
 
 **Amendment 3 — Existing scrape templates in `D:\Vinnugögn\` should be referenced in spec for future Claude sessions.** v1 was drafted under the assumption that no existing scrape pattern was available in the codebase, and the §8.2 build order accordingly allocated effort for greenfield scraper development. That assumption was wrong: Danni has working evalue.is scraper templates in `D:\Vinnugögn\Annað\Scrape - skjöl - skipanir\Scrape - stora\` (5 variants: forward, middle, reverse, reverse2, gap-fill — all sharing identical scraping core, differing only in fastnum-enumeration strategy), an HMS direct API scraper template in `D:\Vinnugögn\Scrape\Fasteignanúmer\` (now functionally obsolete due to Amendment 1, but useful as reference for re-discovery work), and a commercial real-estate active-listings scraper in `D:\Leiguskra - scrape\Gagnasafn\scrape_atvinnuhusnaedi.ps1` (PowerShell-based reference architecture for Track A active-listings — Phase 1 search → Phase 2 detail → Phase 3 mark-withdrawn → Phase 4 export, exactly the shape SCRAPER_SPEC §2 Track A specifies). v1.1 should add an "Existing implementation references" subsection somewhere prominent (likely §8 Build order intro) listing these template paths so future Claude sessions don't re-do the discovery work on every visit.
 
-**Effort**: ~1-2 hour spec rewrite. Single-commit str_replace edits on `app/docs/SCRAPER_SPEC_v1.md` (rename to v1.1 in header metadata + Amendments-list per §9.4 hook + main-body str_replaces on §1, §7.3, §8 intro). Plus corresponding STATE.md / DECISIONS.md sync entries for the amendment.
+**Amendment 4 — Image-ownership policy (image archive at `D:\Gagnapakkar\images\`).** v1 of SCRAPER_SPEC inherits the legacy scraper pattern of recording CloudFront URLs (`d1u57vh96em4i1.cloudfront.net/...`) into the `myndir` SQLite table and downloading the JPGs to `myndir/{fastnum}/N.jpg`. This works tactically but leaves us structurally dependent on a CDN we don't control: if evalue.is migrates off CloudFront, rotates the bucket, or simply bit-rots the URLs, every recorded URL becomes a 404 and the property pages lose imagery silently. **All scrapers — the backfill batch, the recurring cron job, and the future Track A active-listings production pipeline — must download images to a long-term-owned archive at `D:\Gagnapakkar\images\` in addition to the structured-JSON capture.** The archive is the source of truth; the CloudFront URLs are a transient acquisition channel only. Storage convention (per-fastnum subdir vs. content-addressable hash, JPG vs. WebP, dedupe strategy) and refresh policy (re-download on listing change vs. once-and-immutable, retention horizon, repair-mode for broken URLs) will be **locked in the next planning session** post-three-probe-report and pre-image-download-build, using empirical data from the positive-control test in `audit/backfill_pilot.db` (5 known-good fastnums whose `augl_json` will surface the actual image-URL count and structure to drive sizing decisions). v1.1 should add an "Image-ownership policy" subsection in §3 (data model) and a corresponding §8 build-order task that gates "scraper goes to production" on "image archive write path is in place + tested for at least one full property's worth of imagery". Scope note: this is a v1.1 addition, not a retroactive policy — the existing 124,835 rows scraped via the legacy variants used `myndir/{fastnum}/` and that local archive remains the historical record; new policy applies to all scrapes from amendment-merge forward.
+
+**Effort**: ~1-2 hour spec rewrite. Single-commit str_replace edits on `app/docs/SCRAPER_SPEC_v1.md` (rename to v1.1 in header metadata + Amendments-list per §9.4 hook + main-body str_replaces on §1, §3, §7.3, §8 intro). Plus corresponding STATE.md / DECISIONS.md sync entries for the amendment.
 
 **Timing**: not blocking Stage 1 backfill pilot — the pilot proceeds against e-value.is per `audit/backfill_pilot_plan.md` regardless of whether v1.1 spec amendments have shipped. Spec amendment is documentation hygiene, not gating implementation.
 
 **Flagged 2026-05-07 during Áfangi 0 Stage 1 backfill pre-flight + template discovery.**
+
+---
+
+## Sprint 3 Áfangi 0.z — Phase D Supabase sync planning (post 2026-05-18 Stage 1 weekend run)
+
+**Why**: Áfangi 0 Stage 1 weekend run (2026-05-08 → 2026-05-18) completed two coordinated autonomous scrapes that produced ~31K new + 124,738 enriched + 97 ghost rows in local staging databases. Phase D is the controlled sync of that staging data into Supabase `properties` and downstream tables. Three independent decisions are pending; each affects the schema migration path, the prediction-pipeline rebuild surface, and the model retraining cadence. Plan in a fresh strategic chat session with full state-doc context.
+
+**Scope**:
+
+1. **Schema decision** — new `hms_data` table (1:1 with `properties.fastnum` + denormalised `matseiningar` child table) vs widen `properties` in place with new columns (`lhlmat`, `brunabotamat`, `fasteignamat_naesta_ar`, `byggingarstig`, `gerd`, `matsstig`, `skodags`, `landeign_nr`, plus JSON column for `matseiningar[]`). Trade-off: separate table is cleaner for HMS-refresh re-runs that should not touch prediction columns; widening is simpler for downstream queries but couples HMS-refresh cadence to the prediction pipeline. Recommendation working hypothesis: separate `hms_data` table + view that joins to `properties` for the dashboard. Locks in planning session.
+
+2. **30,193 new property insertion path** — these fastnums are real-HMS-known but currently absent from `properties`. Two paths:
+   - **Path A (graduated)**: insert into `hms_only_properties` staging table first, exclude from prediction/dashboard scope, graduate to `properties` only after coordinate enrichment (`Stadfangaskra.csv` join), matsvaedi assignment, region_tier classification, canonical_code derivation, is_residential flag. Low blast-radius, lets us audit each cohort.
+   - **Path B (single-shot)**: full pipeline build → bulk insert into `properties`. Faster end-state, higher risk if any classification rule mis-fires on the new cohort (mostly countryside, jörð, fjárhús, fishing rights — categories our pipeline has not been tuned for).
+   - Recommendation working hypothesis: Path A. Locks in planning session.
+
+3. **97 ghost handling** — Supabase fastnums that HMS no longer recognises (returned HTTP 500 in Phase B). Options:
+   - **Soft-flag**: `deregistered=true` + `deregistered_detected_at` columns, retain row, exclude from default queries.
+   - **Soft-delete**: move to `properties_archive` table.
+   - **Hard-delete**: remove + cascade through `sales_history`, `predictions`, `feature_attributions`.
+   - Implications: each ghost row has linked rows in `sales_history` (sometimes), `predictions`, `comps_index`, `feature_attributions`, `repeat_sale_pairs`. Hard-delete cascades risk data-history loss; soft-flag is reversible. Recommendation working hypothesis: soft-flag. Locks in planning session.
+
+**Deliverables (planning session output)**:
+- `docs/PHASE_D_SPEC.md` covering schema migration, new-property pipeline, ghost handling, rollback plan, and prediction-pipeline impact assessment.
+- Migration SQL drafts (`supabase/migrations/2026MMDD_phase_d_*.sql`).
+- Test plan: spot-check 10 new properties + 10 ghosts + 10 enriched properties post-migration to verify schema and feature flow.
+- Update of `STATE.md` Áfangi 0 section from ~95% to 100% post-Phase-D-execution.
+
+**Out-of-scope for the planning session**:
+- Model retraining using the new HMS features (lhlmat, brunabotamat, matseiningar) — that's a separate Áfangi (likely 4.14 or new Áfangi 5 sub-step).
+- Image bootstrap re-run for the 58 failed URLs from Phase 3 — small enough to handle as a one-off cleanup.
+
+**Carried items not addressed by Phase D** (preserved for completeness):
+- SCRAPER_SPEC v1.1 amendments (Áfangi 0.y) — still pending.
+- Schema variant unit tests — still pending.
+- Pre-load invariant assertion harness (Áfangi 0.x) — still pending.
+- Stage B image-fetch observability gap (workers emitted no log lines during the orchestrator Phase 3 fetch; real-time progress had to be queried directly from `image_index.db`) — log this as Áfangi 0.aa or fold into Phase D if convenient.
+
+**Effort estimate**: 2-3h planning session producing `PHASE_D_SPEC.md`. Implementation 1-2 days for the schema migrations + pipeline integration + ghost handling + verification.
+
+**Flagged 2026-05-18 at the close of the Áfangi 0 Stage 1 weekend run handoff commit.**
 
 ---
 

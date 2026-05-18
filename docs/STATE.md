@@ -248,9 +248,29 @@ Planning session er next major Sprint 3 work. Output: `SCRAPER_SPEC_v1.md` í `a
 
 ## Staða per áfanga
 
-### Áfangi 0 — Infrastructure: **15%**
+### Áfangi 0 — Infrastructure: **~95%** (post Stage 1 weekend run, 2026-05-18)
+
+**Update 2026-05-18 — Áfangi 0 Stage 1 weekend run lokið.** Progress jumped 15% → ~95% over the 2026-05-08 → 2026-05-18 window. Two coordinated autonomous runs:
+
+- **Orchestrator (`weekend_run_orchestrator.py`)** — Phase 1 storage build → Phase 2 augl refresh (124,835 fastnums, all `augl_status=200`, staged in `audit/stage_a_augl_staging.db` at 2.55 GB) → Phase 3 image bootstrap (1,751,358 images downloaded, 99.998% success, 58 failed, **352.53 GB archive** at `D:\Gagnapakkar\images\`, canonical index at `D:\Gagnapakkar\image_index.db`). One Windows Update reboot on 2026-05-13 forced a resume; WU paused via elevated registry write through 2026-05-20 to protect the rest of the run.
+- **HMS full-scrape (`hms_full_scrape.py`, 58h 20m, 2026-05-15 → 2026-05-18)** — 546,957 requests against `hms.is/api/fasteignaskra/fasteign/{nr}` via `curl_cffi` Chrome120 TLS impersonation (plain aiohttp gets 429'd by Cloudflare WAF; the "not exists" signal is HTTP 500, not 404). 154,931 hits at 28.3% aggregate rate. Discovered **30,193 new HMS-only properties** (Phase A 2,059 + Phase C 28,134) + **enriched 124,738 existing Supabase rows** with new HMS schema (`lhlmat`, `brunabotamat`, `matseiningar[]`, `byggingarstig`, `gerd`, `matsstig`, `skodags`, `fasteignamat_naesta_ar`, `landeign_nr`). Identified **97 deregistered ghosts** in `properties` no longer recognised by HMS. Staging at `audit/hms_archive_staging.db` (391 MB, gitignored).
+
+See `audit/weekend_run_summary.md` + `audit/weekend_run_inventory.md` for full metrics.
+
+#### Áfangi 0 — Phase D — Supabase sync (pending)
+
+All HMS scrape data is in staging. Three decisions pending before Supabase write-back:
+
+1. **Schema:** new `hms_data` table (1:1 with `properties.fastnum` + denormalised `matseiningar`) vs widen `properties` in place. Separate table is cleaner for HMS-refresh re-runs without touching prediction-eldsneyti columns; widening is simpler for queries.
+2. **30,193 new property insertion:** they need full pipeline (coordinates from `Stadfangaskra.csv`, matsvaedi assignment, region_tier, canonical_code, is_residential classification etc.) before joining `properties` — or land in HMS-only staging table first and graduate over time.
+3. **97 ghost handling:** mark `deregistered=true` + retain history, soft-delete, or hard-delete? Implications for `sales_history`, `predictions`, model training filters.
+
+Phase D execution is out-of-scope for this commit; will be planned in a fresh strategic chat session. Tracked in PLANNING_BACKLOG under Áfangi 0.z.
+
+#### Áfangi 0 — original planning checkpoints (preserved)
 
 - [x] Planning session lokið 2026-05-06 — `app/docs/SCRAPER_SPEC_v1.md` committed. Tvíþætt scope: Track A (mbl + visir active-listings stream) + Track B (HMS fastanúmera completion ~25K gap).
+- [x] Track B HMS extract executed via Stage 1 weekend run (2026-05-08 → 2026-05-18) — outcome: 25K hypothesis revised to ~30K new properties (see `audit/weekend_run_summary.md` "Phase C surprise" section). Pilot v3 small-sample probes had recommended dropping the full sweep; full-coverage Phase C refuted that conclusion.
 - [ ] Step 1 (secrets + Hetzner deployment infra) — pending
 - [ ] Step 2 (mirror-investigation audit, gates #1A) — pending, parallel with Step 3
 - [ ] Step 3 (HMS dialogue, gates #1B) — pending, parallel with Step 2

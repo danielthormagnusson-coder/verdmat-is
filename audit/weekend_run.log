@@ -1,0 +1,399 @@
+[2026-05-08T12:35:22+00:00] INFO  status writer thread started
+[2026-05-08T12:35:22+00:00] INFO  Phase 1.2 collator started; index_db=D:\Gagnapakkar\image_index.db
+[2026-05-08T12:35:37+00:00] INFO    fasteignir.db: 50,000/218,020 read; inserted=50,000 dup=0 no_disk=0
+[2026-05-08T12:35:53+00:00] INFO    fasteignir.db: 100,000/218,020 read; inserted=100,000 dup=0 no_disk=0
+[2026-05-08T12:36:07+00:00] INFO    fasteignir.db: 150,000/218,020 read; inserted=150,000 dup=0 no_disk=0
+[2026-05-08T12:36:22+00:00] INFO    fasteignir.db: 200,000/218,020 read; inserted=200,000 dup=0 no_disk=0
+[2026-05-08T12:36:27+00:00] INFO    fasteignir.db: complete. read=218,020 inserted=218,020 dup=0 no_disk=0
+[2026-05-08T12:36:44+00:00] INFO    fasteignir1.db: 50,000/437,212 read; inserted=50,000 dup=0 no_disk=0
+[2026-05-08T12:37:00+00:00] INFO    fasteignir1.db: 100,000/437,212 read; inserted=100,000 dup=0 no_disk=0
+[2026-05-08T12:37:17+00:00] INFO    fasteignir1.db: 150,000/437,212 read; inserted=150,000 dup=0 no_disk=0
+[2026-05-08T12:37:33+00:00] INFO    fasteignir1.db: 200,000/437,212 read; inserted=200,000 dup=0 no_disk=35,922
+[2026-05-08T12:37:48+00:00] INFO    fasteignir1.db: 250,000/437,212 read; inserted=250,000 dup=0 no_disk=85,922
+[2026-05-08T12:38:04+00:00] INFO    fasteignir1.db: 300,000/437,212 read; inserted=300,000 dup=0 no_disk=135,921
+[2026-05-08T12:38:20+00:00] INFO    fasteignir1.db: 350,000/437,212 read; inserted=350,000 dup=0 no_disk=185,919
+[2026-05-08T12:38:36+00:00] INFO    fasteignir1.db: 400,000/437,212 read; inserted=400,000 dup=0 no_disk=235,918
+[2026-05-08T12:38:49+00:00] INFO    fasteignir1.db: complete. read=437,212 inserted=437,212 dup=0 no_disk=273,088
+[2026-05-08T12:38:54+00:00] INFO    fasteignir2.db: complete. read=11,256 inserted=11,256 dup=0 no_disk=0
+[2026-05-08T12:39:04+00:00] INFO    fasteignir3.db: 50,000/278,516 read; inserted=50,000 dup=0 no_disk=0
+[2026-05-08T12:39:15+00:00] INFO    fasteignir3.db: 100,000/278,516 read; inserted=100,000 dup=0 no_disk=0
+[2026-05-08T12:39:25+00:00] INFO    fasteignir3.db: 150,000/278,516 read; inserted=150,000 dup=0 no_disk=0
+[2026-05-08T12:39:37+00:00] INFO    fasteignir3.db: 200,000/278,516 read; inserted=200,000 dup=0 no_disk=0
+[2026-05-08T12:39:47+00:00] INFO    fasteignir3.db: 250,000/278,516 read; inserted=250,000 dup=0 no_disk=0
+[2026-05-08T12:39:53+00:00] INFO    fasteignir3.db: complete. read=278,516 inserted=278,516 dup=0 no_disk=0
+[2026-05-08T12:40:06+00:00] INFO    fasteignir4.db: 50,000/211,584 read; inserted=49,975 dup=25 no_disk=0
+[2026-05-08T12:40:18+00:00] INFO    fasteignir4.db: 100,000/211,584 read; inserted=99,975 dup=25 no_disk=0
+[2026-05-08T12:40:31+00:00] INFO    fasteignir4.db: 150,000/211,584 read; inserted=149,975 dup=25 no_disk=0
+[2026-05-08T12:40:44+00:00] INFO    fasteignir4.db: 200,000/211,584 read; inserted=199,975 dup=25 no_disk=0
+[2026-05-08T12:40:47+00:00] INFO    fasteignir4.db: complete. read=211,584 inserted=208,059 dup=3,525 no_disk=0
+[2026-05-08T12:40:47+00:00] INFO  COLLATION TOTALS: {'rows_read': 1156588, 'rows_inserted': 1153063, 'rows_skipped_dup': 3525, 'no_disk': 273088}
+[2026-05-08T12:40:47+00:00] INFO  image_index.db: rows=1,153,063 downloaded=879,904 distinct_fastnums=48,691
+[2026-05-08T12:40:47+00:00] INFO  status writer stopped
+[2026-05-08T12:42:42+00:00] INFO  status writer thread started
+[2026-05-08T12:42:42+00:00] INFO  Phase 1.3 integrity repair started; index_db=D:\Gagnapakkar\image_index.db
+[2026-05-08T12:42:42+00:00] INFO  image_index.db: 1,153,063 rows, 879,904 marked downloaded=1
+[2026-05-08T12:42:46+00:00] INFO    verified 100,000, flipped 0 of 100,000/879,904
+[2026-05-08T12:42:50+00:00] INFO    verified 200,000, flipped 0 of 200,000/879,904
+[2026-05-08T12:42:54+00:00] INFO    verified 300,000, flipped 0 of 300,000/879,904
+[2026-05-08T12:42:58+00:00] INFO    verified 400,000, flipped 0 of 400,000/879,904
+[2026-05-08T12:43:02+00:00] INFO    verified 500,000, flipped 0 of 500,000/879,904
+[2026-05-08T12:43:06+00:00] INFO    verified 600,000, flipped 0 of 600,000/879,904
+[2026-05-08T12:43:10+00:00] INFO    verified 700,000, flipped 0 of 700,000/879,904
+[2026-05-08T12:43:14+00:00] INFO    verified 800,000, flipped 0 of 800,000/879,904
+[2026-05-08T12:43:23+00:00] INFO  COMPLETE checked=879,904 verified=879,904 flipped=0
+[2026-05-08T12:43:24+00:00] INFO  integrity_repair_report.md written
+[2026-05-08T12:43:24+00:00] INFO  status writer stopped
+[2026-05-08T12:47:39+00:00] INFO  status writer thread started
+[2026-05-08T12:47:39+00:00] INFO  Phase 1.5 validation started; controls=[2503338, 2511365, 2512279, 2525474, 2534360]
+[2026-05-08T12:50:28+00:00] INFO  status writer stopped
+[2026-05-08T12:51:54+00:00] INFO  status writer thread started
+[2026-05-08T12:51:54+00:00] INFO  Phase 1.5 validation started; controls=[2503338, 2511365, 2512279, 2525474, 2534360]
+[2026-05-08T12:54:01+00:00] INFO    fastnum=2503338 own=150 cross=59 index_rows=209 on_disk=209
+[2026-05-08T12:54:02+00:00] INFO    fastnum=2511365 own=48 cross=0 index_rows=48 on_disk=48
+[2026-05-08T12:54:03+00:00] INFO    fastnum=2512279 own=22 cross=0 index_rows=22 on_disk=22
+[2026-05-08T12:54:04+00:00] INFO    fastnum=2525474 own=0 cross=0 index_rows=0 on_disk=0
+[2026-05-08T12:54:05+00:00] INFO    fastnum=2534360 own=0 cross=0 index_rows=0 on_disk=0
+[2026-05-08T12:54:05+00:00] INFO  Phase 1.5 PASS — 279 files on disk
+[2026-05-08T12:54:05+00:00] INFO  status writer stopped
+[2026-05-08T12:57:20+00:00] INFO  status writer thread started
+[2026-05-08T12:57:20+00:00] INFO  Phase 2 starting; staging=D:\verdmat-is\app\audit\stage_a_augl_staging.db
+[2026-05-08T12:57:20+00:00] INFO  manifest: 124,835 fastnums
+[2026-05-08T12:57:20+00:00] INFO  resume: 0 fastnums already in staging; 124,835 remaining
+[2026-05-08T13:14:42+00:00] INFO  status writer thread started
+[2026-05-08T13:14:43+00:00] INFO  Phase 2 starting; staging=D:\verdmat-is\app\audit\stage_a_augl_staging.db
+[2026-05-08T13:14:43+00:00] INFO  manifest: 124,835 fastnums
+[2026-05-08T13:14:43+00:00] INFO  resume: 0 fastnums already in staging; 124,835 remaining
+[2026-05-08T13:28:40+00:00] INFO  checkpoint 500/124,835 this_run=500 rate=35.8/min
+[2026-05-08T13:42:33+00:00] INFO  checkpoint 1,000/124,835 this_run=1,000 rate=35.9/min
+[2026-05-08T13:56:19+00:00] INFO  checkpoint 1,500/124,835 this_run=1,500 rate=36.1/min
+[2026-05-08T14:10:26+00:00] INFO  checkpoint 2,000/124,835 this_run=2,000 rate=35.9/min
+[2026-05-08T14:24:21+00:00] INFO  checkpoint 2,500/124,835 this_run=2,500 rate=35.9/min
+[2026-05-08T14:37:46+00:00] INFO  checkpoint 3,000/124,835 this_run=3,000 rate=36.1/min
+[2026-05-08T14:51:42+00:00] INFO  checkpoint 3,500/124,835 this_run=3,500 rate=36.1/min
+[2026-05-08T15:05:55+00:00] INFO  checkpoint 4,000/124,835 this_run=4,000 rate=36.0/min
+[2026-05-08T15:20:05+00:00] INFO  checkpoint 4,500/124,835 this_run=4,500 rate=35.9/min
+[2026-05-08T15:33:58+00:00] INFO  checkpoint 5,000/124,835 this_run=5,000 rate=35.9/min
+[2026-05-08T15:47:59+00:00] INFO  checkpoint 5,500/124,835 this_run=5,500 rate=35.9/min
+[2026-05-08T16:01:41+00:00] INFO  checkpoint 6,000/124,835 this_run=6,000 rate=35.9/min
+[2026-05-08T16:15:38+00:00] INFO  checkpoint 6,500/124,835 this_run=6,500 rate=35.9/min
+[2026-05-08T16:29:26+00:00] INFO  checkpoint 7,000/124,835 this_run=7,000 rate=36.0/min
+[2026-05-08T16:43:17+00:00] INFO  checkpoint 7,500/124,835 this_run=7,500 rate=36.0/min
+[2026-05-08T16:56:30+00:00] INFO  checkpoint 8,000/124,835 this_run=8,000 rate=36.1/min
+[2026-05-08T17:10:28+00:00] INFO  checkpoint 8,500/124,835 this_run=8,500 rate=36.1/min
+[2026-05-08T17:24:50+00:00] INFO  checkpoint 9,000/124,835 this_run=9,000 rate=36.0/min
+[2026-05-08T17:38:36+00:00] INFO  checkpoint 9,500/124,835 this_run=9,500 rate=36.0/min
+[2026-05-08T17:52:20+00:00] INFO  checkpoint 10,000/124,835 this_run=10,000 rate=36.0/min
+[2026-05-08T18:06:28+00:00] INFO  checkpoint 10,500/124,835 this_run=10,500 rate=36.0/min
+[2026-05-08T18:20:03+00:00] INFO  checkpoint 11,000/124,835 this_run=11,000 rate=36.0/min
+[2026-05-08T18:34:11+00:00] INFO  checkpoint 11,500/124,835 this_run=11,500 rate=36.0/min
+[2026-05-08T18:47:55+00:00] INFO  checkpoint 12,000/124,835 this_run=12,000 rate=36.0/min
+[2026-05-08T19:01:00+00:00] INFO  checkpoint 12,500/124,835 this_run=12,500 rate=36.1/min
+[2026-05-08T19:14:12+00:00] INFO  checkpoint 13,000/124,835 this_run=13,000 rate=36.2/min
+[2026-05-11T09:36:20+00:00] INFO  checkpoint 13,500/124,835 this_run=13,500 rate=3.3/min
+[2026-05-11T09:50:01+00:00] INFO  checkpoint 14,000/124,835 this_run=14,000 rate=3.4/min
+[2026-05-11T10:03:58+00:00] INFO  checkpoint 14,500/124,835 this_run=14,500 rate=3.5/min
+[2026-05-11T10:18:08+00:00] INFO  checkpoint 15,000/124,835 this_run=15,000 rate=3.6/min
+[2026-05-11T10:32:54+00:00] INFO  checkpoint 15,500/124,835 this_run=15,500 rate=3.7/min
+[2026-05-11T10:47:04+00:00] INFO  checkpoint 16,000/124,835 this_run=16,000 rate=3.8/min
+[2026-05-11T11:00:50+00:00] INFO  checkpoint 16,500/124,835 this_run=16,500 rate=3.9/min
+[2026-05-11T11:14:50+00:00] INFO  checkpoint 17,000/124,835 this_run=17,000 rate=4.0/min
+[2026-05-11T11:28:55+00:00] INFO  checkpoint 17,500/124,835 this_run=17,500 rate=4.2/min
+[2026-05-11T11:42:28+00:00] INFO  checkpoint 18,000/124,835 this_run=18,000 rate=4.3/min
+[2026-05-11T11:56:09+00:00] INFO  checkpoint 18,500/124,835 this_run=18,500 rate=4.4/min
+[2026-05-11T12:10:46+00:00] INFO  checkpoint 19,000/124,835 this_run=19,000 rate=4.5/min
+[2026-05-11T12:24:59+00:00] INFO  checkpoint 19,500/124,835 this_run=19,500 rate=4.6/min
+[2026-05-11T12:38:50+00:00] INFO  checkpoint 20,000/124,835 this_run=20,000 rate=4.7/min
+[2026-05-11T12:52:51+00:00] INFO  checkpoint 20,500/124,835 this_run=20,500 rate=4.8/min
+[2026-05-11T13:07:02+00:00] INFO  checkpoint 21,000/124,835 this_run=21,000 rate=4.9/min
+[2026-05-11T13:21:02+00:00] INFO  checkpoint 21,500/124,835 this_run=21,500 rate=5.0/min
+[2026-05-11T13:35:12+00:00] INFO  checkpoint 22,000/124,835 this_run=22,000 rate=5.1/min
+[2026-05-11T13:49:44+00:00] INFO  checkpoint 22,500/124,835 this_run=22,500 rate=5.2/min
+[2026-05-11T14:04:06+00:00] INFO  checkpoint 23,000/124,835 this_run=23,000 rate=5.3/min
+[2026-05-11T14:18:27+00:00] INFO  checkpoint 23,500/124,835 this_run=23,500 rate=5.4/min
+[2026-05-11T14:32:30+00:00] INFO  checkpoint 24,000/124,835 this_run=24,000 rate=5.5/min
+[2026-05-11T14:46:55+00:00] INFO  checkpoint 24,500/124,835 this_run=24,500 rate=5.6/min
+[2026-05-11T15:01:06+00:00] INFO  checkpoint 25,000/124,835 this_run=25,000 rate=5.6/min
+[2026-05-11T15:15:18+00:00] INFO  checkpoint 25,500/124,835 this_run=25,500 rate=5.7/min
+[2026-05-11T15:29:36+00:00] INFO  checkpoint 26,000/124,835 this_run=26,000 rate=5.8/min
+[2026-05-11T15:43:40+00:00] INFO  checkpoint 26,500/124,835 this_run=26,500 rate=5.9/min
+[2026-05-11T15:56:54+00:00] INFO  checkpoint 27,000/124,835 this_run=27,000 rate=6.0/min
+[2026-05-11T16:11:14+00:00] INFO  checkpoint 27,500/124,835 this_run=27,500 rate=6.1/min
+[2026-05-11T16:25:40+00:00] INFO  checkpoint 28,000/124,835 this_run=28,000 rate=6.2/min
+[2026-05-11T16:39:41+00:00] INFO  checkpoint 28,500/124,835 this_run=28,500 rate=6.3/min
+[2026-05-11T16:53:29+00:00] INFO  checkpoint 29,000/124,835 this_run=29,000 rate=6.4/min
+[2026-05-11T17:07:55+00:00] INFO  checkpoint 29,500/124,835 this_run=29,500 rate=6.5/min
+[2026-05-11T17:21:23+00:00] INFO  checkpoint 30,000/124,835 this_run=30,000 rate=6.6/min
+[2026-05-11T17:35:14+00:00] INFO  checkpoint 30,500/124,835 this_run=30,500 rate=6.7/min
+[2026-05-11T17:48:43+00:00] INFO  checkpoint 31,000/124,835 this_run=31,000 rate=6.7/min
+[2026-05-11T18:02:24+00:00] INFO  checkpoint 31,500/124,835 this_run=31,500 rate=6.8/min
+[2026-05-11T18:16:03+00:00] INFO  checkpoint 32,000/124,835 this_run=32,000 rate=6.9/min
+[2026-05-11T18:29:49+00:00] INFO  checkpoint 32,500/124,835 this_run=32,500 rate=7.0/min
+[2026-05-11T18:43:52+00:00] INFO  checkpoint 33,000/124,835 this_run=33,000 rate=7.1/min
+[2026-05-11T18:57:50+00:00] INFO  checkpoint 33,500/124,835 this_run=33,500 rate=7.2/min
+[2026-05-11T19:11:55+00:00] INFO  checkpoint 34,000/124,835 this_run=34,000 rate=7.3/min
+[2026-05-11T19:26:00+00:00] INFO  checkpoint 34,500/124,835 this_run=34,500 rate=7.4/min
+[2026-05-11T19:40:06+00:00] INFO  checkpoint 35,000/124,835 this_run=35,000 rate=7.4/min
+[2026-05-11T19:54:22+00:00] INFO  checkpoint 35,500/124,835 this_run=35,500 rate=7.5/min
+[2026-05-11T20:08:23+00:00] INFO  checkpoint 36,000/124,835 this_run=36,000 rate=7.6/min
+[2026-05-11T20:21:44+00:00] INFO  checkpoint 36,500/124,835 this_run=36,500 rate=7.7/min
+[2026-05-11T20:35:10+00:00] INFO  checkpoint 37,000/124,835 this_run=37,000 rate=7.8/min
+[2026-05-11T20:48:34+00:00] INFO  checkpoint 37,500/124,835 this_run=37,500 rate=7.9/min
+[2026-05-11T21:01:51+00:00] INFO  checkpoint 38,000/124,835 this_run=38,000 rate=7.9/min
+[2026-05-11T21:15:07+00:00] INFO  checkpoint 38,500/124,835 this_run=38,500 rate=8.0/min
+[2026-05-11T21:28:25+00:00] INFO  checkpoint 39,000/124,835 this_run=39,000 rate=8.1/min
+[2026-05-11T21:41:27+00:00] INFO  checkpoint 39,500/124,835 this_run=39,500 rate=8.2/min
+[2026-05-11T21:55:04+00:00] INFO  checkpoint 40,000/124,835 this_run=40,000 rate=8.3/min
+[2026-05-11T22:08:30+00:00] INFO  checkpoint 40,500/124,835 this_run=40,500 rate=8.3/min
+[2026-05-11T22:21:48+00:00] INFO  checkpoint 41,000/124,835 this_run=41,000 rate=8.4/min
+[2026-05-11T22:35:02+00:00] INFO  checkpoint 41,500/124,835 this_run=41,500 rate=8.5/min
+[2026-05-11T22:48:25+00:00] INFO  checkpoint 42,000/124,835 this_run=42,000 rate=8.6/min
+[2026-05-11T23:01:32+00:00] INFO  checkpoint 42,500/124,835 this_run=42,500 rate=8.7/min
+[2026-05-11T23:15:14+00:00] INFO  checkpoint 43,000/124,835 this_run=43,000 rate=8.7/min
+[2026-05-11T23:28:30+00:00] INFO  checkpoint 43,500/124,835 this_run=43,500 rate=8.8/min
+[2026-05-11T23:41:40+00:00] INFO  checkpoint 44,000/124,835 this_run=44,000 rate=8.9/min
+[2026-05-11T23:54:44+00:00] INFO  checkpoint 44,500/124,835 this_run=44,500 rate=9.0/min
+[2026-05-12T00:07:53+00:00] INFO  checkpoint 45,000/124,835 this_run=45,000 rate=9.0/min
+[2026-05-12T00:21:01+00:00] INFO  checkpoint 45,500/124,835 this_run=45,500 rate=9.1/min
+[2026-05-12T00:34:33+00:00] INFO  checkpoint 46,000/124,835 this_run=46,000 rate=9.2/min
+[2026-05-12T00:47:38+00:00] INFO  checkpoint 46,500/124,835 this_run=46,500 rate=9.3/min
+[2026-05-12T01:00:47+00:00] INFO  checkpoint 47,000/124,835 this_run=47,000 rate=9.4/min
+[2026-05-12T01:13:36+00:00] INFO  checkpoint 47,500/124,835 this_run=47,500 rate=9.4/min
+[2026-05-12T01:26:32+00:00] INFO  checkpoint 48,000/124,835 this_run=48,000 rate=9.5/min
+[2026-05-12T01:39:32+00:00] INFO  checkpoint 48,500/124,835 this_run=48,500 rate=9.6/min
+[2026-05-12T01:52:38+00:00] INFO  checkpoint 49,000/124,835 this_run=49,000 rate=9.6/min
+[2026-05-12T02:05:21+00:00] INFO  checkpoint 49,500/124,835 this_run=49,500 rate=9.7/min
+[2026-05-12T02:18:21+00:00] INFO  checkpoint 50,000/124,835 this_run=50,000 rate=9.8/min
+[2026-05-12T02:31:22+00:00] INFO  checkpoint 50,500/124,835 this_run=50,500 rate=9.9/min
+[2026-05-12T02:44:09+00:00] INFO  checkpoint 51,000/124,835 this_run=51,000 rate=9.9/min
+[2026-05-12T02:57:14+00:00] INFO  checkpoint 51,500/124,835 this_run=51,500 rate=10.0/min
+[2026-05-12T03:10:20+00:00] INFO  checkpoint 52,000/124,835 this_run=52,000 rate=10.1/min
+[2026-05-12T03:23:02+00:00] INFO  checkpoint 52,500/124,835 this_run=52,500 rate=10.2/min
+[2026-05-12T03:35:50+00:00] INFO  checkpoint 53,000/124,835 this_run=53,000 rate=10.2/min
+[2026-05-12T03:48:42+00:00] INFO  checkpoint 53,500/124,835 this_run=53,500 rate=10.3/min
+[2026-05-12T04:01:35+00:00] INFO  checkpoint 54,000/124,835 this_run=54,000 rate=10.4/min
+[2026-05-12T04:14:21+00:00] INFO  checkpoint 54,500/124,835 this_run=54,500 rate=10.4/min
+[2026-05-12T04:27:33+00:00] INFO  checkpoint 55,000/124,835 this_run=55,000 rate=10.5/min
+[2026-05-12T04:40:15+00:00] INFO  checkpoint 55,500/124,835 this_run=55,500 rate=10.6/min
+[2026-05-12T04:53:13+00:00] INFO  checkpoint 56,000/124,835 this_run=56,000 rate=10.6/min
+[2026-05-12T05:06:09+00:00] INFO  checkpoint 56,500/124,835 this_run=56,500 rate=10.7/min
+[2026-05-12T09:48:07+00:00] INFO  status writer thread started
+[2026-05-12T09:48:07+00:00] INFO  === weekend run orchestrator started ===
+[2026-05-12T09:48:08+00:00] INFO  Phase 1: already done (image_index.db has >1M rows), skipping
+[2026-05-12T09:48:08+00:00] INFO  orchestrator: starting phase 2 stage-a augl-refresh (stage_a_augl_refresh)
+[2026-05-12T09:48:08+00:00] INFO  Phase 2 starting; staging=D:\verdmat-is\app\audit\stage_a_augl_staging.db
+[2026-05-12T09:48:08+00:00] INFO  manifest: 124,835 fastnums
+[2026-05-12T09:48:08+00:00] INFO  resume: 56,500 fastnums already in staging; 68,335 remaining
+[2026-05-12T10:02:31+00:00] INFO  checkpoint 57,000/124,835 this_run=500 rate=34.8/min
+[2026-05-12T10:16:54+00:00] INFO  checkpoint 57,500/124,835 this_run=1,000 rate=34.8/min
+[2026-05-12T10:30:51+00:00] INFO  checkpoint 58,000/124,835 this_run=1,500 rate=35.1/min
+[2026-05-12T10:44:58+00:00] INFO  checkpoint 58,500/124,835 this_run=2,000 rate=35.2/min
+[2026-05-12T10:59:10+00:00] INFO  checkpoint 59,000/124,835 this_run=2,500 rate=35.2/min
+[2026-05-12T11:13:36+00:00] INFO  checkpoint 59,500/124,835 this_run=3,000 rate=35.1/min
+[2026-05-12T11:28:09+00:00] INFO  checkpoint 60,000/124,835 this_run=3,500 rate=35.0/min
+[2026-05-12T11:42:58+00:00] INFO  checkpoint 60,500/124,835 this_run=4,000 rate=34.8/min
+[2026-05-12T11:57:25+00:00] INFO  checkpoint 61,000/124,835 this_run=4,500 rate=34.8/min
+[2026-05-12T12:11:28+00:00] INFO  checkpoint 61,500/124,835 this_run=5,000 rate=34.9/min
+[2026-05-12T12:26:04+00:00] INFO  checkpoint 62,000/124,835 this_run=5,500 rate=34.8/min
+[2026-05-12T12:40:10+00:00] INFO  checkpoint 62,500/124,835 this_run=6,000 rate=34.9/min
+[2026-05-12T12:54:58+00:00] INFO  checkpoint 63,000/124,835 this_run=6,500 rate=34.8/min
+[2026-05-12T13:09:39+00:00] INFO  checkpoint 63,500/124,835 this_run=7,000 rate=34.7/min
+[2026-05-12T13:24:42+00:00] INFO  checkpoint 64,000/124,835 this_run=7,500 rate=34.6/min
+[2026-05-12T13:39:01+00:00] INFO  checkpoint 64,500/124,835 this_run=8,000 rate=34.7/min
+[2026-05-12T13:53:16+00:00] INFO  checkpoint 65,000/124,835 this_run=8,500 rate=34.7/min
+[2026-05-12T14:07:50+00:00] INFO  checkpoint 65,500/124,835 this_run=9,000 rate=34.7/min
+[2026-05-12T14:22:15+00:00] INFO  checkpoint 66,000/124,835 this_run=9,500 rate=34.7/min
+[2026-05-12T14:36:31+00:00] INFO  checkpoint 66,500/124,835 this_run=10,000 rate=34.7/min
+[2026-05-12T14:50:41+00:00] INFO  checkpoint 67,000/124,835 this_run=10,500 rate=34.7/min
+[2026-05-12T15:05:29+00:00] INFO  checkpoint 67,500/124,835 this_run=11,000 rate=34.7/min
+[2026-05-12T15:19:47+00:00] INFO  checkpoint 68,000/124,835 this_run=11,500 rate=34.7/min
+[2026-05-12T15:33:48+00:00] INFO  checkpoint 68,500/124,835 this_run=12,000 rate=34.7/min
+[2026-05-12T15:47:26+00:00] INFO  checkpoint 69,000/124,835 this_run=12,500 rate=34.8/min
+[2026-05-12T16:01:59+00:00] INFO  checkpoint 69,500/124,835 this_run=13,000 rate=34.8/min
+[2026-05-12T16:16:09+00:00] INFO  checkpoint 70,000/124,835 this_run=13,500 rate=34.8/min
+[2026-05-12T16:30:34+00:00] INFO  checkpoint 70,500/124,835 this_run=14,000 rate=34.8/min
+[2026-05-12T16:44:46+00:00] INFO  checkpoint 71,000/124,835 this_run=14,500 rate=34.8/min
+[2026-05-12T16:59:16+00:00] INFO  checkpoint 71,500/124,835 this_run=15,000 rate=34.8/min
+[2026-05-12T17:13:24+00:00] INFO  checkpoint 72,000/124,835 this_run=15,500 rate=34.8/min
+[2026-05-12T17:27:32+00:00] INFO  checkpoint 72,500/124,835 this_run=16,000 rate=34.8/min
+[2026-05-12T17:42:36+00:00] INFO  checkpoint 73,000/124,835 this_run=16,500 rate=34.8/min
+[2026-05-12T17:56:45+00:00] INFO  checkpoint 73,500/124,835 this_run=17,000 rate=34.8/min
+[2026-05-12T18:10:47+00:00] INFO  checkpoint 74,000/124,835 this_run=17,500 rate=34.8/min
+[2026-05-12T18:24:35+00:00] INFO  checkpoint 74,500/124,835 this_run=18,000 rate=34.9/min
+[2026-05-12T18:38:45+00:00] INFO  checkpoint 75,000/124,835 this_run=18,500 rate=34.9/min
+[2026-05-12T18:53:24+00:00] INFO  checkpoint 75,500/124,835 this_run=19,000 rate=34.8/min
+[2026-05-12T19:07:05+00:00] INFO  checkpoint 76,000/124,835 this_run=19,500 rate=34.9/min
+[2026-05-12T19:21:15+00:00] INFO  checkpoint 76,500/124,835 this_run=20,000 rate=34.9/min
+[2026-05-12T19:35:14+00:00] INFO  checkpoint 77,000/124,835 this_run=20,500 rate=34.9/min
+[2026-05-12T19:49:15+00:00] INFO  checkpoint 77,500/124,835 this_run=21,000 rate=34.9/min
+[2026-05-12T20:02:46+00:00] INFO  checkpoint 78,000/124,835 this_run=21,500 rate=35.0/min
+[2026-05-12T20:16:18+00:00] INFO  checkpoint 78,500/124,835 this_run=22,000 rate=35.0/min
+[2026-05-12T20:29:32+00:00] INFO  checkpoint 79,000/124,835 this_run=22,500 rate=35.1/min
+[2026-05-12T20:42:50+00:00] INFO  checkpoint 79,500/124,835 this_run=23,000 rate=35.1/min
+[2026-05-12T20:56:21+00:00] INFO  checkpoint 80,000/124,835 this_run=23,500 rate=35.2/min
+[2026-05-12T21:09:42+00:00] INFO  checkpoint 80,500/124,835 this_run=24,000 rate=35.2/min
+[2026-05-12T21:23:12+00:00] INFO  checkpoint 81,000/124,835 this_run=24,500 rate=35.2/min
+[2026-05-12T21:36:31+00:00] INFO  checkpoint 81,500/124,835 this_run=25,000 rate=35.3/min
+[2026-05-12T21:49:54+00:00] INFO  checkpoint 82,000/124,835 this_run=25,500 rate=35.3/min
+[2026-05-12T22:03:28+00:00] INFO  checkpoint 82,500/124,835 this_run=26,000 rate=35.4/min
+[2026-05-12T22:16:55+00:00] INFO  checkpoint 83,000/124,835 this_run=26,500 rate=35.4/min
+[2026-05-12T22:30:21+00:00] INFO  checkpoint 83,500/124,835 this_run=27,000 rate=35.4/min
+[2026-05-12T22:43:28+00:00] INFO  checkpoint 84,000/124,835 this_run=27,500 rate=35.5/min
+[2026-05-12T22:56:30+00:00] INFO  checkpoint 84,500/124,835 this_run=28,000 rate=35.5/min
+[2026-05-12T23:09:58+00:00] INFO  checkpoint 85,000/124,835 this_run=28,500 rate=35.5/min
+[2026-05-12T23:22:58+00:00] INFO  checkpoint 85,500/124,835 this_run=29,000 rate=35.6/min
+[2026-05-12T23:36:18+00:00] INFO  checkpoint 86,000/124,835 this_run=29,500 rate=35.6/min
+[2026-05-12T23:49:35+00:00] INFO  checkpoint 86,500/124,835 this_run=30,000 rate=35.7/min
+[2026-05-13T00:02:41+00:00] INFO  checkpoint 87,000/124,835 this_run=30,500 rate=35.7/min
+[2026-05-13T00:15:39+00:00] INFO  checkpoint 87,500/124,835 this_run=31,000 rate=35.7/min
+[2026-05-13T00:28:57+00:00] INFO  checkpoint 88,000/124,835 this_run=31,500 rate=35.8/min
+[2026-05-13T00:42:03+00:00] INFO  checkpoint 88,500/124,835 this_run=32,000 rate=35.8/min
+[2026-05-13T00:55:12+00:00] INFO  checkpoint 89,000/124,835 this_run=32,500 rate=35.8/min
+[2026-05-13T01:08:15+00:00] INFO  checkpoint 89,500/124,835 this_run=33,000 rate=35.9/min
+[2026-05-13T01:21:25+00:00] INFO  checkpoint 90,000/124,835 this_run=33,500 rate=35.9/min
+[2026-05-13T01:34:30+00:00] INFO  checkpoint 90,500/124,835 this_run=34,000 rate=35.9/min
+[2026-05-13T01:47:43+00:00] INFO  checkpoint 91,000/124,835 this_run=34,500 rate=36.0/min
+[2026-05-13T02:01:15+00:00] INFO  checkpoint 91,500/124,835 this_run=35,000 rate=36.0/min
+[2026-05-13T02:14:25+00:00] INFO  checkpoint 92,000/124,835 this_run=35,500 rate=36.0/min
+[2026-05-13T02:27:40+00:00] INFO  checkpoint 92,500/124,835 this_run=36,000 rate=36.0/min
+[2026-05-13T02:40:43+00:00] INFO  checkpoint 93,000/124,835 this_run=36,500 rate=36.0/min
+[2026-05-13T02:53:32+00:00] INFO  checkpoint 93,500/124,835 this_run=37,000 rate=36.1/min
+[2026-05-13T03:06:43+00:00] INFO  checkpoint 94,000/124,835 this_run=37,500 rate=36.1/min
+[2026-05-13T03:20:03+00:00] INFO  checkpoint 94,500/124,835 this_run=38,000 rate=36.1/min
+[2026-05-13T03:33:17+00:00] INFO  checkpoint 95,000/124,835 this_run=38,500 rate=36.1/min
+[2026-05-13T03:46:20+00:00] INFO  checkpoint 95,500/124,835 this_run=39,000 rate=36.2/min
+[2026-05-13T03:59:23+00:00] INFO  checkpoint 96,000/124,835 this_run=39,500 rate=36.2/min
+[2026-05-13T04:12:41+00:00] INFO  checkpoint 96,500/124,835 this_run=40,000 rate=36.2/min
+[2026-05-13T04:26:00+00:00] INFO  checkpoint 97,000/124,835 this_run=40,500 rate=36.2/min
+[2026-05-13T04:39:05+00:00] INFO  checkpoint 97,500/124,835 this_run=41,000 rate=36.3/min
+[2026-05-13T09:15:07+00:00] INFO  status writer thread started
+[2026-05-13T09:15:07+00:00] INFO  === weekend run orchestrator started ===
+[2026-05-13T09:15:07+00:00] INFO  Phase 1: already done (image_index.db has >1M rows), skipping
+[2026-05-13T09:15:07+00:00] INFO  orchestrator: starting phase 2 stage-a augl-refresh (stage_a_augl_refresh)
+[2026-05-13T09:15:07+00:00] INFO  Phase 2 starting; staging=D:\verdmat-is\app\audit\stage_a_augl_staging.db
+[2026-05-13T09:15:07+00:00] INFO  manifest: 124,835 fastnums
+[2026-05-13T09:15:08+00:00] INFO  resume: 97,800 fastnums already in staging; 27,035 remaining
+[2026-05-13T09:29:31+00:00] INFO  checkpoint 98,300/124,835 this_run=500 rate=34.7/min
+[2026-05-13T09:44:56+00:00] INFO  checkpoint 98,800/124,835 this_run=1,000 rate=33.6/min
+[2026-05-13T09:59:53+00:00] INFO  checkpoint 99,300/124,835 this_run=1,500 rate=33.5/min
+[2026-05-13T10:13:35+00:00] INFO  checkpoint 99,800/124,835 this_run=2,000 rate=34.2/min
+[2026-05-13T10:27:36+00:00] INFO  checkpoint 100,300/124,835 this_run=2,500 rate=34.5/min
+[2026-05-13T10:41:53+00:00] INFO  checkpoint 100,800/124,835 this_run=3,000 rate=34.6/min
+[2026-05-13T10:56:33+00:00] INFO  checkpoint 101,300/124,835 this_run=3,500 rate=34.5/min
+[2026-05-13T11:10:59+00:00] INFO  checkpoint 101,800/124,835 this_run=4,000 rate=34.5/min
+[2026-05-13T11:26:14+00:00] INFO  checkpoint 102,300/124,835 this_run=4,500 rate=34.3/min
+[2026-05-13T11:40:44+00:00] INFO  checkpoint 102,800/124,835 this_run=5,000 rate=34.3/min
+[2026-05-13T11:56:03+00:00] INFO  checkpoint 103,300/124,835 this_run=5,500 rate=34.2/min
+[2026-05-13T12:11:09+00:00] INFO  checkpoint 103,800/124,835 this_run=6,000 rate=34.1/min
+[2026-05-13T12:25:53+00:00] INFO  checkpoint 104,300/124,835 this_run=6,500 rate=34.1/min
+[2026-05-13T12:40:28+00:00] INFO  checkpoint 104,800/124,835 this_run=7,000 rate=34.1/min
+[2026-05-13T12:55:08+00:00] INFO  checkpoint 105,300/124,835 this_run=7,500 rate=34.1/min
+[2026-05-13T13:10:07+00:00] INFO  checkpoint 105,800/124,835 this_run=8,000 rate=34.0/min
+[2026-05-13T13:25:01+00:00] INFO  checkpoint 106,300/124,835 this_run=8,500 rate=34.0/min
+[2026-05-13T13:40:00+00:00] INFO  checkpoint 106,800/124,835 this_run=9,000 rate=34.0/min
+[2026-05-13T13:56:03+00:00] INFO  checkpoint 107,300/124,835 this_run=9,500 rate=33.8/min
+[2026-05-13T14:11:48+00:00] INFO  checkpoint 107,800/124,835 this_run=10,000 rate=33.7/min
+[2026-05-13T14:27:28+00:00] INFO  checkpoint 108,300/124,835 this_run=10,500 rate=33.6/min
+[2026-05-13T14:43:00+00:00] INFO  checkpoint 108,800/124,835 this_run=11,000 rate=33.5/min
+[2026-05-13T14:58:15+00:00] INFO  checkpoint 109,300/124,835 this_run=11,500 rate=33.5/min
+[2026-05-13T15:12:55+00:00] INFO  checkpoint 109,800/124,835 this_run=12,000 rate=33.5/min
+[2026-05-13T15:27:50+00:00] INFO  checkpoint 110,300/124,835 this_run=12,500 rate=33.5/min
+[2026-05-13T15:42:35+00:00] INFO  checkpoint 110,800/124,835 this_run=13,000 rate=33.6/min
+[2026-05-13T15:57:49+00:00] INFO  checkpoint 111,300/124,835 this_run=13,500 rate=33.5/min
+[2026-05-13T16:12:52+00:00] INFO  checkpoint 111,800/124,835 this_run=14,000 rate=33.5/min
+[2026-05-13T16:28:00+00:00] INFO  checkpoint 112,300/124,835 this_run=14,500 rate=33.5/min
+[2026-05-13T16:42:33+00:00] INFO  checkpoint 112,800/124,835 this_run=15,000 rate=33.5/min
+[2026-05-13T16:56:51+00:00] INFO  checkpoint 113,300/124,835 this_run=15,500 rate=33.6/min
+[2026-05-13T17:11:02+00:00] INFO  checkpoint 113,800/124,835 this_run=16,000 rate=33.6/min
+[2026-05-13T17:25:35+00:00] INFO  checkpoint 114,300/124,835 this_run=16,500 rate=33.6/min
+[2026-05-13T17:40:14+00:00] INFO  checkpoint 114,800/124,835 this_run=17,000 rate=33.7/min
+[2026-05-13T17:54:24+00:00] INFO  checkpoint 115,300/124,835 this_run=17,500 rate=33.7/min
+[2026-05-13T18:08:22+00:00] INFO  checkpoint 115,800/124,835 this_run=18,000 rate=33.8/min
+[2026-05-13T18:23:02+00:00] INFO  checkpoint 116,300/124,835 this_run=18,500 rate=33.8/min
+[2026-05-13T18:37:41+00:00] INFO  checkpoint 116,800/124,835 this_run=19,000 rate=33.8/min
+[2026-05-13T18:52:04+00:00] INFO  checkpoint 117,300/124,835 this_run=19,500 rate=33.8/min
+[2026-05-13T19:06:36+00:00] INFO  checkpoint 117,800/124,835 this_run=20,000 rate=33.8/min
+[2026-05-13T19:21:54+00:00] INFO  checkpoint 118,300/124,835 this_run=20,500 rate=33.8/min
+[2026-05-13T19:37:04+00:00] INFO  checkpoint 118,800/124,835 this_run=21,000 rate=33.8/min
+[2026-05-13T19:51:36+00:00] INFO  checkpoint 119,300/124,835 this_run=21,500 rate=33.8/min
+[2026-05-13T20:05:54+00:00] INFO  checkpoint 119,800/124,835 this_run=22,000 rate=33.8/min
+[2026-05-13T20:20:38+00:00] INFO  checkpoint 120,300/124,835 this_run=22,500 rate=33.8/min
+[2026-05-13T20:35:40+00:00] INFO  checkpoint 120,800/124,835 this_run=23,000 rate=33.8/min
+[2026-05-13T20:50:15+00:00] INFO  checkpoint 121,300/124,835 this_run=23,500 rate=33.8/min
+[2026-05-13T21:05:25+00:00] INFO  checkpoint 121,800/124,835 this_run=24,000 rate=33.8/min
+[2026-05-13T21:20:27+00:00] INFO  checkpoint 122,300/124,835 this_run=24,500 rate=33.8/min
+[2026-05-13T21:35:50+00:00] INFO  checkpoint 122,800/124,835 this_run=25,000 rate=33.8/min
+[2026-05-13T21:50:21+00:00] INFO  checkpoint 123,300/124,835 this_run=25,500 rate=33.8/min
+[2026-05-13T22:05:09+00:00] INFO  checkpoint 123,800/124,835 this_run=26,000 rate=33.8/min
+[2026-05-13T22:19:28+00:00] INFO  checkpoint 124,300/124,835 this_run=26,500 rate=33.8/min
+[2026-05-13T22:33:18+00:00] INFO  checkpoint 124,800/124,835 this_run=27,000 rate=33.8/min
+[2026-05-13T22:34:16+00:00] INFO  Phase 2 COMPLETE this_run=27,035
+[2026-05-13T22:34:16+00:00] INFO  status writer stopped
+[2026-05-13T22:34:16+00:00] INFO  orchestrator: phase 2 stage-a augl-refresh returned 0
+[2026-05-13T22:34:16+00:00] INFO  orchestrator: starting phase 3 stage-b image bootstrap (stage_b_image_bootstrap)
+[2026-05-13T22:34:16+00:00] INFO  Phase 3 starting; index_db=D:\Gagnapakkar\image_index.db
+[2026-05-13T22:34:18+00:00] INFO    url-discovery: scanned 1,000 stage-A rows, inserted 24,793 new image_index rows
+[2026-05-13T22:34:19+00:00] INFO    url-discovery: scanned 2,000 stage-A rows, inserted 45,832 new image_index rows
+[2026-05-13T22:34:21+00:00] INFO    url-discovery: scanned 3,000 stage-A rows, inserted 70,249 new image_index rows
+[2026-05-13T22:34:23+00:00] INFO    url-discovery: scanned 4,000 stage-A rows, inserted 93,136 new image_index rows
+[2026-05-13T22:34:24+00:00] INFO    url-discovery: scanned 5,000 stage-A rows, inserted 114,481 new image_index rows
+[2026-05-13T22:34:26+00:00] INFO    url-discovery: scanned 6,000 stage-A rows, inserted 139,319 new image_index rows
+[2026-05-13T22:34:28+00:00] INFO    url-discovery: scanned 7,000 stage-A rows, inserted 158,946 new image_index rows
+[2026-05-13T22:34:29+00:00] INFO    url-discovery: scanned 8,000 stage-A rows, inserted 181,309 new image_index rows
+[2026-05-13T22:34:31+00:00] INFO    url-discovery: scanned 9,000 stage-A rows, inserted 204,769 new image_index rows
+[2026-05-13T22:34:33+00:00] INFO    url-discovery: scanned 10,000 stage-A rows, inserted 225,730 new image_index rows
+[2026-05-13T22:34:34+00:00] INFO    url-discovery: scanned 11,000 stage-A rows, inserted 250,673 new image_index rows
+[2026-05-13T22:34:36+00:00] INFO    url-discovery: scanned 12,000 stage-A rows, inserted 271,243 new image_index rows
+[2026-05-13T22:34:38+00:00] INFO    url-discovery: scanned 13,000 stage-A rows, inserted 297,009 new image_index rows
+[2026-05-13T22:34:39+00:00] INFO    url-discovery: scanned 14,000 stage-A rows, inserted 322,829 new image_index rows
+[2026-05-13T22:34:41+00:00] INFO    url-discovery: scanned 15,000 stage-A rows, inserted 350,751 new image_index rows
+[2026-05-13T22:34:43+00:00] INFO    url-discovery: scanned 16,000 stage-A rows, inserted 372,499 new image_index rows
+[2026-05-13T22:34:45+00:00] INFO    url-discovery: scanned 17,000 stage-A rows, inserted 395,180 new image_index rows
+[2026-05-13T22:34:47+00:00] INFO    url-discovery: scanned 18,000 stage-A rows, inserted 421,723 new image_index rows
+[2026-05-13T22:34:48+00:00] INFO    url-discovery: scanned 19,000 stage-A rows, inserted 446,620 new image_index rows
+[2026-05-13T22:34:50+00:00] INFO    url-discovery: scanned 20,000 stage-A rows, inserted 471,425 new image_index rows
+[2026-05-13T22:34:52+00:00] INFO    url-discovery: scanned 21,000 stage-A rows, inserted 495,748 new image_index rows
+[2026-05-13T22:34:54+00:00] INFO    url-discovery: scanned 22,000 stage-A rows, inserted 523,136 new image_index rows
+[2026-05-13T22:34:56+00:00] INFO    url-discovery: scanned 23,000 stage-A rows, inserted 550,201 new image_index rows
+[2026-05-13T22:34:57+00:00] INFO    url-discovery: scanned 24,000 stage-A rows, inserted 570,629 new image_index rows
+[2026-05-13T22:34:58+00:00] INFO    url-discovery: scanned 25,000 stage-A rows, inserted 584,806 new image_index rows
+[2026-05-13T22:35:00+00:00] INFO    url-discovery: scanned 26,000 stage-A rows, inserted 599,581 new image_index rows
+[2026-05-13T22:35:01+00:00] INFO    url-discovery: scanned 27,000 stage-A rows, inserted 617,238 new image_index rows
+[2026-05-13T22:35:02+00:00] INFO    url-discovery: scanned 28,000 stage-A rows, inserted 636,325 new image_index rows
+[2026-05-13T22:35:03+00:00] INFO    url-discovery: scanned 29,000 stage-A rows, inserted 649,724 new image_index rows
+[2026-05-13T22:35:04+00:00] INFO    url-discovery: scanned 30,000 stage-A rows, inserted 664,722 new image_index rows
+[2026-05-13T22:35:05+00:00] INFO    url-discovery: scanned 31,000 stage-A rows, inserted 683,044 new image_index rows
+[2026-05-13T22:35:07+00:00] INFO    url-discovery: scanned 32,000 stage-A rows, inserted 703,927 new image_index rows
+[2026-05-13T22:35:09+00:00] INFO    url-discovery: scanned 33,000 stage-A rows, inserted 725,207 new image_index rows
+[2026-05-13T22:35:11+00:00] INFO    url-discovery: scanned 34,000 stage-A rows, inserted 747,308 new image_index rows
+[2026-05-13T22:35:12+00:00] INFO    url-discovery: scanned 35,000 stage-A rows, inserted 769,483 new image_index rows
+[2026-05-13T22:35:14+00:00] INFO    url-discovery: scanned 36,000 stage-A rows, inserted 792,733 new image_index rows
+[2026-05-13T22:35:16+00:00] INFO    url-discovery: scanned 37,000 stage-A rows, inserted 818,249 new image_index rows
+[2026-05-13T22:35:18+00:00] INFO    url-discovery: scanned 38,000 stage-A rows, inserted 847,802 new image_index rows
+[2026-05-13T22:35:20+00:00] INFO    url-discovery: scanned 39,000 stage-A rows, inserted 875,471 new image_index rows
+[2026-05-13T22:35:23+00:00] INFO    url-discovery: scanned 40,000 stage-A rows, inserted 906,899 new image_index rows
+[2026-05-13T22:35:25+00:00] INFO    url-discovery: scanned 41,000 stage-A rows, inserted 938,222 new image_index rows
+[2026-05-13T22:35:27+00:00] INFO    url-discovery: scanned 42,000 stage-A rows, inserted 969,463 new image_index rows
+[2026-05-13T22:35:29+00:00] INFO    url-discovery: scanned 43,000 stage-A rows, inserted 996,645 new image_index rows
+[2026-05-13T22:35:32+00:00] INFO    url-discovery: scanned 44,000 stage-A rows, inserted 1,026,639 new image_index rows
+[2026-05-13T22:35:34+00:00] INFO    url-discovery: scanned 45,000 stage-A rows, inserted 1,054,333 new image_index rows
+[2026-05-13T22:35:37+00:00] INFO    url-discovery: scanned 46,000 stage-A rows, inserted 1,083,358 new image_index rows
+[2026-05-13T22:35:40+00:00] INFO    url-discovery: scanned 47,000 stage-A rows, inserted 1,114,943 new image_index rows
+[2026-05-13T22:35:42+00:00] INFO    url-discovery: scanned 48,000 stage-A rows, inserted 1,140,904 new image_index rows
+[2026-05-13T22:35:45+00:00] INFO    url-discovery: scanned 49,000 stage-A rows, inserted 1,174,538 new image_index rows
+[2026-05-13T22:35:49+00:00] INFO    url-discovery: scanned 50,000 stage-A rows, inserted 1,206,861 new image_index rows
+[2026-05-13T22:35:53+00:00] INFO    url-discovery: scanned 51,000 stage-A rows, inserted 1,241,859 new image_index rows
+[2026-05-13T22:35:57+00:00] INFO    url-discovery: scanned 52,000 stage-A rows, inserted 1,273,175 new image_index rows
+[2026-05-13T22:36:01+00:00] INFO    url-discovery: scanned 53,000 stage-A rows, inserted 1,300,543 new image_index rows
+[2026-05-13T22:36:05+00:00] INFO    url-discovery: scanned 54,000 stage-A rows, inserted 1,328,000 new image_index rows
+[2026-05-13T22:36:11+00:00] INFO    url-discovery: scanned 55,000 stage-A rows, inserted 1,356,389 new image_index rows
+[2026-05-13T22:36:18+00:00] INFO    url-discovery: scanned 56,000 stage-A rows, inserted 1,380,383 new image_index rows
+[2026-05-13T22:36:25+00:00] INFO    url-discovery: scanned 57,000 stage-A rows, inserted 1,410,875 new image_index rows
+[2026-05-13T22:36:32+00:00] INFO    url-discovery: scanned 58,000 stage-A rows, inserted 1,445,259 new image_index rows
+[2026-05-13T22:36:35+00:00] INFO    url-discovery: scanned 59,000 stage-A rows, inserted 1,477,898 new image_index rows
+[2026-05-13T22:36:36+00:00] INFO  discovered 1,478,257 new image_index rows from Stage A
+[2026-05-13T22:36:39+00:00] INFO  queued 1,751,416 downloaded=0 rows for fetch
+[2026-05-15T21:46:17+00:00] INFO  Phase 3 COMPLETE downloaded=1,751,358 failed=58 bytes=378,371,477,854
+[2026-05-15T21:46:57+00:00] INFO  status writer stopped
+[2026-05-15T21:46:57+00:00] INFO  orchestrator: phase 3 stage-b image bootstrap returned 0
+[2026-05-15T21:46:57+00:00] INFO  === orchestrator: phases 1-3 complete; commit/push (phase 4) is manual ===
+[2026-05-15T21:47:37+00:00] INFO  status writer stopped
