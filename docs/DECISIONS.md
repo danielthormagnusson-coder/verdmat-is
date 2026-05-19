@@ -4,6 +4,28 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-18 — Phase D2: 97 ghost properties soft-flagged
+
+97 properties returned HTTP 500 from HMS `/fasteignaskra/fasteign/{nr}` 
+endpoint during weekend run Phase B (existing properties.fastnum sweep). 
+All 97 had verified sales history in kaupskra (100% match), but HMS no 
+longer recognizes them — most likely deregistered post-sale due to lot 
+merging / fastnum renumbering. 3 of the 97 were sold in 2025, confirming 
+this is active churn pattern, not historical dead records.
+
+4 distinct ghosts × 6 rows present in training_data_v2.pkl (0,003% impact). 
+Decision: soft-flag via `deregistered=true` in Supabase properties table. 
+No retroactive training data rebuild — impact is trivial. Future 
+rebuild_training_data.py runs should JOIN properties.deregistered and 
+propagate flag into training data for downstream consumers (UI comparable 
+display, scoring pipeline) to filter.
+
+`deregistered` boolean column was added to properties schema in Batch 1 
+(migration 20260518_hms_columns.sql). Default `false`. D2 sets `true` on 
+the 97 ghost fastnums only.
+
+---
+
 ## 2026-05-18 — Áfangi 0 Stage 1 weekend run completed — registry-completion thesis revised
 
 **Hvað**: Two coordinated autonomous runs over 2026-05-08 → 2026-05-18 finished Áfangi 0 Stage 1 work. (1) Orchestrator (`weekend_run_orchestrator.py`) refreshed augl payloads for all 124,835 Supabase properties (`audit/stage_a_augl_staging.db`) and bootstrapped the image archive to 352.53 GB / 1,752,028 files at `D:\Gagnapakkar\images\` (canonical index `D:\Gagnapakkar\image_index.db`, 99.998% download success). (2) HMS full-scrape (`hms_full_scrape.py`, 58h 20m, 546,957 requests against `hms.is/api/fasteignaskra/fasteign/{nr}` via curl_cffi Chrome120 impersonation) ran sequential **Phase A → B → C**: backfill (kaupskra-only + 200-1000-wide gap ints, 8,897 requests, 2,059 hits at 23.1%), enrich (every existing Supabase fastnum, 124,835 requests, 124,738 hits at 99.92%), full-sweep (everything else in span 2,000,044..2,547,000, 413,225 requests, 28,134 hits at 6.81%). Total 154,931 HMS hits / 392,026 non-existent / 28.3% aggregate hit rate. **Result: 30,193 net-new HMS-only properties + 124,738 enriched rows + 97 deregistered ghosts.** All in staging; no Supabase writes performed.
