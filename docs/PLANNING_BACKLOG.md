@@ -1052,3 +1052,15 @@ Byrja á lestri og Section 1-2 draft.
 - **Sumarhús segment**: land-value features fyrir SUMMERHOUSE (núverandi 175% MAPE)
 
 Þessir þurfa sér planning-session þegar tíminn kemur.
+
+---
+
+## Framtíðar backlog (cont.) — logged 2026-05-20
+
+1. **rebuild_training_data.py HMS export step** — export HMS metadata slice from Supabase → local parquet before building training matrix. Required by SOURCES_OF_TRUTH Supabase-canonical decision. ~1 day. Non-blocking. Linked to iter5 (unblocks brunabotamat/byggingarstig non-circular features).
+
+2. **Áfangi: Innra heilsumælaborð (/heilsa)** — internal observability dashboard, unlinked subpage. Reads pipeline_runs + migrations_log + inputs_snapshots (Group C) + model metrics + backup manifests. Shows: model health (MAPE/PI coverage/bias/drift), data freshness per source, pipeline status, backup status, schema migration log, reproducibility check. Sequenced after Group C. Add auth gate before exposing anything sensitive.
+
+3. **Long-term north-star: Premium agent** — LLM chat product with access to full dataset for property analysis. Enabled by the canonical-sources + Supabase-serving + audit-trail architecture. No near-term planning; tracked as directional goal.
+
+4. **Image fallback for unlisted properties** — ~53% of properties have no listing images (never listed). Phase Z UI decision: show map/aerial view fallback (lat/lon available 100%) rather than blank. Reconcile local archive (fastnum/n.jpg) vs CloudFront (fastnum/hash.jpg) layout in image backfill Áfangi.
