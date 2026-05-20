@@ -267,6 +267,10 @@ All HMS scrape data is in staging. Three decisions pending before Supabase write
 
 Phase D execution is out-of-scope for this commit; will be planned in a fresh strategic chat session. Tracked in PLANNING_BACKLOG under Áfangi 0.z.
 
+#### Áfangi 0 — Operational
+
+- **Backup**: rclone → R2 `verdmat-backups`, nightly 03:00 local, 30-day retention (`scripts/backup_nightly.py`), restore-tested 2026-05-20 (5/5 SHA-256 match). First snapshot 2026-05-20T12-35 = 194 files / 9.72 GB / 14:58 min. Scheduled via Windows Task Scheduler `verdmat-nightly-backup` (user-level — for wake-from-sleep + run-when-logged-out, re-run `scripts/register_backup_task.ps1` from an elevated PowerShell). `D:\Gagnapakkar\images\` (352 GB CloudFront-mirrored) intentionally excluded.
+
 #### Áfangi 0 — original planning checkpoints (preserved)
 
 - [x] Planning session lokið 2026-05-06 — `app/docs/SCRAPER_SPEC_v1.md` committed. Tvíþætt scope: Track A (mbl + visir active-listings stream) + Track B (HMS fastanúmera completion ~25K gap).

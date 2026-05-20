@@ -1,0 +1,37 @@
+{
+  "_comment": "Backup include/exclude path manifest. Loaded by scripts/backup_nightly.py.",
+  "_expected_total_gb": "7-15 GB. Pre-flight halts if outside this range.",
+  "include": [
+    {
+      "local_path": "D:\\verdmat-is\\app\\audit",
+      "remote_subpath": "audit",
+      "recurse": true,
+      "kind": "dir"
+    },
+    { "local_path": "D:\\Gagnapakkar\\fasteignir.db",  "remote_subpath": "Gagnapakkar/fasteignir.db",  "kind": "file" },
+    { "local_path": "D:\\Gagnapakkar\\fasteignir1.db", "remote_subpath": "Gagnapakkar/fasteignir1.db", "kind": "file" },
+    { "local_path": "D:\\Gagnapakkar\\fasteignir2.db", "remote_subpath": "Gagnapakkar/fasteignir2.db", "kind": "file" },
+    { "local_path": "D:\\Gagnapakkar\\fasteignir3.db", "remote_subpath": "Gagnapakkar/fasteignir3.db", "kind": "file" },
+    { "local_path": "D:\\Gagnapakkar\\fasteignir4.db", "remote_subpath": "Gagnapakkar/fasteignir4.db", "kind": "file" },
+    { "local_path": "D:\\Gagnapakkar\\image_index.db", "remote_subpath": "Gagnapakkar/image_index.db", "kind": "file" },
+    {
+      "local_path": "D:\\",
+      "remote_subpath": "D_root",
+      "kind": "glob",
+      "recurse": false,
+      "patterns": ["*.pkl", "*.csv", "*.lgb", "*.parquet", "*.json", "*.sql"]
+    }
+  ],
+  "exclude_paths": [
+    "D:\\Gagnapakkar\\images",
+    "D:\\_rollback_backup",
+    "D:\\audit_1_5"
+  ],
+  "exclude_filenames": [
+    ".env",
+    ".env.local",
+    ".env.example",
+    ".dbconfig",
+    "rclone.conf"
+  ]
+}
