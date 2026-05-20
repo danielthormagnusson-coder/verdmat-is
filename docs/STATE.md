@@ -270,6 +270,7 @@ Phase D execution is out-of-scope for this commit; will be planned in a fresh st
 #### Áfangi 0 — Operational
 
 - **Backup**: rclone → R2 `verdmat-backups`, nightly 03:00 local, 30-day retention (`scripts/backup_nightly.py`), restore-tested 2026-05-20 (5/5 SHA-256 match). First snapshot 2026-05-20T12-35 = 194 files / 9.72 GB / 14:58 min. Scheduled via Windows Task Scheduler `verdmat-nightly-backup` (user-level — for wake-from-sleep + run-when-logged-out, re-run `scripts/register_backup_task.ps1` from an elevated PowerShell). `D:\Gagnapakkar\images\` (352 GB CloudFront-mirrored) intentionally excluded.
+- **Backup strategy refresh (2026-05-20)**: switched from per-snapshot full uploads to **rclone sync + --backup-dir** pattern. `r2backup:verdmat-backups/current/` holds the live mirror; `r2backup:verdmat-backups/archive/<ts>/` holds prior versions of files overwritten by the latest sync. 30-day retention prunes only `archive/<ts>/` entries (safe-guards on parse failure or count >60). The pre-existing `2026-05-20T12-35/` full-snapshot is left intact at bucket root as a one-off historical backup — not under current/ or archive/, so retention cannot touch it. Storage profile: ~9.7 GB steady-state + delta drift, vs. N × 9.7 GB for the prior pattern.
 
 #### Áfangi 0 — original planning checkpoints (preserved)
 

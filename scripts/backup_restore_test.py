@@ -1,17 +1,22 @@
-"""Restore-test — sample 5 files from latest snapshot, download, SHA-256 compare.
+"""Restore-test — sample 5 files from current/ mirror, verify SHA-256.
 
-Reads the most recent manifest in D:\\verdmat-is\\backup_log\\, picks 5 entries
-using random seed=42, downloads each to D:\\restore_test\\, computes SHA-256
-on the restored file, and asserts it matches the manifest entry.
+Strategy (post-2026-05-20 sync conversion):
+  • The live mirror lives at r2backup:<bucket>/current/<rel>/...
+  • Restore-test reads the latest local manifest, picks 5 entries (seed=42),
+    downloads each into D:\\restore_test\\, and compares:
+       (a) restored-file SHA-256 vs manifest-recorded SHA-256
+       (b) restored-file SHA-256 vs CURRENT local-file SHA-256 (round-trip)
 
-Exits 0 on all-pass, non-zero on any mismatch. Always cleans up D:\\restore_test\\
-on exit (success OR failure).
+The second check is what the new pattern enables — it confirms current/
+mirrors the local truth at this exact moment, not just what was on disk
+at backup time. Useful for detecting drift between local + remote.
+
+Exits 0 on all-pass, non-zero on any mismatch. Always cleans D:\\restore_test\\.
 """
 from __future__ import annotations
 
 import hashlib
 import json
-import os
 import random
 import shutil
 import subprocess
@@ -52,8 +57,9 @@ def main() -> int:
         print(f"ERROR: {e}")
         return 2
     print(f"Using manifest: {manifest_path}")
-
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    strategy = data.get("strategy", "<unknown>")
+    print(f"Manifest strategy: {strategy}")
     items = [it for it in data["items"] if it.get("sha256")]
     if len(items) < SAMPLE_SIZE:
         print(f"ERROR: manifest has only {len(items)} items with sha256, need {SAMPLE_SIZE}")
@@ -68,14 +74,14 @@ def main() -> int:
     try:
         for i, item in enumerate(sample, 1):
             remote = item["remote"]
-            local_orig = item["local"]
-            expected_sha = item["sha256"]
+            local_orig = Path(item["local"])
+            manifest_sha = item["sha256"]
             size = item["size_bytes"]
-            restore_name = f"{i:02d}_" + Path(local_orig).name
+            restore_name = f"{i:02d}_" + local_orig.name
             restore_path = RESTORE_DIR / restore_name
 
             print(f"[{i}/{SAMPLE_SIZE}] {remote}")
-            print(f"  → {restore_path}  ({size:,} bytes expected)")
+            print(f"  → {restore_path}  ({size:,} bytes expected from manifest)")
 
             r = subprocess.run(
                 [str(RCLONE_EXE), "--config", str(RCLONE_CONF),
@@ -92,23 +98,36 @@ def main() -> int:
                 exit_code = 1
                 continue
 
-            actual_sha = file_sha256(restore_path)
-            actual_size = restore_path.stat().st_size
-            match = actual_sha == expected_sha and actual_size == size
-            status = "OK" if match else "MISMATCH"
-            print(f"  expected sha256: {expected_sha}")
-            print(f"  actual   sha256: {actual_sha}  [{status}]")
-            print(f"  actual size:     {actual_size:,} bytes")
-            if not match:
+            restored_sha = file_sha256(restore_path)
+            restored_size = restore_path.stat().st_size
+
+            # Check 1: restored matches manifest record
+            manifest_match = restored_sha == manifest_sha and restored_size == size
+            print(f"  manifest sha256: {manifest_sha}")
+            print(f"  restored sha256: {restored_sha}  [{'OK' if manifest_match else 'MISMATCH'}]")
+            print(f"  restored size:   {restored_size:,} bytes")
+
+            # Check 2: restored matches CURRENT local file (round-trip)
+            # Only meaningful if local file still exists at the same path.
+            local_match = None
+            if local_orig.exists():
+                local_now_sha = file_sha256(local_orig)
+                local_match = local_now_sha == restored_sha
+                print(f"  local-now sha256: {local_now_sha}  [{'MATCH' if local_match else 'DIFFERS'}]")
+            else:
+                print(f"  local file no longer present at {local_orig} (skip drift check)")
+
+            if not manifest_match:
                 exit_code = 1
-                print("  ! FAIL — checksum or size differs from manifest")
+                print("  ! FAIL — restored file differs from manifest record")
+            # local-match=False is INFORMATIONAL — file changed since backup,
+            # not a backup integrity failure.
 
         if exit_code == 0:
-            print(f"\nRESTORE TEST PASSED: {SAMPLE_SIZE}/{SAMPLE_SIZE} checksums match")
+            print(f"\nRESTORE TEST PASSED: {SAMPLE_SIZE}/{SAMPLE_SIZE} manifest SHA-256 match")
         else:
             print(f"\nRESTORE TEST FAILED: see mismatches above")
     finally:
-        # Cleanup regardless of pass/fail
         if RESTORE_DIR.exists():
             shutil.rmtree(RESTORE_DIR, ignore_errors=True)
             print(f"Cleaned up {RESTORE_DIR}")
