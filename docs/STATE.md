@@ -8,6 +8,21 @@
 
 **Verkefnisstaða heildar: ~96,5%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready, Sprint 3 Áfangi 0 spec lokið, implementation staged.)
 
+#### Roadmap position (updated 2026-05-20)
+
+Sequence: Phase D (Supabase sync) → Phase X (architecture) → Phase Y (D3-D5) → 
+Phase Z (UI redesign).
+
+- Phase D: D1 (124,738 HMS enrich) ✅ · D2 (97 ghosts) ✅ · D3 (30K insert) / 
+  D4 (cross_property_refs) / D5 (photo_urls_json) pending Phase Y
+- Phase X Group A (backup + SOURCES_OF_TRUTH) ✅ 2026-05-20
+- Phase X Group B (Supabase CLI baseline + views layer) ← NEXT
+- Phase X Group C (migration_helpers + audit tables + run_monthly + 
+  inputs_snapshots wiring) pending
+- Phase Z (UI redesign, matseiningar priority) after Phase Y
+
+Detail: DECISIONS.md 2026-05-20 entries + SOURCES_OF_TRUTH.md.
+
 ---
 
 ## Dev-umhverfi

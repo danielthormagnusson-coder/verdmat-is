@@ -4,6 +4,38 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-20 — Phase X architecture sprint (post independent review)
+
+Independent-Claude review of Phase D methodology ranked three fixes: Q6 (backup + 
+reproducibility) → Q1/Q4 (sources of truth) → Q7 (views + migration CLI). Decision: 
+execute as Phase X BEFORE Phase Y (D3-D5 data) and Phase Z (UI redesign) — UI 
+redesign touches multiple components + new Supabase queries, so doing it on an 
+unprotected/moving schema is risk multiplication. Phase X groups: A (backup + 
+restore test + SOURCES_OF_TRUTH) ✅, B (Supabase CLI baseline + views layer), 
+C (migration_helpers + audit tables + run_monthly + inputs_snapshots wiring).
+
+---
+
+## 2026-05-20 — Supabase canonical for HMS metadata
+
+Supabase `properties` is canonical for HMS property metadata. properties_v2.pkl 
+becomes a derived training cache, rebuilt by exporting the HMS slice from Supabase 
+each training cycle. Resolves the split-brain from Phase D adding 11 HMS columns 
+to Supabase not mirrored in the pickle. Full rationale in SOURCES_OF_TRUTH.md. 
+Unblocks iter5. Follow-up logged: rebuild_training_data.py export step.
+
+---
+
+## 2026-05-20 — Backup architecture (R2 incremental)
+
+Nightly backup of D:\ critical paths (excl. 352 GB images on CloudFront) to 
+Cloudflare R2 via rclone sync + --backup-dir. current/ = live mirror, 
+archive/<ts>/ = overwritten/deleted versions, 30-day archive retention. ~$0.20/mo. 
+R2 over B2 (MCP convenience). Restore-tested 5/5. Staleness alert deferred to 
+Group C run_monthly.py.
+
+---
+
 ## 2026-05-18 — Phase D2: 97 ghost properties soft-flagged
 
 97 properties returned HTTP 500 from HMS `/fasteignaskra/fasteign/{nr}` 
