@@ -23,12 +23,27 @@ Phase Z (UI redesign).
   SELECT grants to anon + authenticated; frontend on views (10 files, 19 
   `.from()` switches); 8-route smoke OK. **Bug 25 closed.** Bug 26 re-scoped 
   to server-side rendered deep-link href via service-role key (not column-strip).
-- Phase X Group B follow-up (pending next session) — REVOKE direct anon + 
-  authenticated SELECT on underlying tables (`properties`, `predictions`, 
-  `repeat_sale_index`, `ats_lookup`) so views become the only public read 
-  path. DO NOT run while live traffic may still hit table paths — wait for 
-  prod confirmation that the deployed frontend reads exclusively from views. 
-  `SECURITY DEFINER` RPCs (`search_properties_grouped`) keep working post-REVOKE.
+- Phase X Group B follow-up (pending next session) — enforce the 
+  `v_properties` column allowlist via column-level grants on the underlying 
+  tables (`properties`, `predictions`, `repeat_sale_index`, `ats_lookup`). 
+  **Naive blanket `REVOKE SELECT ON <table> FROM anon` would break all 4 
+  views in prod**: views are `security_invoker = on`, so they execute under 
+  the calling role; anon must still hold SELECT on the underlying columns 
+  for the view query to plan. Correct sequence per table is two statements 
+  in one transaction: `REVOKE SELECT ON public.<table> FROM anon;` THEN 
+  `GRANT SELECT (<allowlist columns>) ON public.<table> TO anon;` — this 
+  keeps the invoker-views working AND enforces the column-exclude contract 
+  in PostgREST (selecting an excluded column returns 42501 permission 
+  denied). The `authenticated` allowlist may differ from `anon` (e.g. pro 
+  features) — decide column set per role next session. Open decision: 
+  alternative path is `ALTER VIEW ... SET (security_invoker = off)` (DEFINER 
+  semantics, run as view owner, bypasses anon's table grants entirely), 
+  which would allow blanket REVOKE but re-opens Bug 25 / loses RLS 
+  enforcement at the view layer — almost certainly the wrong trade-off, but 
+  flagged here so the decision is explicit. `SECURITY DEFINER` RPCs 
+  (`search_properties_grouped`) keep working under either path. DO NOT run 
+  any REVOKE while live traffic may still hit table paths — wait for prod 
+  confirmation that the deployed frontend reads exclusively from views.
 - Phase X Group C (migration_helpers + audit tables + run_monthly + 
   inputs_snapshots wiring) ← NEXT
 - Phase Z (UI redesign, matseiningar priority) after Phase Y
