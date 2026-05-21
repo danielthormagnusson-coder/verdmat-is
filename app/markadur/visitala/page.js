@@ -32,7 +32,7 @@ async function fetchRepeatSaleAll() {
   for (let from = 0; from < 10000; from += pageSize) {
     const to = from + pageSize - 1;
     const { data, error } = await supabase
-      .from("repeat_sale_index")
+      .from("v_repeat_sale_index")
       .select(COLS)
       .order("canonical_code", { ascending: true })
       .order("region_tier", { ascending: true })

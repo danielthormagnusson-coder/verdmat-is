@@ -4,6 +4,90 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-21 — Phase X Group B Part 2: views layer (security_invoker, anon/auth grants) + frontend switch
+
+**Hvað**: Migration `20260521125751_views_layer.sql` added 4 read-only views — `v_properties`, `v_repeat_sale_index`, `v_ats_lookup_by_heat`, `v_current_predictions` — each declaring `WITH (security_invoker = on)` and granting SELECT to `anon` + `authenticated`. All 10 frontend `.from("properties" | "predictions" | "repeat_sale_index" | "ats_lookup")` call sites switched to the corresponding view (19 `.from()` replacements total). Next.js 16 production build clean; 8-route smoke (incl. `/eign/2008647`, `/markadur`, all four `/markadur/*` sub-pages, `/api/backproj/2008647`) returns HTTP 200 with sizes within ±5% of the 2026-05-06 verify baseline. **Bug 25 (Postgres 15+ view security_invoker discipline) is closed.**
+
+**Why views, why now**: Postgres 15+ defaults views to security DEFINER semantics (run as view owner). With this default, any future RLS policy on the underlying table would be silently bypassed when read through a view — exactly the anti-pattern flagged for Áfangi 0 dependency in the 2026-05-06 RLS baseline audit (Bug 25). Declaring `WITH (security_invoker = on)` forces the view to evaluate with the calling role's permissions, so RLS policies apply as expected. Doing this proactively *before* any new RLS policies land closes the Áfangi 0 hardening dependency without touching policy logic. This entry locks the discipline: every future view in `public` must declare `security_invoker = on` explicitly.
+
+**`v_properties` allowlist (43 of 47 columns)** — confirmed by HALT 2:
+
+| Status | Columns |
+|---|---|
+| Include (43) | identity (`fastnum`, `heimilisfang`, `husnr`, `postnr`, `postheiti`, `svfn`, `sveitarfelag`); classification (`tegund_raw`, `canonical_code`, `unit_category`, `unit_family`, `is_residential`, `is_summerhouse`, `is_new_build`, `is_main_unit`); size & build (`einflm`, `lod_flm`, `byggar`, `fjherb`, `fullbuid`); geo (`lat`, `lng`, `matsvaedi_numer`, `matsvaedi_nafn`, `matsvaedi_bucket`, `region_tier`); HMS valuation (`fasteignamat`, `fasteignamat_gildandi`, `fasteignamat_naesta_ar`, `brunabotamat`, `lhlmat`, `byggingarstig`, `skodags`, `gerd`, `matsstig`); listing snapshot (`augl_id_latest`, `list_price_latest`, `effective_date_latest`, `scraped_at_latest`, `lysing_truncated`, `first_photo_url`, `photo_urls_json`, `n_photos`) |
+| Exclude (4) | `landeign_nr` (unused by frontend; least-exposure default), `matseiningar` jsonb (Phase Z UI redesign will design its public surface), `tengd_stadfang_nr` jsonb (HMS staðfang cross-refs, Phase Y join-internal), `deregistered` (filter-redundant — view's `WHERE deregistered IS NOT TRUE` makes the column constant FALSE for visible rows; the 97 ghosts are hidden from public reads) |
+
+`augl_id_latest` is **INCLUDED** despite Bug 26 (listing-id leak): exposing the `fastnum ↔ augl_id` bulk mapping via `anon` was already true on the underlying `properties` table — `v_properties` does not add new exposure. The Bug 26 fix is now re-scoped (and re-prioritised) to **server-side rendering the deep-link `href` with the service-role key**, NOT column-stripping. That is cheaper than a hashed-proxy approach and avoids reshaping the data contract. Tracked in PLANNING_BACKLOG.
+
+**Spec corrections found during empirical sweep (HALT 2)**:
+- `ats_lookup_by_heat` table does not exist in `public` schema. The view `v_ats_lookup_by_heat` wraps `public.ats_lookup` (the empirical name; 65 rows; this IS Table B from Áfangi 7). View name follows the doc-canonical "by_heat" used in the codebase. Optional underlying-table rename (`ats_lookup` → `ats_lookup_by_heat`) deferred to Group C.
+- `public.predictions` has neither `scored_at` nor `property_id`. Actual key is `fastnum` (bigint), timestamp is `predicted_at` (DATE). `v_current_predictions` uses `DISTINCT ON (fastnum) ... ORDER BY fastnum, predicted_at DESC`. **Currently a no-op** — at iter4, predictions has exactly 1 row per fastnum (110,316 = count(DISTINCT fastnum) = total). Written forward-safe for the schema where multiple predictions per fastnum may co-exist.
+- **Backlog note**: `predicted_at` as DATE is insufficient for robust latest-selection once history accumulates. Replace with `scored_at timestamptz` when iter5 ships (or sooner if a prediction-refresh cadence introduces same-day re-scoring).
+
+**Verification (psycopg2 against linked DB)**:
+- 4 views exist in `public`, all with `reloptions={security_invoker=on}` per `pg_class`.
+- `information_schema.role_table_grants` confirms `SELECT` granted to BOTH `anon` AND `authenticated` on all 4.
+- Row counts:
+  - `v_properties` = 124,738 (= 124,835 properties − 97 ghosts) ✓
+  - `v_repeat_sale_index` = 2,673 (= source table) ✓
+  - `v_ats_lookup_by_heat` = 65 (= `ats_lookup`) ✓
+  - `v_current_predictions` = 110,316 = `count(DISTINCT fastnum) FROM predictions` ✓
+- Simulated `BEGIN; SET LOCAL ROLE anon; SELECT count(*) FROM <view>; ROLLBACK` returned the same counts for all 4 — confirms anon path works through views.
+
+**Frontend switch (10 files, 19 replacements)**:
+- `components/BackProjectionWidget.js` (2× properties)
+- `components/SearchAutocomplete.js` (1× properties)
+- `app/page.js` (1× properties + 1× predictions)
+- `app/eign/[fastnum]/page.js` (3× properties + 1× predictions + 1× ats_lookup)
+- `app/eign/[fastnum]/stilla/page.js` (2× properties + 1× predictions)
+- `app/eign/[fastnum]/stilla/nidurstada/page.js` (1× properties + 1× predictions)
+- `app/markadur/visitala/page.js` (1× repeat_sale_index)
+- `app/markadur/modelstada/page.js` (1× properties + 1× repeat_sale_index)
+- `app/api/adjust-valuation/route.js` (1× properties + 1× predictions)
+- `app/api/backproj/[fastnum]/route.js` (1× properties + 1× predictions + 1× repeat_sale_index)
+
+**Smoke test (production build + curl)** — sizes match 2026-05-06 verify ±5%:
+
+| Route | HTTP | Size |
+|---|---|---|
+| `/` | 200 | 34 KB |
+| `/eign/2008647` | 200 | 127 KB |
+| `/markadur` | 200 | 43 KB |
+| `/markadur/visitala` | 200 | 942 KB |
+| `/markadur/markadsstada` | 200 | 1.1 MB |
+| `/markadur/modelstada` | 200 | 37 KB |
+| `/markadur/ibudir` | 200 | 821 KB |
+| `/api/backproj/2008647` | 200 | 1 KB |
+
+**Security note — what's NOT done in this session (intentional)**:
+Underlying tables `properties`, `predictions`, `repeat_sale_index`, `ats_lookup` **still have direct anon + authenticated SELECT grants** from the 2026-05-06 RLS baseline audit. The 4-column EXCLUDE allowlist on `v_properties` defines the *intended* contract but is not yet *enforced* by grants — anon could still bypass the view by reading the table directly. A follow-up session (after deployed-frontend stability confirmation) will REVOKE direct SELECT from anon + authenticated on those 4 tables, leaving the views as the only public read path. The `SECURITY DEFINER` RPCs (`search_properties_grouped`) keep working post-REVOKE since they run as the function owner. Tracked in STATE.md Roadmap as "Phase X Group B follow-up". **Never REVOKE while live prod traffic may still hit table paths** — that would 401 every reader until the deploy lands.
+
+**Locked rule going forward**: when adding a new public-facing column to `public.properties` (or any underlying table), the change MUST extend the corresponding `v_*` view in the same migration. `SELECT *` is forbidden in view bodies; an allowlist of explicit columns is the contract.
+
+---
+
+## 2026-05-21 — Phase X Group B Part 1: Supabase CLI baseline reconcile
+
+**Hvað**: Reconciled local `supabase/migrations/` dir against remote `supabase_migrations.schema_migrations` via a fresh `pg_dump --schema-only -n public --no-owner` baseline, marked applied with `supabase migration repair --status applied 20260521125431`. The 7 pre-existing local files (`20260421_initial_schema.sql` through `20260518_hms_columns.sql`) moved to `supabase/_legacy_migrations/` (out of CLI's view, retained in git history for traceability). End state: `migration list` shows 1 local file = 1 applied baseline plus 11 historical remote-only entries that pre-date the baseline (harmless audit trail, no longer block `db push`).
+
+**Af hverju**: Discovery (Step 1.2) revealed two-way drift from the MCP-applied period (2026-04-21 → 2026-05-18). Local dir had 7 files with short `YYYYMMDD` timestamps (one duplicate date — `20260422` ×2 for two unrelated changes); remote history had 11 long-timestamp entries from MCP `apply_migration` calls. Only 4 of 7 local files had clear remote content-twins (signature-line match: `20260423_dashboard_v1` ↔ `20260421222521`, `20260424_ats_lookup_by_quarter_and_regime_view` ↔ `20260424095108`, `20260422_search_properties_grouped_rpc` ↔ `20260422152141` plus 4 later evolutions, `20260518_hms_columns` ↔ `20260518111331`); 3 had no remote history row despite their effects being live (initial schema, `effective_date_latest`, RLS baseline audit). 7 remote-only entries had no local file at all (`model_tracking_null_segment`, `model_tracking_segment_nullable`, `latest_regime_per_cell_with_zscore`, `properties_prefix_indexes`, `search_rpc_simplify_inline`, `search_rpc_force_custom_plan`, `search_rpc_dynamic_sql`). File-by-file `migration repair --status applied` would have preserved the noise + duplicate-date locals + 7 invisible orphans; the baseline approach gives a faithful repo with one source of truth going forward. This is the foundational fix Group B was designed to deliver before any new migration (the views layer in Part 2) is pushed.
+
+**Tooling decisions (one-off setup, persisted to user-level PATH)**:
+- Supabase CLI v2.101.0 installed at `D:\verdmat-is\tools\supabase\supabase.exe` (scoop unavailable on this machine; direct binary download from GitHub releases per spec fallback, SHA-256 checksum verified against `checksums.txt`). Login via interactive browser flow (token cached locally; Claude never handled the token value).
+- PostgreSQL 17 client tools (matches server's PG17.6 — pg_dump must equal-or-exceed server major) installed at `D:\verdmat-is\tools\postgres17\pgsql\bin\` (EDB binary-only zip, no installer / no service).
+- Connection path for `pg_dump`: **session pooler on port 5432** (`aws-1-eu-north-1.pooler.supabase.com`, user `postgres.szzjsvmvxfrhyexblzvq`, same password as in `.dbconfig`). Transaction pooler (6543) does not support `pg_dump`'s protocol expectations; direct connection (`db.<ref>.supabase.co:5432`) is IPv6-only and unreachable from this host. The session-pooler URL is derived by swapping the port on the existing `.dbconfig` URI.
+- Docker Desktop intentionally not installed. `supabase db diff --linked` and `supabase db reset` therefore unavailable; verification falls back to direct `psycopg2` SQL queries against the live DB (sufficient for additive view migrations in Part 2 — adds only, no destructive changes).
+
+**Baseline sanity-check (`supabase/migrations/20260521125431_baseline.sql`, 47,533 bytes, 1,128 lines)**:
+- All 11 HMS columns present in `public.properties`: `brunabotamat`, `lhlmat`, `fasteignamat_naesta_ar`, `byggingarstig`, `skodags`, `gerd`, `matsstig`, `landeign_nr`, `matseiningar` (jsonb), `tengd_stadfang_nr` (jsonb), `deregistered`.
+- 18 tables with `ENABLE ROW LEVEL SECURITY` + 18 `CREATE POLICY` statements (matches the 2026-05-06 RLS baseline audit: 14 dashboard-public + 4 user-owned).
+- 28 `TO anon` grants + 46 `TO authenticated` grants.
+- 18 tables, 4 pre-existing views (`latest_regime_per_cell`, `regime_per_cell_monthly`, `repeat_sale_index_by_segment`, `repeat_sale_index_main_pooled`), 1 function (`search_properties_grouped`), 33 indexes.
+
+**Locked rule going forward**: any new schema change MUST go through `supabase/migrations/` + `supabase db push`. MCP `apply_migration` (the original cause of this drift) is disallowed for schema work; reserve the MCP for read-only inspection only.
+
+---
+
 ## 2026-05-20 — Phase X architecture sprint (post independent review)
 
 Independent-Claude review of Phase D methodology ranked three fixes: Q6 (backup + 

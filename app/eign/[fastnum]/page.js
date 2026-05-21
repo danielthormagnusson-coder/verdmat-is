@@ -29,7 +29,7 @@ export const revalidate = 600;
 export async function generateMetadata({ params }) {
   const { fastnum } = await params;
   const { data } = await supabase
-    .from("properties")
+    .from("v_properties")
     .select("heimilisfang, postnr, postheiti, canonical_code")
     .eq("fastnum", fastnum)
     .maybeSingle();
@@ -57,8 +57,8 @@ export default async function PropertyPage({ params, searchParams }) {
   if (!Number.isFinite(fnum)) notFound();
 
   const queries = [
-    supabase.from("properties").select("*").eq("fastnum", fnum).maybeSingle(),
-    supabase.from("predictions").select("*").eq("fastnum", fnum).maybeSingle(),
+    supabase.from("v_properties").select("*").eq("fastnum", fnum).maybeSingle(),
+    supabase.from("v_current_predictions").select("*").eq("fastnum", fnum).maybeSingle(),
     supabase
       .from("feature_attributions")
       .select("*")
@@ -101,7 +101,7 @@ export default async function PropertyPage({ params, searchParams }) {
   if (compsRaw && compsRaw.length) {
     const ids = compsRaw.map((c) => c.comp_fastnum);
     const { data: compProps } = await supabase
-      .from("properties")
+      .from("v_properties")
       .select(
         "fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm, byggar, first_photo_url"
       )
@@ -114,7 +114,7 @@ export default async function PropertyPage({ params, searchParams }) {
   let marketRows = [];
   if (property.canonical_code && property.region_tier) {
     const { data: mkt } = await supabase
-      .from("ats_lookup")
+      .from("v_ats_lookup_by_heat")
       .select("*")
       .eq("canonical_code", property.canonical_code)
       .eq("region_tier", property.region_tier);

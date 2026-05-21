@@ -17,7 +17,7 @@ async function loadFeatured() {
   const results = [];
   for (const p of picks) {
     const { data } = await supabase
-      .from("properties")
+      .from("v_properties")
       .select(
         "fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm, first_photo_url, n_photos"
       )
@@ -29,7 +29,7 @@ async function loadFeatured() {
     if (data && data.length) {
       const prop = data[0];
       const { data: pred } = await supabase
-        .from("predictions")
+        .from("v_current_predictions")
         .select("real_pred_mean, real_pred_lo80, real_pred_hi80")
         .eq("fastnum", prop.fastnum)
         .maybeSingle();

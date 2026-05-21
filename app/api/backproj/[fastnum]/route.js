@@ -56,12 +56,12 @@ export async function GET(_req, { params }) {
 
   const [propRes, predRes] = await Promise.all([
     supabase
-      .from("properties")
+      .from("v_properties")
       .select("fastnum, heimilisfang, postnr, postheiti, canonical_code, region_tier")
       .eq("fastnum", fnum)
       .maybeSingle(),
     supabase
-      .from("predictions")
+      .from("v_current_predictions")
       .select("real_pred_mean, model_version, calibration_version")
       .eq("fastnum", fnum)
       .maybeSingle(),
@@ -87,7 +87,7 @@ export async function GET(_req, { params }) {
   }
 
   const { data: quarterly } = await supabase
-    .from("repeat_sale_index")
+    .from("v_repeat_sale_index")
     .select("year, quarter, index_value_real, insufficient_sample")
     .eq("canonical_code", property.canonical_code)
     .eq("region_tier", property.region_tier)

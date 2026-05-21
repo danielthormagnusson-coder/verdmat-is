@@ -146,7 +146,7 @@ export default function SearchAutocomplete() {
     // precompute pipeline, so requesting it used to silently error out and
     // surface as "Engar einingar" in the dropdown (Bug 5, 2026-04-22).
     const { data, error } = await supabase
-      .from("properties")
+      .from("v_properties")
       .select(
         "fastnum, tegund_raw, canonical_code, unit_category, einflm",
       )

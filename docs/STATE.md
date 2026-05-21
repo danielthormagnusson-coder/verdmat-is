@@ -8,7 +8,7 @@
 
 **Verkefnisstaða heildar: ~96,5%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready, Sprint 3 Áfangi 0 spec lokið, implementation staged.)
 
-#### Roadmap position (updated 2026-05-20)
+#### Roadmap position (updated 2026-05-21)
 
 Sequence: Phase D (Supabase sync) → Phase X (architecture) → Phase Y (D3-D5) → 
 Phase Z (UI redesign).
@@ -16,12 +16,24 @@ Phase Z (UI redesign).
 - Phase D: D1 (124,738 HMS enrich) ✅ · D2 (97 ghosts) ✅ · D3 (30K insert) / 
   D4 (cross_property_refs) / D5 (photo_urls_json) pending Phase Y
 - Phase X Group A (backup + SOURCES_OF_TRUTH) ✅ 2026-05-20
-- Phase X Group B (Supabase CLI baseline + views layer) ← NEXT
+- Phase X Group B (Supabase CLI baseline + views layer) ✅ 2026-05-21 — 
+  pg_dump 17 client-tools baseline + `supabase migration repair --status applied`; 
+  4 read-only views (`v_properties`, `v_repeat_sale_index`, `v_ats_lookup_by_heat`, 
+  `v_current_predictions`) with explicit `WITH (security_invoker = on)` and 
+  SELECT grants to anon + authenticated; frontend on views (10 files, 19 
+  `.from()` switches); 8-route smoke OK. **Bug 25 closed.** Bug 26 re-scoped 
+  to server-side rendered deep-link href via service-role key (not column-strip).
+- Phase X Group B follow-up (pending next session) — REVOKE direct anon + 
+  authenticated SELECT on underlying tables (`properties`, `predictions`, 
+  `repeat_sale_index`, `ats_lookup`) so views become the only public read 
+  path. DO NOT run while live traffic may still hit table paths — wait for 
+  prod confirmation that the deployed frontend reads exclusively from views. 
+  `SECURITY DEFINER` RPCs (`search_properties_grouped`) keep working post-REVOKE.
 - Phase X Group C (migration_helpers + audit tables + run_monthly + 
-  inputs_snapshots wiring) pending
+  inputs_snapshots wiring) ← NEXT
 - Phase Z (UI redesign, matseiningar priority) after Phase Y
 
-Detail: DECISIONS.md 2026-05-20 entries + SOURCES_OF_TRUTH.md.
+Detail: DECISIONS.md 2026-05-21 entries + 2026-05-20 entries + SOURCES_OF_TRUTH.md.
 
 ---
 

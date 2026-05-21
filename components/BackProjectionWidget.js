@@ -42,13 +42,13 @@ function SearchBox({ onSelect }) {
       setLoading(true);
       const term = q.trim();
       let query = supabase
-        .from("properties")
+        .from("v_properties")
         .select("fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm")
         .eq("is_residential", true)
         .limit(8);
       if (/^\d+$/.test(term)) {
         query = supabase
-          .from("properties")
+          .from("v_properties")
           .select("fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm")
           .eq("fastnum", Number(term))
           .limit(1);

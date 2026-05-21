@@ -70,7 +70,7 @@ async function loadPipelineHealth() {
       .limit(1)
       .maybeSingle(),
     supabase
-      .from("repeat_sale_index")
+      .from("v_repeat_sale_index")
       .select("period")
       .order("year", { ascending: false })
       .order("quarter", { ascending: false })
@@ -83,7 +83,7 @@ async function loadPipelineHealth() {
       .limit(1)
       .maybeSingle(),
     supabase
-      .from("properties")
+      .from("v_properties")
       .select("scraped_at_latest")
       .order("scraped_at_latest", { ascending: false })
       .limit(1)

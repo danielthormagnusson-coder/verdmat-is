@@ -88,7 +88,7 @@ export async function POST(request) {
   }
 
   const { data: property, error: propErr } = await supabase
-    .from("properties")
+    .from("v_properties")
     .select("canonical_code")
     .eq("fastnum", Number(fastnum))
     .maybeSingle();
@@ -108,7 +108,7 @@ export async function POST(request) {
   }
 
   const { data: prediction, error } = await supabase
-    .from("predictions")
+    .from("v_current_predictions")
     .select(
       "fastnum, real_pred_mean, real_pred_median, real_pred_lo80, real_pred_hi80, real_pred_lo95, real_pred_hi95, segment, model_version, calibration_version"
     )

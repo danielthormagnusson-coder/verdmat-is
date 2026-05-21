@@ -113,14 +113,14 @@ export default async function NidurstadaPage({ params, searchParams }) {
 
   const [{ data: property }, { data: prediction }] = await Promise.all([
     supabase
-      .from("properties")
+      .from("v_properties")
       .select(
         "fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm, byggar, fasteignamat"
       )
       .eq("fastnum", fnum)
       .maybeSingle(),
     supabase
-      .from("predictions")
+      .from("v_current_predictions")
       .select(
         "real_pred_mean, real_pred_median, real_pred_lo80, real_pred_hi80, real_pred_lo95, real_pred_hi95, model_version, calibration_version"
       )

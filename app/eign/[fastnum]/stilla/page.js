@@ -8,7 +8,7 @@ export const revalidate = 600;
 export async function generateMetadata({ params }) {
   const { fastnum } = await params;
   const { data } = await supabase
-    .from("properties")
+    .from("v_properties")
     .select("heimilisfang")
     .eq("fastnum", fastnum)
     .maybeSingle();
@@ -24,7 +24,7 @@ export default async function StillaPage({ params }) {
   if (!Number.isFinite(fnum)) notFound();
 
   const { data: property } = await supabase
-    .from("properties")
+    .from("v_properties")
     .select(
       "fastnum, heimilisfang, postnr, postheiti, canonical_code, einflm, byggar, is_residential"
     )
@@ -42,7 +42,7 @@ export default async function StillaPage({ params }) {
   }
 
   const { data: prediction } = await supabase
-    .from("predictions")
+    .from("v_current_predictions")
     .select("real_pred_mean, real_pred_lo80, real_pred_hi80")
     .eq("fastnum", fnum)
     .maybeSingle();
