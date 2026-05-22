@@ -8,13 +8,15 @@
 
 **Verkefnisstaða heildar: ~96,5%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready, Sprint 3 Áfangi 0 spec lokið, implementation staged.)
 
-#### Roadmap position (updated 2026-05-21)
+#### Roadmap position (updated 2026-05-22)
 
 Sequence: Phase D (Supabase sync) → Phase X (architecture) → Phase Y (D3-D5) → 
 Phase Z (UI redesign).
 
 - Phase D: D1 (124,738 HMS enrich) ✅ · D2 (97 ghosts) ✅ · D3 (30K insert) / 
-  D4 (cross_property_refs) / D5 (photo_urls_json) pending Phase Y
+  D4 (cross_property_refs) / D5 (photo_urls_json) pending Phase Y. D3 scope 
+  expected to grow from ~30K to ~102K net-new fastnums post-HMS-recovery 
+  (additive locked 2026-05-22, see `docs/POST_HMS_RECOVERY_PLAN.md`).
 - Phase X Group A (backup + SOURCES_OF_TRUTH) ✅ 2026-05-20
 - Phase X Group B (Supabase CLI baseline + views layer) ✅ 2026-05-21 — 
   pg_dump 17 client-tools baseline + `supabase migration repair --status applied`; 
@@ -23,9 +25,9 @@ Phase Z (UI redesign).
   SELECT grants to anon + authenticated; frontend on views (10 files, 19 
   `.from()` switches); 8-route smoke OK. **Bug 25 closed.** Bug 26 re-scoped 
   to server-side rendered deep-link href via service-role key (not column-strip).
-- Phase X Group B follow-up (pending next session) — enforce the 
-  `v_properties` column allowlist via column-level grants on the underlying 
-  tables (`properties`, `predictions`, `repeat_sale_index`, `ats_lookup`). 
+- Phase X Group B follow-up — enforce the `v_properties` column allowlist 
+  via column-level grants on the underlying tables (`properties`, 
+  `predictions`, `repeat_sale_index`, `ats_lookup`). 
   **Naive blanket `REVOKE SELECT ON <table> FROM anon` would break all 4 
   views in prod**: views are `security_invoker = on`, so they execute under 
   the calling role; anon must still hold SELECT on the underlying columns 
@@ -44,11 +46,44 @@ Phase Z (UI redesign).
   (`search_properties_grouped`) keep working under either path. DO NOT run 
   any REVOKE while live traffic may still hit table paths — wait for prod 
   confirmation that the deployed frontend reads exclusively from views.
+- Evalue sibling-scraper audit ✅ 2026-05-22 — diagnostic-only sweep of 6 
+  evalue variants in `audit/` + 5-day temporal review of 
+  `stage_a_augl_staging.db` + single positive-control probe. **HMS bug-class 
+  not present** in any variant; no re-probe justified. Coverage-coupling 
+  caveat surfaced: HMS recovered fastnums were never offered to evalue 
+  refresher — handled in the gated post-recovery track below.
+- HMS full recovery in-flight (parallel CC #1) — `audit/hms_full_recovery.py` 
+  re-probing 392,026 HTTP-500 rows from 2026-05-15→18 scrape's dead-zone 
+  windows; expected ~71,800 net-new real properties (Wilson 95% CI 16.2–
+  21.0% recovery rate). Reads but does not write Supabase; staging DB only.
+
+The two tracks below are **independent — neither blocks the other**.
+
+**Next focused session**: **Phase X Group B column-grant lockout** (gated on 
+deployed-frontend prod confirmation; per 2026-05-21 DECISIONS entry). 
+Scheduled first per user priority.
+
+**Independent gated-track** (own scheduling, both gates must be green; 
+does not block and is not blocked by the column-grant lockout above):
+- Production-template hardening (PLANNING_BACKLOG item 5) — fold the HMS 
+  retro-fix (outage detection + 500-aware backoff in `hms_full_scrape.py`) 
+  with the evalue resume-skip fix (`stage_a_augl_refresh.py` retry-on-resume 
+  for non-(200,204) rows) into one canonical scraper template.
+- Post-HMS-recovery plan (PLANNING_BACKLOG item 6 + 
+  `docs/POST_HMS_RECOVERY_PLAN.md`) — 4 steps: Step 0 partition recovered 
+  into already-in-base (~97, HMS refresh) and net-new Phase C (~71.7K, full 
+  pass) → Step 1 evalue augl pass for net-new → Step 2 kaupskrá lookup for 
+  net-new → Step 3 D3-extended Supabase promotion (additive ~102K net-new 
+  + ~97 ghost refresh) → Step 4 score net-new with iter4 → populate 
+  `predictions`. Universe expands from 124,835 to **~227K** properties; 
+  predictions grow from 110,316 to ~212K.
+
 - Phase X Group C (migration_helpers + audit tables + run_monthly + 
-  inputs_snapshots wiring) ← NEXT
+  inputs_snapshots wiring) ← AFTER Group B column-grant lockout completes
 - Phase Z (UI redesign, matseiningar priority) after Phase Y
 
-Detail: DECISIONS.md 2026-05-21 entries + 2026-05-20 entries + SOURCES_OF_TRUTH.md.
+Detail: DECISIONS.md 2026-05-22 + 2026-05-21 + 2026-05-20 entries; 
+`docs/POST_HMS_RECOVERY_PLAN.md` for the runnable spec.
 
 ---
 
