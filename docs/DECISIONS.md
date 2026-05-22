@@ -4,6 +4,147 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-22 — Evalue sibling-scraper audit (diagnostic): HMS bug class not present; coverage-coupling caveat surfaced
+
+**Hvað**: Diagnostic-only audit (parallel lane to HMS recovery; no HMS files touched, no evalue network scrape beyond one positive-control probe). Inventoried 6 evalue scraper variants in `audit/`, static-reviewed each for the HMS bug class (HTTP-5xx misinterpreted as "fastnum doesn't exist"), temporal-bucketed the 124,835-row `audit/stage_a_augl_staging.db` for dead-zone clusters, and confirmed endpoint liveness with one positive-control POST. **Verdict: HMS bug class not present in any of the 6 evalue variants.** No sample re-probe justified.
+
+**The 6 variants** (all under `audit/`):
+
+| # | File | Role | Network |
+|---|---|---|---|
+| 1 | `stage_a_augl_refresh.py` | Production augl refresher (124,835 fastnums in the existing staging DB) | yes |
+| 2 | `backfill_evalue_range.py` | Pilot scraper + shared core (`post_evalue`, `scrape_property`, `HaltSignal`) | yes |
+| 3 | `backfill_evalue_probes.py` | Wraps #2 for 3 probe ranges | yes |
+| 4 | `backfill_evalue_v3.py` | Wraps #2 for phases 2-4 + image downloads | yes |
+| 5 | `backfill_preflight.py` | Read-only probe of 5 candidate sources | yes |
+| 6 | `scrape_gap_diagnostic.py` | Wraps #2 for single-fastnum diagnostic | yes |
+
+**Three independent evidence lines** for the "no HMS bug class" verdict:
+
+1. **Static review** — None of the 6 variants conflate HTTP-5xx with "fastnum doesn't exist". Evalue has a distinct "not-in-index" signal (HTTP 200 + inner `status=204`), so the semantic ambiguity that bit HMS does not apply.
+   - The pilot family (#2, #3, #4, #6) is **fail-loud**: any transient error path raises `HaltSignal` which stops the run. No silent-skip path exists.
+   - `stage_a_augl_refresh.py` (#1) is **graceful but bounded**: rolling 5xx-rate halt over 100-request window, 1-strike halt on `cf-mitigated` / HTML / 403, 10-min sustained-net halt, and error rows persisted as `augl_status=-1` placeholder (distinguishable from real 200 rows).
+   - `backfill_preflight.py` (#5) is read-only probe; records every status as a structured field.
+
+2. **Temporal review** of `stage_a_augl_staging.db` (124,835 rows, span 2026-05-08T13:14 → 2026-05-13T22:34, 5d 9h) — **100.00% augl_status=200**, zero `-1` placeholders, zero NULL `augl_json`. Population-wide empty-rate (n_ads=0 ↔ latest_augl_iso IS NULL, perfectly correlated) = 52.72%. Per-6h windows across the run band tightly between 45.4% and 60.0% — no window crossed the 75% empty / 80% iso_null threshold. No outage signature.
+
+3. **Manual probe** — One POST to `evalue.is/fastnum/2526172?/get_fasteign_augl` (positive control from `backfill_evalue_range.POSITIVE_CONTROLS`): HTTP 200, 2.11 s, application/json, no `cf-mitigated`, JSON parses, inner status 200, n_ads=2. Endpoint operating identically to the staging-run baseline.
+
+**Leiguskra-scraper does not yet exist** — the 2026-05-21 DECISIONS line ("evalue.is backfill-skipti (×6) + leiguskrá-scraper — sami WAF-ignorar-500 mynstur líklega til staðar") was aspirational. No `leigu*`, `rental*`, or `rls_*` Python file under `audit/` or `scripts/` is a network scraper. Recorded so a future builder knows: when leiguskra is built, it must inherit the hardened canonical template (the post-HMS-recovery production-template), not a one-off implementation.
+
+**Coverage-coupling caveat — the HMS recovery will surface fastnums that were never in the evalue input universe**:
+
+`stage_a_augl_staging.db` contains exactly **124,835 rows = the Phase B input set** (every fastnum present in Supabase `properties` at run start on 2026-05-08, captured 2026-05-08 → 2026-05-13). The HMS full-scrape that finished 2026-05-18 added Phase C: a wider range sweep (2,000,044..2,547,000) which discovered ~30K HMS-only fastnums beyond the Phase B baseline. The HMS dead-zone of 2026-05-16/17 sits **inside** Phase C, and the ~71,800 fastnums currently being recovered by `audit/hms_full_recovery.py` are predominantly drawn from the Phase C range. **They were never offered to the evalue refresher.** Expected intersection of `recovered_fastnums ∩ evalue_staging` ≈ 0.
+
+**This is not a bug in evalue's scrapers**. It is a downstream coverage consequence of the HMS bug — once HMS recovery completes and the ~71,800 net-new fastnums are confirmed real, those fastnums need a full data pass (evalue augl + kaupskrá lookup) before they can be promoted to Supabase `properties`. Recorded in PLANNING_BACKLOG as a post-HMS-recovery follow-up. **Do NOT run any evalue pass yet** — wait for HMS recovery to complete and yield the canonical recovered-fastnum set. Magnitude (|recovered ∩ evalue staging|) to be confirmed empirically post-recovery; expected near-zero.
+
+**Latent (non-urgent) risk recorded for production-template hardening**: `stage_a_augl_refresh.py`'s resume logic uses `SELECT fastnum FROM stage_a_augl` to build its done-set, which would include `augl_status=-1` placeholders if any existed. If errors below the 5% halt threshold ever occur, those `-1` rows would never be retried on subsequent runs (silent-loss shape, same family as the HMS-resume issue this entry is responding to). **Has not fired** — current DB has 0 placeholder rows — but the path is there. Fold into the existing post-HMS-recovery "production-template hardening" backlog item: retry rows with `augl_status NOT IN (200, 204)` on resume; apply the same retry-on-resume discipline to the canonical scraper template so future scrapers (incl. leiguskra when built) inherit it.
+
+**Artifacts (read-only, audit-script-first)**:
+- `scripts/evalue_audit_schema_probe.py` — schema + cardinality
+- `scripts/evalue_audit_temporal.py` — 6h-window bucketing
+- `scripts/evalue_audit_single_probe.py` — single endpoint liveness probe
+
+No DB writes, no HMS access, single non-batched network request total.
+
+---
+
+## 2026-05-21 — HMS full-scrape (2026-05-15 → 18) leyndi ~71.800 raunverulegum eignum vegna ~38 klst API-outage; gangsetjum full recovery
+
+**Hvað**: Spike á `audit/hms_archive_staging.db` (random sample n=1.000 af 392.026 HTTP-500-röðum, seed=42) sýndi **18,5% false-negative rate (Wilson 95% CI 16,2–21,0%)** → áætluð **~71.803 raunverulegar eignir** vantar sem stendur í staging-DB-inu. 185/185 recovery komu á 1. tilraun — engin within-spike transient blip — sem þýðir að HMS-API-ið er stöðugt **núna** og að 500-svörin í scrape-window-inu voru *historical* server-side failure, ekki request-flake. Anchor 2226598 endurskilaði 200 á 1. tilraun, end-to-end sanity check stenst. Næsta skref: full recovery (option a í spike-report-inu) — re-probe allar 392K HTTP-500-raðir í gegnum `audit/hms_full_recovery.py` (nýtt skipt), endurnotanlegt, með outage-detection innbyggðu. Engar Supabase writes í þessari lotu.
+
+**Why**: Notandi uppgötvaði 2226598 (Nóbýlavegur 14, Kópavogi) sýnilegt á `https://hms.is/fasteignaskra/115672/1022801/2226598` en staging-DB markaði hana `http_status=500, exists_in_hms=0`. Bein endurprófa via sömu `curl_cffi.chrome120` impersonation skilaði HTTP 200 með fullum payload. Þetta opnaði rannsókn á því hversu víðtækur missir væri. Step-0 (read-only timestamp clustering) sýndi tvo aðskilda dead-zone glugga; spike-network-probe staðfesti 18,5% recovery rate.
+
+**Dead-zone gluggar (UTC, nákvæmir)**:
+
+| Window | Start | End | Hours | Phase C 500s | Phase C 200s |
+|---|---|---|---|---|---|
+| DZ-1 (primary) | 2026-05-16T07:00:09 | 2026-05-17T06:59:47 | **23,99 klst** | 226.400 | 0 |
+| Partial recovery | 2026-05-17T07:00:00 | 2026-05-17T08:59:59 | 2 klst | ~16.972 | ~2.028 (degraded: 20,5% → 1,1%) |
+| DZ-2 (secondary) | 2026-05-17T09:00:00 | 2026-05-17T20:59:59 | **~12 klst** | 115.000 | 0 |
+
+Heildar-degraded gluggi: **~38 klst** (2026-05-16T07:00 → 2026-05-17T21:00 UTC). Phase C 500-skipting: **dead-zone bulk ~355K**, **healthy-zone tail ~30K**. Spike-skipting per zone: dead-zone FN 19,8% (CI 17,4–22,5%) → ~70.432 recoverable; healthy-zone FN 4,6% (CI 1,8–11,2%) → ~1.370 recoverable.
+
+**Root cause — WAF-backoff scoped to 429/403/503 EN EKKI 500**: `audit/hms_full_scrape.py:226` aðeins eykur `rate_limit_streak` á þessum þremur status code, og núllar streak-inn á öllu öðru (þ.m.t. 500). Backoff-logikkinn (`WAF_BACKOFF_STREAK=10` → 300s sleep) triggerast aldrei á sustained 500-flood. Scraper-inn keyrði beint í gegnum 9.200–9.600 fastnums á klst í ~38 klst með 0% hit-rate án þess að nokkurn tímann pása. Auk þess interpretar `1 if sc == 200 else 0` (sama skipti, lína 223) öll 500 sem `exists_in_hms=0` — engar retries, engin cross-check. **Tvíhliða galli**: outage er ósýnilegt, og einstök 500 eru þögult demoted-uð í "doesn't-exist". Saman skráðu þeir ~280K raunverulegar eignir sem doesn't-exist.
+
+**Overturn — fyrri tilgátur sem þetta hrekur**:
+- `audit/cross_source_probe_report.md` (2026-05-07) — Agent-driven exploration hélt að "HMS deprecated public JSON API". Phase B 99,9% hit-rate (124.738 / 124.835) staðfestir að API-ið er **lifandi**; spike staðfesti að það er stöðugt núna. Sú athugasemd byggði á hallucination af content í `audit/hms_dialogue_draft.md`. Ógilt.
+- "97 ghost soft-flag" (D2 í Phase D, CLAUDE.md) — 97 Phase B 500s eru *líklega* raunverulegir ghosts (ekki transient á 18,5%/0,08% ratio), en það er tap á forsendu þangað til þeir eru endurprófaðir í recovery-keyrslunni.
+
+**D3 scope reconciliation**: Phase D3 var áætlað sem "30K new-property insertion" í Supabase, byggt á þeim Phase C 200-hits (28.134) sem ekki voru þegar í `properties`. **Nýtt scope er ~75-100K** (28.134 staðfest + ~71.800 recovery). D3 verður frestað þangað til full-recovery klárast og `confirmed-genuine-500` tölur eru pinnaðar; þá fær Supabase-sync nýjan extract/dryrun/apply pattern (sjá `scripts/phase_d1_*.py` template).
+
+**Hardening í `hms_full_recovery.py` (byggt núna, ekki retro-uppfært í `hms_full_scrape.py` ennþá)**:
+- Skip `leit`-endpoint cross-check (spike: 0/815 leit-only recoveries — flat API einn dugar).
+- 1 retry á 500/exception með 1s backoff (spike: 185/185 á 1. tilraun, en retry er ódýr insurance).
+- **Outage detection**: sliding window af 100 nýjustu niðurstöðum; ef 200-rate í glugganum hrynur í <1% (vs expected ~18% recovery rate) → PÁSA 5 mín → endurprófa; ef areftir 100 → HALT + alert. Þetta fyrirbyggir að recovery-keyrslan endurskapi sömu villu ef fresh outage lendir.
+- WAF backoff óbreyttur (429/403/503 streak ≥10 → 300s).
+- Schema (tvær viðbætur við `hms_fasteign`):
+  - `reprobed_at TEXT` — mismunandi: `reprobed_at IS NULL` = original-500 (frá scrape), `reprobed_at IS NOT NULL AND http_status=500` = confirmed-still-500 (frá recovery), `reprobed_at IS NOT NULL AND http_status=200` = recovered.
+  - `full_response TEXT` — geymir allan API envelope-inn (`fasteignData` + `stadfangData` + `hasMultipleFasteignir`). Bætt við í v2 eftir uppgötvun að upprunalegi scraper-inn dropp-aði 2/3 af top-level keys.
+- `fetched_at` er EKKI yfirskrifað á recovery-200 (preserved frá upprunalegri scrape). `reprobed_at` heldur recovery-tímanum sér.
+- Resumable: target set = `WHERE http_status=500 AND reprobed_at IS NULL` — re-byggt við hverja gangsetningu.
+- Polite rate: matching original (~157/min) með CONCURRENCY=3, PER_WORKER_DELAY=1.0s + jitter. Wall-clock estimate (með 1 retry á 81,5% cases): ~70 klst (~3 dagar).
+
+**stadfangData uppgötvun (v2 amendment, 2026-05-21 ~20:50 UTC)**: HMS API-svarið hefur **þrjár top-level keys**, ekki bara `fasteignData` eins og upprunalegi scraper-inn gerði ráð fyrir:
+
+```
+{
+  "fasteignData":         { ... fasteignamat, einflm, notkunareiningar[].matseiningar[].byggingarstig, ... },
+  "stadfangData":         { stadfang: {stadvisir, postnumer_heiti_nf/tgf, ...},
+                            fasteignir: [ FULL fasteignData fyrir ALLAR systur-fasteignir á sama heimilisfangi ] },
+  "hasMultipleFasteignir": bool
+}
+```
+
+Hver probe skilar **systur-fasteignum á sama stadfangi ókeypis** (t.d. 7 fasteignir undir Nýbýlavegi 14 fyrir 2226598-probe; 2 undir Fífurima fyrir 2040381-probe). Original scrape henti þessu öllu (`hms_full_scrape.py:184-190`: `j.get('fasteignData')`). Recovery v2 geymir núna ALLT envelope-ið í `full_response` column (~3,9 KB á row vs 1,6 KB fyrir bara `fasteignData`).
+
+**Áhrif**:
+- `byggingarstig` (B4 etc.) — alltaf í fasteignData.notkunareiningar[].matseiningar[].byggingarstig; **alltaf preserved í bæði fasteign_data og full_response columns**. Ekki týnt.
+- `sérmetnar einingar` (= matseiningar nested innan notkunareiningar) — alltaf preserved í bæði columns. Ekki týnt. Dæmi: Móberg 1 jörð hefur 5 sérmetnar einingar (ræktað land, lax/silungsveiði, fjárhús, hesthús, hlaða) — allt geymt.
+- `stadvisir`, `postnumer_heiti_nf/tgf`, systur-fastnums — NÝTT í recovery v2; vantar í upprunalegu 154.931 200-raðirnar frá Phase A/B/C.
+
+**Asymmetric coverage post-recovery**: ~75K recovered rows hafa `full_response`; ~154K upprunalegu 200-raðir hafa aðeins `fasteign_data`. Þetta er meðvituð skuld sem verður greidd í **júní-byrjun rescrape** (sjá næstu kafla).
+
+**Data-quality caveat — 866 raðir með yfirskrifað `fetched_at`**: v1-keyrslan (50 mín áður en stadfangData uppgötvun gerðist) hafði bug þar sem recovery-200 endurnýjuðu `fetched_at` í recovery-tíma. Þegar v1 var stöðvuð og 866 recovered raðir revert-aðar til http_status=500/reprobed_at=NULL, var upprunalegt `fetched_at` þeirra glatað (yfirskrifað 2026-05-21T20:08-20:55Z í stað þess að halda 2026-05-16/17 dead-zone tímabilinu). Áhrif: þessar 866 raðir munu birtast sem "healthy-zone" í lokaskýrslunni í stað dead-zone, þrátt fyrir að flestar þeirra séu úr DZ-1 (sást ~24% recovery rate í v1 sem matchar dead-zone hlutfallið). Statistical noise 0,22% af 392K populationinu; flagg-að í `hms_recovery_report.md` post-run.
+
+---
+
+**Júní-byrjun rescrape — plan til að loka asymmetric coverage gap-inu**:
+
+Þegar recovery klárast (~2026-05-24), liggja fyrir tvö data-sets:
+- ~154.931 upprunalegt 200-raðir með aðeins `fasteign_data` (engin `stadfangData`)
+- ~75.000 nýleg recovered 200-raðir með bæði `fasteign_data` og `full_response`
+
+Júní-rescrape (skipulagður fyrir byrjun júní 2026) mun:
+1. **Bakfylla `full_response` á 154K upprunalegu raðirnar** — sömu `WHERE full_response IS NULL AND http_status=200` target set sem önnur recovery-keyrsla. Áætlað ~155K × 1.5s/row × 1.815 retries-fyrir-81,5% / 3 workers ≈ 24 klst (ódýrara en upphaflega vegna þess að flest 200-svör koma á 1. tilraun, engin retries).
+2. **Refresh-a stale data** — `index_last_updated` í HMS-payloadinu er u.þ.b. 2026-05-15 fyrir flestar Phase B raðir; um 2-3 vikna gamalt í júní. Recovery v2 mun einnig pikka upp ný gildi (sérstaklega `fasteignamat`, `lhlmat` ef HMS hefur uppfært).
+3. **Cross-check nýrri stadfangData** gegn `cross_property_refs` Phase D4 vinnu. Hver `full_response.stadfangData.fasteignir[]` er rich source fyrir address-clustering án viðbótar API-kalla.
+4. **Production-template hardening** — `hms_full_scrape.py` skal vera retro-uppfært **áður en** júní-rescrape kviknar:
+   - Capture full response (allir top-level keys)
+   - Outage detection (sliding window 100 → pause + alert á <1% hit-rate)
+   - 500-aware backoff (sustained 500s skulu trigger-a backoff, ekki bara WAF status codes)
+   - Það "production-template hardening session" sem var út-of-scope hér er **kveikjandi fyrir júní-rescrape**.
+
+Eftir júní-rescrape: 100% af 200-raðum hafa `full_response`, og Phase D4 cross_property_refs hefur fullbúið source-set.
+
+**Decision-lock**: Júní-rescrape skal nota **sömu canonical template** og hms_full_recovery.py er að nota núna (eftir að retro-uppfærsla á `hms_full_scrape.py` hefur landað í eigin session). Engin tvíverknað á recovery + scrape mynstrum.
+
+**Out of scope (eigin lota, hækkað í forgang)**:
+- Sibling-scraper audit: evalue.is backfill-skipti (×6 í `audit/backfill_evalue_*.py` og fyrri pilots) + leiguskrá-scraper — sami WAF-ignorar-500 mynstur líklega til staðar.
+- Production-template hardening: fold outage-detection + 500-aware backoff inn í canonical scraper-template (sem `hms_full_scrape.py` hefur framsemt eftir).
+
+**Verification path (post-recovery)**: HALT-report frá `hms_full_recovery.py` skal innihalda **nákvæman recovered count** (ekki estimatið), dead-zone vs healthy-zone breakdown, og confirmed-genuine-500 count. Þá ákveður notandi Supabase-sync / D3 scope.
+
+**Artifacts (þessi lota)**:
+- `audit/hms_fn_spike.py` — spike runner (read-only)
+- `audit/hms_fn_spike_sample.txt` — 1.000 sampled fastnums (seed=42)
+- `audit/hms_fn_spike_results.json` — per-fastnum raw probe outcomes
+- `audit/hms_fn_spike_report.md` — halt-report
+- `audit/hms_fn_spike_run.log` — runtime log (94,7 mín wall-clock)
+- `C:\Users\danie\.claude\plans\i-have-a-large-indexed-lynx.md` — plan file (spike scope)
+
+---
+
 ## 2026-05-21 — Phase X Group B Part 2: views layer (security_invoker, anon/auth grants) + frontend switch
 
 **Hvað**: Migration `20260521125751_views_layer.sql` added 4 read-only views — `v_properties`, `v_repeat_sale_index`, `v_ats_lookup_by_heat`, `v_current_predictions` — each declaring `WITH (security_invoker = on)` and granting SELECT to `anon` + `authenticated`. All 10 frontend `.from("properties" | "predictions" | "repeat_sale_index" | "ats_lookup")` call sites switched to the corresponding view (19 `.from()` replacements total). Next.js 16 production build clean; 8-route smoke (incl. `/eign/2008647`, `/markadur`, all four `/markadur/*` sub-pages, `/api/backproj/2008647`) returns HTTP 200 with sizes within ±5% of the 2026-05-06 verify baseline. **Bug 25 (Postgres 15+ view security_invoker discipline) is closed.**

@@ -1064,3 +1064,16 @@ Byrja á lestri og Section 1-2 draft.
 3. **Long-term north-star: Premium agent** — LLM chat product with access to full dataset for property analysis. Enabled by the canonical-sources + Supabase-serving + audit-trail architecture. No near-term planning; tracked as directional goal.
 
 4. **Image fallback for unlisted properties** — ~53% of properties have no listing images (never listed). Phase Z UI decision: show map/aerial view fallback (lat/lon available 100%) rather than blank. Reconcile local archive (fastnum/n.jpg) vs CloudFront (fastnum/hash.jpg) layout in image backfill Áfangi.
+
+---
+
+## Framtíðar backlog (cont.) — logged 2026-05-22 (evalue-audit follow-ups)
+
+5. **Production-template hardening — fold evalue resume-skip risk into the HMS retro-fix session** — `audit/stage_a_augl_refresh.py`'s resume done-set is `SELECT fastnum FROM stage_a_augl`, which would include `augl_status=-1` placeholder rows if any existed. Below the 5% rolling-5xx halt threshold, errors persist as `-1` placeholders and are never retried on subsequent resume runs (silent-loss shape, same family as the HMS-resume issue). **Has not fired** in the current 2026-05-08→13 run (0 placeholder rows in staging DB), but the path is there. Fix shape: change resume done-set to `SELECT fastnum FROM stage_a_augl WHERE augl_status IN (200, 204)` so error rows get retried automatically. Apply the same retry-on-resume discipline to the canonical scraper template (the one `hms_full_scrape.py` will be retrofitted to, per the 2026-05-21 DECISIONS entry) so all future scrapers — including leiguskra when built — inherit it from one source. Non-urgent.
+
+6. **Post-HMS-recovery: full evalue + kaupskrá pass for the ~71,800 recovered fastnums** — once `audit/hms_full_recovery.py` completes and the recovered set is locked, those fastnums need a full data pass before promotion to Supabase `properties`. **They are NOT in the existing evalue staging DB** (which is exactly the 124,835 Phase B set from 2026-05-08; recovered fastnums are predominantly Phase C range and were never offered to the evalue refresher). Steps:
+   - **Magnitude confirm** (cheap, post-recovery): compute `|recovered_fastnums ∩ stage_a_augl_staging.fastnum|`. Expected near-zero. If significantly > 0, investigate why (overlap would indicate a Phase B fastnum was incorrectly classified as HMS-500 during the dead-zone).
+   - **Evalue augl pass** for the recovered set using `stage_a_augl_refresh.py` shape but with the hardened template from item 5 (so any non-200 row is retried on resume).
+   - **Kaupskrá lookup** for the recovered set — `D:\kaupskra.csv` is canonical for sales history; filter rows where FASTNUM is in the recovered set, ingest.
+   - **Supabase promotion** via the Phase D pattern (extract → dryrun → apply scripts in `scripts/phase_d*_*.py`).
+   - **Gated on**: HMS recovery completing (canonical recovered set), AND production-template hardening landing (item 5). **Do NOT run evalue pass before either.**
