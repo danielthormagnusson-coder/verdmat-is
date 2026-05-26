@@ -41,3 +41,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 __pycache__/
+
+# audit staging databases (large; rebuildable from scrapers)
+audit/*.db
+audit/*.db-shm
+audit/*.db-wal

@@ -56,6 +56,29 @@ Phase Z (UI redesign).
   re-probing 392,026 HTTP-500 rows from 2026-05-15→18 scrape's dead-zone 
   windows; expected ~71,800 net-new real properties (Wilson 95% CI 16.2–
   21.0% recovery rate). Reads but does not write Supabase; staging DB only.
+- HMS full recovery ✅ 2026-05-26 — 74h10m wall-clock; **77,859 recovered** 
+  (+8.4% over 71.8K spike-estimate, realized FN 19.86% vs spike 18.5% ± 3pp), 
+  314,167 confirmed-still-500, 0 outage/WAF pauses. Dead-zone (2026-05-16T07 
+  → 17T21 UTC, ~38h) accounted for 96.5% of recoveries at 21.00% FN rate; 
+  healthy-zone 8.00% FN. 97 D2-ghosts re-probed → all confirmed genuine 
+  deregistered → **subset (a) un-ghost path collapses to ~0**, D3-sync 
+  becomes pure insert (no UPDATE/refresh path needed unless dryrun finds a 
+  real already-in-base case). **kaupskrá cross-check (independent 
+  completeness check)**: 125,330 / 126,362 unique kaupskrá fastnums in 
+  HMS-200 (**99.18%**). 1,032 missing = real deregistered/merged (n=50 
+  probe: 50/50 still 500; 15/50 address resolves via leit→merged-into-
+  sibling). Known repeat-sale limitation; optional Phase Y address-
+  resolution workflow (~1,032 leit lookups, ~10 min) deferred. New universe 
+  post-D3-sync ≈ **~231K** (124,738 + ~106K Phase-C-real).
+- D3-sync NOW lota (gated on recovery ✅, NOT gated on template-hardening) — 
+  insert candidates = recovered (77,859) ∪ original Phase C 200-hits 
+  (28,134) ≈ **~106K**, disjoint via single-probe argument. Apply pattern: 
+  idempotent `INSERT ... ON CONFLICT (fastnum) DO NOTHING`. extract → 
+  dryrun → HALT (Danni reviews dryrun report: true net-new count, 
+  derived-column coverage, rollback SQL) → apply. Scope split per Danni 
+  2026-05-26: properties INSERT + sales_history INSERT + iter4 scoring 
+  ship in this NOW lota; evalue augl-pass (POST_HMS_RECOVERY_PLAN §2) 
+  defers to a LATER lota gated on G2 production-template hardening.
 
 The two tracks below are **independent — neither blocks the other**.
 

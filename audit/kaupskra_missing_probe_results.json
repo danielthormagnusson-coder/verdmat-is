@@ -1,0 +1,302 @@
+[
+ {
+  "fastnum": 2003253,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2003257,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2003260,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2004685,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2005013,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2006663,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2009372,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 9
+ },
+ {
+  "fastnum": 2009375,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 9
+ },
+ {
+  "fastnum": 2009432,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2011218,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2015546,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 6
+ },
+ {
+  "fastnum": 2023296,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2035513,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2036488,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2052217,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 5
+ },
+ {
+  "fastnum": 2060624,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2064423,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2065905,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2073697,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2078648,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2102426,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2119504,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 3
+ },
+ {
+  "fastnum": 2124944,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2133791,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2148492,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2160226,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2173616,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2176032,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2184403,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2202463,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2205426,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2234568,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2234572,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2235393,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2264241,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2272578,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2274158,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2283623,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2286215,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 1
+ },
+ {
+  "fastnum": 2286222,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 1
+ },
+ {
+  "fastnum": 2298443,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2307393,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 2
+ },
+ {
+  "fastnum": 2316450,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2316453,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2319323,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2347380,
+  "flat": 500,
+  "leit_addr_hit": true,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2362160,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2520377,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2526295,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ },
+ {
+  "fastnum": 2531902,
+  "flat": 500,
+  "leit_addr_hit": false,
+  "leit_count": 10
+ }
+]

@@ -4,6 +4,75 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-26 — HMS full recovery COMPLETE; kaupskrá cross-check (99,18%) staðfestir completeness; D3-sync scope locked á ~106K insert-candidates
+
+**Hvað**: `audit/hms_full_recovery.py` lauk eftir 74h 10m wall-clock (2026-05-21T20:58 → 2026-05-24T23:08 UTC). Endurspáði allar 392.026 HTTP-500 raðir staging-DB-ins gegn flat API með 1-retry hardening + outage-detection (sliding-window 100 → pause á <1% hit-rate). **Lokatölur**:
+
+| Bucket | n | Notes |
+|---|---:|---|
+| recovered (var 500, núna 200) | **77.859** | +8,4% yfir spike-spá 71.803 (innan 95% CI 16,2–21,0%) |
+| confirmed-still-500 (eftir retry) | 314.167 | upper bound á truly-empty Phase C slot-um |
+| untouched | 0 | hreint completion, engin resume þörf |
+| realized FN rate | **19,86%** | spike spáði 18,5% ± 3pp; landed +1,36pp ofan |
+| WAF/outage pauses | 0 / 0 | outage-detector fór aldrei af stað (74h hreint) |
+
+**Per-phase**: allar 77.859 recoveries úr Phase C. Phase A (6.838) + Phase B (97) **staðfestir genuine ghosts** — engin recovery þar. **Subset (a) un-ghost path = 0** (97 D2-ghostar re-probe-aðir, allir héldu áfram að skila 500 → ekta deregistered, ekki dead-zone false-negative á þekktum fastnum). Það ógildir refresh-path-inn í POST_HMS_RECOVERY_PLAN §4c: D3-sync er **hreint insert**, ekkert un-ghost UPDATE nema dryrun finni raunverulegan already-in-base case.
+
+**Dead-zone breakdown (orsakavottun)**:
+
+| Zone | recovered | confirmed-500 | FN rate |
+|---|---:|---:|---:|
+| Dead-zone (2026-05-16T07:00 → 17T21:00, ~38h) | 75.098 | 282.428 | **21,00%** |
+| Healthy-zone (allt annað) | 2.761 | 31.739 | 8,00% |
+
+**96,5%** af öllum recoveries komu úr dead-zone (75.098 / 77.859) — confirms root cause: WAF-backoff scoped to 429/403/503 EN EKKI 500 (`hms_full_scrape.py:226`). Healthy-zone 8% FN er hærra en spike pre-run estimate (4,6%) vegna þess að 866 v1-rolled-back raðir með yfirskrifað `fetched_at` flokkast nú healthy-zone (statistical noise 0,22%, flagged í `hms_recovery_report.md`).
+
+**12-tíma FN rate stabilitet (74h run)**: 19,6% → 19,8% → 19,8% → 19,9% → 19,9% → 20,0% → 19,8%. Aldrei meira en 0,4pp frávik frá meðaltali. Fixed-rate sampling problem (1-in-5 af 500s var transient false-negative), ekki fluctuating.
+
+**kaupskrá cross-check (óháð completeness-staðfesting)**:
+
+| Metric | Result |
+|---|---|
+| kaupskrá unique fastnums | 126.362 (úr 226.481 sölum) |
+| Til staðar í HMS-200 (post-recovery) | **125.330 (99,18%)** |
+| Missing frá HMS-200 | 1.032 (0,82%) — all in HMS-500 bucket, none outside scrape span |
+
+Sample probe (n=50 af 1.032 missing) gegn fresh HMS API + leit:
+
+- 50/50 enn HTTP 500 (**ekki recovery-miss** — ekta gone)
+- 15/50 stadfangur leysist í gegnum `leit?q=<address>` (líklega merged into sibling fastnum)
+- 35/50 stadfangur skilar 0 fasteign match (heimilisfang hefur líklega breyst eða stadfang_nr endurraðað)
+
+Pattern: clustered missing fastnums á sama heimilisfangi (t.d. Vatnsstígur 11: 3 sequential 2003253/2003257/2003260 frá 2010; Guðrúnartún 8: 2 atvinnuhúsnæði frá 2009). Ár-dreifing leans heavily 2006-2014 (75% af missing); 56 missing 2023-2025 staðfestir að þetta er ongoing churn, ekki bara legacy. **Túlkun**: 1.032 = ekta deregistered/merged properties (sameining/skipting eftir sölu), ekki scrape-vandi. Þekkt **repeat-sale takmörkun** — klofin söguskrá við sameining/skipting. **Valfrjáls Phase Y address-resolution** workflow (~1.032 leit-lookups, ~10 mín) gæti backfill-að `effective_fastnum` column ef historical-sale-continuity skiptir máli fyrir index. Frestað nema iter5 / BMN-index endurspái þurfi það.
+
+**D3-sync scope locked**:
+
+- **Insert candidates = recovered net-new (77.859) ∪ original Phase C 200-hits (28.134) ≈ 106K**. Disjoint via single-probe argument í POST_HMS_RECOVERY_PLAN §4a; staðfest við dryrun.
+- Apply pattern: idempotent `INSERT INTO properties ... ON CONFLICT (fastnum) DO NOTHING`. Dryrun reports true net-new vs collisions.
+- 1.032 kaupskrá-missing FNs **eru ekki insert-candidates** (þeir eru ekki HMS-200; við insert-um EKKI ghost-eignir).
+- Universe post-D3-sync ≈ **~231K** = 124.738 base + ~106K Phase-C-real. Áður spáð ~227K; +4K vegna recovery overshoot (77.859 vs 71.700 spá).
+
+**SPLIT gating på POST_HMS_RECOVERY_PLAN**:
+
+Notandi sundrar §1-§5 niður í tvær óháðar lotur:
+
+- **NOW (gated bara á recovery ✅)**: §3 properties insert + §3 sales_history insert + §5 iter4-scoring. Engin scraper-keyrsla, svo ekki háð template-hardening gate-inu (G2). Skilar Phase D3 ✅ + ~106K nýjar fastnum-síður live á `/eign/<fastnum>` með iter4 prediction.
+- **LATER (gated á G2 template-hardening)**: §2 evalue augl-pass fyrir net-new subset (~71.7K, ~28h single-worker). Bíður þangað til canonical scraper-template er hardened. `feature_attributions` + `comps_index` follow í næstu precompute-cycle (precompute-driven, ekki per-fastnum).
+
+**Næst (sjá STATE.md roadmap update)**: D3-sync (NOW lota) — properties+sales+scoring; svo Phase X Group B column-grant lockout; svo Phase X Group C.
+
+**Artifacts (þessi lota)**:
+- `audit/hms_full_recovery.py` — hardened runner (1 retry + outage detection + full envelope capture)
+- `audit/hms_recovery_report.md` — final halt-report (77.859 / 314.167 / dead-zone breakdown)
+- `audit/hms_recovery.log` — 74h append-only runtime log
+- `audit/hms_recovery_status.md` — final status snapshot
+- `audit/kaupskra_missing_from_hms.txt` — 1.032 missing kaupskrá FNs
+- `audit/kaupskra_missing_probe_results.json` — n=50 sample probe outcomes
+- `audit/hms_fn_spike.{py,md,sample.txt,results.json,run.log}` — pre-recovery spike artifacts (validated the strategy before 74h commit)
+- DECISIONS.md (this entry) + STATE.md roadmap refresh
+
+---
+
 ## 2026-05-22 — Evalue sibling-scraper audit (diagnostic): HMS bug class not present; coverage-coupling caveat surfaced
 
 **Hvað**: Diagnostic-only audit (parallel lane to HMS recovery; no HMS files touched, no evalue network scrape beyond one positive-control probe). Inventoried 6 evalue scraper variants in `audit/`, static-reviewed each for the HMS bug class (HTTP-5xx misinterpreted as "fastnum doesn't exist"), temporal-bucketed the 124,835-row `audit/stage_a_augl_staging.db` for dead-zone clusters, and confirmed endpoint liveness with one positive-control POST. **Verdict: HMS bug class not present in any of the 6 evalue variants.** No sample re-probe justified.
