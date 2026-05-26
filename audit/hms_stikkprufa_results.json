@@ -1,0 +1,564 @@
+{
+  "summary": {
+    "total": 100,
+    "status_counts": {
+      "200": 19,
+      "500": 81
+    },
+    "hit_rate_pct": 19.0
+  },
+  "results": [
+    {
+      "fastnum": 2138438,
+      "status": 200,
+      "stadfang": "Móberg 1",
+      "postnumer": 541,
+      "sveitarfelag": "Húnabyggð",
+      "notkun": "Fjárhús með áburðark",
+      "notkun_kodi": 425,
+      "einflm": null,
+      "fasteignamat": 11669,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2138462,
+      "status": 500
+    },
+    {
+      "fastnum": 2138486,
+      "status": 200,
+      "stadfang": "Skriðuland",
+      "postnumer": 541,
+      "sveitarfelag": "Húnabyggð",
+      "notkun": "Einbýlishús",
+      "notkun_kodi": 301,
+      "einflm": null,
+      "fasteignamat": 93523,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2138510,
+      "status": 200,
+      "stadfang": "Sölvabakki lóð",
+      "postnumer": 541,
+      "sveitarfelag": "Húnabyggð",
+      "notkun": "Einbýlishús",
+      "notkun_kodi": 301,
+      "einflm": 249.8,
+      "fasteignamat": 30134,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2138534,
+      "status": 200,
+      "stadfang": "Vesturá",
+      "postnumer": 541,
+      "sveitarfelag": "Húnabyggð",
+      "notkun": "Lax- og silungsveiði",
+      "notkun_kodi": 102,
+      "einflm": null,
+      "fasteignamat": 655,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2138558,
+      "status": 500
+    },
+    {
+      "fastnum": 2138582,
+      "status": 500
+    },
+    {
+      "fastnum": 2138606,
+      "status": 200,
+      "stadfang": "Ytri-Ey",
+      "postnumer": 541,
+      "sveitarfelag": "Húnabyggð",
+      "notkun": "Einbýlishús",
+      "notkun_kodi": 301,
+      "einflm": null,
+      "fasteignamat": 61996,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2138630,
+      "status": 200,
+      "stadfang": "Kambakot",
+      "postnumer": 541,
+      "sveitarfelag": "Húnabyggð",
+      "notkun": "Einbýlishús",
+      "notkun_kodi": 301,
+      "einflm": null,
+      "fasteignamat": 57173,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2138654,
+      "status": 200,
+      "stadfang": "Mánaskál",
+      "postnumer": 541,
+      "sveitarfelag": "Húnabyggð",
+      "notkun": "Einbýlishús",
+      "notkun_kodi": 301,
+      "einflm": null,
+      "fasteignamat": 23647,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2143101,
+      "status": 500
+    },
+    {
+      "fastnum": 2143130,
+      "status": 500
+    },
+    {
+      "fastnum": 2143159,
+      "status": 500
+    },
+    {
+      "fastnum": 2143188,
+      "status": 500
+    },
+    {
+      "fastnum": 2143217,
+      "status": 500
+    },
+    {
+      "fastnum": 2143246,
+      "status": 500
+    },
+    {
+      "fastnum": 2143275,
+      "status": 500
+    },
+    {
+      "fastnum": 2143304,
+      "status": 200,
+      "stadfang": "Ljótsstaðir lóð",
+      "postnumer": 566,
+      "sveitarfelag": "Skagafjörður",
+      "notkun": "Sumarbústaður",
+      "notkun_kodi": 516,
+      "einflm": 56.9,
+      "fasteignamat": 27350,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2143333,
+      "status": 500
+    },
+    {
+      "fastnum": 2143362,
+      "status": 500
+    },
+    {
+      "fastnum": 2193907,
+      "status": 500
+    },
+    {
+      "fastnum": 2193945,
+      "status": 500
+    },
+    {
+      "fastnum": 2193983,
+      "status": 500
+    },
+    {
+      "fastnum": 2194021,
+      "status": 500
+    },
+    {
+      "fastnum": 2194059,
+      "status": 500
+    },
+    {
+      "fastnum": 2194097,
+      "status": 500
+    },
+    {
+      "fastnum": 2194135,
+      "status": 500
+    },
+    {
+      "fastnum": 2194173,
+      "status": 500
+    },
+    {
+      "fastnum": 2194211,
+      "status": 500
+    },
+    {
+      "fastnum": 2194249,
+      "status": 500
+    },
+    {
+      "fastnum": 2299575,
+      "status": 500
+    },
+    {
+      "fastnum": 2299605,
+      "status": 500
+    },
+    {
+      "fastnum": 2299635,
+      "status": 500
+    },
+    {
+      "fastnum": 2299665,
+      "status": 500
+    },
+    {
+      "fastnum": 2299695,
+      "status": 500
+    },
+    {
+      "fastnum": 2299725,
+      "status": 500
+    },
+    {
+      "fastnum": 2299755,
+      "status": 500
+    },
+    {
+      "fastnum": 2299785,
+      "status": 500
+    },
+    {
+      "fastnum": 2299815,
+      "status": 500
+    },
+    {
+      "fastnum": 2299845,
+      "status": 500
+    },
+    {
+      "fastnum": 2322720,
+      "status": 500
+    },
+    {
+      "fastnum": 2322776,
+      "status": 500
+    },
+    {
+      "fastnum": 2322832,
+      "status": 500
+    },
+    {
+      "fastnum": 2322888,
+      "status": 500
+    },
+    {
+      "fastnum": 2322944,
+      "status": 500
+    },
+    {
+      "fastnum": 2323000,
+      "status": 500
+    },
+    {
+      "fastnum": 2323056,
+      "status": 500
+    },
+    {
+      "fastnum": 2323112,
+      "status": 500
+    },
+    {
+      "fastnum": 2323168,
+      "status": 500
+    },
+    {
+      "fastnum": 2323224,
+      "status": 200,
+      "stadfang": "Hæðarendi 8",
+      "postnumer": 203,
+      "sveitarfelag": "Kópavogsbær",
+      "notkun": "Hesthús",
+      "notkun_kodi": 426,
+      "einflm": 0,
+      "fasteignamat": 35200,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2338352,
+      "status": 200,
+      "stadfang": "Hávegur 1",
+      "postnumer": null,
+      "sveitarfelag": "Fjallabyggð",
+      "notkun": "Óbyggð lóð",
+      "notkun_kodi": 90,
+      "einflm": null,
+      "fasteignamat": 176,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2338378,
+      "status": 200,
+      "stadfang": "Hólavegur 26",
+      "postnumer": 580,
+      "sveitarfelag": "Fjallabyggð",
+      "notkun": "Iðnaðar og athafnalóð",
+      "notkun_kodi": 20,
+      "einflm": null,
+      "fasteignamat": 633,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2338404,
+      "status": 500
+    },
+    {
+      "fastnum": 2338430,
+      "status": 200,
+      "stadfang": "Lækjargata 16B",
+      "postnumer": null,
+      "sveitarfelag": "Fjallabyggð",
+      "notkun": "Viðskipta og þjón.lóð",
+      "notkun_kodi": 30,
+      "einflm": null,
+      "fasteignamat": 120,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2338456,
+      "status": 500
+    },
+    {
+      "fastnum": 2338482,
+      "status": 200,
+      "stadfang": "Túngata 36",
+      "postnumer": 580,
+      "sveitarfelag": "Fjallabyggð",
+      "notkun": "Íbúðarhúsalóð",
+      "notkun_kodi": 10,
+      "einflm": null,
+      "fasteignamat": 2440,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2338508,
+      "status": 200,
+      "stadfang": "Ásgarður",
+      "postnumer": null,
+      "sveitarfelag": "Fjallabyggð",
+      "notkun": "Sumarbústaðaland",
+      "notkun_kodi": 60,
+      "einflm": null,
+      "fasteignamat": 3590,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2338534,
+      "status": 200,
+      "stadfang": "Brimnesvegur 12",
+      "postnumer": 625,
+      "sveitarfelag": "Fjallabyggð",
+      "notkun": "Íbúðarhúsalóð",
+      "notkun_kodi": 10,
+      "einflm": null,
+      "fasteignamat": 2650,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2338560,
+      "status": 200,
+      "stadfang": "Hólkot 2",
+      "postnumer": 626,
+      "sveitarfelag": "Fjallabyggð",
+      "notkun": "Sumarbústaðaland",
+      "notkun_kodi": 60,
+      "einflm": null,
+      "fasteignamat": 1430,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2338586,
+      "status": 200,
+      "stadfang": "Böggvisbraut 20",
+      "postnumer": 620,
+      "sveitarfelag": "Dalvíkurbyggð",
+      "notkun": "Einbýlishús",
+      "notkun_kodi": 301,
+      "einflm": 223.7,
+      "fasteignamat": 87550,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2365590,
+      "status": 500
+    },
+    {
+      "fastnum": 2365619,
+      "status": 500
+    },
+    {
+      "fastnum": 2365648,
+      "status": 500
+    },
+    {
+      "fastnum": 2365677,
+      "status": 500
+    },
+    {
+      "fastnum": 2365706,
+      "status": 500
+    },
+    {
+      "fastnum": 2365735,
+      "status": 500
+    },
+    {
+      "fastnum": 2365764,
+      "status": 500
+    },
+    {
+      "fastnum": 2365793,
+      "status": 500
+    },
+    {
+      "fastnum": 2365822,
+      "status": 500
+    },
+    {
+      "fastnum": 2365851,
+      "status": 500
+    },
+    {
+      "fastnum": 2369844,
+      "status": 500
+    },
+    {
+      "fastnum": 2369877,
+      "status": 500
+    },
+    {
+      "fastnum": 2369910,
+      "status": 500
+    },
+    {
+      "fastnum": 2369943,
+      "status": 500
+    },
+    {
+      "fastnum": 2369976,
+      "status": 500
+    },
+    {
+      "fastnum": 2370009,
+      "status": 500
+    },
+    {
+      "fastnum": 2370042,
+      "status": 500
+    },
+    {
+      "fastnum": 2370075,
+      "status": 500
+    },
+    {
+      "fastnum": 2370108,
+      "status": 500
+    },
+    {
+      "fastnum": 2370141,
+      "status": 500
+    },
+    {
+      "fastnum": 2370879,
+      "status": 500
+    },
+    {
+      "fastnum": 2370925,
+      "status": 500
+    },
+    {
+      "fastnum": 2370971,
+      "status": 500
+    },
+    {
+      "fastnum": 2371017,
+      "status": 500
+    },
+    {
+      "fastnum": 2371063,
+      "status": 500
+    },
+    {
+      "fastnum": 2371109,
+      "status": 500
+    },
+    {
+      "fastnum": 2371155,
+      "status": 500
+    },
+    {
+      "fastnum": 2371201,
+      "status": 500
+    },
+    {
+      "fastnum": 2371247,
+      "status": 500
+    },
+    {
+      "fastnum": 2371293,
+      "status": 500
+    },
+    {
+      "fastnum": 2516924,
+      "status": 500
+    },
+    {
+      "fastnum": 2516952,
+      "status": 500
+    },
+    {
+      "fastnum": 2516980,
+      "status": 500
+    },
+    {
+      "fastnum": 2517008,
+      "status": 500
+    },
+    {
+      "fastnum": 2517036,
+      "status": 500
+    },
+    {
+      "fastnum": 2517064,
+      "status": 500
+    },
+    {
+      "fastnum": 2517092,
+      "status": 500
+    },
+    {
+      "fastnum": 2517120,
+      "status": 500
+    },
+    {
+      "fastnum": 2517148,
+      "status": 200,
+      "stadfang": "Stakkahlíð 3",
+      "postnumer": 105,
+      "sveitarfelag": "Reykjavíkurborg",
+      "notkun": "Íbúð á hæð",
+      "notkun_kodi": 501,
+      "einflm": 41.8,
+      "fasteignamat": 50400,
+      "byggingarar_str": null
+    },
+    {
+      "fastnum": 2517176,
+      "status": 200,
+      "stadfang": "Stakkahlíð 5",
+      "postnumer": 105,
+      "sveitarfelag": "Reykjavíkurborg",
+      "notkun": "Íbúð á hæð",
+      "notkun_kodi": 501,
+      "einflm": 34.7,
+      "fasteignamat": 38600,
+      "byggingarar_str": null
+    }
+  ]
+}

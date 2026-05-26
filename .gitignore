@@ -46,3 +46,15 @@ __pycache__/
 audit/*.db
 audit/*.db-shm
 audit/*.db-wal
+
+# audit routine runtime logs (regenerable). Incident/recovery-evidence logs
+# bypass this via `git add -f` (e.g., hms_full_scrape*.log captures the
+# 58h buggy-run that motivated the recovery — non-regenerable evidence).
+audit/*.log
+audit/*.flag
+
+# large regenerable fastnum manifests (rebuilt from Supabase / kaupskra.csv;
+# 3 scripts reference them by name — files stay on disk, just not tracked).
+audit/stage_a_fastnum_manifest.txt
+audit/supabase_fastnums.txt
+audit/known_real_fastnums.txt
