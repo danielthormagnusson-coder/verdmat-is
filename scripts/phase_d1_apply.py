@@ -16,6 +16,13 @@ from text in the SET clause.
 
 After all batches, re-queries Supabase to verify post-write coverage
 matches the dryrun expectation. Exits non-zero if mismatch.
+
+NOTE (Phase X Group C, 2026-05-27): the bulk-UPDATE pattern this script
+demonstrates (UNNEST → row-typed table → JOIN) is closely related to the
+`unnest_upsert()` helper in `scripts/migration_helpers.py`. Helper is
+INSERT-focused; future bulk-UPDATE-via-UNNEST analogues should either
+extend the helper or follow this script's shape. Left as-is to preserve
+the audit trail of the 2026-05-18 Phase D1 apply.
 """
 from __future__ import annotations
 

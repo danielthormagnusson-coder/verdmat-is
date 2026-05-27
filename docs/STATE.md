@@ -1,6 +1,8 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 27. maí 2026 (Phase X Group B **column-grant lockout APPLIED** til Supabase prod — 4 in-scope tables (`properties`, `predictions`, `repeat_sale_index`, `ats_lookup`) eru núna með column-level SELECT grants TO anon+authenticated (44/12/15/15 cols); table-level grants revoked. Properties allowlist = 43 `v_properties`-projected + `deregistered` (WHERE-filter); 3 cols excluded (`landeign_nr`, `matseiningar`, `tengd_stadfang_nr`). Sanity green: anon `v_properties` count 232.790 = baseline; 42501 raised on excluded cols; `augl_id_latest` still SELECTable (intentionally retained — Bug 26 stays open as separate SSR-deep-link task, NOT closed by this lockout). 11-route prod smoke clean (0 PostgREST errors). `search_properties_grouped` RPC is invoker-mode (correction to 2026-05-21 record); its column footprint sits inside the v_properties allowlist so it survived without RPC-side change. **Value delivered = 3-col exclusion + default-deny on future columns** (standing rule: any new v_*-projected column requires matching column-GRANT or view 42501s). Sjá DECISIONS 2026-05-27 second entry.)
+**Síðast uppfært:** 27. maí 2026 (Phase X Group C **trimmed core APPLIED** til Supabase prod — `scripts/migration_helpers.py` (7 reusable patterns codified frá phase_d1/d3/lockout) + 3 audit tables (`pipeline_runs`, `pipeline_steps`, `inputs_snapshots`) + `scripts/run_monthly.py` orchestrator með halt-before-push + `scripts/backfill_current_snapshot.py` anchor (id=1 fingerprints núverandi iter4_final_v1/iter4_conformal_v1 batch: 232.887 props · 167.503 preds · 154-feat hash · git_sha e938cc5f). Migration `20260527155123` applied via psycopg2 í einum BEGIN/COMMIT; 3 tables með RLS enabled + 0 anon/auth grants + 6 indexes + service_role-only writes. Pre-flight rollback exercise: fyrri apply caught verifier miscount → `DROP TABLE × 3 CASCADE` cleanly rolled back, re-apply green — proves rollback path works. `run_monthly.py --dry-run` logged 1 run + 7 steps cleanly (no D:\\ subprocess). Trim rationale: `model_metrics` + `backup_manifests` + `migrations_log` deferred til /heilsa dashboard session; `push_precompute_to_supabase` deferred til after 2-3 proven cycles (current `--push` returns exit 2). Lightweight current-stack (Vercel + Supabase + local D:\\) frekar en SUPERSEDED Hetzner/Dagster/MLflow plan; inputs_snapshots IS the lightweight MLflow-equivalent. Tracking-table CLI repair pending Danni's PowerShell step. **Phase X is fully closed (Groups A + B + C ✅)**. Sjá DECISIONS 2026-05-27 third entry.)
+
+**Previous Group-B-lockout milestone:** 27. maí 2026 (Phase X Group B **column-grant lockout APPLIED** til Supabase prod — 4 in-scope tables (`properties`, `predictions`, `repeat_sale_index`, `ats_lookup`) eru núna með column-level SELECT grants TO anon+authenticated (44/12/15/15 cols); table-level grants revoked. Properties allowlist = 43 `v_properties`-projected + `deregistered` (WHERE-filter); 3 cols excluded (`landeign_nr`, `matseiningar`, `tengd_stadfang_nr`). Sanity green: anon `v_properties` count 232.790 = baseline; 42501 raised on excluded cols; `augl_id_latest` still SELECTable (intentionally retained — Bug 26 stays open as separate SSR-deep-link task, NOT closed by this lockout). 11-route prod smoke clean (0 PostgREST errors). `search_properties_grouped` RPC is invoker-mode (correction to 2026-05-21 record); its column footprint sits inside the v_properties allowlist so it survived without RPC-side change. **Value delivered = 3-col exclusion + default-deny on future columns** (standing rule: any new v_*-projected column requires matching column-GRANT or view 42501s). Sjá DECISIONS 2026-05-27 second entry.)
 
 **Previous D3-applied milestone:** 27. maí 2026 (Phase D3 NOW lota APPLIED til Supabase: 108.052 net-new properties + 786 sales_history + 57.187 iter4-scored predictions (`model_version='iter4_final_v1'` / `calibration_version='iter4_conformal_v1'`); new universe **232.887 properties / 167.503 predictions / 173.867 sales_history**. **Spatial-NN matsvaedi backfill** (k=1 KDTree á `geography_features.pkl` lat/lng → matsvaediNUMER, distance-gated T=1 km) sanctioned sem reusable path fyrir HMS-only properties — hold-out validation 99,8% match, ablation 51%/22% PI breach → 0%/0% under spatial-inferred. Confidence gate held 5.993 matsvaedi-unconfident (mostly Country) + 2.433 no-byggar til að halda iter4_conformal_v1 PI-i heiðarlegum (57.187 scored frekar en 63.180). UI: graceful held-residential state bætt við `/eign/[fastnum]/page.js`. **Decoupling:** predictions eru ekki lengur gated á evalue augl-pass — LATER evalue lota er UI-enrichment + matsvæði/byggar fyrir 8.426 held rows. Phase D3 ✅. Sjá DECISIONS 2026-05-27 entry.)
 
@@ -12,7 +14,7 @@
 
 **Previous launch-polish milestone:** 27. apríl 2026 (**Sprint 2 Áfangi 4 LOKIÐ.** Public dashboard live á /markadur með fimm undirsíðum (visitala, markadsstada, ibudir + unregistered map, modelstada) + waterfall fix á eign-síðu + Fasi E launch polish (canonical, mobile collapse, skip-link, scrape-gap disclosure, Bug 8 nýbygging filter). Átta bug-fixes leystir mid-sprint: 1 regime pill, 2 `effective_date_latest`, 3 autocomplete ORDER BY, 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, 5 expand-query merking column, 6 quarterly/smoothed-monthly regime, 7 n<30 thin-sample filter á /ibudir, 8 is_new_build filter á metrics 1 & 2. Launch strategy Leið B: dashboard ships með HMS-gap acknowledgement; comprehensive scraper er Sprint 3 Áfangi 0 top-priority.)
 
-**Verkefnisstaða heildar: ~98%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready. Sprint 3 Áfangi 0 Stage 1 weekend run ✅, Phase D1+D2 ✅, Phase D3 NOW lota ✅ (108K properties + 786 sales + 57K iter4 predictions applied 2026-05-27; universe 232.887), Phase X Group A+B (CLI baseline + views layer + column-grant lockout) ✅, HMS full recovery ✅ (74h, 77.859 endurheimtar). Eftir: D4 (cross_property_refs) + D5 (photo_urls_json) + LATER evalue augl-pass (UI-enrichment + scoring 8.426 held rows) + Phase X Group C + Bug 26 SSR-deep-link closure, svo Phase Y/Z.)
+**Verkefnisstaða heildar: ~98,5%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready. Sprint 3 Áfangi 0 Stage 1 weekend run ✅, Phase D1+D2 ✅, Phase D3 NOW lota ✅ (108K properties + 786 sales + 57K iter4 predictions applied 2026-05-27; universe 232.887), **Phase X Groups A + B + C ✅ (fully closed)** — backup + views/RLS/column-grant + helpers/audit-tables/run_monthly trimmed-core, HMS full recovery ✅ (74h, 77.859 endurheimtar). Eftir: D4 (cross_property_refs) + D5 (photo_urls_json) + LATER evalue augl-pass (UI-enrichment + scoring 8.426 held rows) + Bug 26 SSR-deep-link closure + /heilsa dashboard (consumes Group C tables; deferred model_metrics/backup_manifests/migrations_log land there) + push_precompute_to_supabase (after 2-3 proven run_monthly cycles) + iter5 retraining sprint, svo Phase Y/Z.)
 
 #### Roadmap position (updated 2026-05-22)
 
@@ -33,6 +35,34 @@ Phase Z (UI redesign).
   SELECT grants to anon + authenticated; frontend on views (10 files, 19 
   `.from()` switches); 8-route smoke OK. **Bug 25 closed.** Bug 26 re-scoped 
   to server-side rendered deep-link href via service-role key (not column-strip).
+- **Phase X Group C trimmed-core ✅ 2026-05-27** — `scripts/migration_helpers.py` 
+  codifies 7 reusable patterns (apply_migration_sql, generate_rollback_sql, 
+  unnest_upsert, column_grant_lockout, subprocess_with_shape_safety, 
+  register_supabase_migration, set_local_role_and_test) extracted from 
+  phase_d1/d3/lockout. Migration `20260527155123_group_c_audit_tables.sql` 
+  applied via psycopg2 (1 BEGIN/COMMIT): 3 service-role-only audit tables 
+  (pipeline_runs, pipeline_steps, inputs_snapshots) + 6 indexes; RLS enabled; 
+  0 anon/auth SELECT grants; service_role bypasses RLS for orchestrator 
+  writes. `scripts/run_monthly.py` orchestrator wraps the 6 D:\\ monthly 
+  scripts + build_precompute with shape-safety gates and HALT-before-push 
+  (--push returns exit 2 — flip to auto-on-all-green after 2-3 proven 
+  cycles). `scripts/backfill_current_snapshot.py` wrote inputs_snapshots.id=1 
+  anchoring current iter4_final_v1/iter4_conformal_v1 batch (232,887 props · 
+  167,503 preds · cpi/kaupskra/training MD5 fingerprints · 154-feature 
+  hash · git_sha e938cc5f). Pre-flight rollback exercise: first verify 
+  miscount → `DROP TABLE × 3 CASCADE` cleanly rolled back, re-apply green 
+  — proves rollback path works empirically. Lightweight current-stack 
+  (Vercel + Supabase + local Windows/Python at monthly cadence) frekar en 
+  SUPERSEDED Hetzner/Dagster/MLflow plan; inputs_snapshots IS the 
+  lightweight MLflow-equivalent. Tracking-table CLI repair pending Danni's 
+  PowerShell step (same pattern as 2026-05-21 baseline + Group B). 
+  **Deferred-with-rationale** (not built; sequenced for later sessions): 
+  `model_metrics` + `backup_manifests` + `migrations_log` tables → /heilsa 
+  dashboard session; `push_precompute_to_supabase` helper → after 2-3 
+  proven cycles; `ats_lookup` rename → next ats migration; iter5 
+  retraining + `predicted_at DATE→TIMESTAMPTZ` → iter5 session; Bug 26 
+  SSR-deep-link closure remains separate. Phase X complete. Sjá DECISIONS 
+  2026-05-27 third entry.
 - **Phase X Group B column-grant lockout ✅ 2026-05-27** — applied via 
   `supabase/migrations/20260527150435_column_grant_lockout_stage1_properties.sql` 
   + `20260527150436_column_grant_lockout_stage2_other3.sql`. `properties` 
@@ -1672,6 +1702,12 @@ https://frs3o1zldvgn.objectstorage.eu-frankfurt-1.oci.customer-oci.com
 OCI Object Storage bucket í Frankfurt. `hms.is` landing síða linkar á þennan URL. URL virðist stöðug — `frs3o1zldvgn` er OCI tenant identifier sem ætti að haldast svo lengi sem HMS hefur sama Oracle samning.
 
 Monthly update pattern (observed): Sunnudagur 2. viku mánaðar ~02:00 GMT. Latest transaction í skjalinu er ~2 vikna lag frá publication (latest þinglýsingardagur 2026-04-17 í 2026-04-19 release).
+
+**Cadence revision 2026-05-27**: HMS has switched to a much more frequent publication rhythm. HEAD-probe `Last-Modified: Wed, 27 May 2026 02:00:53 GMT` (today) vs state-file recorded `Mon, 20 Apr 2026 02:00:36 GMT` — 37-day gap locally, but Danni's observation in late May 2026 is that publication is now ~daily. Publication-time-of-day remains stable at ~02:00 GMT.
+
+`kaupskra_fetch_state.json` is **single-snapshot** (overwritten each fetch) — cannot reconstruct full historical cadence from the local artifact. Future option: extend the state file to append a per-fetch row to `D:\kaupskra_fetch_history.jsonl` so cadence can be audited without external probing.
+
+**Implications for Phase X Group C `run_monthly.py`**: cadence is decoupled from publication day. `refresh_kaupskra.py` is idempotent on `Last-Modified`/MD5 (HEAD → no-op when unchanged), so `run_monthly` can be pinned to any convenient fixed day; refresh_kaupskra grabs whatever's current at that moment. **Recommended pin**: 1st of each month 03:30 local (post nightly R2 backup at 03:00). Forward option (do NOT build now): once Group C is proven, a lighter dashboard-only refresh decoupled from the heavy monthly recalibration cycle could trigger daily on Last-Modified change — pickup latest sales for repeat-sale-index + ATS lookup without re-training. Tracked as a follow-up consideration.
 
 ### Composite primary key finding (critical)
 

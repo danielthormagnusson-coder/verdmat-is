@@ -53,6 +53,10 @@ audit/*.db-wal
 audit/*.log
 audit/*.flag
 
+# Group C run_monthly local JSON run-logs (regenerable; pipeline_runs +
+# pipeline_steps in Supabase are the canonical record).
+audit/monthly_runs/
+
 # large regenerable fastnum manifests (rebuilt from Supabase / kaupskra.csv;
 # 3 scripts reference them by name — files stay on disk, just not tracked).
 audit/stage_a_fastnum_manifest.txt

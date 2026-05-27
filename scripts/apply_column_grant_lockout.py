@@ -12,6 +12,15 @@ Sanity per stage:
   - Stage 1 only: SELECT landeign_nr FROM properties LIMIT 1 → must 42501.
 
 If any sanity fails → ROLLBACK by re-GRANT table-level SELECT and STOP.
+
+NOTE (Phase X Group C, 2026-05-27): future analogue scripts should import
+the reusable patterns from `scripts/migration_helpers.py`:
+  - column_grant_lockout()      replaces the per-table REVOKE+GRANT block
+  - apply_migration_sql()       replaces apply_sql_file()
+  - set_local_role_and_test()   replaces anon_view_count + anon_should_42501
+  - open_connection()           replaces get_conn()
+This file was committed before the helpers module landed; left as-is to
+preserve the audit trail of the 2026-05-27 lockout apply.
 """
 from __future__ import annotations
 

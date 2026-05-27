@@ -16,6 +16,13 @@ Apply order (each block is its own BEGIN/COMMIT per batch of 500):
      model_version='iter4_final_v1', calibration_version='iter4_conformal_v1')
 
 Post-apply: row-count verification queries (read-only).
+
+NOTE (Phase X Group C, 2026-05-27): the per-table UNNEST-INSERT-with-
+ON-CONFLICT pattern in this file is now generalised in
+`scripts/migration_helpers.py:unnest_upsert()`. Future analogue scripts
+(D4 cross_property_refs, D5 photo_urls_json, evalue augl-pass) should
+import the helper. Left as-is to preserve the audit trail of the
+2026-05-27 Phase D3 apply.
 """
 from __future__ import annotations
 

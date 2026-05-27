@@ -4,6 +4,193 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-27 — Phase X Group C trimmed core APPLIED; lightweight current-stack supersedes Hetzner/Dagster/MLflow plan; Phase X fully closed
+
+**Hvað**: Phase X Group C trimmed-core landed live á Supabase prod (project `szzjsvmvxfrhyexblzvq`). Net-new + additive — zero impact on existing tables/views/predictions.
+
+**What was built**:
+
+| Artifact | Purpose |
+|---|---|
+| `scripts/migration_helpers.py` | 7 reusable patterns extracted from phase_d1/d3/lockout (apply_migration_sql, generate_rollback_sql, unnest_upsert, column_grant_lockout, subprocess_with_shape_safety, register_supabase_migration, set_local_role_and_test) + 3 utilities (open_connection, file_md5_hex, git_sha_head). Future analogue scripts inherit; phase_d1/d3/lockout get header-note pointers (no working-code changes) |
+| `supabase/migrations/20260527155123_group_c_audit_tables.sql` | Creates 3 service-role-only audit tables: `pipeline_runs` (8 cols), `pipeline_steps` (12 cols), `inputs_snapshots` (20 cols) + 6 indexes |
+| `scripts/run_monthly.py` | Orchestrator wrapping 6 D:\\ monthly scripts + build_precompute, with shape-safety gates per step. On all-green: captures inputs_snapshot + push-preview, then HALTs |
+| `scripts/backfill_current_snapshot.py` | One-off: writes ONE inputs_snapshots row anchoring current live batch |
+| `scripts/apply_group_c_migration.py` | Apply + verify orchestrator with auto-rollback on verify-fail |
+
+**Post-apply counts**:
+
+| Table | Rows | Notes |
+|---|---:|---|
+| `public.pipeline_runs` | 1 | dry-run row from run_monthly --dry-run, exit_status=success |
+| `public.pipeline_steps` | 7 | one per planned step, all exit=0, notes='dry-run' |
+| `public.inputs_snapshots` | 1 | backfill anchor for current iter4 batch |
+
+**Backfill anchor row (`inputs_snapshots.id=1`)** — fingerprints current live batch:
+
+```
+model_version       = iter4_final_v1
+calibration_version = iter4_conformal_v1
+valuation_year/mo   = 2026 / 4
+cpi_factor_at_val   = 1.005484731692855
+cpi_csv_md5         = cd14045c9ff5…
+kaupskra_csv_md5    = 0105a680c197…
+kaupskra_last_mod   = 2026-04-20 02:00:36 UTC  (state-file value; refresh hasn't run since)
+training_data_v2_md5 = 405b663f21d7…
+feature_names_hash  = 0f8b90a8cd9d…  (154 features)
+properties_n        = 232,887
+predictions_n       = 167,503
+git_sha             = e938cc5ffebb…  (HEAD at backfill time)
+precompute_git_sha  = c85ad83cb11f…
+extra.note          = "backfill of current state"
+```
+
+This row answers reproducibly: "what inputs produced the 167,503-row iter4 prediction batch live in production?" — equivalent to MLflow's run-tracking, in a single Postgres table.
+
+---
+
+**Trim rationale + deferred-with-rationale list**
+
+Group C scope was intentionally trimmed from the original spec to keep the lota focused on the parts that pay off immediately. Deferred items are sequenced for clear later sessions:
+
+| Deferred | Where it lands | Why now-not |
+|---|---|---|
+| `model_metrics` table | /heilsa session | Feeds the dashboard directly; building both together keeps the schema/UI co-evolution tight |
+| `backup_manifests` table | /heilsa session | Same — dashboard consumer drives the schema |
+| `migrations_log` table | /heilsa session | `supabase_migrations.schema_migrations` is canonical today; this is a metadata sidecar (applied_via, sanity_passed, rollback_path) that only helps when /heilsa shows it |
+| `push_precompute_to_supabase` helper | After 2-3 proven run_monthly cycles | Monthly cadence + bank-facing app = high cost of an automated-push regression. The unnest_upsert pattern is in place; per-table column-type maps + ON CONFLICT keys land when the wrapping orchestration is empirically stable |
+| `ats_lookup` → `ats_lookup_by_heat` rename | Next ats-touching migration | Cosmetic; would burn a migration cycle for ~no value standalone |
+| `/heilsa` internal dashboard | Separate session after Group C | PLANNING_BACKLOG already sequenced; consumes Group C tables |
+| iter5 retraining + `run_retrain.py` | iter5 spec session | Retraining is event-driven (drift > threshold), not monthly |
+| `predictions.predicted_at: DATE → TIMESTAMPTZ` | iter5 session | Orthogonal; lands cleanly with iter5's re-scoring-cadence decision |
+| Bug 26 SSR-deep-link closure | Separate UI session | Group B/C did not address; `augl_id_latest` remains in anon allowlist for the view |
+| Lighter dashboard-only refresh decoupled from monthly cycle | Forward option, gated on near-daily kaupskrá publication being confirmed sustained | Enabled by kaupskrá cadence revision below; build after run_monthly has 2-3 clean cycles |
+
+---
+
+**Halt-before-push design**
+
+`scripts/run_monthly.py` produces the precompute CSVs and an inputs_snapshot row, then prints a per-table push-preview (CSV-rows vs live-Supabase-rows delta) and exits with `pipeline_runs.exit_status='success_halt_pre_push'`. Operator reviews and decides whether to push. `--push` flag is wired in the CLI but returns exit 2 with a "not implemented this lota" message.
+
+Reasoning:
+
+1. **Monthly cadence**: a botched auto-push wouldn't be noticed until the next cycle a month later. Manual review window is essentially free in operator-time terms.
+2. **Bank-facing application**: properties + predictions are read by /eign render path. A bad row count or stale predictions visible immediately. The halt-before-push gives a deliberate "do these numbers look right?" gate.
+3. **Pattern is already known**: phase_d3_apply demonstrated the unnest_upsert idempotent INSERT path. Generalising it across 7 precompute targets requires per-table {column_types, conflict_cols, casts} maps — small but should be done once we've watched the orchestrator behave through 2-3 monthly cycles. Premature automation would lock in column-type maps before knowing what edge cases the cycle surfaces.
+
+Decision lock: **flip to auto-on-all-green only after 2-3 proven cycles** demonstrate the orchestrator's halt-gate fires correctly on real drift (validate_metrics MAPE/coverage thresholds, kaupskrá file-shrinkage, training-data row drift > 10%). Until then, push is manual.
+
+---
+
+**Audit-table security posture**
+
+All 3 tables follow the same pattern, consistent with Group B's least-privilege posture:
+
+```sql
+ALTER TABLE public.<table> ENABLE ROW LEVEL SECURITY;
+-- No CREATE POLICY — default-deny for anon and authenticated.
+-- service_role bypasses RLS via its built-in role membership.
+REVOKE ALL ON public.<table> FROM anon;
+REVOKE ALL ON public.<table> FROM authenticated;
+```
+
+Verified post-apply: each table has `relrowsecurity=t`, 0 anon SELECT grants, 0 authenticated SELECT grants, and a fresh `service_role` SET LOCAL ROLE returns `count(*)=0` cleanly (no 42501). Orchestrator writes come from the service-role connection (`.dbconfig` URL is the postgres role, which has BYPASSRLS in Supabase managed Postgres).
+
+When /heilsa lands, it reads via a Next.js API route using `SUPABASE_SERVICE_ROLE_KEY` (never anon). The dashboard route will be unlinked + auth-gated per PLANNING_BACKLOG.
+
+---
+
+**Pre-flight rollback exercise (worth recording)**
+
+First apply caught a **verifier miscount bug**: `apply_group_c_migration.py` had expected column counts of 7/11/16, while actual schemas are 8/12/20 (I miscounted from the SQL while writing the verifier — pipeline_runs has 8 cols not 7, etc.). The verify step returned all 3 tables as FAIL on column count.
+
+The script's auto-rollback path fired: `DROP TABLE public.inputs_snapshots, public.pipeline_steps, public.pipeline_runs CASCADE` in a single statement. Clean rollback — no residual state. Fixed the expected-counts dict in the verifier, re-ran apply, all checks green on second attempt.
+
+**Empirical precedent**: the rollback path actually works in practice — DROP TABLE × 3 CASCADE on a fresh migration is a clean recovery. Useful to have demonstrated this on net-new tables (no FK conflicts to other live data, all 3 tables empty at rollback time). For future migrations that mutate existing schema, the rollback path is more complex; this exercise establishes the simpler additive-migration case as a known-good pattern.
+
+The pattern: **verifier mistakes are recoverable when the migration is purely additive and the rollback is DROP TABLE on the net-new objects**. For migrations with REVOKE/GRANT changes (like Group B), the rollback path is re-GRANT table-level — also additive in the recovery direction.
+
+---
+
+**CORRECT THE RECORD — two corrections**
+
+**(a) Kaupskrá publication cadence — revised**
+
+The 2026-04-20 STATE Áfangi 4d note ("Monthly update pattern: Sunnudagur 2. viku mánaðar ~02:00 GMT") is **stale**. Empirical state observed 2026-05-27:
+
+- HMS HEAD-probe today: `Last-Modified: Wed, 27 May 2026 02:00:53 GMT`
+- State-file last-recorded fetch: `Mon, 20 Apr 2026 02:00:36 GMT`
+- 37-day gap in local artifact, but Danni's observation in late May 2026 is that publication is **now near-daily**
+
+Publication-time-of-day (~02:00 UTC) remains stable; only frequency changed.
+
+**Limitation of the local artifact**: `D:\kaupskra_fetch_state.json` is single-snapshot — it overwrites itself each fetch, so we cannot reconstruct full publication history from local data alone. The cadence revision is based on operator observation; the in-script HEAD probe today is the only empirical anchor. STATE Áfangi 4d updated additively (+6 lines: "Cadence revision 2026-05-27" sub-block).
+
+**Forward option** (do NOT build now, noted in STATE Áfangi 4d): once Group C's run_monthly is proven over 2-3 cycles, a lighter dashboard-only refresh decoupled from the heavy monthly recalibration cycle could trigger daily on Last-Modified change — pickup latest sales → repeat_sale_index + ATS lookup refresh, without re-training. This is gated on (a) sustained near-daily publication being confirmed, and (b) operational confidence in the monthly cycle.
+
+**Implication for run_monthly cadence**: decoupled from publication day. `refresh_kaupskra.py` is idempotent on Last-Modified/MD5 (HEAD → no-op when unchanged), so any convenient day works. **Pinned**: 1st of each month 03:30 local (post nightly R2 backup at 03:00) — operator convenience, not a HMS dependency.
+
+**(b) Hetzner + Dagster + MLflow plan — superseded**
+
+`STATE.md:1051` (historical, from initial planning ~spring 2026) specified the infra stack as:
+
+> "Infra stack = Hetzner + Postgres/PostGIS + Docker Compose + Dagster + MLflow + Cloudflare R2."
+
+Reality: the platform has been running ~6 months on **Vercel (Next.js app) + Supabase (Postgres data layer) + local Windows D:\\ Python 3.14 (training pipeline) + Cloudflare R2 (backups)**. The Hetzner/Dagster/MLflow leg never landed. Project has shipped and grown without it.
+
+**Decision lock**: Group C IS the lightweight current-stack version of what Dagster + MLflow would have provided. Standing up Dagster/MLflow now would be 2-4 weeks of infrastructure work for marginal value — the training set is ~144K rows (~10 min/cycle on a laptop), the monthly cadence is small-scale, and the team is small. Revisit if the project scales 10× (multi-engineer, multi-tenant data, hourly retraining).
+
+Specifically:
+
+- `pipeline_runs` + `pipeline_steps` provide Dagster's run-orchestration audit trail in a Postgres table.
+- `inputs_snapshots` provides MLflow's run-tracking (model_version, input MD5s, parameters, environment) in a Postgres table.
+- `scripts/run_monthly.py` is the orchestrator (Dagster job in MLflow terms).
+- Windows Task Scheduler is the cron (same role as Dagster scheduler / Airflow DAG sensor).
+- Cloudflare R2 + nightly rclone backup is the artifact store (MLflow artifacts equivalent).
+
+The line in STATE.md is left for historical context — it documents the path-not-taken. This DECISIONS entry is the canonical statement of the superseding decision.
+
+---
+
+**Migration-history caveat**
+
+Migration file `20260527155123_group_c_audit_tables.sql` is on disk under `supabase/migrations/` but was applied via `psycopg2` in `scripts/apply_group_c_migration.py`, not the Supabase CLI. The remote tracking table `supabase_migrations.schema_migrations` does NOT yet include version `20260527155123`. To register it:
+
+```powershell
+D:\verdmat-is\tools\supabase\supabase.exe migration repair --status applied 20260527155123
+```
+
+Same pattern as Group B (2026-05-27 second DECISIONS entry) and as the 2026-05-21 baseline reconcile. Requires interactive TTY, which is why the agent shell cannot execute it directly. **Does NOT block the commit** — disk file belongs in the repo regardless.
+
+---
+
+**Open follow-ups (sequenced)**
+
+1. CLI repair `20260527155123` (Danni's PowerShell step).
+2. First manual `run_monthly.py` clean run (no --dry-run) — observe end-to-end behavior, particularly the validate_metrics drift gate and the push-preview deltas.
+3. After 2-3 proven cycles: register Windows Task Scheduler for monthly orchestrator + flip `--push` to auto-on-all-green; build `push_precompute_to_supabase` per-table maps.
+4. /heilsa dashboard session — builds `model_metrics` + `backup_manifests` + `migrations_log` tables alongside the unlinked auth-gated UI.
+5. Lighter dashboard-only refresh (forward option) once kaupskrá near-daily cadence is confirmed sustained.
+6. `ats_lookup` → `ats_lookup_by_heat` rename when next ats-touching migration lands.
+7. iter5 retraining spec + `run_retrain.py` orchestrator + `predicted_at` DATE→TIMESTAMPTZ.
+8. Bug 26 SSR-deep-link closure (remains separate UI session).
+
+---
+
+**Artifacts (þessi lota)**
+
+- `scripts/migration_helpers.py` — 7 helpers + 3 utilities, 291 lines
+- `scripts/run_monthly.py` — orchestrator with halt-before-push, 302 lines
+- `scripts/backfill_current_snapshot.py` — one-off anchor writer, 146 lines
+- `scripts/apply_group_c_migration.py` — apply + verify + auto-rollback orchestrator
+- `supabase/migrations/20260527155123_group_c_audit_tables.sql` — 3 tables + 6 indexes
+- `scripts/{apply_column_grant_lockout, phase_d1_apply, phase_d3_apply}.py` — additive header-note pointers to migration_helpers (no working-code changes)
+- `docs/STATE.md` — Áfangi 4d cadence revision + new milestone + Roadmap update + Group A+B+C closure
+- `docs/DECISIONS.md` (this entry)
+- `audit/monthly_runs/` (gitignored) — local JSON run-logs
+
+---
+
 ## 2026-05-27 — Phase X Group B column-grant lockout APPLIED; default-deny på future columns; Bug 26 reframed (not closed)
 
 **Hvað**: Phase X Group B follow-up landed live á Supabase prod (project `szzjsvmvxfrhyexblzvq`). Replaced table-level SELECT grants on the 4 in-scope tables with column-level allowlists per role. Each migration in its own transaction; sanity green after each.
