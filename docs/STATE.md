@@ -1,6 +1,8 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 27. maí 2026 (Phase D3 NOW lota APPLIED til Supabase: 108.052 net-new properties + 786 sales_history + 57.187 iter4-scored predictions (`model_version='iter4_final_v1'` / `calibration_version='iter4_conformal_v1'`); new universe **232.887 properties / 167.503 predictions / 173.867 sales_history**. **Spatial-NN matsvaedi backfill** (k=1 KDTree á `geography_features.pkl` lat/lng → matsvaediNUMER, distance-gated T=1 km) sanctioned sem reusable path fyrir HMS-only properties — hold-out validation 99,8% match, ablation 51%/22% PI breach → 0%/0% under spatial-inferred. Confidence gate held 5.993 matsvaedi-unconfident (mostly Country) + 2.433 no-byggar til að halda iter4_conformal_v1 PI-i heiðarlegum (57.187 scored frekar en 63.180). UI: graceful held-residential state bætt við `/eign/[fastnum]/page.js`. **Decoupling:** predictions eru ekki lengur gated á evalue augl-pass — LATER evalue lota er UI-enrichment + matsvæði/byggar fyrir 8.426 held rows. Phase D3 ✅. Sjá DECISIONS 2026-05-27 entry.)
+**Síðast uppfært:** 27. maí 2026 (Phase X Group B **column-grant lockout APPLIED** til Supabase prod — 4 in-scope tables (`properties`, `predictions`, `repeat_sale_index`, `ats_lookup`) eru núna með column-level SELECT grants TO anon+authenticated (44/12/15/15 cols); table-level grants revoked. Properties allowlist = 43 `v_properties`-projected + `deregistered` (WHERE-filter); 3 cols excluded (`landeign_nr`, `matseiningar`, `tengd_stadfang_nr`). Sanity green: anon `v_properties` count 232.790 = baseline; 42501 raised on excluded cols; `augl_id_latest` still SELECTable (intentionally retained — Bug 26 stays open as separate SSR-deep-link task, NOT closed by this lockout). 11-route prod smoke clean (0 PostgREST errors). `search_properties_grouped` RPC is invoker-mode (correction to 2026-05-21 record); its column footprint sits inside the v_properties allowlist so it survived without RPC-side change. **Value delivered = 3-col exclusion + default-deny on future columns** (standing rule: any new v_*-projected column requires matching column-GRANT or view 42501s). Sjá DECISIONS 2026-05-27 second entry.)
+
+**Previous D3-applied milestone:** 27. maí 2026 (Phase D3 NOW lota APPLIED til Supabase: 108.052 net-new properties + 786 sales_history + 57.187 iter4-scored predictions (`model_version='iter4_final_v1'` / `calibration_version='iter4_conformal_v1'`); new universe **232.887 properties / 167.503 predictions / 173.867 sales_history**. **Spatial-NN matsvaedi backfill** (k=1 KDTree á `geography_features.pkl` lat/lng → matsvaediNUMER, distance-gated T=1 km) sanctioned sem reusable path fyrir HMS-only properties — hold-out validation 99,8% match, ablation 51%/22% PI breach → 0%/0% under spatial-inferred. Confidence gate held 5.993 matsvaedi-unconfident (mostly Country) + 2.433 no-byggar til að halda iter4_conformal_v1 PI-i heiðarlegum (57.187 scored frekar en 63.180). UI: graceful held-residential state bætt við `/eign/[fastnum]/page.js`. **Decoupling:** predictions eru ekki lengur gated á evalue augl-pass — LATER evalue lota er UI-enrichment + matsvæði/byggar fyrir 8.426 held rows. Phase D3 ✅. Sjá DECISIONS 2026-05-27 entry.)
 
 **Previous HMS-recovery milestone:** 26. maí 2026 (HMS full recovery COMPLETE — 77.859 raunverulegar eignir endurheimtar úr 392K HTTP-500 staging-row-um (realized FN 19,86%; root cause: WAF-backoff scoped to 429/403/503 en ekki 500; dead-zone outage 2026-05-16/17 sem orsakavöld); kaupskrá cross-check 99,18% (125.330/126.362) staðfestir completeness óháð; D3-sync NOW lota scoped á ~106K insert-candidates (recovered ∪ original Phase C 200-hits, disjoint via single-probe argument); recovery + crown-jewel scrapers (hms_full_scrape.py, stage_a_augl_refresh.py) + 6. evalue variant + audit tools + historical reports committed og pushed til origin/main. Sjá DECISIONS 2026-05-26 entry.)
 
@@ -10,7 +12,7 @@
 
 **Previous launch-polish milestone:** 27. apríl 2026 (**Sprint 2 Áfangi 4 LOKIÐ.** Public dashboard live á /markadur með fimm undirsíðum (visitala, markadsstada, ibudir + unregistered map, modelstada) + waterfall fix á eign-síðu + Fasi E launch polish (canonical, mobile collapse, skip-link, scrape-gap disclosure, Bug 8 nýbygging filter). Átta bug-fixes leystir mid-sprint: 1 regime pill, 2 `effective_date_latest`, 3 autocomplete ORDER BY, 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, 5 expand-query merking column, 6 quarterly/smoothed-monthly regime, 7 n<30 thin-sample filter á /ibudir, 8 is_new_build filter á metrics 1 & 2. Launch strategy Leið B: dashboard ships með HMS-gap acknowledgement; comprehensive scraper er Sprint 3 Áfangi 0 top-priority.)
 
-**Verkefnisstaða heildar: ~98%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready. Sprint 3 Áfangi 0 Stage 1 weekend run ✅, Phase D1+D2 ✅, Phase D3 NOW lota ✅ (108K properties + 786 sales + 57K iter4 predictions applied 2026-05-27; universe 232.887), Phase X Group A+B (CLI baseline + views layer) ✅, HMS full recovery ✅ (74h, 77.859 endurheimtar). Eftir: D4 (cross_property_refs) + D5 (photo_urls_json) + LATER evalue augl-pass (UI-enrichment + scoring 8.426 held rows) + column-grant lockout + Phase X Group C, svo Phase Y/Z.)
+**Verkefnisstaða heildar: ~98%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready. Sprint 3 Áfangi 0 Stage 1 weekend run ✅, Phase D1+D2 ✅, Phase D3 NOW lota ✅ (108K properties + 786 sales + 57K iter4 predictions applied 2026-05-27; universe 232.887), Phase X Group A+B (CLI baseline + views layer + column-grant lockout) ✅, HMS full recovery ✅ (74h, 77.859 endurheimtar). Eftir: D4 (cross_property_refs) + D5 (photo_urls_json) + LATER evalue augl-pass (UI-enrichment + scoring 8.426 held rows) + Phase X Group C + Bug 26 SSR-deep-link closure, svo Phase Y/Z.)
 
 #### Roadmap position (updated 2026-05-22)
 
@@ -31,6 +33,20 @@ Phase Z (UI redesign).
   SELECT grants to anon + authenticated; frontend on views (10 files, 19 
   `.from()` switches); 8-route smoke OK. **Bug 25 closed.** Bug 26 re-scoped 
   to server-side rendered deep-link href via service-role key (not column-strip).
+- **Phase X Group B column-grant lockout ✅ 2026-05-27** — applied via 
+  `supabase/migrations/20260527150435_column_grant_lockout_stage1_properties.sql` 
+  + `20260527150436_column_grant_lockout_stage2_other3.sql`. `properties` 
+  44-col anon+authenticated allowlist (43 projected + `deregistered`); 
+  `predictions`/`repeat_sale_index`/`ats_lookup` all-cols (12/15/15). Excluded 
+  on `properties`: `landeign_nr`, `matseiningar`, `tengd_stadfang_nr`. 
+  Verified anon `v_properties` count 232,790 = baseline; 42501 raised on 
+  excluded cols; `augl_id_latest` still SELECTable (intentional — Bug 26 
+  stays open). 11-route prod smoke clean. `search_properties_grouped` is 
+  invoker-mode (correction); footprint within allowlist so it survived. 
+  Value = 3-col exclusion + default-deny on future columns. **Standing 
+  rule**: any new v_*-projected column on these 4 tables MUST also receive 
+  a matching column-GRANT or the view 42501s. Bug 26 reframed: closure 
+  remains the separate SSR-deep-link task (see DECISIONS 2026-05-27).
 - Phase X Group B follow-up — enforce the `v_properties` column allowlist 
   via column-level grants on the underlying tables (`properties`, 
   `predictions`, `repeat_sale_index`, `ats_lookup`). 

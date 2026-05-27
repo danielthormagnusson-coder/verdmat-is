@@ -4,6 +4,116 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-27 — Phase X Group B column-grant lockout APPLIED; default-deny på future columns; Bug 26 reframed (not closed)
+
+**Hvað**: Phase X Group B follow-up landed live á Supabase prod (project `szzjsvmvxfrhyexblzvq`). Replaced table-level SELECT grants on the 4 in-scope tables with column-level allowlists per role. Each migration in its own transaction; sanity green after each.
+
+**Migrations** (in `supabase/migrations/`):
+
+- `20260527150435_column_grant_lockout_stage1_properties.sql` (2.677 bytes) — STAGE 1, `public.properties`.
+- `20260527150436_column_grant_lockout_stage2_other3.sql` (2.695 bytes) — STAGE 2, `public.predictions` + `public.repeat_sale_index` + `public.ats_lookup` (each in its own BEGIN/COMMIT).
+
+Applied via `psycopg2` through the transaction pooler (Docker / `supabase db push` unavailable on this host per 2026-05-21 Group B Part 1 entry). **Tracking caveat below**.
+
+**Per-table allowlist**:
+
+| Table | anon = authenticated | Excluded (anon CANNOT SELECT) |
+|---|---|---|
+| `properties` | **44** cols: 43 v_properties-projected + `deregistered` (WHERE) | `landeign_nr`, `matseiningar`, `tengd_stadfang_nr` |
+| `predictions` | **12** (all, = v_current_predictions projection) | (none) |
+| `repeat_sale_index` | **15** (all, = v_repeat_sale_index projection) | (none) |
+| `ats_lookup` | **15** (all, = v_ats_lookup_by_heat projection) | (none) |
+
+**Role split**: `authenticated = anon` for now. `/pro` is a frozen static landing page; no pro feature currently exercises `authenticated` for these 4 tables. Revisit on pro reactivation — likely candidates for an expanded authenticated set are `matseiningar` (sub-unit drill-down) and `tengd_stadfang_nr` (cross-property comp). Documented as backlog.
+
+**Sanity (under `SET LOCAL ROLE anon`)**:
+
+- `SELECT count(*) FROM v_properties` → **232.790** = baseline ✓
+- `SELECT count(*) FROM v_current_predictions` → 167.503 = baseline ✓
+- `SELECT count(*) FROM v_repeat_sale_index` → 2.673 = baseline ✓
+- `SELECT count(*) FROM v_ats_lookup_by_heat` → 65 = baseline ✓
+- `SELECT landeign_nr FROM properties LIMIT 1` → **42501** `permission denied for table properties` ✓
+- `SELECT matseiningar FROM properties LIMIT 1` → 42501 ✓
+- `SELECT tengd_stadfang_nr FROM properties LIMIT 1` → 42501 ✓
+- `SELECT augl_id_latest FROM properties LIMIT 1` → **PASS** (intentional, see Bug 26 reframe below)
+
+**Final grant state**:
+
+| Table | anon table-level | anon column-level |
+|---|---:|---:|
+| `properties` | 0 | 44 |
+| `predictions` | 0 | 12 |
+| `repeat_sale_index` | 0 | 15 |
+| `ats_lookup` | 0 | 15 |
+
+**Full prod smoke** — 11 routes, all HTTP 200, 0 PostgREST 42501/42703 errors:
+
+`/` · `/eign/2008647` (Group-B scored baseline) · `/markadur` + 4 sub-pages · `/api/backproj/2008647` · `/eign/2151573` (D3 scored net-new) · `/eign/2019479` (D3 held net-new) · `/api/search?q=Vesturs`. Sizes within ±5% of 2026-05-21 Group B Part 2 baseline. Deep verify on `/eign/2151573`: "Verðmat í dag" PredictionCard renders 36,7 M kr point + 80% PI [30,3; 44,4] M + 95% PI [25,4; 53,0] M + iter4_final_v1 / iter4_conformal_v1 / APT_FLOOR stamp ✓. `/eign/2019479` held: graceful state + "Verðmat bíður" chip ✓.
+
+---
+
+**CORRECT THE RECORD — two prior-entry inaccuracies surfaced during this audit**
+
+1. **`search_properties_grouped` is invoker-mode, NOT SECURITY DEFINER.** The 2026-05-21 Group B Part 2 entry stated "SECURITY DEFINER RPCs (`search_properties_grouped`) keep working under either path" — that was wrong. `pg_proc.prosecdef = False` empirically. The function uses the default invoker mode and reads `public.properties` directly with anon's privileges. The audit revealed this; the empirical column footprint is 7 cols — `heimilisfang`, `postnr`, `postheiti`, `sveitarfelag`, `fastnum`, `tegund_raw`, `is_residential` — ALL of which are in the 44-col anon allowlist on `properties`. So the function survived REVOKE+GRANT without an RPC-side change (confirmed: `/api/search?q=Vesturs` returns Vestursíða 10 group anchors post-lockout). If a future column gets added to its body and is NOT in the allowlist, the RPC will start 42501-ing — standing rule below applies.
+
+2. **This lockout does NOT close Bug 26 (`fastnum ↔ augl_id` leak).** The 2026-05-21 entry left Bug 26 in a re-scoped-but-undone state ("SSR deep-link href via service-role key"), and Bug 26 closure could be misread as a side-effect of the column-grant work. It is NOT. `augl_id_latest` is **intentionally retained in the anon+authenticated allowlist** on `properties` because (a) `v_properties` projects it, so removing it from base-table grants would 42501 the view, and (b) Bug 26 fix is a UI-side change (render the deep-link href in server-rendered HTML with the service-role key; never ship `augl_id_latest` to the client bundle). That UI change is a separate task. **Closing it remains open work.**
+
+---
+
+**Standing rule (locked)**
+
+Any new column added to `public.properties` / `public.predictions` / `public.repeat_sale_index` / `public.ats_lookup` that needs to be projected by a `v_*` view MUST also receive a matching `GRANT SELECT (<col>) ON <table> TO anon, authenticated;` in the same migration that adds it. Otherwise the view's SELECT (or its WHERE-filter, ORDER BY, etc.) will fail with PostgREST `42501 permission denied`.
+
+Conversely, **omitting** a new column from both the view projection and the grant is the new default — that's the "default-deny on future columns" value this lockout delivers.
+
+This rule applies equally to:
+- Adding a column to a base table where a `v_*` view does `SELECT *`-style projection (currently none — all 4 views use explicit projection lists, which is the recommended pattern).
+- Adding a column to a `v_*` view definition that wasn't previously projected.
+- Changing a `v_*` view's WHERE/ORDER BY/JOIN clause to reference a previously-unreferenced base-table column.
+
+When in doubt: run the proposed view migration locally, then under `SET LOCAL ROLE anon; SELECT count(*) FROM <view>;`. If it 42501s, the column-grant is missing.
+
+---
+
+**Value delivered**
+
+| | Before lockout | After lockout |
+|---|---|---|
+| anon SELECT on `properties` | all 47 cols (incl. `landeign_nr`, `matseiningar`, `tengd_stadfang_nr`) | 44 of 47 (3 excluded) |
+| anon SELECT on `predictions` | all 12 | all 12 (no behavior change) |
+| anon SELECT on `repeat_sale_index` | all 15 | all 15 (no behavior change) |
+| anon SELECT on `ats_lookup` | all 15 | all 15 (no behavior change) |
+| Default behavior on future column add | anon can SELECT immediately | anon must wait for explicit GRANT (default-deny) |
+
+The 3-col exclusion is the immediate visible win; the default-deny posture is the durable win — it prevents accidental column leaks the next time someone adds a column to one of these tables.
+
+---
+
+**Migration-history tracking caveat**
+
+Both migration files are recorded in `supabase/migrations/` on disk, but the remote tracking table `supabase_migrations.schema_migrations` was NOT updated during the apply because we used `psycopg2`, not the Supabase CLI. Verified empirically post-apply: `SELECT version FROM supabase_migrations.schema_migrations WHERE version IN ('20260527150435','20260527150436')` returns **0 rows**.
+
+**Fix**: run the following in a real PowerShell terminal (CLI needs interactive TTY, not available inside this agent shell):
+
+```powershell
+D:\verdmat-is\tools\supabase\supabase.exe migration repair --status applied 20260527150435 20260527150436
+```
+
+This is the same pattern used in the 2026-05-21 Group B Part 1 baseline reconcile. It writes the two version-ids into `schema_migrations` with `status='applied'` so that future `supabase db push` runs and `supabase migration list` correctly show the lockout migrations as applied — no `db push` re-runs them and no drift warnings. **This does NOT block git commit / push — the disk files belong in the repo regardless; the repair fixes the remote tracking table in parallel.**
+
+**Anti-pattern to avoid**: hand-inserting into `supabase_migrations.schema_migrations` via SQL. The CLI repair command computes the `statements` payload correctly; manual INSERT would leave the column NULL (or wrong) and break future `supabase db diff` comparisons. Use the CLI command, not raw SQL.
+
+---
+
+**Artifacts (þessi lota)**:
+
+- `supabase/migrations/20260527150435_column_grant_lockout_stage1_properties.sql`
+- `supabase/migrations/20260527150436_column_grant_lockout_stage2_other3.sql`
+- `scripts/apply_column_grant_lockout.py` — apply orchestrator with per-stage sanity gates (baseline counts, anon view-count match, 42501-exclusion proof on each excluded column, anon-SELECT-pass on `augl_id_latest`)
+- DECISIONS.md (this entry) + STATE.md milestone demotion + Roadmap update
+
+---
+
 ## 2026-05-27 — Phase D3 NOW lota APPLIED; Spatial-NN matsvaedi backfill sanctioned; predictions decoupled from evalue augl-pass
 
 **Hvað**: Phase D3 NOW lota landed live á Supabase prod (project `szzjsvmvxfrhyexblzvq`). Þrír idempotent INSERT blokkar runnu án villu og post-apply row-counts matchuðu dryrun-spá nákvæmlega:
