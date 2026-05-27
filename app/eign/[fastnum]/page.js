@@ -291,6 +291,45 @@ export default async function PropertyPage({ params, searchParams }) {
         />
       )}
 
+      {/* Row 2 — Residential without prediction (held: matsvæði-óvissa,
+          vantar byggingarár, eða ekki enn skorað) */}
+      {property.is_residential && !prediction && (
+        <section
+          className="vm-card vm-card-elevated"
+          style={{
+            marginBottom: "2rem",
+            borderTop: "3px solid var(--vm-neutral)",
+            padding: "1.75rem 2rem",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "0.8rem",
+              color: "var(--vm-neutral)",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              marginBottom: "0.6rem",
+            }}
+          >
+            Verðmat bíður
+          </div>
+          <h2
+            className="display"
+            style={{ fontSize: "1.35rem", marginBottom: "0.5rem" }}
+          >
+            Verðmat liggur ekki fyrir þessa eign
+          </h2>
+          <p style={{ color: "var(--vm-ink-muted)", lineHeight: 1.6 }}>
+            Eignin er nýskráð í gagnasafni verdmat.is en ekki nægileg
+            módel-gögn liggja fyrir til að reikna áreiðanlegt spá-bil
+            (oftast vantar matsvæðis-staðsetningu með nógu nálægum systur-eignum
+            eða byggingarár). Spá birtist um leið og næsta líkanaþjálfun er
+            keyrð með uppfærðum gögnum.
+          </p>
+        </section>
+      )}
+
       {/* CTA — Stilla verðmat (residential, non-summer only) */}
       {property.is_residential && property.canonical_code !== "SUMMERHOUSE" && prediction && (
         <section

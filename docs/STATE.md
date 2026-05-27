@@ -1,6 +1,8 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 26. maí 2026 (HMS full recovery COMPLETE — 77.859 raunverulegar eignir endurheimtar úr 392K HTTP-500 staging-row-um (realized FN 19,86%; root cause: WAF-backoff scoped to 429/403/503 en ekki 500; dead-zone outage 2026-05-16/17 sem orsakavöld); kaupskrá cross-check 99,18% (125.330/126.362) staðfestir completeness óháð; D3-sync NOW lota scoped á ~106K insert-candidates (recovered ∪ original Phase C 200-hits, disjoint via single-probe argument); recovery + crown-jewel scrapers (hms_full_scrape.py, stage_a_augl_refresh.py) + 6. evalue variant + audit tools + historical reports committed og pushed til origin/main. Sjá DECISIONS 2026-05-26 entry.)
+**Síðast uppfært:** 27. maí 2026 (Phase D3 NOW lota APPLIED til Supabase: 108.052 net-new properties + 786 sales_history + 57.187 iter4-scored predictions (`model_version='iter4_final_v1'` / `calibration_version='iter4_conformal_v1'`); new universe **232.887 properties / 167.503 predictions / 173.867 sales_history**. **Spatial-NN matsvaedi backfill** (k=1 KDTree á `geography_features.pkl` lat/lng → matsvaediNUMER, distance-gated T=1 km) sanctioned sem reusable path fyrir HMS-only properties — hold-out validation 99,8% match, ablation 51%/22% PI breach → 0%/0% under spatial-inferred. Confidence gate held 5.993 matsvaedi-unconfident (mostly Country) + 2.433 no-byggar til að halda iter4_conformal_v1 PI-i heiðarlegum (57.187 scored frekar en 63.180). UI: graceful held-residential state bætt við `/eign/[fastnum]/page.js`. **Decoupling:** predictions eru ekki lengur gated á evalue augl-pass — LATER evalue lota er UI-enrichment + matsvæði/byggar fyrir 8.426 held rows. Phase D3 ✅. Sjá DECISIONS 2026-05-27 entry.)
+
+**Previous HMS-recovery milestone:** 26. maí 2026 (HMS full recovery COMPLETE — 77.859 raunverulegar eignir endurheimtar úr 392K HTTP-500 staging-row-um (realized FN 19,86%; root cause: WAF-backoff scoped to 429/403/503 en ekki 500; dead-zone outage 2026-05-16/17 sem orsakavöld); kaupskrá cross-check 99,18% (125.330/126.362) staðfestir completeness óháð; D3-sync NOW lota scoped á ~106K insert-candidates (recovered ∪ original Phase C 200-hits, disjoint via single-probe argument); recovery + crown-jewel scrapers (hms_full_scrape.py, stage_a_augl_refresh.py) + 6. evalue variant + audit tools + historical reports committed og pushed til origin/main. Sjá DECISIONS 2026-05-26 entry.)
 
 **Previous SCRAPER_SPEC milestone:** 6. maí 2026 (SCRAPER_SPEC_v1 committed, Sprint 3 Áfangi 0 planning lokið — Track A + Track B spec, 4 decision-points identified (#1A/#1B/#2A deferred, #2B locked), 10-step build order; previous 29. apríl milestone preserved.)
 
@@ -8,17 +10,19 @@
 
 **Previous launch-polish milestone:** 27. apríl 2026 (**Sprint 2 Áfangi 4 LOKIÐ.** Public dashboard live á /markadur með fimm undirsíðum (visitala, markadsstada, ibudir + unregistered map, modelstada) + waterfall fix á eign-síðu + Fasi E launch polish (canonical, mobile collapse, skip-link, scrape-gap disclosure, Bug 8 nýbygging filter). Átta bug-fixes leystir mid-sprint: 1 regime pill, 2 `effective_date_latest`, 3 autocomplete ORDER BY, 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, 5 expand-query merking column, 6 quarterly/smoothed-monthly regime, 7 n<30 thin-sample filter á /ibudir, 8 is_new_build filter á metrics 1 & 2. Launch strategy Leið B: dashboard ships með HMS-gap acknowledgement; comprehensive scraper er Sprint 3 Áfangi 0 top-priority.)
 
-**Verkefnisstaða heildar: ~97,5%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready. Sprint 3 Áfangi 0 Stage 1 weekend run ✅, Phase D1+D2 ✅, Phase X Group A+B (CLI baseline + views layer) ✅, HMS full recovery ✅ (74h, 77.859 endurheimtar). Eftir: D3-sync NOW lota (gated á dryrun-review), D3-D5 follow-up + column-grant lockout + Phase X Group C, svo Phase Y/Z.)
+**Verkefnisstaða heildar: ~98%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready. Sprint 3 Áfangi 0 Stage 1 weekend run ✅, Phase D1+D2 ✅, Phase D3 NOW lota ✅ (108K properties + 786 sales + 57K iter4 predictions applied 2026-05-27; universe 232.887), Phase X Group A+B (CLI baseline + views layer) ✅, HMS full recovery ✅ (74h, 77.859 endurheimtar). Eftir: D4 (cross_property_refs) + D5 (photo_urls_json) + LATER evalue augl-pass (UI-enrichment + scoring 8.426 held rows) + column-grant lockout + Phase X Group C, svo Phase Y/Z.)
 
 #### Roadmap position (updated 2026-05-22)
 
 Sequence: Phase D (Supabase sync) → Phase X (architecture) → Phase Y (D3-D5) → 
 Phase Z (UI redesign).
 
-- Phase D: D1 (124,738 HMS enrich) ✅ · D2 (97 ghosts) ✅ · D3 (30K insert) / 
-  D4 (cross_property_refs) / D5 (photo_urls_json) pending Phase Y. D3 scope 
-  expected to grow from ~30K to ~102K net-new fastnums post-HMS-recovery 
-  (additive locked 2026-05-22, see `docs/POST_HMS_RECOVERY_PLAN.md`).
+- Phase D: D1 (124,738 HMS enrich) ✅ · D2 (97 ghosts) ✅ · 
+  **D3 (108,052 net-new properties + 786 sales + 57,187 iter4 predictions) 
+  ✅ 2026-05-27** · D4 (cross_property_refs) / D5 (photo_urls_json) pending 
+  Phase Y. D3 final scope was 108K (additive 2,059 Phase A + 28,134 Phase C 
+  orig + 77,859 Phase C recovered); evalue augl-pass decoupled to LATER 
+  lota for UI-enrichment + held-row scoring (8,426 held in D3).
 - Phase X Group A (backup + SOURCES_OF_TRUTH) ✅ 2026-05-20
 - Phase X Group B (Supabase CLI baseline + views layer) ✅ 2026-05-21 — 
   pg_dump 17 client-tools baseline + `supabase migration repair --status applied`; 
@@ -81,6 +85,28 @@ Phase Z (UI redesign).
   2026-05-26: properties INSERT + sales_history INSERT + iter4 scoring 
   ship in this NOW lota; evalue augl-pass (POST_HMS_RECOVERY_PLAN §2) 
   defers to a LATER lota gated on G2 production-template hardening.
+- **Phase D3 NOW lota APPLIED ✅ 2026-05-27** — final insert universe was 
+  **108,052** (not ~106K): Phase A 2,059 + Phase C orig 28,134 + Phase C 
+  recovered 77,859. Phase A inclusion confirms the original D3 scope per 
+  DECISIONS 2026-05-18 (30,193 = 2,059 + 28,134). Apply outcome: 108,052 
+  properties INSERTed (0 collisions), 786 sales_history rows (487 arm's-
+  length + 299 un-arm's-length onothaefur=1), 57,187 iter4 predictions 
+  (5,993 matsvaedi-unconfident + 2,433 no-byggar held to keep PIs honest). 
+  Predictions stamped exactly `iter4_final_v1`/`iter4_conformal_v1` to match 
+  the existing 110,316. **Spatial-NN matsvaedi backfill** (k=1 KDTree on 
+  `geography_features.pkl` lat/lng → matsvaediNUMER, distance-gated T=1 km 
+  per per-bin hold-out match-rate ≥98%) sanctioned for HMS-only properties: 
+  ablation showed blank matsvaedi gives 51%/22% PI breach (+40% Country 
+  bias) → spatial-inferred gives 0%/0% breach. Reusable path for D4/D5 and 
+  future HMS-only inserts. UI: held-residential graceful state ("Verðmat 
+  liggur ekki fyrir þessa eign") added to `/eign/[fastnum]/page.js` — this 
+  was a NEW frontend state (previously only EXCLUDE non-residential had a 
+  no-prediction branch). **Decoupling:** predictions no longer gated on 
+  evalue augl-pass — the LATER evalue lota becomes UI-enrichment 
+  (photos/comps/cross-refs) + true matsvaedi/byggar for the 8,426 held 
+  rows, after which they get scored. New universe: 232,887 properties / 
+  167,503 predictions / 173,867 sales_history. Sjá DECISIONS 2026-05-27 
+  entry.
 
 The two tracks below are **independent — neither blocks the other**.
 

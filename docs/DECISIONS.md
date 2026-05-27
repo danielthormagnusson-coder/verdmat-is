@@ -4,6 +4,141 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-27 — Phase D3 NOW lota APPLIED; Spatial-NN matsvaedi backfill sanctioned; predictions decoupled from evalue augl-pass
+
+**Hvað**: Phase D3 NOW lota landed live á Supabase prod (project `szzjsvmvxfrhyexblzvq`). Þrír idempotent INSERT blokkar runnu án villu og post-apply row-counts matchuðu dryrun-spá nákvæmlega:
+
+| Block | Inserted | New universe | Idempotency |
+|---|---:|---|---|
+| `properties` | **108.052** | 124.835 → **232.887** | `ON CONFLICT (fastnum) DO NOTHING` · 0 collisions |
+| `sales_history` | **786** (487 arm's-length + 299 onothaefur=1) | 173.081 → **173.867** | fastnum-existence pre-check (no PK on fastnum) |
+| `predictions` | **57.187** | 110.316 → **167.503** | `ON CONFLICT (fastnum) DO NOTHING` · 0 PK collisions |
+
+**Predictions stamp**: allar 167.503 rows í `predictions` eru `model_version='iter4_final_v1'` / `calibration_version='iter4_conformal_v1'` — engin blönduð útgáfu-stamp, `v_current_predictions` `DISTINCT ON (fastnum)` og footer-badge haldast stöðug.
+
+**Phase A 2.059 inclusion (frávik frá ~106K prompt)**: insert-universe varð **108.052**, ekki ~106K sem Danni nefndi í prompt-i. Það er vegna þess að Phase A 200 (2.059 net-new HMS-only fastnums frá kaupskrá-only + wide-gap candidates) tilheyrir original D3 scope per DECISIONS 2026-05-18 ("30.193 = Phase A 2.059 + Phase C 28.134"). Allir þrír buckets (Phase A 200 / Phase C 200 orig / Phase C 200 reprobed) eru disjoint via single-probe argument (fastnum INTEGER PRIMARY KEY í `hms_archive_staging.db`). Empirically staðfest í dryrun: 0 collisions við existing Supabase `properties`.
+
+---
+
+**Spatial-NN matsvaedi backfill — sanctioned reusable path fyrir HMS-only properties**
+
+Vandamálið: HMS API payload-ið inniheldur EKKI `matsvaediNUMER`. Existing 124.835 Supabase rows fá matsvaedi úr `properties_v2.pkl` sem var byggt úr `Gagnapakkar/fasteignir{,1-4}.db` `data_json` — þ.e. **evalue augl payloads**. Net-new D3 candidates eru að defininsion fastnums sem evalue hefur aldrei haft (Phase B var existing-Supabase set; Phase A+C eru utan við þá), svo enginn direct-lookup væri fyrir hendi: af 108.052 D3 fastnums fundust 476 (0,44%) í scrape-DBum og þeir voru allir `status=204` (ekki í evalue index, no matsvaedi gögn).
+
+Naive blanking (matsvaediNUMER = NaN + bucket = `P{postnr}_other`) reyndist statistically dishonest:
+
+- Ablation á 3.000-row training-sample (sami iter4a + conformal scorer): **51,2% PI80 breach, 22,0% PI95 breach**, mean +3,83% nominal bias, std 0,239 log. Country region versti með **+40,3% bias og 71,2% breach**.
+- Fallback bucket `P{postnr}_other` matchaði aðeins 7,0% af training categories → 93% lentu í LightGBM categorical NaN (missing-branch); 326 distinct buckets aldrei séð í training.
+
+Spatial k=1 nearest-neighbor solution:
+
+- Byggja `scipy.spatial.cKDTree` á `geography_features.pkl` (124.835 labeled lat/lon → matsvaediNUMER, sales_2015 fyrir bucket rare-merge).
+- Per net-new D3 fastnum með lat/lng: query k=1 → assign matsvaediNUMER + nn_distance_km.
+- Hold-out validation (5K random points removed, re-assigned by NN from the rest): **k=1: 99,8% exact matsvaediNUMER match, 99,9% bucket match** (per-region uniform 99,8–99,9%). NN-distance distribution: p50 = 0 km (sami stadfang), p99 = 0,7 km — Ísland er nógu þétt-merkt að spatial inheritance er essentially exact.
+- Re-ablation undir spatial-inferred matsvaedi á sömu 3.000-row training-sample: **0,0% PI80 breach, 0,0% PI95 breach**, mean delta_log = **−0,0000**, std 0,0009 — statistically indistinguishable frá full-feature regime.
+
+**Threshold T = 1 km (0,009°)**, valið með **per-bin** logic (síðasta bin þar sem hold-out match-rate ≥98%): 300m–1km bin gaf 98,2%, 1–2km bin féll í 88,9% (n=18, small-sample noise en conservative read). T persisted á `D:\phase_d3_matsvaedi_T_deg.txt`.
+
+D3 NN-distance transfer (102.209 with coords): p50 = 0,057 km, p90 = 1,36 km, p95 = 3,07 km. **89.689 within T (87,75% of those með coords)** — restin 12.520 beyond T held í confidence gate (mostly Country: 78,6% within; SFH_DETACHED 81,7%; SUMMERHOUSE 80,5%).
+
+**Reusable path forward**: spatial-NN matsvaedi backfill via `scipy.spatial.cKDTree` á `geography_features.pkl` er nú sanctioned default fyrir hvers konar HMS-only properties sem land í Supabase post-D3 — D4 cross_property_refs, D5 photo_urls_json, framtíðarscrapes. Skref er kóða í `scripts/phase_d3_extract.py:load_matsvaedi_donor()` + `main()` post-pass.
+
+---
+
+**Honesty-vs-coverage trade**
+
+Scoring funnel:
+
+```
+total D3 candidates              108.052
+minus non-scorable (EXCLUDE)      42.439  → 65.613 residential+summer
+  minus no byggar                  2.433
+  minus matsvaedi-unconfident      5.993
+= SCORABLE                                  57.187
+```
+
+5.993 matsvaedi-unconfident (mostly Country: 5.110 af þeim) + 2.433 no-byggar held til að halda `iter4_conformal_v1` PI-i empirically heiðarlegum (training-time empirical coverage 79,1% PI80, 94,6% PI95). 57.187 scored frekar en 63.180 sem v1 score-ið framleiddi án gate-ins — explicit accuracy-vs-coverage trade: **honesty trumps coverage**. Held rows fá samt full `properties` row með öllum HMS metadata (fasteignamat, brunabotamat, byggingarstig, matseiningar etc.) — bara engin iter4 prediction.
+
+Verification: dryrun staðfesti 0 PI80 inversions og 0 PI95 nesting violations á öllum 57.187 scored rows (var 11.231/42.093 inversions í v1 með segment-stretch frekar en conformal).
+
+---
+
+**Decoupling: predictions no longer gated on evalue augl-pass**
+
+POST_HMS_RECOVERY_PLAN §1-§5 átti upphaflega að keyra sekvensjellt: §1 evalue augl-pass (~28h single-worker, gated á G2 template-hardening) → §2 kaupskrá → §3 D3 promotion → §5 iter4 scoring. Spatial-NN backfill collapsar §1-§5 í einn hreinan apply: iter4 scoring fær matsvaedi spatially og þarf ekki að bíða eftir evalue.
+
+LATER evalue lota er nú **UI-enrichment + held-row scoring**, ekki blocker:
+
+- UI-enrichment: photo_urls_json, lysing_truncated, augl_id_latest, n_photos, first_photo_url, scraped_at_latest fyrir 108K net-new (þau hafa öll `NULL` í Phase D3 INSERTs).
+- Held-row scoring: matsvæði + byggar fyrir 8.426 held rows (5.993 unconfident + 2.433 no-byggar) → scoring eftir á.
+- Production-template hardening (G2) er enn pre-req fyrir evalue lotuna sjálfa (stage_a_augl_refresh.py resume retry-on-non-(200,204)), en *ekki* lengur fyrir prediction surface.
+
+---
+
+**UI: held-residential graceful state**
+
+Áður var `/eign/[fastnum]/page.js` aðeins með tvær branchur fyrir prediction display:
+
+- `!property.is_residential` → "Verðmat er ekki í boði fyrir þessa eign" (non-residential notice — applied á EXCLUDE properties).
+- `property.is_residential && prediction` → `<PredictionCard>` render.
+
+Þriðja sviðið (is_residential=true + no prediction) var **engin branch** — leiddi til blank space milli hero og SHAP sections. Þetta var aldrei áður mögulegt (existing 14.519 properties án predictions í dag eru ALLAR EXCLUDE), en með D3 verður þetta nýtt UI state fyrir 6.173 held residential + 2.253 held SUMMERHOUSE = 8.426 rows.
+
+Bætt við í þessari lotu (`page.js` line 287–319):
+
+```jsx
+{property.is_residential && !prediction && (
+  <section className="vm-card vm-card-elevated" style={{ ..., borderTop: "3px solid var(--vm-neutral)" }}>
+    <div>Verðmat bíður</div>
+    <h2>Verðmat liggur ekki fyrir þessa eign</h2>
+    <p>Eignin er nýskráð í gagnasafni verdmat.is en ekki nægileg módel-gögn liggja fyrir
+       til að reikna áreiðanlegt spá-bil (oftast vantar matsvæðis-staðsetningu með nógu
+       nálægum systur-eignum eða byggingarár). Spá birtist um leið og næsta líkanaþjálfun
+       er keyrð með uppfærðum gögnum.</p>
+  </section>
+)}
+```
+
+Styled like the existing non-residential notice. Verifecerað via curl (`/eign/2019479` — Sigtún 30, RVK_core APT_FLOOR, no byggar): graceful state renderar; PredictionCard absent. SCORED case (`/eign/2151573` — Vestursíða 10): PredictionCard renderar, graceful state absent. COORDLESS case (`/eign/2536633` — Breiðimelur): hero renderar, map section gated absent. Autocomplete (`/api/search?q=Vesturs`): net-new heimilisfang surface-ar via group-anchor.
+
+---
+
+**Protocol lesson — data-ahead-of-frontend window**
+
+Lota þessi opnaði stuttan glugga þar sem prod Supabase var komin með 6.173 held residential rows en `page.js` graceful-state fixið var local (commit + push kom á eftir). Live `/eign/<held-fn>` síður rendered the blank gap fyrir nokkrar mínútur þangað til Vercel re-deployed main eftir push. Stuðningstap var minimal vegna þess að net-new fastnums voru aldrei áður indexed af search engines og hafa lágan organic traffic, en pattern-ið er still wrong.
+
+**Regla locked**: data apply í prod Supabase sem **introducer nýja frontend state** (vs only adding rows til existing rendered branches) þarf að ship-a frontend handling **fyrir eða atómískt með** data-inu. Konkretasta path-ið:
+
+1. PR-a frontend changes + merge til main + láta Vercel deploy → confirm deployed.
+2. Þá keyra data apply.
+
+Eða atómískt:
+
+1. Stage frontend changes + run data apply.
+2. Push frontend immediately eftir apply success í sömu lotu (þ.e. without breaking for review/halt í gegnum push).
+
+Þessi lota fylgdi blönduðu pattern-i: vissi um held-residential nýja state-ið mid-session (eftir dryrun, fyrir apply), bætti við frontend handlingu mid-session, en push-aði ekki fyrr en eftir apply + verify (3-4 mín gap). Acceptable í þetta sinn af því (a) net-new fastnums hafa lítinn organic traffic, (b) gap-ið var stutt, og (c) verify-aðferðin krafðist live Supabase state. En þetta var meðvitað risk, ekki rétt pattern.
+
+Næsta sinn: ef frontend fix er einföld og þekkt fyrirfram (eins og þetta — addition á þriðju branch í eign-síðu), push fyrst, þá apply.
+
+---
+
+**Artifacts (þessi lota)**
+
+- `scripts/phase_d3_extract.py` — properties extract með Stadfangaskra lookup + spatial-NN matsvaedi backfill
+- `scripts/phase_d3_sales_extract.py` — sales filter úr kaupskra.csv + CPI deflation
+- `scripts/phase_d3_score_extract.py` — iter4 scoring með conformal PIs + confidence gate
+- `scripts/phase_d3_dryrun.py` — 3-batch dryrun + collision + integrity + PI sanity + peer-comp spot-check
+- `scripts/phase_d3_apply.py` — 3-batch idempotent apply
+- `scripts/phase_d3_threshold_calibration.py` — per-bin hold-out match-rate + T calibration + D3 transfer check
+- `scripts/phase_d3_matsvaedi_recoverability.py` — provenance + direct-lookup + spatial-NN hold-out + honesty re-check
+- `scripts/phase_d3_matsvaedi_ablation.py` — blank-matsvaedi 3000-sample degradation diagnostic
+- `app/eign/[fastnum]/page.js` — held-residential graceful state added
+- `D:\phase_d3_*.parquet` + `D:\phase_d3_rollback.sql` — staging artifacts (gitignored under `D:\`, retained until next nightly backup confirms new state)
+- `D:\phase_d3_matsvaedi_T_deg.txt` — persisted threshold (0,009°)
+- DECISIONS.md (this entry) + STATE.md milestone demotion + Roadmap update
+
+---
+
 ## 2026-05-26 — HMS full recovery COMPLETE; kaupskrá cross-check (99,18%) staðfestir completeness; D3-sync scope locked á ~106K insert-candidates
 
 **Hvað**: `audit/hms_full_recovery.py` lauk eftir 74h 10m wall-clock (2026-05-21T20:58 → 2026-05-24T23:08 UTC). Endurspáði allar 392.026 HTTP-500 raðir staging-DB-ins gegn flat API með 1-retry hardening + outage-detection (sliding-window 100 → pause á <1% hit-rate). **Lokatölur**:
