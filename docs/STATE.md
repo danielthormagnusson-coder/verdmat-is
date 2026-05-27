@@ -1,12 +1,14 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 6. maí 2026 (SCRAPER_SPEC_v1 committed, Sprint 3 Áfangi 0 planning lokið — Track A + Track B spec, 4 decision-points identified (#1A/#1B/#2A deferred, #2B locked), 10-step build order; previous 29. apríl milestone preserved.)
+**Síðast uppfært:** 26. maí 2026 (HMS full recovery COMPLETE — 77.859 raunverulegar eignir endurheimtar úr 392K HTTP-500 staging-row-um (realized FN 19,86%; root cause: WAF-backoff scoped to 429/403/503 en ekki 500; dead-zone outage 2026-05-16/17 sem orsakavöld); kaupskrá cross-check 99,18% (125.330/126.362) staðfestir completeness óháð; D3-sync NOW lota scoped á ~106K insert-candidates (recovered ∪ original Phase C 200-hits, disjoint via single-probe argument); recovery + crown-jewel scrapers (hms_full_scrape.py, stage_a_augl_refresh.py) + 6. evalue variant + audit tools + historical reports committed og pushed til origin/main. Sjá DECISIONS 2026-05-26 entry.)
+
+**Previous SCRAPER_SPEC milestone:** 6. maí 2026 (SCRAPER_SPEC_v1 committed, Sprint 3 Áfangi 0 planning lokið — Track A + Track B spec, 4 decision-points identified (#1A/#1B/#2A deferred, #2B locked), 10-step build order; previous 29. apríl milestone preserved.)
 
 **Previous post-launch polish milestone:** 29. apríl 2026 (post-launch polish session — Bugs 13-23 closure, /um anchor fix, Lighthouse hero-image polish (Performance 78→90+, LCP 1900ms→400ms), Áfangi 4.11/4.12/4.13 logged í PLANNING_BACKLOG, Áfangi 0 expanded til tvíþætts scope (Track A active listings + Track B HMS gap-filling), precompute folder git-tracked sem nýtt repo verdmat-is-precompute (commit c85ad83). Sprint 2 Áfangi 4 launch announcement enn HELD pending Danni's call.)
 
 **Previous launch-polish milestone:** 27. apríl 2026 (**Sprint 2 Áfangi 4 LOKIÐ.** Public dashboard live á /markadur með fimm undirsíðum (visitala, markadsstada, ibudir + unregistered map, modelstada) + waterfall fix á eign-síðu + Fasi E launch polish (canonical, mobile collapse, skip-link, scrape-gap disclosure, Bug 8 nýbygging filter). Átta bug-fixes leystir mid-sprint: 1 regime pill, 2 `effective_date_latest`, 3 autocomplete ORDER BY, 4 tveggja-þrepa autocomplete + HMS-gap caveat + prefix indexes, 5 expand-query merking column, 6 quarterly/smoothed-monthly regime, 7 n<30 thin-sample filter á /ibudir, 8 is_new_build filter á metrics 1 & 2. Launch strategy Leið B: dashboard ships með HMS-gap acknowledgement; comprehensive scraper er Sprint 3 Áfangi 0 top-priority.)
 
-**Verkefnisstaða heildar: ~96,5%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready, Sprint 3 Áfangi 0 spec lokið, implementation staged.)
+**Verkefnisstaða heildar: ~97,5%** (ML pipeline ~100% post Áfangi 7 + iter4 deploy. Web-app Sprint 2 launch-ready. Sprint 3 Áfangi 0 Stage 1 weekend run ✅, Phase D1+D2 ✅, Phase X Group A+B (CLI baseline + views layer) ✅, HMS full recovery ✅ (74h, 77.859 endurheimtar). Eftir: D3-sync NOW lota (gated á dryrun-review), D3-D5 follow-up + column-grant lockout + Phase X Group C, svo Phase Y/Z.)
 
 #### Roadmap position (updated 2026-05-22)
 

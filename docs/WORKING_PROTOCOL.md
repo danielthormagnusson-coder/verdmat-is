@@ -151,6 +151,23 @@ Ef Danni upload-ar skrárnar í message (inline document), treat hann uploadið 
 
 ---
 
+## Workflow template fyrir session END (STATE.md refresh, added 2026-05-27)
+
+Þegar STATE.md er uppfært í lok session — og sérstaklega þegar nýr milestone hefur shipped (Phase complete, recovery klárað, deploy live, o.fl.):
+
+- **Demote fyrri "Síðast uppfært" milestone** í nýjan "Previous <X> milestone" lykil (haldið orðrétt sem var; bara breytt label-inu). Stack-ur upp eins og changelog: "Previous SCRAPER_SPEC milestone", "Previous post-launch polish milestone", "Previous launch-polish milestone", o.s.frv.
+- **Bæta nýrri "Síðast uppfært"** efst í skjalinu með núverandi milestone (dagsetning + 2-4 setninga samantekt á helstu áfanga session-arinnar; nefna ALLAR meiriháttar shipped-areas, ekki bara þá sem þetta session vann að).
+- **Uppfæra "Verkefnisstaða heildar: ~X%"** ef nýir áfangar hafa shippað sem færa hlutfallið. Halda parenthetical breakdown current (lista hvað er ✅ vs eftir).
+- **Roadmap-position blokk** (additive bullets per Phase) er sjálfstæð frá milestone-headers ofan — bæta þar inn nýjum bullet eins og hingað til; en það kemur **til viðbótar** við milestone-header demotion, ekki í staðinn fyrir.
+
+**Reason**: Fyrstu ~5 línurnar af STATE.md verða ALLTAF að endurspegla núverandi stöðu. Project-knowledge panel, raw-GitHub fetch-readers, og skim-lesarar reiða sig á þá fyrstu skjáfyllingu sem source-of-truth check. Ef "Síðast uppfært" er stale, lesendurnir álykta að skjalið sé apríl-útgáfa jafnvel þegar deeper-section content (Roadmap-position, Phase status) er current. Uppgötvað 2026-05-27 sem follow-up á panel-stale diagnostic (sjá DECISIONS 2026-05-26 og þessa lotu).
+
+Þetta er additive til "Workflow template fyrir hvern session start" reglnanna að ofan: **start-template les top-5 línurnar; end-template tryggir að top-5 verði current áður en session lokast**. Saman myndar þetta full-cycle source-of-truth discipline.
+
+DECISIONS.md er *ekki* háð þessari reglu af sömu ástæðu og hingað til: newest-entry-on-top conventionin þar gerir top-of-doc alltaf current sjálfkrafa. STATE.md hefur milestone-header pattern sem þarf eksplisita demotion.
+
+---
+
 ## Hvenær er OK að nota `create_file` í stað `str_replace`?
 
 - **Nýtt skjal sem ekki er til** (t.d. fyrsta útgáfa af WORKING_PROTOCOL.md sjálfu).
