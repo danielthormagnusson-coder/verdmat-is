@@ -57,6 +57,17 @@ audit/*.flag
 # pipeline_steps in Supabase are the canonical record).
 audit/monthly_runs/
 
+# Orchestrator step-script logs (<script>_log_<date>.txt). The 5 D:\ monthly
+# scripts write these to their resolved LOG_PATH/D_DRIVE; if CWD is mis-set
+# they leak into the repo working dir (as run id=2's pre-fix CWD bug showed).
+# Listing the 5 known patterns prevents accidental commits, intentionally
+# (not a wildcard).
+refresh_cpi_log_*.txt
+refresh_kaupskra_log_*.txt
+rebuild_training_data_log_*.txt
+monthly_recalibration_log_*.txt
+validate_metrics_log_*.txt
+
 # large regenerable fastnum manifests (rebuilt from Supabase / kaupskra.csv;
 # 3 scripts reference them by name — files stay on disk, just not tracked).
 audit/stage_a_fastnum_manifest.txt
