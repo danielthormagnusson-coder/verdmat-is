@@ -4,6 +4,53 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-28 — Orchestrator first-green-cycle + 5-bug debug session
+
+**Context**: Fyrsta raunverulega `run_monthly.py` keyrslan (engin `--dry-run`) eftir Group C closure 2026-05-27. Markmið: end-to-end grænn mánaðar-cycle með halt-before-push gate sannað í verki. `run_monthly` + `migration_helpers` höfðu verið skrifuð en aldrei keyrð gegn raunverulegu subprocess (dry-run sleppti subprocess; fyrsta real-run dó á preflight áður en það náði output-handling). Þannig komu real-execution bugs upp í röð, hver um sig blocking næsta skref. Allir fixaðir at root og regression-testaðir.
+
+**Bug-listi í discovery-röð**:
+
+1. **Drive-relative `Path("D:")` í 5 D:\ scriptum** (LOG_PATH + D_DRIVE konstöntur). `Path("D:")` er drive-relative (resolve-ast gegn current dir á D: drifinu), ekki absolute. Þegar orchestrator keyrði þau frá `D:\verdmat-is\app` (ekki `cd D:\` eins og scriptin documenta) resolve-aðist `Path("D:")/"x"` í `D:\verdmat-is\app\x` → preflight fann ekki input-skrár → exit 2. **Halt-aði run id=2** á step 3 (rebuild_training_data).
+2. **cp1252 decode parent-side** í `subprocess.run(..., text=True)`. Á Windows decode-ar `text=True` child-stdout með locale-encoding (cp1252). D:\ build-scriptin emit-a íslenska + box-drawing stafi (`│ ─ á í ð þ ö`); byte 0x81 er ógildur í cp1252 → `UnicodeDecodeError` í subprocess reader-thread → `result.stdout = None`. **Crash-aði run id=3** (unhandled exception, exit 1) eftir að rebuild-subprocess kláraðist en á meðan orchestrator las output-ið.
+3. **None-unsafe stdout/stderr** í helper — `result.stdout.splitlines()` og `.strip()` gerðu ráð fyrir streng; með `stdout=None` (frá #2) → `AttributeError`. Bundlað með #2.
+4. **No crash-finalize** í `run_monthly.main` — unhandled exception skildi `pipeline_runs` row eftir dangling (`ended_at`/`exit_status` NULL). id=3 var dangling þar til manual cleanup.
+5. **Child-side cp1252 stdout þegar piped**. Jafnvel með parent-decode lagað skrifar child-Python sín eigin stdout í cp1252 þegar piped (Windows locale), nema hann reconfigure-i. `refresh_dashboard_tables.py:245` `log(f"... {prev} → {cur} rows")` (U+2192) kastaði `UnicodeEncodeError`; of-breitt `except` í scriptinu mis-túlkaði logging-villu sem data-validation failure → triggeraði óþarfa atomic rollback (restored 14 files) → exit 1. **Halt-aði run id=5** á step 4. Athugið: sjálf data-byggingin (repeat_sale_index + ats_lookup) heppnaðist — aðeins validation-logging línan crash-aði.
+
+**Root fixes (engir plástrar)**:
+
+- **5 per-script**: `Path("D:")` → `Path("D:/")` (absolute, CWD-óháð). Skrárnar lifa á `D:\` data-drifinu (utan repo við `D:\verdmat-is\app`); fixaðar in-place, 0 footguns eftir. EKKI git-tracked hér — logged fyrir audit í commit 8edc297.
+- **Helper (`scripts/migration_helpers.py`)**: `encoding="utf-8", errors="replace"` (ekki `text=True`) á báðum subprocess-köllum + `(result.stdout or "")` / `(result.stderr or "")` None-guards + stdout-tail capture á failure-path (svo child sem bail-ar til stdout sé diagnosable).
+- **Orchestrator (`scripts/run_monthly.py`)**: `try/except` crash-finalize um step-loop-ið með `current_step_id` tracking; á exception finalize-ar in-flight step (exit_code=-1) + run (`exit_status='crashed'`) áður en re-raise.
+- **Env**: `env={**os.environ, "PYTHONIOENCODING": "utf-8"}` á báðum subprocess-köllum — forsar child-stdio í utf-8 óháð því hvort scriptið reconfigure-i sjálft. Þetta er systemic root-fix sem nær yfir alla 6 child-scripts í einu (vs að plástra hvern `→`).
+
+**Empirical validation**: `scripts/shakedown_orchestrator.py` byggður (throwaway harness) — **15/15 assertions**. 5 child-modes (happy / halt / crash / explode / cp1252_writer) + negative control + crash-finalize gegn Supabase audit-töflum. `cp1252_writer` mode reproduce-ar bug #5 faithfully (child sem reconfigure-ar EKKI sín stdout og prentar `→`); **negative control strip-ar `PYTHONIOENCODING` úr env og sannar að bug-#5 mechanism re-fire-ar án env-fix-ins** — proving fixið er load-bearing, ekki cosmetic. Upprunalegi shakedown (Skref 4) missti þetta því synthetic-child-inn hans reconfigure-aði sín eigin stdout; gap-ið var lagað í Skref 6.
+
+**Pipeline_runs audit-trail**:
+
+| id | outcome | hvar |
+|---|---|---|
+| 2 | halted | step 3, CWD bug (#1) |
+| 3 | crashed → manual cleanup | step 3-output, encoding crash (#2-4); finalize-aður handvirkt sem 'crashed' með cleanup-note í `summary` |
+| 5 | halted | step 4, cp1252 child-write (#5) |
+| 7 | **success_halt_pre_push** | **7 steps green, 113s — fyrsta fully-green cycle** |
+
+**Snapshot id=2** (frá run id=7) fangaði drift-detectable fingerprints: CPI MD5 / kaupskrá MD5 / training_data_v2 MD5 allir breyttir (fresh), `feature_names_hash` stable (sami 154-feature surface), valuation rúllaði 2026-04 → 2026-05, cpi_factor 1,00548 → 1,00885. Reproducibility-ledger virkar.
+
+**Data-quality á run id=7** (sub-script outcomes):
+- `monthly_recalibration`: **SEMI_DETACHED k95 drift +31,3%** (k80 +21,8%) yfir 30%-þröskuldinn → scriptið hélt prior calibration (auto-update declined), `calibration_config.json` ÓBREYTT (mtime 2026-04-19), printaði proposed k-factors fyrir manual review. Non-fatal (exit 0).
+- `validate_metrics`: **8/8 pass** gegn 4c-baseline — held clean MAPE 6,98% (baseline 7,00%, Δ −0,02pp), cov80 72,90% (73,10%), cov95 92,67% (92,70%); allt innan ±0,5pp MAPE / ±3pp coverage þröskulda. Líkanið stöðugt á prior calibration.
+
+**Open follow-ups (ekki í commit-scope, sér workstreams)**:
+- **`properties_v2.pkl` divergence vs live Supabase** — pickle er 124.835 (pre-D3) en live er 232.887 (post-D3). `build_precompute.py` les pickle → push-preview á run id=7 sýndi `properties` csv 124.835 vs live 232.887 (−108.052), `predictions` −57.187, `sales_history` −786; 4 derived-töflur delta +0. **Naive push myndi annaðhvort skilja D3-raðir eftir stale (upsert) eða WIPE-a þær (truncate-reload)** → push BLOKKAÐ þar til pickle er rebuilt FROM Supabase (PLANNING_BACKLOG item 1, SOURCES_OF_TRUTH 2026-05-20 mandate). Skref 10B audit-ar þennan path.
+- **SEMI_DETACHED k95 +31,3% drift** — prior cal kept; pending 2-3 cycles til að greina noise vs regime shift. Validate 8/8 pass á prior cal svo engin urgency.
+- **`refresh_dashboard_tables` of-breitt `except`** — defanged af env-fix-inu (triggerinn horfinn) en vert að þrengja eventually svo logging-villa verði ekki aftur að spurious rollback.
+
+**Commits**: `8edc297` (orchestrator fix + shakedown) + `16baa59` (gitignore fyrir log-patterns). Báðir á origin/main.
+
+**Process observation (locked)**: halt-on-decision-points design reyndist load-bearing. Þrjár first-execution failures (id=2/3/5) voru hver um sig contained at step-boundary með clean rollback (orchestrator's own halt/crash-finalize + sub-scripts' atomic rollback), og halt-before-push gate fangaði 108K-row divergence ÁÐUR en nokkuð destructive skrifaðist. Auto-fix-and-rerun hefði masked sequence-inn og áhættað bad push. Mynstrið vistað í user-memory (`feedback_halt_on_decision_points`) fyrir continuity.
+
+---
+
 ## 2026-05-27 — Phase X Group C trimmed core APPLIED; lightweight current-stack supersedes Hetzner/Dagster/MLflow plan; Phase X fully closed
 
 **Hvað**: Phase X Group C trimmed-core landed live á Supabase prod (project `szzjsvmvxfrhyexblzvq`). Net-new + additive — zero impact on existing tables/views/predictions.
