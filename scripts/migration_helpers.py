@@ -265,20 +265,42 @@ def subprocess_with_shape_safety(
     Returns (exit_code, rowcount_after, message).
     rowcount_after is None if not measured.
     """
+    # encoding="utf-8" + errors="replace" (NOT text=True): the D:\ build scripts
+    # emit Icelandic + box-drawing chars (│ ─ á í ð þ ö); text=True decodes with
+    # the Windows locale (cp1252), which throws UnicodeDecodeError on byte 0x81
+    # in a subprocess reader thread and leaves result.stdout = None.
+    # PYTHONIOENCODING=utf-8 forces the CHILD Python's stdout/stderr to utf-8
+    # when piped — without it, a child that doesn't reconfigure its own stdout
+    # writes cp1252 and crashes printing → / Icelandic / box-drawing chars
+    # (bug #5, refresh_dashboard_tables.py). Affects child stdio only, not the
+    # child's file IO (those carry their own encoding= params).
     result = subprocess.run(
         list(cmd),
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=timeout,
         cwd=str(cwd) if cwd else None,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
+    # None-guard: capture_output can still yield None on some interpreters/paths.
+    out = result.stdout or ""
+    err = result.stderr or ""
     if result.returncode != 0:
-        return result.returncode, None, (
-            f"subprocess failed (exit {result.returncode}): "
-            f"{result.stderr.strip()[:500]}"
-        )
+        # Many of our D:\ scripts print their error (preflight bails, halts)
+        # to STDOUT, not stderr — capturing stderr alone hides the real cause.
+        # Include a stdout tail (last 40 lines) so the failure is diagnosable.
+        stderr_tail = err.strip()[:500]
+        stdout_lines = out.strip().splitlines()
+        stdout_tail = "\n".join(stdout_lines[-40:]) if stdout_lines else ""
+        msg = f"subprocess failed (exit {result.returncode})"
+        if stderr_tail:
+            msg += f"; stderr: {stderr_tail}"
+        if stdout_tail:
+            msg += f"; stdout-tail:\n{stdout_tail}"
+        return result.returncode, None, msg
     if output_path is None or rowcount_after_fn is None:
-        return 0, None, f"subprocess ok ({len(result.stdout.splitlines())} stdout lines)"
+        return 0, None, f"subprocess ok ({len(out.splitlines())} stdout lines)"
 
     rowcount_after = rowcount_after_fn(output_path)
     if rowcount_before is not None and rowcount_before > 0:
@@ -382,8 +404,10 @@ def git_sha_head(repo_dir: Path = Path(r"D:\verdmat-is\app")) -> str | None:
             ["git", "rev-parse", "HEAD"],
             cwd=str(repo_dir),
             stderr=subprocess.DEVNULL,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5,
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         ).strip()
         return out or None
     except Exception:

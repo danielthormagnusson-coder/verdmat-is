@@ -409,119 +409,154 @@ def main() -> int:
     print(f"  pipeline_runs.id = {run_id}")
 
     step_records: list[dict] = []
+    current_step_id: int | None = None  # tracks the in-flight step for crash-finalize
 
-    for order, step in enumerate(STEPS, 1):
-        name = step["name"]
-        cmd = step["cmd"]
-        out_path = step.get("output")
-        rowcount_fn = step.get("rowcount_fn")
-        max_shrink = step.get("max_shrink_pct")
-        print(f"\n[{order}/{len(STEPS)}] {name}")
-        step_id = create_pipeline_step(conn, run_id, name, order)
+    try:
+        for order, step in enumerate(STEPS, 1):
+            name = step["name"]
+            cmd = step["cmd"]
+            out_path = step.get("output")
+            rowcount_fn = step.get("rowcount_fn")
+            max_shrink = step.get("max_shrink_pct")
+            print(f"\n[{order}/{len(STEPS)}] {name}")
+            step_id = create_pipeline_step(conn, run_id, name, order)
+            current_step_id = step_id
 
-        rowcount_before = None
-        if out_path and out_path.exists() and rowcount_fn:
-            try:
-                rowcount_before = rowcount_fn(out_path)
-            except Exception:
-                rowcount_before = None
+            rowcount_before = None
+            if out_path and out_path.exists() and rowcount_fn:
+                try:
+                    rowcount_before = rowcount_fn(out_path)
+                except Exception:
+                    rowcount_before = None
 
-        if args.dry_run:
-            print(f"    DRY-RUN — would invoke: {' '.join(str(x) for x in cmd)}")
-            finalize_pipeline_step(
-                conn, step_id, 0,
+            if args.dry_run:
+                print(f"    DRY-RUN — would invoke: {' '.join(str(x) for x in cmd)}")
+                finalize_pipeline_step(
+                    conn, step_id, 0,
+                    rowcount_before=rowcount_before,
+                    notes="dry-run"
+                )
+                current_step_id = None
+                step_records.append({
+                    "step": name, "exit": 0, "dry_run": True,
+                    "rowcount_before": rowcount_before,
+                })
+                continue
+
+            t0 = time.time()
+            exit_code, rowcount_after, msg = subprocess_with_shape_safety(
+                cmd,
+                output_path=out_path,
                 rowcount_before=rowcount_before,
-                notes="dry-run"
+                rowcount_after_fn=rowcount_fn,
+                max_shrink_pct=max_shrink if max_shrink is not None else 100.0,
+                timeout=3600,
             )
+            elapsed = time.time() - t0
+            print(f"    exit={exit_code}  elapsed={elapsed:.1f}s  {msg}")
+
+            finalize_pipeline_step(
+                conn, step_id, exit_code,
+                rowcount_before=rowcount_before,
+                rowcount_after=rowcount_after,
+                notes=msg,
+            )
+            current_step_id = None
             step_records.append({
-                "step": name, "exit": 0, "dry_run": True,
+                "step": name, "exit": exit_code, "elapsed_s": round(elapsed, 1),
                 "rowcount_before": rowcount_before,
+                "rowcount_after": rowcount_after,
+                "message": msg,
             })
-            continue
 
-        t0 = time.time()
-        exit_code, rowcount_after, msg = subprocess_with_shape_safety(
-            cmd,
-            output_path=out_path,
-            rowcount_before=rowcount_before,
-            rowcount_after_fn=rowcount_fn,
-            max_shrink_pct=max_shrink if max_shrink is not None else 100.0,
-            timeout=3600,
-        )
-        elapsed = time.time() - t0
-        print(f"    exit={exit_code}  elapsed={elapsed:.1f}s  {msg}")
+            if exit_code != 0:
+                print(f"\n*** HALT — step {name} failed (exit={exit_code}). ***")
+                finalize_pipeline_run(
+                    conn, run_id, "halted",
+                    summary={"halt_at_step": name, "exit_code": exit_code, "msg": msg},
+                )
+                log_path = write_run_log(run_id, step_records)
+                print(f"    run-log: {log_path}")
+                conn.close()
+                return 3
 
-        finalize_pipeline_step(
-            conn, step_id, exit_code,
-            rowcount_before=rowcount_before,
-            rowcount_after=rowcount_after,
-            notes=msg,
-        )
-        step_records.append({
-            "step": name, "exit": exit_code, "elapsed_s": round(elapsed, 1),
-            "rowcount_before": rowcount_before,
-            "rowcount_after": rowcount_after,
-            "message": msg,
-        })
-
-        if exit_code != 0:
-            print(f"\n*** HALT — step {name} failed (exit={exit_code}). ***")
+        # ============================================================
+        # All 7 steps green. Capture inputs_snapshot + push-preview.
+        # ============================================================
+        if args.dry_run:
+            print("\nDRY-RUN — skipping inputs_snapshot + push-preview")
             finalize_pipeline_run(
-                conn, run_id, "halted",
-                summary={"halt_at_step": name, "exit_code": exit_code, "msg": msg},
+                conn, run_id, "success",
+                summary={"mode": "dry-run", "step_count": len(STEPS)}
             )
             log_path = write_run_log(run_id, step_records)
-            print(f"    run-log: {log_path}")
+            print(f"\nRun log: {log_path}")
             conn.close()
-            return 3
+            return 0
 
-    # ============================================================
-    # All 7 steps green. Capture inputs_snapshot + push-preview.
-    # ============================================================
-    if args.dry_run:
-        print("\nDRY-RUN — skipping inputs_snapshot + push-preview")
+        print("\nCapturing inputs_snapshot ...")
+        snap_id = capture_inputs_snapshot(conn, run_id)
+        print(f"    inputs_snapshots.id = {snap_id}")
+
+        print("\nPush preview (precompute CSV → live Supabase row deltas):")
+        preview = push_preview(conn)
+        print(f"  {'table':<24s} {'csv_rows':>10s} {'live_rows':>10s} {'delta':>10s}  note")
+        for r in preview:
+            cr = f"{r['csv_rows']:,}" if r.get('csv_rows') is not None else "-"
+            lr = f"{r['live_rows']:,}" if r.get('live_rows') is not None else "-"
+            dl = f"{r['delta']:+,}" if r.get('delta') is not None else "-"
+            print(f"  {r['table']:<24s} {cr:>10s} {lr:>10s} {dl:>10s}  {r.get('note','')}")
+
         finalize_pipeline_run(
-            conn, run_id, "success",
-            summary={"mode": "dry-run", "step_count": len(STEPS)}
+            conn, run_id, "success_halt_pre_push",
+            summary={
+                "step_count": len(STEPS),
+                "snapshot_id": snap_id,
+                "push_preview": preview,
+            },
         )
-        log_path = write_run_log(run_id, step_records)
-        print(f"\nRun log: {log_path}")
+        log_path = write_run_log(run_id, step_records + [{
+            "step": "_push_preview", "preview": preview, "snapshot_id": snap_id,
+        }])
+
+        print(f"\n*** HALT before push. Pipeline is GREEN. ***")
+        print(f"    Run log:           {log_path}")
+        print(f"    inputs_snapshot:   public.inputs_snapshots.id = {snap_id}")
+        print(f"    pipeline_runs.id:  {run_id}  (exit_status='success_halt_pre_push')")
+        print(f"\n    Review the push preview above. To push:")
+        print(f"      python run_monthly.py --push   (not implemented yet — manual import)")
         conn.close()
         return 0
 
-    print("\nCapturing inputs_snapshot ...")
-    snap_id = capture_inputs_snapshot(conn, run_id)
-    print(f"    inputs_snapshots.id = {snap_id}")
-
-    print("\nPush preview (precompute CSV → live Supabase row deltas):")
-    preview = push_preview(conn)
-    print(f"  {'table':<24s} {'csv_rows':>10s} {'live_rows':>10s} {'delta':>10s}  note")
-    for r in preview:
-        cr = f"{r['csv_rows']:,}" if r.get('csv_rows') is not None else "-"
-        lr = f"{r['live_rows']:,}" if r.get('live_rows') is not None else "-"
-        dl = f"{r['delta']:+,}" if r.get('delta') is not None else "-"
-        print(f"  {r['table']:<24s} {cr:>10s} {lr:>10s} {dl:>10s}  {r.get('note','')}")
-
-    finalize_pipeline_run(
-        conn, run_id, "success_halt_pre_push",
-        summary={
-            "step_count": len(STEPS),
-            "snapshot_id": snap_id,
-            "push_preview": preview,
-        },
-    )
-    log_path = write_run_log(run_id, step_records + [{
-        "step": "_push_preview", "preview": preview, "snapshot_id": snap_id,
-    }])
-
-    print(f"\n*** HALT before push. Pipeline is GREEN. ***")
-    print(f"    Run log:           {log_path}")
-    print(f"    inputs_snapshot:   public.inputs_snapshots.id = {snap_id}")
-    print(f"    pipeline_runs.id:  {run_id}  (exit_status='success_halt_pre_push')")
-    print(f"\n    Review the push preview above. To push:")
-    print(f"      python run_monthly.py --push   (not implemented yet — manual import)")
-    conn.close()
-    return 0
+    except Exception as exc:
+        # Crash-finalize: never leave a dangling pipeline_runs / in-flight step.
+        import traceback
+        tb_head = "\n".join(traceback.format_exc().splitlines()[:10])
+        if current_step_id is not None:
+            try:
+                finalize_pipeline_step(
+                    conn, current_step_id, -1,
+                    notes=f"crashed: {exc!r}\n{tb_head}",
+                )
+            except Exception:
+                pass
+        try:
+            finalize_pipeline_run(
+                conn, run_id, "crashed",
+                summary={"exception": repr(exc), "traceback_head": tb_head},
+            )
+        except Exception:
+            pass
+        try:
+            write_run_log(run_id, step_records + [{"step": "_crash", "exception": repr(exc)}])
+        except Exception:
+            pass
+        print(f"\n*** CRASH — orchestrator exception ***\n{exc!r}\n{tb_head}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return 1
 
 
 if __name__ == "__main__":
