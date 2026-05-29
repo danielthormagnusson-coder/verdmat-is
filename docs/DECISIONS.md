@@ -4,6 +4,74 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-29 — Precompute-spine debt (iter3v2 build_precompute vs iter4 live serving) elevated til Skref 13 push-blocker
+
+**Context**: Skref 12c/12d cascade re-confirm-aði undir nýju ljósi að `build_precompute.py` + `score_new_listing.py` + `monthly_recalibration.py` + `validate_metrics.py` keyra allir á **iter3v2-track**, en live serving (`/eign/[fastnum]`, `predictions`-taflan) er **iter4_final_v1 + iter4_conformal_v1**. Þetta var þekkt tech-debt en var "passive" þar til reconciliation gerði push-path-inn raunhæfan.
+
+**Af hverju þetta er nú blocker, ekki bara debt**: `push_precompute_to_supabase` (Skref 13) myndi taka iter3v2-afurð `build_precompute` og skrifa hana yfir iter4 `predictions`-töfluna → silent model-track regression í prod. Reconciliation (Skref 11→12) fjarlægði 232.887-vs-124.835 divergence-ina sem hingað til hefur BLOKKAÐ push; spine-mismatch-inn er núna eini eftirstandandi correctness-blocker fyrir push.
+
+**Decision**: spine-alignment er **hard pre-req fyrir push** (Skref 13b). Tvær leiðir á borðinu, EKKI valið enn:
+- (i) Færa `build_precompute` predictions-step yfir á `iter4a_*.lgb` + iter4_conformal_v1 (full track-unification) — réttast en stærra.
+- (ii) Disable-a predictions-step í `build_precompute` (lætur live iter4 `predictions` ósnerta; push skrifar aðeins properties / comps / attributions) — minni breyting, en skilur tvo tracks eftir.
+Ákvörðun gated á Skref 13b spike.
+
+**Knock-on**: validate_metrics drift-flagg (sjá systkina-entry sama dag) er iter3v2-calibration artifact, ekki live-iter4 signal — styrkir að spine-split sé raunverulegur, ekki cosmetic.
+
+---
+
+## 2026-05-29 — sales_history −786 push-preview anomaly: reconciliation-strategy deferred til Skref 13c
+
+**Context**: Skref 12d standalone `build_precompute.py --force` push-preview á reconciled state sýndi: `properties` / `repeat_sale_index` / `ats_lookup` / `predictions_iter4` allir **+0 vs live** (clean match — reconciliation proven), `comps_index` **+634.212** og `feature_attributions_iter4` **+571.870** (expected growth fyrir nýja 232.887-universe-ið), EN `sales_history` **−786** (preview hefur 173.081, live hefur 173.867).
+
+**Root cause**: `build_precompute` deriva-r sales_history úr `training_data_v2` filtrað á last-5-sölur-per-fastnum. Phase D3 apply (2026-05-27) skrifaði 786 sölur sem **raw direct-inserts** (þ.m.t. `onothaefur=1` rows) sem ná aldrei inn í training_data_v2 filter-inn → þær birtast ekki í build_precompute-afurð. −786 er því derivation-vs-direct-insert mismatch, EKKI gagnatap; live sales_history (173.867) er rétt.
+
+**Af hverju deferral, ekki fix núna**: ekkert er pushað í Skref 12; −786 er push-preview observation, ekki live-state breyting. Fix-ið krefst stefnuvals sem snertir push-helper-hönnun.
+
+**Decision (deferred til Skref 13c)**: tvær leiðir:
+- (a) **append-D3**: push-helper upsert-ar build_precompute sales_history en skilur D3 raw-rows (786) eftir ósnertar (additive, varðveitir onothaefur-flaggaðar).
+- (b) **re-derive**: extend-a `training_data_v2` / build_precompute svo D3 raw-sölur (incl onothaefur) verði first-class — root-fix per [[feedback_root_fix_vs_workaround]] en stærra.
+Val gated á push-helper byggingu í Skref 13c.
+
+---
+
+## 2026-05-29 — validate_metrics cov80 +5,95pp er coverage-IMPROVEMENT, ekki regression; baseline-rebase deferred til 13a
+
+**Context**: run_monthly cascade á reconciled state (Skref 12c, run id=8) halt-aði á `validate_metrics`: cov80 73,10% → 79,05% (**+5,95pp** vs frosna 4c-baseline-inn). Þröskuldur er ±3pp coverage → flaggað sem fail/halt.
+
+**Greining**: drift-ið er ekki degradation. `monthly_recalibration` (step á undan) auto-update-aði `calibration_config.json` í þessari keyrslu því SEMI_DETACHED k95 drift datt **31,3% → 22,8%** (undir 30%-þröskuldinn, öfugt við run id=7) — enabled af 552 D3-sölum sem urðu newly-joinable inn í training eftir reconciliation. Ný calibration færir coverage frá 73% **í átt að nominal 80%** — það er bati, ekki tap. ±3pp-gat-ið mælir gegn frosnum 4c-baseline sem var settur FYRIR reconciliation.
+
+**Mikilvægt caveat**: `calibration_config.json` er **iter3v2-track** (sjá systkina-entry um spine-debt), EKKI live iter4_conformal_v1. Þessi coverage-breyting hefur því engin bein áhrif á prod-serving fyrr en spine er sameinað.
+
+**Decision (deferred til Skref 13a)**: rebase 4c-baseline-inn á post-reconciliation calibration (skrá nýjan ~79% cov80 baseline) — **couple-að við recalibration-decision** svo við frystum ekki baseline gegn calibration sem gæti haldið áfram að hreyfast næstu 2-3 cycles. Engin urgency: validate er informational gate, ekkert pushað.
+
+---
+
+## 2026-05-28 — classify_property NaN-safe root-fix (D3 NaN-tegund rows)
+
+**Context**: Skref 12b Step 2 (iter4 predictions rebuild á reconciled 232.887-pkl) crash-aði í `classify_property.py:134`: `if not tegund_str:` gerði ráð fyrir streng, en 89 D3-raðir höfðu `tegund = NaN` (float). `not NaN` → `False` (NaN er truthy), svo guard-inn fór ekki í gang og næsta `.strip()`/lookup kastaði.
+
+**Root fix (ekki plástur)**: `if not tegund_str:` → `if not isinstance(tegund_str, str) or not tegund_str.strip():` með WHY-comment. Höndlar bæði NaN-float OG tóman/whitespace-streng í einum guard. `classify_property.py` lifir á `D:\` (utan repo við `D:\verdmat-is\app`); fixað in-place via verified Python replacement (Edit-tool gefur EPERM á drive-root), assert count==1. Audit-tracked, ekki git-tracked hér.
+
+**Af hverju þetta kom fyrst núna**: pre-reconciliation pkl (124.835) hafði enga NaN-tegund; D3-recovery-universe-ið bætti við 89 raðum með vantandi tegund (HMS payload án skráðrar tegundar). Reconciliation afhjúpaði latent type-assumption sem hafði aldrei verið testuð gegn NaN.
+
+**Tengt**: [[feedback_root_fix_vs_workaround]] — gat ekki bara dropp-að 89 röðunum; isinstance-guard-inn er rétti staðurinn.
+
+---
+
+## 2026-05-28 — D3 honesty gate materialíseraður sem held-fastnum-set artifact (d3_held_fastnums.csv)
+
+**Context**: Reconciled pkl (232.887) inniheldur 8.426 D3-eignir sem voru held úr scoring í Phase D3 NOW lota (5.993 matsvaedi-unconfident + 2.433 no-byggar) til að halda iter4_conformal_v1 PI-i heiðarlegum (ablation: blank matsvaedi → 51%/22% PI breach vs 0%/0% spatial-inferred). Skref 12b iter4 predictions rebuild þurfti að virða þennan gate — annars hefðu held-raðir fengið low-confidence predictions skrifaðar.
+
+**Decision**: gate-inn er materialíseraður sem **standalone artifact** `D:\d3_held_fastnums.csv` (8.426 rows: `fastnum,reason`, UTF-8 no BOM) frekar en in-lined í scoring-logic (Option d, valið af Danni yfir Option A inline-gate). `rebuild_predictions_iter4.py` les `HELD_CSV` constant og filter-ar preds+shaps gegn settinu fyrir `to_csv` → output 167.503 (var 175.929 ungated, Δ −8.426 = nákvæmlega held-settið).
+
+**Af hverju artifact frekar en inline-gate**: (i) reusable af hverju downstream step (predictions, push-preview, future evalue augl-pass); (ii) explicit auditability — held-count + reason inspectable án þess að lesa scoring-kóða; (iii) decoupling — LATER evalue lota fjarlægir bara raðir úr CSV-inu þegar þær verða confident (matsvæði/byggar fæst), án scoring-rewrite.
+
+**Verifað**: 167.503 = 175.929 − 8.426 (exact). Held-residential UI-state (`/eign/[fastnum]`: "Verðmat liggur ekki fyrir þessa eign") þjónar þessum 8.426 gracefully.
+
+**Tengt**: Phase D3 honesty-gate decision (DECISIONS 2026-05-27 D3-entry); held-set un-holdast í LATER evalue augl-pass.
+
+---
+
 ## 2026-05-28 — Orchestrator first-green-cycle + 5-bug debug session
 
 **Context**: Fyrsta raunverulega `run_monthly.py` keyrslan (engin `--dry-run`) eftir Group C closure 2026-05-27. Markmið: end-to-end grænn mánaðar-cycle með halt-before-push gate sannað í verki. `run_monthly` + `migration_helpers` höfðu verið skrifuð en aldrei keyrð gegn raunverulegu subprocess (dry-run sleppti subprocess; fyrsta real-run dó á preflight áður en það náði output-handling). Þannig komu real-execution bugs upp í röð, hver um sig blocking næsta skref. Allir fixaðir at root og regression-testaðir.
