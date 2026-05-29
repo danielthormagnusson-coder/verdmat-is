@@ -1,6 +1,8 @@
 # STATE — Núverandi staða verkefnis
 
-**Síðast uppfært:** 29. maí 2026 (**Skref 11→12 — precompute reconciliation: `properties_v2.pkl` rebuilt FROM Supabase (124.835 → 232.887), full cascade re-run, push-preview proven clean gegn live.** Skref 11 = `rebuild_properties_v2.py` multi-source stitch (11 raw cols úr `hms_archive_staging.db` + 4 Supabase lookup-cols + matsvaediNAFN mode-map + byggar=null + `source_db`-tag → 232.887×19, tz-fix + Int64-widening; leysir SOURCES_OF_TRUTH 2026-05-20 mandate um pickle derived FROM canonical Supabase). Skref 12a = read-only cascade-prelude. Skref 12b = geography rebuild (manual) + iter4 predictions rebuild + classify_property NaN-safe root-fix (89 NaN-tegund D3-raðir) + D3 honesty-gate materialíseraður sem `d3_held_fastnums.csv` (8.426 held → preds 175.929 → 167.503). Skref 12c = run_monthly cascade á reconciled state (run id=8). Skref 12d = standalone `build_precompute --force` push-preview. **Niðurstaða: `properties` / `repeat_sale_index` / `ats_lookup` / `predictions_iter4` allir +0 vs live (reconciliation proven), `comps_index` +634.212 & `feature_attributions_iter4` +571.870 (expected new-universe growth), `sales_history` −786 (derivation-vs-direct-insert mismatch, ekki gagnatap), validate cov80 +5,95pp (coverage-IMPROVEMENT á iter3v2-track, ekki regression).** EKKERT pushað/committað — push nú gated á iter3v2/iter4 spine-alignment, ekki lengur á pickle-divergence. Sjá DECISIONS 2026-05-29/28 entries + "Skref 11→12 reconciliation arc" og "Open items for Skref 13" blokkir neðar.)
+**Síðast uppfært:** 29. maí 2026 (**Skref 13b — iter3v2/iter4 precompute-spine debt RESOLVED via option (ii) (decouple).** Push-path correctness-blocker lokað án full track-unification: (A) `predictions` + `feature_attributions` commented út úr `run_monthly.py` `PRECOMPUTE_TARGETS` (iter4-leiðin `import_iter4.py` á þær töflur); (B) `build_precompute.py --skip-predictions` flag (early-return í `score_and_shap`) wired inn í orchestrator build_precompute-step; (C) nýr `push_preview` version-stamp guard (`check_version_stamp`) sem HALT-ar push (exit 4 `halted_version_mismatch`) ef CSV `model_version` ≠ live — lokar count-parity blindspot-inu sem gaf falskt +0 í Skref 12d. CC1 Q1/Q6 findings sem grunnur: `score_new_listing` þjónar ENGUM notanda (frontend les iter4 via `v_current_predictions`; iter3v2 aðeins í `?mode=debug`/`predictions_iter3v2`), og live taflan heitir **`predictions`** (EKKI `predictions_iter4` — það var bara CSV-skráarnafn). Guard-smoke 3/3 + `run_monthly --dry-run` id=9 grænn (`--skip-predictions` staðfest). Option (i) full unification (~340-630 LOC + recalibration-rewrite) deferred til Phase Y iter4-spine sprint. Precompute commit `41d123c`; app-commit í þessu lota. Sjá DECISIONS 2026-05-29 Skref 13b entry.)
+
+**Previous reconciliation milestone:** 29. maí 2026 (**Skref 11→12 — precompute reconciliation: `properties_v2.pkl` rebuilt FROM Supabase (124.835 → 232.887), full cascade re-run, push-preview proven clean gegn live.** Skref 11 = `rebuild_properties_v2.py` multi-source stitch (11 raw cols úr `hms_archive_staging.db` + 4 Supabase lookup-cols + matsvaediNAFN mode-map + byggar=null + `source_db`-tag → 232.887×19, tz-fix + Int64-widening; leysir SOURCES_OF_TRUTH 2026-05-20 mandate um pickle derived FROM canonical Supabase). Skref 12a = read-only cascade-prelude. Skref 12b = geography rebuild (manual) + iter4 predictions rebuild + classify_property NaN-safe root-fix (89 NaN-tegund D3-raðir) + D3 honesty-gate materialíseraður sem `d3_held_fastnums.csv` (8.426 held → preds 175.929 → 167.503). Skref 12c = run_monthly cascade á reconciled state (run id=8). Skref 12d = standalone `build_precompute --force` push-preview. **Niðurstaða: `properties` / `repeat_sale_index` / `ats_lookup` / `predictions_iter4` allir +0 vs live (reconciliation proven), `comps_index` +634.212 & `feature_attributions_iter4` +571.870 (expected new-universe growth), `sales_history` −786 (derivation-vs-direct-insert mismatch, ekki gagnatap), validate cov80 +5,95pp (coverage-IMPROVEMENT á iter3v2-track, ekki regression).** EKKERT pushað/committað — push nú gated á iter3v2/iter4 spine-alignment, ekki lengur á pickle-divergence. Sjá DECISIONS 2026-05-29/28 entries + "Skref 11→12 reconciliation arc" og "Open items for Skref 13" blokkir neðar.)
 
 **Previous orchestrator-validation milestone:** 28. maí 2026 (**Orchestrator operational validation — first fully-green cycle**. `run_monthly.py` sannað end-to-end: run id=7 = **success_halt_pre_push, 7 steps green, 113s** (refresh_cpi → refresh_kaupskra → rebuild_training_data → refresh_dashboard_tables → monthly_recalibration → validate_metrics → build_precompute → inputs_snapshot id=2 → HALT). Fyrsta raunverulega keyrslan afhjúpaði **5 latent bugs** sem dry-run/halted runs gátu ekki: (1) drive-relative `Path("D:")` í 5 D:\ scriptum, (2) cp1252 decode parent-side í `subprocess.run(text=True)`, (3) None-unsafe stdout/stderr í helper, (4) no crash-finalize í run_monthly.main (dangling rows), (5) child-side cp1252 stdout þegar piped (`refresh_dashboard_tables:245` `→` → spurious rollback). **Allir fixaðir at root** (Path→`"D:/"`, `encoding="utf-8"`+None-guards+stdout-tail, try/except crash-finalize með step-tracking, `PYTHONIOENCODING=utf-8` env til children) + regression-testaðir via `scripts/shakedown_orchestrator.py` (**15/15** þ.m.t. negative control sem sannar bug-#5 mechanism re-fire-ar án env-fix). **halt-before-push gate sannað**: push-preview á run id=7 fangaði 108K-row precompute-vs-live divergence ÁÐUR en nokkuð skrifaðist (properties csv 124.835 vs live 232.887). validate_metrics 8/8 pass gegn 4c-baseline (held clean MAPE 6,98%). SEMI_DETACHED k95 drift +31,3% (>30% þröskuldur) → recalibration hélt prior calibration, manual review pending. Commits 8edc297 + 16baa59 á origin/main. Sjá DECISIONS 2026-05-28 entry.)
 
@@ -56,12 +58,16 @@
 - **13a — validate-baseline rebase**: rebase frosna 4c-baseline (cov80 73,10%) á 
   post-reconciliation ~79%; couple-a við recalibration-decision svo baseline 
   frystist ekki gegn moving calibration. Gated, engin urgency (DECISIONS 2026-05-29).
-- **13b — iter3v2/iter4 spine-alignment (push HARD pre-req)**: build_precompute / 
-  score_new_listing / monthly_recalibration / validate_metrics eru iter3v2-track en 
-  live serving er iter4_final_v1 + iter4_conformal_v1 — push myndi annars skrifa 
-  iter3v2-afurð yfir iter4 predictions-töfluna (silent model-track regression). 
-  Val: (i) færa build_precompute predictions-step á `iter4a_*.lgb` + 
-  iter4_conformal_v1, eða (ii) disable predictions-step. DECISIONS 2026-05-29.
+- **13b — iter3v2/iter4 spine-alignment ✅ CLOSED 2026-05-29 (option ii)**: 
+  build_precompute / score_new_listing / monthly_recalibration / validate_metrics 
+  voru iter3v2-track en live serving er iter4_final_v1 + iter4_conformal_v1. 
+  **Leyst via option (ii) decouple** (EKKI full unification): predictions/
+  feature_attributions tekin úr `run_monthly` push-targets + `build_precompute 
+  --skip-predictions` + `push_preview` version-stamp guard (exit 4 á model-track 
+  mismatch). CC1 Q1/Q6 sönnuðu iter3v2 þjónar engum notanda + live tafla = 
+  `predictions`. Option (i) full unification (~340-630 LOC + recalibration-rewrite) 
+  deferred til Phase Y iter4-spine sprint. Precompute `41d123c` + app-commit Skref 
+  13b. DECISIONS 2026-05-29 Skref 13b entry.
 - **13c — push-helper + atomic two-repo commit infra**: byggja 
   `push_precompute_to_supabase` (núverandi `--push` = exit 2) + atomic commit yfir 
   `verdmat-is` (app) + `verdmat-is-precompute`. Inniheldur sales_history −786 
@@ -70,8 +76,10 @@
   `refresh_dashboard_tables` of-breitt `except`, audit-a Skref 11-12 throwaway 
   scripts (rebuild_properties_v2 diagnostics, ablation/recoverability/threshold).
 - **push_precompute_to_supabase enablement**: reconciliation-blocker fjarlægður 
-  (Skref 11→12); push nú gated AÐEINS á spine-alignment (13b) + 2-3 proven cycles, 
-  ekki lengur á 232.887-vs-124.835 pickle-divergence.
+  (Skref 11→12); spine-blocker leyst (Skref 13b option ii). Push nú gated AÐEINS á 
+  2-3 proven cycles + push_preview version-stamp-guard-green — ekki lengur á 
+  pickle-divergence né spine-mismatch. (`push_precompute_to_supabase` sjálft er enn 
+  `NotImplementedError`/`--push`=exit 2; landar í 13c.)
 - **LATER evalue augl-pass**: UI-enrichment + matsvæði/byggar fyrir 8.426 held-raðir 
   → un-hold-ar þær úr `d3_held_fastnums.csv` og endurskora (gate-artifact er 
   designaður fyrir þetta — sjá DECISIONS 2026-05-28 D3-honesty-gate entry).

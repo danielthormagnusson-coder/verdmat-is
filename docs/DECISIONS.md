@@ -4,6 +4,31 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-05-29 — Skref 13b: iter3v2/iter4 spine debt RESOLVED via option (ii) (decouple) + push_preview version-stamp guard
+
+**Context**: Precompute-spine debt (systkina-entry sama dag) gerði push-path-inn rangan: `run_monthly` push myndi UPSERT-a iter3v2-afurð `build_precompute` ofan í live `predictions`-töfluna sem er iter4. Tvær leiðir voru á borðinu — (i) full track-unification, (ii) decouple. Valið féll á **(ii)** eftir CC1 READ-ONLY audit (Q1+Q6).
+
+**CC1 findings sem réðu valinu**:
+- **Q1 — `score_new_listing` er EKKI í production runtime path**: 0 runtime-hits í app-repo (aðeins docs); eini caller er `build_precompute` (batch). Frontend les iter4 alls staðar via `v_current_predictions`-view; iter3v2 birtist EINGÖNGU í `?mode=debug` (`predictions_iter3v2`-tafla). → iter3v2-spine þjónar ENGUM notanda, svo decouple hefur núll user-facing downside.
+- **Q6 — ein tafla, tveir track-writers**: live taflan heitir **`predictions`** (EKKI `predictions_iter4` — það er bara CSV-skráarnafn frá iter4-leiðinni). `import_iter4.py` (Skref 10) renamed gömlu iter3v2 → `predictions_iter3v2` og COPY-aði iter4 í `predictions`. `run_monthly` push-target `("predictions","predictions.csv")` + iter4-leiðin target SÖMU töflu → áreksturinn.
+
+**Option (i) vs (ii) trade-off**: option (i) (færa build_precompute + score + recal + validate á `iter4a` + conformal) er ~340-630 LOC + **reiknirit-skipti** í monthly_recalibration (k-factor stretch → conformal refit) + JSON-schema migration — paradigm-migration, ekki swap. Option (ii) (decouple) er ~2-12 LOC. Þar sem iter3v2 þjónar engum (Q1), er decouple réttur fyrsti leikur; option (i) deferred til Phase Y iter4-spine sprint (þá fær precompute aftur predictions-ownership undir iter4).
+
+**Hvað var gert**:
+1. `run_monthly.py` `PRECOMPUTE_TARGETS`: `predictions` + `feature_attributions` commented út (preserved fyrir framtíðar re-enable) — push snertir þær ekki lengur.
+2. `build_precompute.py --skip-predictions` flag (early-return í `score_and_shap`), wired inn í orchestrator build_precompute-step (`cmd … --skip-predictions`).
+3. **push_preview version-stamp guard** (`check_version_stamp`): fyrir hverja push-target sem hefur `model_version`-dálk, ber saman CSV-version-sett vs live-version-sett; mismatch → `main` HALT-ar með exit 4 (`halted_version_mismatch`). Column-gated, svo model-óháðar töflur (properties/sales/repeat_sale/ats/comps) self-skip-a.
+
+**Guard rationale**: Skref 12d push-preview gaf "+0" á `predictions` — en það var **count-parity, ekki value-parity**: push_preview bar aðeins saman `count(*)` (run_monthly.py L334-342), svo iter3v2-vs-iter4 track-munur var ósýnilegur. Falskt +0 hefði hleypt iter3v2 yfir iter4 silently. Version-stamp guard lokar þessu blindspot-i varanlega — verður relevant aftur þegar predictions er re-enabled í push (Phase Y).
+
+**Empirical**: guard-smoke 3/3 (synthetic iter3v2 → mismatch HALT; `iter4_final_v1` → pass; `properties` self-skip) gegn live `predictions`. `run_monthly --dry-run` (run id=9) grænn með `build_precompute … --skip-predictions`. Báðar skrár byte-compile clean. ENGIN push.
+
+**Commits**: precompute `41d123c` (build_precompute.py, explicit-path; held-set-gate `rebuild_predictions_iter4.py` skilið eftir uncommitted f. Skref 13c) + app-commit (run_monthly.py + docs) þessa lota — two-repo split (atomic two-repo push-helper er sjálft Skref 13c). EKKERT pushað.
+
+**Afleiðing fyrir push-gating**: spine-blocker farinn; push nú gated aðeins á 2-3 proven cycles + version-guard-green. 13b ✅.
+
+---
+
 ## 2026-05-29 — Precompute-spine debt (iter3v2 build_precompute vs iter4 live serving) elevated til Skref 13 push-blocker
 
 **Context**: Skref 12c/12d cascade re-confirm-aði undir nýju ljósi að `build_precompute.py` + `score_new_listing.py` + `monthly_recalibration.py` + `validate_metrics.py` keyra allir á **iter3v2-track**, en live serving (`/eign/[fastnum]`, `predictions`-taflan) er **iter4_final_v1 + iter4_conformal_v1**. Þetta var þekkt tech-debt en var "passive" þar til reconciliation gerði push-path-inn raunhæfan.
@@ -16,6 +41,8 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 Ákvörðun gated á Skref 13b spike.
 
 **Knock-on**: validate_metrics drift-flagg (sjá systkina-entry sama dag) er iter3v2-calibration artifact, ekki live-iter4 signal — styrkir að spine-split sé raunverulegur, ekki cosmetic.
+
+**Status (2026-05-29, Skref 13b)**: **RESOLVED via option (ii)** (decouple) — iter4-spine-migration (option i) deferred til Phase Y. predictions/feature_attributions tekin úr `run_monthly` push-targets + `build_precompute --skip-predictions` + push_preview version-stamp guard. CC1 Q1/Q6 sönnuðu: score_new_listing þjónar engum notanda, live tafla = `predictions` (iter4). Sjá Skref 13b entry efst.
 
 ---
 

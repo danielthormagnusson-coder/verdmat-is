@@ -114,7 +114,10 @@ STEPS: list[dict] = [
     },
     {
         "name": "build_precompute",
-        "cmd": ["python", str(PRECOMPUTE / "build_precompute.py")],
+        # --skip-predictions: option (ii) — do NOT regenerate iter3v2 predictions/
+        # SHAP; the iter4 path owns predictions/feature_attributions. Sjá DECISIONS
+        # 2026-05-29 Skref 13b. Drop the flag when re-enabling the iter4 spine.
+        "cmd": ["python", str(PRECOMPUTE / "build_precompute.py"), "--skip-predictions"],
         "output": EXPORTS / "properties.csv",
         "rowcount_fn": lambda p: sum(1 for _ in open(p, encoding="utf-8")) - 1,
         "max_shrink_pct": 5.0,
@@ -306,20 +309,68 @@ def capture_inputs_snapshot(conn, run_id: int) -> int:
 # ----------------------------------------------------------------------
 PRECOMPUTE_TARGETS = [
     ("properties", "properties.csv"),
-    ("predictions", "predictions.csv"),
+    # DEPRECATED iter3v2-track — iter4 path skrifar í predictions/feature_
+    # attributions beint via import_iter4.py. Re-enable post iter4-spine-migration
+    # (PLANNING_BACKLOG: Phase Y iter4-spine sprint). Sjá DECISIONS 2026-05-29
+    # Precompute-spine debt entry + Skref 13b option (ii) decision.
+    # ("predictions", "predictions.csv"),
+    # ("feature_attributions", "feature_attributions.csv"),
     ("sales_history", "sales_history.csv"),
     ("repeat_sale_index", "repeat_sale_index.csv"),
     ("ats_lookup", "ats_lookup.csv"),
     ("comps_index", "comps_index.csv"),
-    ("feature_attributions", "feature_attributions.csv"),
 ]
 
 
+def _table_has_column(cur, table: str, column: str) -> bool:
+    cur.execute(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_schema='public' AND table_name=%s AND column_name=%s",
+        (table, column),
+    )
+    return cur.fetchone() is not None
+
+
+def check_version_stamp(conn, table: str, csv_path) -> tuple[bool, str]:
+    """Guard against silent model-track regression.
+
+    If the live table carries a model_version column, compare the set of
+    model_version values in the CSV against the live set. A mismatch means
+    the precompute output was produced by a different model track than what
+    is live (e.g. iter3v2 build_precompute output about to overwrite iter4
+    predictions). Push must HALT for review — count-parity push_preview cannot
+    catch this (Skref 12d gave a false +0 on a model-track swap). Sjá DECISIONS
+    2026-05-29 Precompute-spine debt entry + Skref 13b.
+
+    Returns (mismatch, note). mismatch=False when the table has no
+    model_version column or the version sets match. Read-only.
+    """
+    import pandas as pd
+    with conn.cursor() as cur:
+        if not _table_has_column(cur, table, "model_version"):
+            return (False, "")
+        cur.execute(f"SELECT DISTINCT model_version FROM public.{table}")
+        live_versions = {r[0] for r in cur.fetchall() if r[0] is not None}
+    try:
+        csv_mv = pd.read_csv(csv_path, usecols=["model_version"])
+        csv_versions = set(csv_mv["model_version"].dropna().unique())
+    except (ValueError, KeyError):
+        # CSV has no model_version column — nothing to compare
+        return (False, "")
+    if csv_versions and csv_versions != live_versions:
+        return (True,
+                f"VERSION-STAMP MISMATCH: csv={sorted(csv_versions)} "
+                f"vs live={sorted(live_versions)}")
+    return (False, "")
+
+
 def push_preview(conn) -> list[dict]:
-    """For each precompute CSV, compute (csv_rows, live_rows, delta).
+    """For each precompute CSV, compute (csv_rows, live_rows, delta) and a
+    model_version-stamp check.
 
     Read-only. Does NOT push. Returns a list of dicts the operator
-    reviews before calling run_monthly.py --push.
+    reviews before calling run_monthly.py --push. Any row with
+    version_mismatch=True must block the push (see main()).
     """
     import pandas as pd
     out = []
@@ -327,25 +378,29 @@ def push_preview(conn) -> list[dict]:
         csv_path = EXPORTS / csv_name
         if not csv_path.exists():
             out.append({"table": table, "csv_rows": None,
-                        "live_rows": None, "note": "csv missing"})
+                        "live_rows": None, "version_mismatch": False,
+                        "note": "csv missing"})
             continue
         # Count CSV rows (header-aware)
         try:
             csv_rows = sum(1 for _ in open(csv_path, encoding="utf-8")) - 1
         except Exception as e:
             out.append({"table": table, "csv_rows": None,
-                        "live_rows": None, "note": f"csv read error: {e}"})
+                        "live_rows": None, "version_mismatch": False,
+                        "note": f"csv read error: {e}"})
             continue
         with conn.cursor() as cur:
             cur.execute(f"SELECT count(*) FROM public.{table}")
             live_rows = cur.fetchone()[0]
         delta = csv_rows - live_rows
+        mismatch, vnote = check_version_stamp(conn, table, csv_path)
         out.append({
             "table": table,
             "csv_rows": csv_rows,
             "live_rows": live_rows,
             "delta": delta,
-            "note": "",
+            "version_mismatch": mismatch,
+            "note": vnote,
         })
     return out
 
@@ -506,6 +561,31 @@ def main() -> int:
             lr = f"{r['live_rows']:,}" if r.get('live_rows') is not None else "-"
             dl = f"{r['delta']:+,}" if r.get('delta') is not None else "-"
             print(f"  {r['table']:<24s} {cr:>10s} {lr:>10s} {dl:>10s}  {r.get('note','')}")
+
+        # Version-stamp guard — block push on any model-track regression.
+        version_halts = [r for r in preview if r.get("version_mismatch")]
+        if version_halts:
+            print("\n*** HALT — VERSION-STAMP MISMATCH (model-track regression guard) ***")
+            for r in version_halts:
+                print(f"    {r['table']}: {r['note']}")
+            print("    A precompute CSV's model_version does not match the live table.")
+            print("    Refusing push to avoid silent model-track regression.")
+            finalize_pipeline_run(
+                conn, run_id, "halted_version_mismatch",
+                summary={
+                    "step_count": len(STEPS),
+                    "snapshot_id": snap_id,
+                    "push_preview": preview,
+                    "version_halts": [r["table"] for r in version_halts],
+                },
+            )
+            log_path = write_run_log(run_id, step_records + [{
+                "step": "_push_preview", "preview": preview,
+                "snapshot_id": snap_id, "version_mismatch": True,
+            }])
+            print(f"    Run log: {log_path}")
+            conn.close()
+            return 4
 
         finalize_pipeline_run(
             conn, run_id, "success_halt_pre_push",
