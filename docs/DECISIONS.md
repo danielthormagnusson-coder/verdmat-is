@@ -4,6 +4,28 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-01 — Scraper schema applied: `scraper.*` foundation live í Supabase (SCRAPER_SPEC_v2 §2.3 + §2.4 + §2.5)
+
+**Context**: Fyrsta production-write úr scraper-substream-inu. SCRAPER_SPEC_v2 (planning-drafts á `D:\verdmat-is\`, un-tracked) er architecturally locked fyrir §0/§1/§2.1-2.5/§3/§5/§6/§7. Næsta concrete skref var að leggja canonical schema-target inn í Supabase **áður en** scraper-kóði (parser/fetcher) er skrifaður — surfaces hvaða DDL-issue sem er strax og gefur myigloo Step 1 skýrt target.
+
+**What**: Migration `20260601122916_scraper_schema_init.sql` applied via MCP `apply_migration` (single BEGIN/COMMIT). Nýtt `scraper` schema:
+- `listings_canonical` base table — **39 cols**: decomposed `(category, tenure)` key + `sub_type` + `tegund_raw` + `lease_term_class` (TAXONOMY_v2); `fastnum` FK → `public.properties` **ON DELETE NO ACTION**; PostGIS `geog` generated column; fastnum-resolution trió (`method`/`confidence`/`at`, §2.5).
+- **4 enums** (`category_enum`, `tenure_enum`, `lease_term_enum`, `fastnum_res_enum` m. `unresolvable_by_design`).
+- **5 CHECK** constraints (`ck_rent_lease`, `ck_plot_area`, `ck_price_pos`, `ck_fastnum_pos`, `ck_fastnum_resolution`) + `uq_source_listing` UNIQUE.
+- **7 indexes** (5 named `ix_lc_*` incl `ix_lc_geo` GiST á geography, + unique + PK).
+- RLS enabled + `public_read` SELECT policy + column-allowlist GRANT (**29 cols** TO anon/authenticated; operational/provenance cols excluded) — sama mynstur og Group B 14-tafla lockout.
+- **5 security_invoker views** (`v_residential_sale_listings`, `v_residential_rent_listings`, `v_commercial_listings`, `v_plot_listings`, `v_listings_combined`); residential-views join → `public.v_properties` (Group B view-layer abstraction, FIX 3 — `v_properties` exposes byggar/einflm/matsvaedi_nafn anon-readable).
+
+**Why this gating**: Step 1 (myigloo raw→parsed→canonical) þarf canonical-target til staðar áður en parser/fetcher-kóði er skrifaður. Schema-first afhjúpar DDL-vandamál strax — dry-run (BEGIN…ROLLBACK gegn live) staðfesti FK + PostGIS `geog` + enums + views + grants áður en apply, og fann tvö latent-issue í endurskoðun: `is_active` getur ekki verið GENERATED column (now()-háð → stored + nightly-refresh) og `ON DELETE SET NULL` rakst á `ck_fastnum_resolution` (→ NO ACTION).
+
+**Verification**: post-apply **10/10** read-only checks grænir — schema(1), enums(4), relations(6 = 1 tafla + 5 views), columns(39), CHECKs(5), indexes(7), policy(1 `public_read`/SELECT), anon-allowlist(29), anon `v_residential_rent_listings` count=0 án villu (security_invoker resolve-ar rétt), extensions(pgcrypto + postgis).
+
+**Pending manual Danni steps** (ekki blocking downstream): (1) Supabase dashboard → API → Exposed schemas → add `scraper` (annars eru v_* views ekki REST-reachable); (2) `supabase migration repair --status applied 20260601122916` svo future `db push` reynir ekki re-apply (apply var via MCP, ekki CLI, svo schema_migrations-taflan þekkir hana ekki enn).
+
+**Explicit non-changes**: ENGIN `public.*` tafla/view snert; ENGIN existing gögn breytt; net-new additive schema. `pgcrypto` + `postgis` voru þegar til staðar (CREATE IF NOT EXISTS = no-op).
+
+**Refs**: `SCRAPER_SPEC_v2_draft.md` §0.1-§0.5 (sign-offs Danni 2026-05-29/06-01: evalue-replace strategy, asking-rent leigu-módel, single-table `(category,tenure)`, TAXONOMY_v2 pre-req, mbl headless+kill-switch) + `TAXONOMY_v2_draft.md` (locked 2026-05-29: 4 categories × 2 tenures, rent/commercial/plot sub-types, fastnum-resolution eligibility). §4 frontend = pass 3b (deferred til UI input).
+
 ## 2026-05-29 — Skref 13b: iter3v2/iter4 spine debt RESOLVED via option (ii) (decouple) + push_preview version-stamp guard
 
 **Context**: Precompute-spine debt (systkina-entry sama dag) gerði push-path-inn rangan: `run_monthly` push myndi UPSERT-a iter3v2-afurð `build_precompute` ofan í live `predictions`-töfluna sem er iter4. Tvær leiðir voru á borðinu — (i) full track-unification, (ii) decouple. Valið féll á **(ii)** eftir CC1 READ-ONLY audit (Q1+Q6).
