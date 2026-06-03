@@ -1,0 +1,73 @@
+{
+  "id": 23922,
+  "title": "Holtsgata 14A",
+  "primary_description": {
+    "id": 1,
+    "text": "Hugguleg 31,5 fermetra íbúð í miðbænum með þvottahúsi og sérinngangi.",
+    "translation": {"id": 1, "lang": "is", "native": "Íslenska"}
+  },
+  "description_translations": [
+    {"id": 2, "text": "Cosy 31.5 sqm flat downtown.", "translation": {"id": 34, "lang": "en", "native": "English"}}
+  ],
+  "price": {"price": "295000.00", "currency": {"id": 1, "code": "ISK", "symbol": "kr"}, "unit": null},
+  "price_formatted": "295,000 ISK",
+  "size": "31.50",
+  "rooms": 2.0,
+  "bedrooms": 1,
+  "bathrooms": 1,
+  "listing_type": {
+    "id": 1, "tag": "apartment", "name": "Íbúð", "name_en": "Apartment",
+    "category": {"id": 1, "tag": "residential", "name": "Íbúðarhúsnæði", "name_en": "Residential property"}
+  },
+  "listing_category": {"id": 1, "tag": "residential", "name": "Íbúðarhúsnæði"},
+  "address": {
+    "id": "601b0d90-052b-4a7e-a3f9-183bb08e1f11",
+    "street_name": "Holtsgata",
+    "street_number": "14A",
+    "city": {"id": 89, "name": "Reykjavík", "country": {"id": 1, "name": "Iceland", "name_short": "IS"}},
+    "postal_code": {"id": 140, "code": "101"},
+    "country": {"id": 1, "name": "Iceland"},
+    "location": {"lat": 64.146, "lng": -21.94}
+  },
+  "location": {"lat": 64.146, "lng": -21.94},
+  "contract_min_months": 13,
+  "contract_max_months": null,
+  "insurance_price": 590000,
+  "insurance_months": 2,
+  "pre_paid_rent_amount": null,
+  "pre_paid_rent_months": null,
+  "move_in_price": {"currency": {"code": "ISK"}, "total": "885000.00", "saving_possible": "295000.00"},
+  "available_from": null,
+  "visible": true,
+  "published_at": "2026-05-29T14:53:23.990408Z",
+  "created_at": "2026-05-29T14:45:21.128204Z",
+  "last_edit": "2026-05-29T14:53:24.012704Z",
+  "images": [
+    {"id": 1, "caption": null, "relative_order": 0, "image": {"file_field": "https://myigloo.is/media/a.jpeg", "smaller": "https://myigloo.is/media/a_s.jpeg"}},
+    {"id": 2, "caption": null, "relative_order": 1, "image": {"file_field": "https://myigloo.is/media/b.jpeg"}}
+  ],
+  "real_estate": {
+    "id": 1, "external_id": "25545", "landreg_id": "2005298", "landreg_source": "landreg",
+    "owners": [{"full_name": "PII_SHOULD_BE_DROPPED"}],
+    "units": [], "created_at": "2026-01-01T00:00:00Z"
+  },
+  "mbl_id": null,
+  "linked_property_id": "07f24f00-498f-4446-9376-1f0d5aef7937",
+  "owner": {
+    "id": 77631, "full_name": "PII_OWNER_NAME_SHOULD_BE_DROPPED", "is_individual": true,
+    "verification": {"as_of": "2026-06-03T11:34:04.644429Z", "verified": true}
+  },
+  "organization": {
+    "uuid": "1a58d4d4-b3e5-4e1b-8394-438cff1cdde4", "slug": "agency", "name": "Some Agency",
+    "verification": {"as_of": "2026-06-03T11:34:04.644429Z", "verified": true}
+  },
+  "amenities": ["dishwasher", "washing_machine"],
+  "rules": {"smoking": false, "max_people": 2},
+  "utilities": [{"utility": "heat", "paid_by_tenant": false}],
+  "furniture": "negotiable",
+  "pet_friendly": false,
+  "views_count": 42,
+  "application_count": 6,
+  "has_applied": false,
+  "liked": false
+}

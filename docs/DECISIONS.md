@@ -4,6 +4,67 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-03 (Step 1d closed) — myigloo parser live: parsed_myigloo populated with Tier-1 fastnum resolution insight
+
+**Hvað**: Step 1d (myigloo parser) lokuð. `init_parsed_myigloo_schema.py` (119 línur) + `parse_myigloo.py` (260 línur) + `parse_myigloo_test.py` (127 línur, 16/16 pass) + `scripts/fixtures/parsed_myigloo_fixture.json` (sanitized hand-crafted fixture) committed. raw_myigloo.db inniheldur nú parsed_myigloo með 870 rows, 1:1 með distinct detail content_hashes í raw_fetches. Engin parser failures.
+
+**Critical empirical wins úr Phase 1.5 mini-probe (Q1/Q2/Q3/Q8)**:
+
+- **Q1 — `real_estate.landreg_id` IS the HMS fastnum** ⭐: 86.9% fill rate (756/870), 30/30 cross-match against `public.properties.fastnum` (100%). `landreg_source='landreg'` flags authoritative; `manual` (~13%) fallback til address resolution (Tier 2/3). Þetta er Tier-1 source_supplied fastnum per §2.5 fyrir ~87% af myigloo listings — leapfrogs the 47-71% address-match ceiling sem §2.5 var byggt í kringum. Promotion step (Step 1e) mun nýta `fastnum_supplied` column fyrst, þá address tier fyrir manual entries. Aðskilið frá Step 1c finding (§2.1.1 verification.as_of), þetta er annað major source-quirks insight á sama dag.
+
+- **Q2 — deposit_isk = `insurance_price`** (tryggingafé absolute kr): empirical ratio distribution showed insurance_price varies 1-3× monthly rent (3× most common, 357/870; avg insurance_months 2,25). Schema captures both absolute amount (`deposit_isk`) og multiplier signal (`insurance_months`). `move_in_price.total` is composite (deposit + first month rent) → overflow, ekki canonical. `pre_paid_rent_*` always null í myigloo → drop entirely.
+
+- **Q3 — lysing = `primary_description.text`** (Icelandic original): `primary_description.translation` er language metadata ({lang:'is', native:'Íslenska'}), ekki translated text. `description_translations[]` er translated variants (lang en/pl populated). Canonical maps lysing direct from primary_description.text.
+
+- **Q8 — listing_type vocabulary**: 15 distinct tags + 5 categories empirically enumerated (confirmed identical í full run). TAXONOMY_v2 §3 mapping locked (15 tags → 7 residential sub-types + 4 commercial sub-types). NEW SUB-TYPE: `summerhouse` will be added to TAXONOMY_v2 §3 for cottage tag (3 listings observed). TAXONOMY_v2 amendment deferred til Step 1e (promotion) þegar mapping lookup table verður smíðuð.
+
+**Parser architecture**:
+- Per-(content_hash, parser_version) — matches §2.2 spec, UNIQUE INDEX enforced (distinct content_hash = rows = 870, invariant holds).
+- INSERT ... ON CONFLICT DO NOTHING fyrir idempotent re-runs.
+- On success: flips ALL raw_fetches sharing the content_hash til parse_status='parsed' (multi-fetch handling).
+- On per-blob failure: only the specific raw_id flagged 'failed' (no cascade — DLQ-correct).
+- raw_overflow JSON excludes PII paths (whole `owner` object dropped; `real_estate` mapped svo `owners[]` PII excluded líka).
+- raw_overflow nullifies volatile paths (organization.verification.as_of) — same §2.1.1 paths pre-hashed at raw level, also scrubbed from parsed-level overflow.
+- Engagement metrics (views_count, application_count, has_applied, last_conversation, liked, pre_approval, client_steps_done) preserved í overflow med `_volatile_suspect` flags — useful for future analysis (time-on-market predictors) but flagged as not-canonical.
+- ISO8601 timestamps frá Python call-site, never SQL.
+- api_page rows EKKI parsed (deferred; 9 rows stay parse_status='pending').
+
+**Phase 2b operational metrics**:
+- parsed_myigloo rows: 870
+- raw_fetches detail parse_status='parsed': 870  (pending 0, failed 0)
+- parse failures: 0
+- fastnum_supplied fill rate: 86,9% (756/870 — matches Phase 1.5 mini-probe exactly)
+- listing_type_tag distribution matches Phase 1.5 vocabulary table (15 tags); category_tag 5 (residential 714, commercial 147, bnb 5, other 3, hotel 1)
+- **title null count: 449 (51,6% — over half, NOT a small minority)**; canonical promotion will COALESCE(title, short_address) at Step 1e
+- **lysing null count: 13** (listings with no source `primary_description.text`; nullable, expected — NOT 0)
+- avg insurance_months: 2,25
+- Total parse time: 2,2 sec
+
+**Empirical corrections to mid-Phase assumptions** (surfaced at full-run inspect, before commit):
+- title-null was assumed "small minority" í Phase-2a plan — empirically 449/870 = 51,6%. COALESCE-at-promotion is therefore load-bearing for ~half the corpus, not an edge case.
+- lysing-null was assumed 0 — empirically 13 (matches Phase-1.5's 857/870 non-null primary_description.text). Genuine source reality (those listings carry no description), not a parser miss.
+
+**Files í Step 1d commit**:
+- `app/scripts/init_parsed_myigloo_schema.py` (119 línur, stdlib only, idempotent §2.2 + Q1/Q2 DDL)
+- `app/scripts/parse_myigloo.py` (260 línur, stdlib only, PARSER_VERSION='0.1.0')
+- `app/scripts/parse_myigloo_test.py` (127 línur, 16/16 pass)
+- `app/scripts/fixtures/parsed_myigloo_fixture.json` (sanitized fixture, no PII)
+- Additive uppfærslur á `docs/STATE.md` og `docs/DECISIONS.md`
+
+**Ófært**: `app/scripts/probe_myigloo.py` (Phase 1 ad-hoc, untracked). TAXONOMY_v2 amendments (cottage → summerhouse sub_type, bnb/apartment_hotel → hospitality) í `D:\verdmat-is\TAXONOMY_v2_draft.md` deferred til Step 1e þegar promotion mapping er smíðuð.
+
+**Source-fidelity decisions** (architect calls):
+- title null → preserved as-is í parsed; COALESCE til short_address (eða addr_street+addr_number) við canonical promotion (Step 1e), ekki parse-time.
+- listing_type_tag = 'studio' vs lysing-says-'herbergi' noise: parser preserves source signal verbatim; TAXONOMY mapping við promotion. Future feature post-promotion: flag tag_uncertain ef mis-match patterns rísa.
+- PII drop confirmed (GDPR posture — capture only what we need).
+
+**Deferred (post-Step 1d, ekki blockers)**:
+- api_page (index) parsing — separate index-observation parser, will produce a withdrawn-detection signal (per §2.1 footer 2-night rule).
+- TAXONOMY_v2 amendment for summerhouse sub_type — Step 1e.
+- Step 1e promotion til scraper.listings_canonical (Tier-1 fastnum resolution + Tier-2/3 fallback for manual entries).
+
+**Næsta skref — Step 1e (promotion)**: reads parsed_myigloo WHERE promoted_to_canonical_at IS NULL, applies TAXONOMY_v2 lookup (listing_type_tag → category/tenure/sub_type), resolves fastnum (Tier-1 from fastnum_supplied OR Tier-2/3 address-match), maps to scraper.listings_canonical 39 columns, INSERTs/UPSERTs til Supabase. Cross-source dedup (§4) deferred til mbl + visir come online (Step 2 + 3).
+
 ## 2026-06-03 (Step 1c Phase 3 closed) — myigloo raw fetcher live: hybrid index + detail, normalize-before-hash idempotency
 
 **Hvað**: Step 1c Phase 3 lokuð — `fetch_myigloo.py` (378 línur, stdlib only) + `fetch_myigloo_test.py` (169 línur, 14/14 pass) committed sem fyrsti production scraper-modul. Production raw_myigloo.db inniheldur fyrsta nightly snapshot af ~870 virkum leigulistum, content-addressable storage + append-only ledger per §2.1 + §2.1.1 normalization.
