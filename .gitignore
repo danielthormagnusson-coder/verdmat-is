@@ -47,6 +47,14 @@ audit/*.db
 audit/*.db-shm
 audit/*.db-wal
 
+# scraper raw-layer SQLite DBs (SCRAPER_SPEC_v2 §2.1) — live OUTSIDE the repo on
+# D:\ by convention (scraper_data/); these globs are belt-and-suspenders against
+# a mis-set cwd so multi-GB blob DBs never land in a commit.
+scraper_data/
+*.db
+*.db-shm
+*.db-wal
+
 # audit routine runtime logs (regenerable). Incident/recovery-evidence logs
 # bypass this via `git add -f` (e.g., hms_full_scrape*.log captures the
 # 58h buggy-run that motivated the recovery — non-regenerable evidence).

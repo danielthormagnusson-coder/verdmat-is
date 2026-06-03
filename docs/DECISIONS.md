@@ -4,6 +4,41 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-03 (Step 1c Phase 2) — myigloo raw layer: hybrid fetching design + scraper_data/ outside-repo storage
+
+**Hvað**: Step 1c (myigloo raw fetcher) Phase 2 lokuð — schema bootstrap + scraper_paths utility committed. Phase 1 audit probe lokuð empíríkt sama dag (ad-hoc `probe_myigloo.py` untracked fyrir Phase 3 referens). raw_myigloo.db smíðað eftir SCRAPER_SPEC_v2 §2.1 verbatim (raw_blobs + raw_fetches + v_dlq_parse_failures view), WAL mode, FK enforcement on. Smoke test 13/13 pass, scraper_paths_test 8/8 pass.
+
+**Fetching design — hybrid (locked)**:
+- Index-walk per cycle: `GET /api/listings/?page=N&page_size=100` (~9 pages) → enumeration eingöngu. `fetch_kind='api_page'`, `source_listing_id=NULL`. Page blobs low-value/short-retention.
+- Detail-per-id per cycle: `GET /api/listings/{id}/` (~874 calls) → rich payload (~80 keys, m.a. `primary_description` (lýsing fyrir LLM extraction), `contract_min_months/max_months/termination_term`, `move_in_price`/`insurance_*`/`pre_paid_rent_*`, `amenities`/`furniture`/`rules`, `mbl_id` cross-ref, `linked_property_id`). `fetch_kind='detail'`, `source_listing_id=<id>`. Full §2.1 content-hash idempotency: óbreyttur body → `changed=0` + `parse_status='skipped_unchanged'` + hash reused; breyttur body → ný blob + `changed=1`.
+
+**Hvers vegna hybrid frekar en page-only**: (1) detail er essential — `primary_description` er lýsing fyrir LLM extraction (iter_rent_v1 forsenda), og page-payload skortir öll canonical/§2.5 fields. (2) §2.1 content-hash idempotency virkar bara á detail-level — á page-level shiftast composition daglega svo hash breytist next time þótt enginn listing breytist, sem gerir §2.1 dedup-virði ~zero. (3) Call-budget ~880/night @ 1s politeness ≈ 15 mín — vel undir §0.5 mbl-cap (sem á hvort sem er ekki við myigloo: ekkert WAF, opin DRF-style API, robots 404 á rent-api subdomain).
+
+**Empíríkar áréttingar úr Phase 1 probe (leiðréttingar á §1.1 og handoff)**:
+- Array key er `items[]`, ekki `results[]` (handoff rangur)
+- Live count 874 (vs handoff 871; +3 drift)
+- `per_page` er **silently ignored** — einungis `page_size` virkar (kritisk gotcha; fetcher sem notar `per_page` mis-paginar í default 25/page án villu)
+- Server er uvicorn / FastAPI-Starlette, ekki klassísk DRF
+- Detail endpoint `/api/listings/{id}/` til staðar, HTTP 200, ~3× richer
+- `rent-api.myigloo.is/robots.txt` skilar 404 — ekki restriction
+
+§1.1 í `D:\verdmat-is\SCRAPER_SPEC_v2_draft.md` (un-tracked, utan repo) fékk additive empirical-correction note 937→945 línur — ekki hluti af þessum commit.
+
+**Storage convention (locked)**:
+- Raw SQLite DB-ar lifa á `D:\verdmat-is\scraper_data\raw_<source>.db`, utan git-repo. Mirrors `D:\Gagnapakkar\*.db` convention; multi-GB blob accumulation færi aldrei í commits.
+- Path read úr env-var `SCRAPER_DATA_DIR` (default `D:\verdmat-is\scraper_data\`), via shared utility `app/scripts/scraper_paths.py`.
+- `.gitignore` belt-and-suspenders: `scraper_data/`, `*.db`, `*.db-shm`, `*.db-wal`.
+
+**Files í Phase 2 commit**:
+- `app/scripts/scraper_paths.py` (39 línur, stdlib only, raw docstring til að forðast SyntaxWarning)
+- `app/scripts/scraper_paths_test.py` (92 línur, 8/8 pass: default/env/parent-dir/per-source/validation/idempotency)
+- `app/scripts/init_raw_myigloo_schema.py` (98 línur, idempotent §2.1 DDL verbatim + v_dlq_parse_failures view)
+- `app/.gitignore` (+8 línur: scraper raw-DB block með comment refererandi §2.1)
+
+**Ófært í commit**: `app/scripts/probe_myigloo.py` (Phase 1 ad-hoc, untracked til Phase 3 refactor). `D:\verdmat-is\SCRAPER_SPEC_v2_draft.md` §1.1 correction (un-tracked draft sem býr utan repo).
+
+**Næsta skref**: Phase 3 — fetcher implementation. Hybrid index + detail loop, gzip-compressed blob storage með sha256 hash á óþjappðu body, append-only ledger með changed=0/1 logic, polite UA + 1s delay, dry-run flag fyrir 2-page warm-up áður en fullur 874-listing run keyrir.
+
 ## 2026-06-01 — Scraper schema applied: `scraper.*` foundation live í Supabase (SCRAPER_SPEC_v2 §2.3 + §2.4 + §2.5)
 
 **Context**: Fyrsta production-write úr scraper-substream-inu. SCRAPER_SPEC_v2 (planning-drafts á `D:\verdmat-is\`, un-tracked) er architecturally locked fyrir §0/§1/§2.1-2.5/§3/§5/§6/§7. Næsta concrete skref var að leggja canonical schema-target inn í Supabase **áður en** scraper-kóði (parser/fetcher) er skrifaður — surfaces hvaða DDL-issue sem er strax og gefur myigloo Step 1 skýrt target.
