@@ -4,6 +4,56 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-03 (Step 1c Phase 3 closed) — myigloo raw fetcher live: hybrid index + detail, normalize-before-hash idempotency
+
+**Hvað**: Step 1c Phase 3 lokuð — `fetch_myigloo.py` (378 línur, stdlib only) + `fetch_myigloo_test.py` (169 línur, 14/14 pass) committed sem fyrsti production scraper-modul. Production raw_myigloo.db inniheldur fyrsta nightly snapshot af ~870 virkum leigulistum, content-addressable storage + append-only ledger per §2.1 + §2.1.1 normalization.
+
+**Critical mid-Phase finding — content-hash idempotency defeated by volatile per-request timestamps**:
+
+Phase 3b's first full run completed clean operationally (880 fetches, 0 errors, 0 retries) but inspect afhjúpaði að `changed=0` fired aldrei á neinum re-fetch. Diff á tveggja fetches á sama listing (id=23989, 11 mín gap) sýndi að allir fields voru identical EXCEPT:
+- `organization.verification.as_of`: server-stamped við request-time
+- `owner.verification.as_of`: sama
+
+Þetta þýddi að hver detail response var unique per fetch → sha256 alltaf different → blob dedup virkaði aldrei. Storage hefði vaxið linearly (~4 MB × N nætur) án dedup. `changed` flag varð gagnslaus per-listing change signal — beint stríðandi við §2.1 stated contract.
+
+**Fix — normalize-before-hash (§2.1.1 amendment)**:
+
+- `content_hash` redefined: sha256 á CANONICALIZED body (per-source volatile-field paths nulled).
+- `blob_gz` heldur áfram að geyma verbatim body (capture-fidelity preserved — staðfest post-fix: `verification.as_of` enn til staðar í stored blob).
+- Per-source volatile field paths skráð í §2.1.1 (myigloo: `organization.verification.as_of`, `owner.verification.as_of`; visir og mbl TBD við Steps 2 og 3).
+- Unit-test validated: identical bodies → same hash; bodies differ only í verification.as_of → same hash; bodies differ í real fields → different hashes; non-JSON payloads → graceful raw-hash fallback.
+- Live-validated post-fix: dry-run × 2 immediately á sömu IDs → second fetch sýndi (detail, changed=0)=10 rows í raw_fetches (22 fetches → 12 distinct blobs). Idempotency contract restored.
+
+**Phase 3 final operational metrics** (post-fix full run á clean baseline):
+- Total raw_fetches: 879   raw_blobs (unique): 879
+- api_page: 9 (all changed=1 — page composition shifts over time as expected)
+- detail: ~870 (all changed=1 í fyrsta nightly snapshot, ekkert prior state)
+- HTTP errors (post-retry): 0   Max retry_count observed: 0 (this baseline run; Phase 3a dry-run hafði one transient id=22844 retries=1)
+- Uncompressed: ~18,6 MB   Compressed: ~4,1 MB   Ratio ~22%
+- Full run elapsed: ~21,7 mín @ 1s politeness
+
+**Empirical validations úr Phase 3**:
+- `order_by=-published_at` honored — first-page IDs strictly descending by published_at (cross-validated by third-party HTML scraper audit á D:\myigloo_tracker_v2). Enables future incremental-sync stopping-condition.
+- `page_size=100` honored consistently — hver index page skilar exactly 100 items.
+- Retry path validated in wild — Phase 3a dry-run á id=22844 með retries=1 (transient failure auto-recovered). Decision matrix: 5xx + 429 + ConnError + Timeout = retry með exponential backoff (1s, 2s, 4s); 4xx other than 429 = no retry.
+- 5xx outage detection unit-test validated; ekki yet stress-tested in wild.
+- Compression ratio ~22% consistently.
+
+**Architectural notes**:
+- Body data rides on FetchResult dataclass aðeins transiently — no memory growth over ~880 fetches.
+- Allir ISO8601 timestamps koma frá Python call-site, never SQL.
+- HTTP failures post-retry skrifa content_hash=NULL ledger row með parse_error=NULL.
+- Normalization (§2.1.1) applies aðeins við hash computation; blob_gz geymir verbatim body fyrir fidelity og future re-parse.
+
+**Files í Phase 3 commit**:
+- `app/scripts/fetch_myigloo.py` (378 línur, stdlib only, með `_canonical_hash()`/`_nullify_path()`)
+- `app/scripts/fetch_myigloo_test.py` (169 línur, 14/14 pass — including normalize-related cases)
+- Additive uppfærslur á `docs/STATE.md` og `docs/DECISIONS.md`
+
+**Ófært**: `app/scripts/probe_myigloo.py` (Phase 1 ad-hoc, untracked). §2.1.1 amendment í `D:\verdmat-is\SCRAPER_SPEC_v2_draft.md` (un-tracked draft).
+
+**Næsta skref — Step 1d (parser)**: reads raw_blobs frá raw_myigloo.db, extracts structured fields úr ~80-key detail payload, populates `parsed_myigloo` table.
+
 ## 2026-06-03 (Step 1c Phase 2) — myigloo raw layer: hybrid fetching design + scraper_data/ outside-repo storage
 
 **Hvað**: Step 1c (myigloo raw fetcher) Phase 2 lokuð — schema bootstrap + scraper_paths utility committed. Phase 1 audit probe lokuð empíríkt sama dag (ad-hoc `probe_myigloo.py` untracked fyrir Phase 3 referens). raw_myigloo.db smíðað eftir SCRAPER_SPEC_v2 §2.1 verbatim (raw_blobs + raw_fetches + v_dlq_parse_failures view), WAL mode, FK enforcement on. Smoke test 13/13 pass, scraper_paths_test 8/8 pass.
