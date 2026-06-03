@@ -4,6 +4,60 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-03 (Step 1e closed) — myigloo promotion live: scraper.listings_canonical populated with first 861 listings
+
+**Hvað**: Step 1e (myigloo promotion til canonical) lokuð. `promote_myigloo.py` (340 línur) + `promote_myigloo_test.py` (132 línur, 16/16 pass) committed. **`scraper.listings_canonical` inniheldur nú 861 myigloo listings** (first real-listing Supabase writes í scraper-substream-inu), með **98,1% fastnum resolution** (Tier-1 source_supplied dominant) + TAXONOMY_v2 §3/§4 lookup applied. by category: residential 715, commercial 146. 0 ck_rent_lease / ck_fastnum_resolution violations.
+
+**Empirical wins úr Phase 1 + 2a + 2b**:
+
+- **51 fastnum_supplied missing í properties** (6.7%) — Tier-1 FK-safety fall-through til address/geo match catches these (they land via address_match/geo_match instead of erroring on the FK). Worth periodic check ef count grows — signal til að refresh public.properties frá HMS.
+- **Manual-source entries (114, landreg_source='manual')** — Tier-2/3 address-match resolved most (94% had complete address fields). **Final resolution distribution: source_supplied 752 (Tier-1), address_match 40, geo_match 53, unresolvable_by_design 3 (room sub-types með no source fastnum), unresolved 13 (true edge cases — no addr/geo match). 845/861 = 98,1% have a fastnum.**
+- **TAXONOMY_v2 §3 amendment** (7→8 sub-types): added `summerhouse` til residential rent sub-type list for myigloo's cottage tag (3 listings live). Editaður í `D:\verdmat-is\TAXONOMY_v2_draft.md` (un-tracked). Pre-flight confirmed `sub_type` er free-form TEXT (no enum constraint) — no migration needed.
+- **Source-fidelity decisions** for storage(18) og garage(9): follow myigloo's commercial classification (→ industrial_warehouse / mixed_use_other) frekar en TAXONOMY §3 residential default. Standalone commercial storage/parking facilities eru semantically commercial; §2.5-G "unresolvable" rationale (designed fyrir sub-units within buildings) doesn't apply.
+- **Cottage(3) override**: myigloo's 'other' source category remapped til residential/summerhouse based á semantic understanding of cottage rentals as residential housing.
+
+**Price-on-request convention** (NEW DOWNSTREAM RULE):
+myigloo agency commercial listings use `price_amount=1` (occasionally 0) sem placeholder fyrir "verð samkvæmt tilboði" — found í 61 listings (47 office, 11 warehouse, 10 retail; Miklaborg + öðrum agencies). At promotion: **commercial listings með price_amount > 0 promoted as-is** regardless of magnitude; **only residential price ≤ 100 skipped** (genuine junk); **price = 0 skipped universally** per ck_price_pos. Net: 9 skipped (7 commercial price=0, 2 residential junk), ~62 commercial recovered vs the naïve ≤100 filter. Downstream consumers (frontend, analytics) MUST handle commercial price ≤ 1000 as "verð samkvæmt tilboði" — apply lower bound (e.g., price > 1000) when filtering commercial by price; UI renders price-on-request label.
+
+**Refined §2.5-G semantic** (additive clarification, Danni 2026-06-03):
+"unresolvable_by_design" applies when source provides NO fastnum AND sub_type ∈ {room, parking_space, storage}. **When source provides an authoritative landreg_id (myigloo's `real_estate.landreg_id` for rooms = the parent building's fastnum), the source signal is accepted at source_supplied confidence regardless of sub_type.** `sub_type='room'` column er downstream semantic flag — downstream queries must apply room-rental-specific logic (e.g. don't compute rent/sqm using parent area, don't aggregate as building-level signal). ~48 of 51 room listings got Tier-1 fastnum via parent building this way; only 3 (no source fastnum) stayed unresolvable_by_design. Algorithm runs Tier-1 BEFORE the sub_type gate, which is the locked order.
+
+**Phase 2b implementation issues caught + fixed** (during the live run, before close):
+1. **`ON CONFLICT DO UPDATE` double-assigned `canonical_version`** (once via the EXCLUDED-loop, once via the explicit `+1`) → SyntaxError on all 861. Fixed: excluded `canonical_version` from the EXCLUDED-loop. Nothing persisted (all rolled back).
+2. **Transaction-pooler defaults a tx to read-only** (`ReadOnlySqlTransaction` on INSERT) — same quirk as the Step-1a migration. Fixed: per-tx `SET TRANSACTION READ WRITE` folded into each upsert via `mogrify` (single round-trip).
+3. **`preload_props` left an open read-tx** (autocommit=False) → the FIRST upsert's `SET TRANSACTION READ WRITE` wasn't the first statement of its tx (only parse_id=1 failed; rows 2+ succeeded after the prior rollback cleared it). Fixed: `pg.rollback()` after preload. Re-run promoted the last row → 861. Resumable throughout (promoted_to_canonical_at + ON CONFLICT idempotency).
+
+**Architecture decisions**:
+- Bulk-preload properties candidate slice frá Supabase (filtered by 66 distinct postcodes í parsed_myigloo): ~89K address-keys + 705 present-fastnums into in-memory dict for (heimilisfang_norm, postnr) + per-postnr geo lookups. Eliminates per-row Supabase round-trips during resolution.
+- psycopg2 per-row UPSERTs via `.dbconfig` service-role connection, `ON CONFLICT (source, source_listing_id) DO UPDATE` (idempotent re-runs; canonical_version increments on conflict). Per-row error isolation (one bad row logged, doesn't poison the rest).
+- `normalize_address` shared utility (commit b503981) used for address-match tier.
+- ISO8601 timestamps frá Python call-site, never SQL.
+
+**Phase 2b operational metrics** (final):
+- scraper.listings_canonical rows frá myigloo: 861
+- skipped_junk: 9   failed promotions: 0
+- Fastnum resolution: source_supplied 752, address_match 40, geo_match 53, unresolvable_by_design 3, unresolved 13 → **98,1% (845/861) with fastnum**
+- by category: residential 715, commercial 146; by sub_type incl summerhouse 3
+- Total promotion time: ~176 sec (per-row upserts; resumable)
+- parsed_myigloo.promoted_to_canonical_at set for 861 rows (9 junk stay NULL)
+
+**Files í Step 1e commit**:
+- `app/scripts/promote_myigloo.py` (340 línur, stdlib + psycopg2, PROMOTER_VERSION='0.1.0')
+- `app/scripts/promote_myigloo_test.py` (132 línur, 16/16 pass)
+- Additive uppfærslur á `docs/STATE.md` og `docs/DECISIONS.md`
+
+**Untracked changes** (intentionally not in commit): `D:\verdmat-is\TAXONOMY_v2_draft.md` §3.1 amendment (added summerhouse line, un-tracked draft).
+
+**Deferred (post-Step 1e, ekki blockers)**:
+- **PostgREST exposed-schemas dashboard step** — manual Danni task til að gera `scraper.*` views REST-reachable from frontend. (Canonical writes are unaffected; only frontend REST consumption blocked.)
+- Step 2 — visir scraper (next major scraper-substream task).
+- Step 3 — mbl scraper (Playwright headless, kill-switch per §0.5).
+- Cross-source dedup (§4) — gated til mbl + visir add sources.
+- iter_rent_v1 asking-rent model — post-canonical, dependent á promoted data.
+- api_page (index) parsing for withdrawn-detection (§7.2 2-night rule).
+
+**Næsta skref**: dashboard exposed-schemas (Danni manual) + Step 2 visir scraper.
+
 ## 2026-06-03 (Step 1d closed) — myigloo parser live: parsed_myigloo populated with Tier-1 fastnum resolution insight
 
 **Hvað**: Step 1d (myigloo parser) lokuð. `init_parsed_myigloo_schema.py` (119 línur) + `parse_myigloo.py` (260 línur) + `parse_myigloo_test.py` (127 línur, 16/16 pass) + `scripts/fixtures/parsed_myigloo_fixture.json` (sanitized hand-crafted fixture) committed. raw_myigloo.db inniheldur nú parsed_myigloo með 870 rows, 1:1 með distinct detail content_hashes í raw_fetches. Engin parser failures.
