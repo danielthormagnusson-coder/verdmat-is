@@ -4,6 +4,90 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-04 — Step 2a (visir probe) closed: /ajaxsearch/getresults locked as enumeration endpoint
+
+**Hvað**: Locked `/ajaxsearch/getresults?stype=<stype>` (GET) sem canonical enumeration
+endpoint fyrir visir.is. Settled via 3-phase probe (probe_visir.py Phase 1 + 1b + 1c,
+un-tracked, 1303 línur).
+
+**Empirical basis**: visir's minified bundle `/minify/?g=v2-js&v=...` config object
+explicitly defines `_param.resultRequestBaseurl = '/ajaxsearch/getresults'`. Cross-stype
+test: sale + rent return populated 50-54KB HTML fragments með `/property/{id}` links;
+company + vessel return near-empty 9.6KB shells. Pagination via `page` param, to be
+reverse-engineered at Step 2b fetcher implementation. ~50 live requests across the 3
+phases, 0 kill-switch trips, all HTTP 200; 13 raw samples í scraper_data/ (gitignored).
+
+**Side note (§1.1 correction needed)**: SCRAPER_SPEC_v2 §1.1 currently identifies
+`/ajax/photolist` sem search-list AJAX. That is WRONG — empirically confirmed via
+bundle inspection that photolist is a per-listing photo-gallery popup loader
+(`$.get('/ajax/photolist', {id, type}, ...)`). Spec correction applied til un-tracked
+draft í þessari lotu; tracked-doc correction queued for Step 2 closure.
+
+**Out-of-scope (decided not to do)**: forcing visir til að expose JSON API. Existing HTML
+fragment output is parseable og works for our use case.
+
+---
+
+## 2026-06-04 — §2.1.1 visir canonicalization rule locked
+
+**Hvað**: Visir raw content-hash canonicalization rule per §2.1.1 (analog of myigloo's
+verification.as_of JSON-path nulling, but ad-redirect HTML stripping for visir):
+
+```
+1. Strip /ads/redirect/\d+ patterns (replace digits with constant token)
+2. Drop <a> elements whose parent class matches:
+   Reklama | ad-banner | details-ad-block | partner-link
+   (because img src and other ad attributes rotate, not just href)
+3. Apply ONLY to text/html payloads (not JSON)
+4. Store verbatim blob unchanged; compute sha256 on canonicalized HTML
+```
+
+**Empirical basis**: Phase 1b Probe 5 + Phase 1c re-validation. 4 stype × 2 fetches
+diff-check showed all differences were rotating ad blocks (5+ `/ads/redirect/N` per
+page). Listing content (price, address, area, fastnum, lysing) was byte-identical
+across re-fetches.
+
+**Per-source pattern**: each source carries its own volatile-field rule per §2.1.1.
+myigloo nulls JSON paths (`organization.verification.as_of`, `owner.verification.as_of`).
+visir strips ad-redirect HTML. mbl TBD (Step 3).
+
+---
+
+## 2026-06-04 — visir stype ≠ category; tegund-based classification + label-anchored fastnum
+
+**Hvað (1) — stype ≠ category**: visir's `stype` URL param er ekki clean category axis.
+Empirically: real rent sample 1056643 "Skútuvogur 12, 104 Reykjavík" er atvinnuhúsnæði
+(commercial property) með "Tilboð" price-on-request, served under stype=rent. Step 2d
+promotion verður að classify (category, tenure, sub_type) frá parsed `tegund_raw` field,
+EKKI frá stype URL param. tenure (sale vs rent) can be derived from stype reliably; only
+category cross-contaminates.
+
+**Hvað (2) — company/vessel empty**: stype=company og stype=vessel return 9.6KB empty
+shells á visir (both /search/results og /ajaxsearch/getresults). visir is residential
+sale+rent portal; commercial inventory mixes into stype=sale (e.g. 1056643) eða
+stype=rent. Real commercial volume only surfaces via tegund-classification during full
+crawl. Vessels are out of scope per spec §1.2.
+
+**Hvað (3) — "Tilboð" = price-on-request**: Same convention as myigloo's commercial
+price=1 placeholder. Visir uses string "Tilboð" instead of numeric placeholder.
+Downstream rule (from Step 1e Phase 2a): commercial price > 0 promoted as-is regardless
+of magnitude; residential price ≤ 100 skipped as junk; price = 0 skipped universally.
+Visir parser will need to handle "Tilboð" string → null price (or convention placeholder),
+and promoter applies the existing commercial-junk-tolerance rule.
+
+**Hvað (4) — fastnum extraction must be label-anchored**: Page-wide regex
+`\b[1-9]\d{6}\b` for fastnum is contaminated. Confirmed false positive on real rent
+sample 1056643: regex hits include 4360339, which is Google Analytics UA-4360339-3
+account ID. Multi-unit buildings also legitimately expose multiple fastnums (e.g.
+1021848|1021851|...). Step 2c parser must use targeted selector anchored on
+"fasteignanúmer"/"fastnúmer" label, never page-wide regex.
+
+Tier-1 source_supplied feasibility confirmed: fasteignanúmer label fired on 100% of
+12 samples (Phase 1) and 6 real samples (Phase 1c). Visir promotion will achieve
+high Tier-1 resolution similar to or better than myigloo's 752/870 ≈ 86.4%.
+
+---
+
 ## 2026-06-03 (Step 1e closed) — myigloo promotion live: scraper.listings_canonical populated with first 861 listings
 
 **Hvað**: Step 1e (myigloo promotion til canonical) lokuð. `promote_myigloo.py` (340 línur) + `promote_myigloo_test.py` (132 línur, 16/16 pass) committed. **`scraper.listings_canonical` inniheldur nú 861 myigloo listings** (first real-listing Supabase writes í scraper-substream-inu), með **98,1% fastnum resolution** (Tier-1 source_supplied dominant) + TAXONOMY_v2 §3/§4 lookup applied. by category: residential 715, commercial 146. 0 ck_rent_lease / ck_fastnum_resolution violations.
