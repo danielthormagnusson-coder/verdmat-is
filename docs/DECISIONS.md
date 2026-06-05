@@ -4,6 +4,105 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-04 — Step 2c closed: parse_visir.py + parsed_visir at visir_parse_v1
+
+**Hvað**: Step 2c lokuð. `parse_visir.py` (299 línur) + `init_parsed_visir_schema.py`
+(106 línur) + `parse_visir_test.py` (154 línur) committed. `parsed_visir` table inside
+`raw_visir.db` carries 31-column visir-source-flavored schema per §2.2. 10 detail rows
+parsed at `PARSER_VERSION='visir_parse_v1'`, 0 failures.
+
+**Selector design (Step A empirical discovery against 5 real samples)**:
+21 of 22 fields HIGH confidence selectors from `.property__*` and `.description__*`
+BEM namespaces. tenure_signal MEDIUM (rent-marker heuristic, hint-only at parser
+tier — canonical authority at Step 2d). agency_name LOW (best-effort, PII dropped
+at promotion).
+
+Key selectors locked:
+- title: `.property__center-title`
+- price_text_raw: `.property__center-price` ("Tilboð" → price_amount=NULL, is_price_on_request=1)
+- tegund_raw: `.property__center-class` (drives category classification at promotion)
+- size_sqm / rooms / bed / bath / byggar: `.description__head-text` chips with regex
+- lysing: `.description__bottom-text` (longest meaningful block)
+- addr_street + addr_number: `.property__center-title` PRIMARY (unit-stripped),
+  og:title meta FALLBACK
+- addr_postcode + addr_city: `.property__center-text` leading 3-digit + remainder
+- lat/lng: regex `lat=N&lon=N` from kort URL (NULL if no map)
+- fastnum_supplied: label-anchored `.property__bottom-item` with text "Fasteignanúmer",
+  F-prefix stripped ("F2534030" → 2534030). NOT page-wide regex.
+- photos: gallery `<img>` srcs, deduped
+- listing_date: `.property__head-text` "Skráð <date>" (text only, no parse)
+
+**Architect decisions (3) applied to design**:
+
+1. **Rent-marker heuristic LOCKED** (Decision 1): case-insensitive any-of `{Leiguverð,
+   til leigu, /mán, á mánuði}` in HTML text → tenure_signal='rent'; else 'sale' (default);
+   'unknown' only if both price_text_raw AND tegund_raw extraction failed. MEDIUM
+   confidence at parser tier acceptable — canonical authority at Step 2d. If production
+   reveals additional rent markers, bump PARSER_VERSION → v2 + re-parse via §2.2
+   INSERT-OR-IGNORE on (content_hash, parser_version) UNIQUE.
+
+2. **T2 fixture repurposed as stype≠tenure canary** (Decision 2): Real sample 1052249
+   (Phase 1c-captured under stype=rent) is empirically a SALE listing — 79.9M ISK
+   total price, fjölbýlishús, no rent markers anywhere in HTML. Test asserts
+   tenure_signal='sale' for this ID with explicit comment documenting the empirical
+   stype≠tenure noise. Confirms Step 2a finding extends from stype≠category to
+   stype≠tenure as well. Synthetic T2b covers true-rent classification path.
+
+3. **Authoritative tenure source = detail-HTML markers, NOT index-stype provenance**
+   (Decision 3): Empirical reality says visir's getresults?stype= index is unreliable
+   for tenure decomposition. parsed_visir.tenure_signal is parser's best-effort
+   detail-HTML reading. Step 2d promotion uses tenure_signal directly as canonical
+   tenure source. Index-stype provenance MAY be recorded as audit metadata at
+   promotion (deferred design — column like `seen_in_stypes TEXT[]` or similar).
+
+**Persistent learning extending Step 2a**: Index-endpoint classification labels
+(visir's getresults?stype=) cannot be trusted for canonical (category, tenure,
+sub_type) decomposition. stype contaminates BOTH category AND tenure on visir.
+Same discipline applies at Step 3 mbl probe and future sources — always classify
+from parsed detail markers, never from enumeration URL labels.
+
+**Verification-stage bug fixes** (caught by 10-row spot-check + locked by regression tests):
+
+- **Bug 1 — `_num()` mangling coordinates**: lat 64.14535959 was being stripped to
+  integer 6414535959 because `_num()` stripped non-digit characters. Fix: parse
+  fractional coordinate fields with `float()` instead. Locked by T1 lat-range
+  assertion (63<lat<67, -25<lng<-13).
+
+- **Bug 2 — og:title omits house number**: og:title meta tag carries only street +
+  locality on many listings, so initial addr_number completeness was 10%. Fix:
+  `.property__center-title` is now PRIMARY source for street+number (unit-suffix
+  "íbúð N" stripped via regex, letter suffix like "24B" / "103A" preserved); og:title
+  is FALLBACK. Locked by T11 (synthetic center-title address with unit).
+
+**Field completeness on 10-row sample** (all latest residential sale from smoke #5
+getresults page-1):
+- 100% populated: title, price_amount, price_text_raw, is_price_on_request, size_sqm,
+  rooms, bathrooms, byggar, tegund_raw, tenure_signal, lysing, addr_street,
+  addr_postcode, addr_city, fastnum_supplied, n_photos, photos_json, listing_date,
+  agency_name
+- 90% populated: addr_number (1 "Leifsstaðabrúnir" named summerhouse area legitimately
+  has no house number), lat/lng (1 new-build "Vetrarbraut 2-4" legitimately has no map)
+- 80% populated: bedrooms (2 listings don't break out svefnh chips — chip absent
+  in source HTML, not a parser miss)
+
+All sub-100% counts are empirical legitimate-NULL cases, NOT parser defects.
+
+**Caveat noted**: The 10-row batch is all latest residential sale (smoke #5 page-1).
+Commercial / true-rent / Tilboð / plot paths are covered by REAL-sample tests
+(T3 against 1056643 commercial-as-rent, T2b synthetic rent) rather than by the live
+batch. Production full crawl will surface diversity (commercial sales mixed under
+stype=sale, true residential rents, Tilboð prices, plot listings). If edge cases
+break v1 selectors, bump `PARSER_VERSION='visir_parse_v2'` and re-parse — §2.2
+UNIQUE(content_hash, parser_version) ensures latest version wins for downstream.
+
+**Næst**: Step 2d — canonical promotion (parsed_visir → scraper.listings_canonical).
+This is the §6 cross-source dedup proving ground per Step 2 mandate. visir wins over
+myigloo per §2.3-D source_priority; will exercise §4 single-table row-merge against
+the 861 existing myigloo canonical rows. Tenure decision uses parsed_visir.tenure_signal
+directly per Decision 3 above.
+
+---
+
 ## 2026-06-04 — §2.1.1 visir rule amendments: Skoðendur counter + class-anchored ad-drop
 
 **Bakgrunnur**: §2.1.1 visir canonicalization rule locked in commit d32d9c2 covered ad-redirect
