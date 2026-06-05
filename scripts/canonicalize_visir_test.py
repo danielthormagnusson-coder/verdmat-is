@@ -118,8 +118,49 @@ class TestCanonicalizeVisir(unittest.TestCase):
         out = cz.canonicalize_visir_html(REAL_SAMPLE.read_bytes()).decode("utf-8", "replace")
         low = out.lower()
         self.assertIn("kr", low)
-        self.assertIn("fasteignan", low)          # 'fasteignanúmer' label preserved
-        self.assertGreater(len(out), 50_000)      # body not gutted (sample was ~120 KB)
+        self.assertIn("fasteignan", low)              # 'fasteignanúmer' label preserved
+        # class-anchored ad-drop must NOT over-remove listing content:
+        self.assertIn("property__head-text", out)     # Skráð-date <p class> survives the drop
+        self.assertIn("Skráð", out)                   # registration-date text survives
+        self.assertGreater(len(out), 30_000)          # bulk listing content survives (sample ~120 KB)
+
+
+    # T11 — Skoðendur view counter normalized: same listing, different count -> same hash.
+    def test_t11_view_counter_normalized(self):
+        a = ('<html><body>'
+             '<p class="property__head-text">2 &nbsp;<span>Skoðendur</span></p>'
+             '<p class="property__head-text">2</p>'
+             '<p class="property__head-text"><span>Skráð&nbsp;</span> 5. jún. 2026</p>'
+             '<p>actual listing content</p></body></html>').encode("utf-8")
+        b = ('<html><body>'
+             '<p class="property__head-text">17 &nbsp;<span>Skoðendur</span></p>'
+             '<p class="property__head-text">17</p>'
+             '<p class="property__head-text"><span>Skráð&nbsp;</span> 5. jún. 2026</p>'
+             '<p>actual listing content</p></body></html>').encode("utf-8")
+        self.assertEqual(cz.content_hash_visir(a), cz.content_hash_visir(b),
+                         "view counter must normalize to the same hash")
+
+    # T12 — Skráð registration date must NOT be normalized (stable, semantic).
+    def test_t12_skradur_date_preserved(self):
+        a = ('<html><body><p class="property__head-text">'
+             '<span>Skráð&nbsp;</span> 5. jún. 2026</p></body></html>').encode("utf-8")
+        b = ('<html><body><p class="property__head-text">'
+             '<span>Skráð&nbsp;</span> 6. jún. 2026</p></body></html>').encode("utf-8")
+        self.assertNotEqual(cz.content_hash_visir(a), cz.content_hash_visir(b),
+                            "Skráð date change must change the hash")
+
+    # T13 — class-anchored drop removes iframe/script ad creatives (no /ads/redirect anchor).
+    def test_t13_class_anchored_drops_iframe_script_ads(self):
+        a = ('<html><body>'
+             '<div class="b-partnerlink partner-link s1">'
+             '<iframe src="https://app.pulsmedia.is/snjallbordi/AAAAAAAAAA/" width="310"></iframe>'
+             '</div><p>real listing content</p></body></html>').encode("utf-8")
+        b = ('<html><body>'
+             '<div class="b-partnerlink partner-link s1">'
+             '<script data-urls="ad-DFP-different-creative"></script>'
+             '</div><p>real listing content</p></body></html>').encode("utf-8")
+        self.assertEqual(cz.content_hash_visir(a), cz.content_hash_visir(b),
+                         "class-anchored drop must remove iframe/script ad containers")
 
 
 if __name__ == "__main__":

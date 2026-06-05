@@ -1,14 +1,20 @@
 """canonicalize_visir — §2.1.1 visir content-hash canonicalization (pure functions).
 
-LOCKED rule (2026-06-04, Phase 1b+1c probe; see DECISIONS.md + SCRAPER_SPEC_v2 §2.1.1):
+LOCKED rule (2026-06-04, Phase 1b+1c probe + Step 2b P2 amendments):
 
-  1. Strip /ads/redirect/\\d+ patterns (replace digits with a constant token).
-  2. Drop the ad-block element whose class matches any of:
+  1. Drop every element whose OWN class matches any of:
        Reklama | ad-banner | details-ad-block | partner-link
-     (banner `img src` and other ad attributes rotate per request, not just `href`,
-      so the whole block is removed — found via its /ads/redirect/ anchor).
-  3. Apply ONLY to text/html payloads (JSON / other bypass unchanged).
-  4. Store the verbatim blob elsewhere; HASH is computed on the canonicalized HTML.
+     (case-insensitive, [a-z0-9]-normalized substring). Class-anchored — covers anchor,
+     iframe, and script ad creatives alike (visir rotates the inner creative per request).
+  2. Strip remaining /ads/redirect/\\d+ patterns (replace digits with a constant token)
+     — belt-and-suspenders for stray refs in onClick handlers etc.
+  3. Normalize the "Skoðendur" view counter (ticks on every detail fetch):
+       a. labeled:    <digit>[ws]*<span>Skoðendur  ->  __VIEWS__...<span>Skoðendur
+       b. standalone: <p class="property__head-text">\\s*<digit>\\s*</p>  ->  __VIEWS__
+     Both date-safe: the registration-date <p> contains <span>Skráð, not <span>Skoðendur
+     and not pure-digit content.
+  4. Apply ONLY to text/html payloads (JSON / other bypass unchanged).
+  5. Store the verbatim blob elsewhere; HASH is computed on the canonicalized HTML.
 
 The point: two fetches of the same listing differing only in rotating ad blocks must
 hash identically, while any real listing-content change flips the hash.
@@ -28,10 +34,15 @@ from bs4 import BeautifulSoup
 # `details-ad-block`, `b-partnerlink`/`partner-link` all hit.
 _TARGET_FRAGMENTS = ("reklama", "adbanner", "detailsadblock", "partnerlink")
 
-_AD_HREF_PREFIX = "/ads/redirect/"
 _AD_REDIRECT_RE = re.compile(r"/ads/redirect/\d+")
 _AD_REDIRECT_TOKEN = "/ads/redirect/__ID__"
-_ANCESTOR_DEPTH = 3                      # how far up to look for the ad-block class
+
+# §2.1.1 amendment (Step 2b P2 smoke test, 2026-06-04): the "Skoðendur" view counter
+# ticks on each detail fetch — a SECOND volatile field, not covered by the ad-redirect
+# rule. Both regexes are date-safe by construction: the registration-date <p> contains
+# <span>Skráð (never <span>Skoðendur, never pure-digit content), so it is untouched.
+_VIEWS_LABELED_RE = re.compile(r"(\d+)(\s|&nbsp;)*(<span>\s*Skoðendur)")
+_VIEWS_STANDALONE_RE = re.compile(r'(<p class="property__head-text">\s*)\d+(\s*</p>)')
 
 
 def _norm_class(value) -> str:
@@ -51,22 +62,20 @@ def _matches_adclass(el) -> bool:
 
 
 def _drop_ad_blocks(soup) -> None:
-    """Pass 1: decompose the nearest ad-classed ancestor of each /ads/redirect/ anchor."""
-    anchors = [a for a in soup.find_all("a", href=True)
-               if a["href"].startswith(_AD_HREF_PREFIX)]
-    for a in anchors:
-        if a.parent is None:             # already removed via an earlier decompose
+    """Pass 1: decompose every element whose OWN class matches a target ad-block fragment.
+
+    Class-anchored (not /ads/redirect anchor-walk): visir ad containers rotate their inner
+    creative per request — sometimes an <a href=/ads/redirect/>, sometimes a pulsmedia
+    <iframe>, sometimes a DFP <script> with no anchor at all (Step 2b P2 smoke finding).
+    Matching the container class directly removes the whole block regardless of creative
+    type. Targets are domain-specific visir ad classes (Reklama|ad-banner|details-ad-block|
+    partner-link) — unlikely to collide with listing content.
+    """
+    for el in list(soup.find_all(class_=True)):
+        if el.parent is None:            # stale ref after an ancestor was decomposed
             continue
-        target = None
-        node = a.parent
-        for _ in range(_ANCESTOR_DEPTH):
-            if node is None or node.name is None:
-                break
-            if _matches_adclass(node):
-                target = node            # keep walking; prefer the highest matching ancestor
-            node = node.parent
-        if target is not None and target.parent is not None:
-            target.decompose()
+        if _matches_adclass(el):
+            el.decompose()
 
 
 def canonicalize_visir_html(body: bytes, content_type: str = "text/html") -> bytes:
@@ -92,7 +101,9 @@ def canonicalize_visir_html(body: bytes, content_type: str = "text/html") -> byt
             soup = BeautifulSoup(text, "html.parser")
         _drop_ad_blocks(soup)                                   # pass 1: drop ad blocks
         out = str(soup)
-        out = _AD_REDIRECT_RE.sub(_AD_REDIRECT_TOKEN, out)      # pass 2: normalize leftovers
+        out = _AD_REDIRECT_RE.sub(_AD_REDIRECT_TOKEN, out)      # pass 2: normalize ad-redirect leftovers
+        out = _VIEWS_LABELED_RE.sub(r"__VIEWS__\2\3", out)      # pass 3a: labeled Skoðendur counter
+        out = _VIEWS_STANDALONE_RE.sub(r"\1__VIEWS__\2", out)   # pass 3b: standalone head-text counter
         return out.encode("utf-8")
     except Exception as e:                                      # defensive fallback
         sys.stderr.write("canonicalize_visir: parse failed (%s); regex-only fallback\n"

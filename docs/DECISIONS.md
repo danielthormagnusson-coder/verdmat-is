@@ -4,6 +4,52 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-04 — §2.1.1 visir rule amendments: Skoðendur counter + class-anchored ad-drop
+
+**Bakgrunnur**: §2.1.1 visir canonicalization rule locked in commit d32d9c2 covered ad-redirect
+strip + ad-block drop via anchor-walk. Step 2b P2 smoke testing surfaced two empirical defects
+that required amendments before full crawl could safely commit.
+
+**Defect 1 — Skoðendur view counter** (LOCKED 2026-06-04 amendment):
+Per-detail-fetch view counter (`<p class="property__head-text">` containing standalone digit
+OR labeled `<digit> <span>Skoðendur</span>`) ticks on every fetch. Phase 1b probe used 5-sec
+re-fetch gap — too short to observe tick. Caught at Step 2b P2 smoke (~1 min real-world gap
+between identical-id fetches).
+
+Fix: two regex normalizations applied AFTER ad-block drop, BEFORE serialize:
+- `r'(\d+)(\s|&nbsp;)*(<span>\s*Skoðendur)'` → `'__VIEWS__\2\3'` (labeled counter)
+- `r'(<p class="property__head-text">\s*)\d+(\s*</p>)'` → `'\1__VIEWS__\2'` (standalone)
+
+Both date-safe by construction: the registration-date <p> contains `<span>Skráð`, not pure
+digit, so neither regex matches it. T11 (counter tick → same hash) + T12 (Skráð date change
+→ different hash) confirm.
+
+**Defect 2 — class-anchored vs anchor-walk ad-drop** (LOCKED 2026-06-04 mechanism rewrite):
+Original locked rule found ad blocks via `/ads/redirect/\d+` anchor presence, walked up 3
+ancestors, decomposed matching parent class. Real-world ad containers (`b-partnerlink`,
+`partner-link s1 sidebar-top-add`, `ad-banner-mobile footer__top-img`) rotate iframe/script
+creatives with NO `/ads/redirect/` anchor. Anchor-walk missed them entirely → re-fetch produced
+new content_hash.
+
+Fix: `_drop_ad_blocks` rewritten class-anchored — decompose any element whose own class
+matches target set ([a-z0-9]-normalized substring against Reklama|ad-banner|details-ad-block|
+partner-link), regardless of inner content type. Subsumes anchor-walk behavior. The
+`/ads/redirect/\d+` regex retained as belt-and-suspenders for stray refs in inline handlers.
+T13 (iframe/script ad block with no redirect anchor → dropped) confirms.
+
+**Validation method correction** (workflow lesson):
+Rotation-based smoke testing (5-min sleep between sweeps) CANNOT validate dedup, because
+visir's getresults returns rotating ID set — 5-min gap produced zero detail overlap between
+runs. Correct validator: deterministic same-id re-fetch via fetcher's `--ids` flag (new),
+loop 2+ iterations with delays to flush slow-tick volatile fields. This method confirmed 3/3
+detail IDs dedup over ~6.5 min real elapsed in Step 2b P2.
+
+**Persistent learning**: volatile-field probes for future sources (Step 3 mbl, etc.) MUST
+use multi-gap re-fetch (5s + minutes) + deterministic same-id validation, not single-gap
+rotation-based testing.
+
+---
+
 ## 2026-06-04 — Step 2a (visir probe) closed: /ajaxsearch/getresults locked as enumeration endpoint
 
 **Hvað**: Locked `/ajaxsearch/getresults?stype=<stype>` (GET) sem canonical enumeration
