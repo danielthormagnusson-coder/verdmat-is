@@ -4,6 +4,117 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-08 — Step 2d closed: promote_visir.py + §4 cross-source dedup proving ground
+
+**Hvað**: Step 2d lokuð. `promote_visir.py` (589 línur) + `promote_visir_test.py` (230
+línur) committed. 388 visir rows promoted to `scraper.listings_canonical` (386 insert_new
++ 2 visir_wins folded against existing myigloo canonical rows), 11 junk skipped, 0 failed.
+**Canonical layer is now genuinely multi-source: 1,266 rows (859 myigloo + 407 visir)**,
+spanning residential sale+rent, commercial sale+rent, and plots, with 2 verified
+cross-source folds.
+
+**Decomposition mapping (visir tegund_raw → TAXONOMY_v2 category+sub_type)**:
+
+8 tegund_raw values mapped cleanly:
+- `fjölbýlishús` / `íbúðir` / `íbúð` / `hæð` → residential/apartment
+- `sérbýli` / `einbýli` / `einbýlishús` → residential/house
+- `raðhús` / `parhús` → residential/townhouse
+- `sumarhús` / `sumarbústaður` → residential/summerhouse
+- `atvinnuhúsnæði` → commercial/{office|retail|industrial|hospitality|mixed_use_other},
+  resolved via secondary KEYWORD parse against title+lysing (skrifstofa→office,
+  verslun→retail, iðnaðar/vörugeymsla/lager/verkstæði→industrial,
+  hótel/gistiheimili→hospitality, else mixed_use_other)
+- `lóð` / `jörð` → plot/{residential_plot|commercial_plot|agricultural_plot|other_plot},
+  resolved via secondary keyword parse
+
+Tenure from `parsed_visir.tenure_signal` directly per Step 2c Decision 3 (detail-HTML
+markers authoritative). lease_term_class set to 'unspecified' for all visir rent
+(no contract_min_months in parsed_visir v1).
+
+**§4 cross-source dedup — three universal reject rules**:
+
+The §4 machinery fires against the existing 861 myigloo canonical rows per Step 2's
+§6 dedup proving ground mandate. Empirical iteration on real corpus exposed 16 candidate
+matches, of which 14 were false positives. Three universal reject rules now lock the
+machinery to genuine cross-source overlaps only.
+
+**Rule 1 — Fastnum-disagreement reject (universal)**: In any tier candidate evaluation,
+if BOTH visir_row AND candidate_row have non-NULL fastnum AND fastnums differ → reject.
+Mathematical certainty: different HMS-registered fastnums = different properties.
+Killed 2 tier-2 false positives (visir 1054922 fn=2121211 ↔ myigloo 3669 fn=2313904 +
+visir 1046418 fn=2271716 ↔ myigloo 11524 fn=2012663).
+
+**Rule 2 — Size-disagreement reject (universal)**: In any tier candidate evaluation,
+if BOTH visir_row AND candidate_row have non-NULL size_sqm AND
+`|size_a - size_b| / max(size_a, size_b) > 0.10` → reject. Catches multi-unit-same-
+fastnum case (commercial building registered as one HMS fastnum, multiple units inside).
+Killed 2 of 3 multi-unit office matches at fn=2252816 (visir 1056507 + 551503 had
+sizes ≠ myigloo 822's 86.9 m²).
+
+**Rule 3 — Commercial corroboration (category-targeted, ALL tiers)**: For commercial
+category matches at ANY tier (1, 2, or 3), require at least one informative corroborator:
+EITHER size agreement (both >0, within 10%) OR price agreement (both non-sentinel, within 5%).
+If neither corroborator available → reject. Empirical reality: commercial fastnum is 1:N
+over building units; sentinel price=1 (Tilboð) makes Tier-2/3 price filters degenerate;
+without size or non-sentinel price match, fastnum alone is insufficient confidence.
+Killed the surviving multi-unit case (visir 1047898 size=0 + myigloo 822 size=86.9,
+both prices=1 Tilboð sentinel → no corroborator → reject).
+
+**Architect-spec-vs-empirical-test correction (transparency)**:
+Original architect spec said Rule 3 applies to "Tier-1 only". T22 test empirically
+exposed that the same uncorroborated multi-unit-commercial match also surfaces via Tier-2
+(addr match) because price=1 sentinel on both sides trivially satisfies the Tier-2 price
+filter. CC correctly generalized Rule 3 to ALL tiers for commercial — better matches the
+underlying reality that commercial-fastnum-is-1:N is a category-level constraint, not a
+tier-level one. Generalization is safer (prefers false negatives over false positives,
+consistent with §4 philosophy).
+
+**Empirical false-positive reduction narrative**:
+- Initial dedup machinery: 16 candidate matches
+- After Rule 1 (fastnum-disagreement): 14 (2 tier-2 different-fastnum killed)
+- After Rule 2 (size-disagreement): 3 (multi-unit-different-size + degenerate tier-3 killed)
+- After Rule 3 (commercial-corroboration, all tiers): 2 (uncorroborated multi-unit killed)
+- Final genuine matches: 2 residential apartments, both with identical
+  fastnum + size + price + tenure — exactly the cross-source overlap §4 was designed
+  to detect.
+
+**Persistent learning extending Step 2c**: Architectural specs at design-time can miss
+edge cases that empirical tests at integration-time expose. §4 dedup principles should
+apply at category granularity (commercial-1:N reality), not tier granularity. Apply same
+discipline to Step 3 mbl + future sources: write tests that encode the INTENT
+("uncorroborated commercial match must not fold"), let the test failures reveal where
+the rule needs to generalize.
+
+**v1 limitation (deferred to v2)**: Within-run visir↔visir dedup is deferred — promote
+loop matches only against the STATIC preloaded canonical snapshot (myigloo + prior runs),
+not against same-run visir inserts. Eliminates a placeholder-uuid write bug and avoids
+Tier-2 false-positive risk of folding two distinct units in one building during the same
+batch. Production impact: small (only matters if visir lists same property twice
+simultaneously, rare). Future v2 could implement within-run dedup with proper canonical_id
+generation if needed.
+
+**Verification (live Supabase state)**:
+- by source: myigloo 859 (861 − 2 folded), visir 407 (19 smoke + 386 insert + 2 won)
+- visir cat×tenure: residential/sale 193, commercial/rent 169, commercial/sale 29,
+  residential/rent 12, plot/sale 4
+- visir fastnum resolution: source_supplied 336, address_match 33, geo_match 11,
+  unresolved 27 = 93% resolved
+- folded rows: 2, both correct (visir 1050593 ← myigloo 23863; visir 1050668 ← myigloo 23937)
+- 0 ck_price_pos / ck_fastnum_resolution violations
+- Supabase pooler quirk handled per memory entry 1 (SET TRANSACTION READ WRITE as first
+  statement, mogrify INSERT single round-trip)
+
+**File metrics**: promote_visir.py 589 lines, promote_visir_test.py 230 lines, 28/28 tests
+pass (decomposition T1-T4, price T5-T9, fastnum T10-T11, §4 dedup T12-T18, §4 reject rules
+T19-T24).
+
+**Næst**: Step 2 substream (visir) complete; scraper substream chain at 15 commits on
+origin/main. Production-grade visir corpus refresh deferred to timed-batch session when
+needed (per Step 2b P3 IP-throttle finding). Step 3 mbl next major milestone — apply same
+defensive scraper patterns + universal §4 dedup rules from the start.
+
+---
+
 ## 2026-06-04 — Step 2b P3: visir IP throttle finding + fetcher defensive patches
 
 **Bakgrunnur**: Full visir crawl initiation surfaced production-scale rate limiting
