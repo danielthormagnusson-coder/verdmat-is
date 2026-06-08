@@ -4,6 +4,79 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-04 — Step 2b P3: visir IP throttle finding + fetcher defensive patches
+
+**Bakgrunnur**: Full visir crawl initiation surfaced production-scale rate limiting
+that was invisible at probe scale. Two attempts, two empirical corrections.
+
+**Empirical timeline (honest log of false-positive correction)**:
+
+- **Crawl attempt #1 (09:26-09:55)**: Naive full crawl. Phase A index sweep reached
+  ~170 requests at 8 min; from request 170 onward visir returned HTTP 400 on every
+  detail fetch. 622 wasted requests before manual halt. Spec §1.1 "no WAF" assumption
+  invalidated for sustained scale.
+
+- **Patch hypothesis #1 (session-based throttle)**: Fresh `requests.Session()` got HTTP
+  200 on same IDs ~20 min after halt → seemed session-bound. Patches: (1) 400-aware
+  kill-switch [Patch 1], (2) periodic session re-prime every 80 requests [Patch 2].
+
+- **Validation crawl (10:23-10:35)**: 440 requests with 5 re-primes → 0×400, exit 0.
+  Conclusion: "session-based throttle, re-prime works". **THIS WAS WRONG**.
+
+- **Full crawl attempt #2 (10:41-10:44)**: 76 requests on top of validation's 440 →
+  HTTP 400 at cumulative request ~516 across multi-session sequence → kill-switch
+  tripped at 3×400, exit 2. Wasted only 3 requests this time (Patch 1 essential ✓).
+
+- **Corrected hypothesis (IP-based throttle, validated)**: Validation didn't pass
+  *because* re-prime worked — it passed *because* total IP-cumulative was under ~500.
+  The 47-min cooldown between halt and validation cleared the IP counter. When full
+  crawl piled on top of validation's 440, cumulative breached the IP window. Throttle
+  is IP-level cumulative ~500 requests per rolling ~30-60 min window. Session re-prime
+  is harmless cookie hygiene but does NOT reset an IP counter.
+
+**Patches kept (both genuinely valuable)**:
+
+- **Patch 1 (400-aware kill-switch)**: Essential safety net. Halts on 3+ consecutive
+  HTTP 400 responses, resets on 200. Caught both 622-request blast (attempt #1) and
+  3-request blast (attempt #2). T11 locks behavior on consecutive 400s + recorded
+  raw_fetches rows.
+
+- **Patch 2 (unified re-prime every 80 across both phases)**: Cookie hygiene + handles
+  potential session-level sub-limits if they exist below the IP threshold. Doesn't
+  defeat IP throttle but no cost to keep. Counter spans both Phase A (index sweep) and
+  Phase B (detail walk) via class-level `requests_since_prime`. T12 verifies firing
+  across phases; T13 verifies counter reset on `prime()`.
+
+- **Tests**: 13/13 pass (T1-T10 unchanged + T11 kill-switch-on-400 + T12 periodic
+  re-prime + T13 prime resets counter).
+
+**Spec corrections (un-tracked SCRAPER_SPEC_v2_draft.md, this commit)**:
+- §1.1 visir entry: throttle finding added (IP-cumulative ~500 req per ~30-60 min window)
+- §0.5 kill-switch: HTTP 400 (3+ consecutive) added to monitored signals
+
+**Corpus state**: 418 valid detail blobs banked (validation crawl + smoke residue).
+Reparsed at visir_parse_v1, 0 failures. Distribution: **235 sale / 183 rent** by
+tenure_signal, but rent is dominated by **commercial** — 198 atvinnuhúsnæði + 172
+"Tilboð" price-on-request; **only 14 residential-rent** (the myigloo-overlap dedup
+target). Also 158 fjölbýlishús, 18 raðhús, 18 einbýlishús, 8 lóð, 5 sumarhús. Adequate
+for Step 2d proving ground (commercial classification + Tilboð at scale, residential-sale,
+plots, summerhouse all well-sampled); residential-rent dedup-vs-myigloo overlap is THIN
+(14) — but visir residential-rent is genuinely scarce (mostly commercial), not a crawl
+artifact, so a bigger crawl would not help much. Production full crawl deferred to a
+timed-batch session (45-60 min IP-window pauses between ≤300-request batches).
+
+**Persistent learning extending Step 2a + 2c**:
+- Probe-scale empirical evidence does NOT extrapolate to production-scale (50 req
+  probe found no WAF; 500 req production found IP throttle).
+- Validation methodology: cross-attempt cumulative IP state must be tracked, not just
+  per-attempt state — false-positive risk is real when window-state matters. Apply to
+  Step 3 mbl probe + full crawl: build IP-cumulative tracking into the validation gate.
+
+**Næst**: Step 2d build against the 418 corpus. Production visir top-up deferred to a
+separate session with timed-batch infrastructure.
+
+---
+
 ## 2026-06-04 — Step 2c closed: parse_visir.py + parsed_visir at visir_parse_v1
 
 **Hvað**: Step 2c lokuð. `parse_visir.py` (299 línur) + `init_parsed_visir_schema.py`

@@ -50,6 +50,8 @@ TIMEOUT_S = 30
 MAX_ATTEMPTS = 3                 # internal retries on timeout / 5xx
 BACKOFF = (1, 2, 4)
 TIMEOUT_KILL_THRESHOLD = 3       # >3 consecutive failed fetches -> dead host
+MAX_CONSECUTIVE_400 = 3          # visir soft-throttles with HTTP 400 (Step 2b crawl finding)
+DEFAULT_REPRIME_EVERY = 80       # re-prime session every N details (below ~170 throttle threshold)
 TEST_DETAIL_CAP = 10
 
 _PROPERTY_RE = re.compile(r"/property/(\d+)")
@@ -127,6 +129,9 @@ class VisirFetcher:
         self.log = log
         self.stats = RunStats()
         self._consec_timeouts = 0
+        self._consec_400 = 0                       # visir throttle signal (Patch 1)
+        self.requests_since_prime = 0              # unified re-prime cadence (Patch 2, both phases)
+        self.REPRIME_EVERY = DEFAULT_REPRIME_EVERY
 
     # -- HTTP -------------------------------------------------------------
     def _get(self, url: str) -> HttpResult:
@@ -158,6 +163,15 @@ class VisirFetcher:
             raise KillSwitch("HTTP %s on %s" % (res.status, url))
         if res.captcha:
             raise KillSwitch("CAPTCHA/challenge body on %s" % url)
+        # visir soft-throttles sustained crawling with HTTP 400 (not 403/429) — halt on a
+        # short run of consecutive 400s instead of hammering through them (Step 2b finding).
+        if res.status == 400:
+            self._consec_400 += 1
+            if self._consec_400 >= MAX_CONSECUTIVE_400:
+                raise KillSwitch("%d consecutive HTTP 400 — likely throttle on %s"
+                                 % (self._consec_400, url))
+        elif res.status == 200:
+            self._consec_400 = 0
         if res.timed_out:
             self._consec_timeouts += 1
             if self._consec_timeouts > TIMEOUT_KILL_THRESHOLD:
@@ -232,6 +246,7 @@ class VisirFetcher:
             seen_for_stype = set()
             page = 1
             while page <= self.max_pages:
+                self._maybe_reprime()
                 url = "%s%s?stype=%s&page=%d" % (BASE_URL, GETRESULTS, stype, page)
                 res = self._get(url)
                 if res.status == 200 and res.body:
@@ -270,6 +285,7 @@ class VisirFetcher:
         self.log("--- Phase B: detail walk (%d ids%s) ---"
                  % (len(ids), ", TEST cap" if self.test else ""))
         for n, lid in enumerate(ids, 1):
+            self._maybe_reprime()      # unified counter — refresh session before throttle (both phases)
             url = "%s/property/%s" % (BASE_URL, lid)
             res = self._get(url)
             if res.status == 200 and res.body:
@@ -292,6 +308,15 @@ class VisirFetcher:
             self.log("  session primed (/search/results/?stype=sale)")
         except requests.RequestException:
             self.log("  prime call failed (non-fatal; getresults works without cookie)")
+        self.requests_since_prime = 0              # the prime call itself doesn't count
+
+    def _maybe_reprime(self):
+        """Refresh the session every REPRIME_EVERY requests (across BOTH phases) — visir
+        throttles a session at ~170 requests (Step 2b crawl finding). Call before each fetch."""
+        if self.requests_since_prime >= self.REPRIME_EVERY:
+            self.log("  re-priming session at request #%d" % self.requests_since_prime)
+            self.prime()                           # resets requests_since_prime to 0
+        self.requests_since_prime += 1
 
     def run(self, ids=None):
         """Crawl. If `ids` is given (explicit list), skip Phase A and detail-walk those

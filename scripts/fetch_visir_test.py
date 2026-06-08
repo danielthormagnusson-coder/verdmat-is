@@ -203,6 +203,49 @@ class TestFetchVisir(unittest.TestCase):
         kinds = list(conn.execute("SELECT fetch_kind, COUNT(*) FROM raw_fetches GROUP BY fetch_kind"))
         self.assertEqual(dict(kinds), {"detail": 2})                   # 2 detail, 0 index
 
+    # T11 — kill-switch trips on 3 consecutive HTTP 400 (visir soft-throttle).
+    def test_t11_kill_switch_on_consecutive_400s(self):
+        def handler(url, idx):
+            if "search/results" in url:
+                return FakeResponse(200, b"<html>prime</html>")
+            return FakeResponse(400, b"throttled")
+        conn = mem_conn()
+        f = fv.VisirFetcher(FakeSession(handler), conn, delay=0, log=silent)
+        with self.assertRaises(fv.KillSwitch):
+            f.run(ids=["1", "2", "3", "4", "5"])
+        self.assertLessEqual(f.stats.detail_fetches, 3)               # halts at/before the 3rd
+        # all attempted rows recorded as failed (400)
+        self.assertGreaterEqual(
+            conn.execute("SELECT COUNT(*) FROM raw_fetches WHERE http_status=400").fetchone()[0], 3)
+
+    # T12 — re-prime fires across BOTH phases via the unified counter (full sweep + detail).
+    def test_t12_periodic_session_reprime_unified(self):
+        prime_count = [0]
+
+        def handler(url, idx):
+            if "search/results" in url:
+                prime_count[0] += 1
+                return FakeResponse(200, b"<html>prime</html>")
+            if "getresults" in url:
+                page = int(url.split("page=")[1].split("&")[0])
+                if page > 10:
+                    return FakeResponse(200, b"")              # end of sweep
+                ids = "".join('<a href="/property/%d">x</a>' % (page * 10 + i) for i in range(5))
+                return FakeResponse(200, ids.encode())
+            return FakeResponse(200, detail_html())
+        f = fv.VisirFetcher(FakeSession(handler), mem_conn(), delay=0, log=silent, stypes=["sale"])
+        f.REPRIME_EVERY = 15
+        f.run()                                                # ~11 index + ~50 detail = ~61 reqs
+        self.assertGreaterEqual(prime_count[0], 4)             # initial + ~3 re-primes
+
+    # T13 — prime() resets the unified counter (no double-counting the prime request).
+    def test_t13_counter_resets_after_reprime(self):
+        f = fv.VisirFetcher(FakeSession(lambda u, i: FakeResponse(200, detail_html())),
+                            mem_conn(), delay=0, log=silent)
+        f.REPRIME_EVERY = 5
+        f.prime()
+        self.assertEqual(f.requests_since_prime, 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
