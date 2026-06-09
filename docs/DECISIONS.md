@@ -4,6 +4,54 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-09 — Spec correction: §5 #5 + §2.4-C image archival policy
+
+**Hvað**: Spec drift caught during Step 3b P1 review. §5 #5 read "URL-only v1, escalate
+if >5% 404" — this contradicts Danni's locked intent of full image archival to D: drive
+from v1. Drift originated from skeleton-era text not updated post-decision.
+
+**Locked policy (re-confirmed)**: all source CDN images mirrored locally to D: drive from
+v1. Storage at `D:\verdmat-is\image_mirror\<source>\<source_listing_id>\<index>.<ext>`.
+Tracking via `image_mirror.db` SQLite.
+
+**Rationale**: withdrawn listings cause source CDN URLs to 404 permanently. Valuation
+model + bank product + future historical analytics need visual context for sold
+properties. D: drive storage is essentially free (precedent: existing 352 GB image mirror
+from Galdrabúðin/legacy work). Cloud storage (Cloudflare R2 et al.) carries 100s-of-GB
+recurring cost — deferred until economics warrant. Danni's desktop can serve images via
+Cloudflare Tunnel in v1 stretch if frontend wants mirror access.
+
+**Architecture sketch (Step 3e/4 design input)**:
+- Storage layout LOCKED: per-listing folder (`image_mirror/<source>/<source_listing_id>/<index>.<ext>`).
+  Sha256 content-addressed deferred to v2 if storage pressure shows; `image_mirror.db`
+  carries sha256 column from v1 so migration path is mechanical.
+- `image_mirror.db` tracking schema (per-image row): source, source_listing_id, image_index,
+  source_url, local_path (relative under image_mirror/), fetched_at, byte_size,
+  content_type, sha256, fetch_status (success/404/timeout/blocked)
+- Fetcher reads canonical `photos_json` URLs across all sources (cross-source single pipeline)
+- Pacing: 5-10 req/sec (image CDNs designed for browser hot-load — much more permissive
+  than listing APIs which are minute-paced)
+- Standard Chrome UA, no identifier
+- Kill-switch on 403/429/persistent timeout
+- Parallel 3-5 concurrent connections OK (browser-equivalent posture)
+- Resume-safe: skip rows where local_path exists + fetched_at is recent
+- Serving in v1 minimum: dormant archive (frontend keeps source URLs, falls back on 404).
+  Cloudflare Tunnel stretch: serve mirror via desktop, frontend prefers mirror with source
+  fallback.
+
+**Sequencing**: image archival is cross-source sub-stream — works on canonical `photos_json`
+URLs regardless of source. Can start anytime canonical has rows (already 1,266 rows from
+myigloo + visir). Recommended order: complete Step 3 mbl substream first (3b P2 listing
+fetcher → 3c parser → 3d promotion), then Step 3e/4 image archival processing all 3
+sources' canonical photos_json. Storage estimate ~50-150 GB full mirror.
+
+**Næst (when Step 3e/4 actually builds)**: `init_image_mirror_schema.py` (image_mirror.db
+bootstrap) + `fetch_images.py` (cross-source byte archival with politeness pacing) +
+reconciliation pass against canonical photos_json. Optional v1 stretch: Cloudflare Tunnel
+setup for frontend mirror access.
+
+---
+
 ## 2026-06-09 — Step 3a closed: mbl Hasura GraphQL characterization
 
 **Hvað**: Step 3a (mbl probe) lokuð — Phases 1b/1c/1d/1e/1f all empirically resolved.
