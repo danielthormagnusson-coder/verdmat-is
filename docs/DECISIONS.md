@@ -4,6 +4,107 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-09 — Step 3a closed: mbl Hasura GraphQL characterization
+
+**Hvað**: Step 3a (mbl probe) lokuð — Phases 1b/1c/1d/1e/1f all empirically resolved.
+`probe_mbl.py` un-tracked (3 phases: `--confirm`, `--tail`, `--p1f`). ~50 GraphQL requests
+across the phases, **all HTTP 200, zero anomalies**. Journal-only milestone — NO code commits.
+
+**1. Architecture finding (overturns §1.1 mbl framing)**:
+- Spec held mbl was a React SPA with REST `/fasteignir/api/*` (robots-disallowed) needing Playwright.
+- Empirical: the data layer is a **Hasura GraphQL** endpoint at `g.mbl.is/v1/graphql` (a
+  different subdomain — the robots-disallow was on `www.mbl.is`, not `g.mbl.is`).
+- `g.mbl.is/robots.txt` → **404** (no restriction).
+- **No auth, no TLS impersonation**, plain `requests` + standard Chrome UA → 200 + JSON.
+- Introspection **enabled** — full schema captured (`fs_fasteign` 50 scalar + 7 nested;
+  `rentals_property` 21 scalar + 5 nested).
+- Difficulty-rank update: mbl is now the **EASIEST transport** (cleaner than visir's SSR HTML).
+
+**2. §0.5 amendment (mechanism only)**:
+- Original choice (B): "headless rendering with kill-switch, Playwright Python framework".
+- Amended: **direct GraphQL via stdlib `requests`; Playwright fallback only if mbl later gates
+  the endpoint.**
+- Posture spirit UNCHANGED + binding: conservative rate, standard Chrome UA without identifier,
+  no active deception (no TLS impersonation, no proxy rotation, no CAPTCHA bypass), kill-switch
+  on 3+ HTTP 400 OR 403/429/CAPTCHA, alert Danni, try-and-see, halt-and-drop on block, no Árvakur
+  (path C) escalation. Spec patch landed in SCRAPER_SPEC_v2_draft.md (un-tracked) §0.5 + §1.1.
+
+**3. §2.1.1 mbl rule LOCKED — trivial**:
+- Empirical: t=0 vs t=+60s, same id, both `raw_hash` AND sorted-keys `hash` identical (sale + rent).
+- Rule: `content_hash = sha256(json.dumps(parsed, sort_keys=True, separators=(',',':')))`.
+- Zero path-nulling (unlike myigloo `verification.as_of`, unlike visir Skoðendur counter / ad-blocks).
+  Hasura returns deterministic bodies — no per-request server stamps. Cleanest §2.1.1 of all 3 sources.
+- Caveat: a +1h longer-gap confirm was NOT done; revisit if Step 3b raw layer shows linear blob
+  growth without real changes. `blob_gz` verbatim per §2.1.
+
+**4. Universe + distribution (exact, uncapped aggregate queries)**:
+- Sale **13,772** · Rent **1,349**.
+- Per-`teg_eign` sale: fjolb 7266, atv 2450, einb 1395, radpar 1003, jord 778, sumarhus 433,
+  haedir 334, hesthus 72, annad 38 (sums 13,769; ~3 with null/other teg_eign).
+- mbl is the **LARGEST source by row count** (~15k+ active > visir + myigloo combined).
+- Commercial (atv 2,450) is **first-class** on mbl (unlike visir's non-first-class commercial);
+  plots (jord 778) substantial. §7.1 monitoring floors lockable from these counts.
+- §1.2 estimates ("3-5k est" sale, "few-hundred est" rent) were ~3× low.
+
+**5. ⚠ 16-row hard cap (Hasura anonymous role)**:
+- `limit:100` → 16 rows; `limit:1000` → 16 rows. Aggregate counts are NOT capped (server-computed).
+- Step 3b enumeration constraint: **offset-pagination at 16/page → ~946 pages** for the full universe.
+- §0.5 cap (<1000/24h) + minutes-between → **multi-night seed crawl** (2-3 nights @ 300-500/night).
+  Steady-state delta-refresh via `where:{br_dags:{_gt:<last_seen>}}`. Mitigation locked in Step 3b design.
+
+**6. ⚠ fastano heterogeneity (Step 3d concern, flagged not solved)**:
+- Typed `Int` (Hasura schema); observed range **6-9 digits** across teg_eign categories.
+- Standard HMS fastnum is 7 digits → some values likely landeignarnúmer (for jord plots) or other ids.
+- §2.5 promotion must do **format-aware FK validation** against `properties.fastnum`.
+- Coverage feasibility high — fastano present on **ALL** teg_eign categories sampled (better than
+  visir where commercial fastnum was sketchy).
+
+**7. Draft-listing production filter (Step 3b concern)**:
+- `sent_dags desc` sampling surfaced draft/placeholder rows (verd=0, fermetrar=0).
+- Production enumeration filter: `where:{syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}}`.
+
+**8. ⚠ rent type_id (1-11) — empirically OPAQUE (not locked)**:
+- Phase 1f sampled up to 5 listings per type_id (1 aliased query). Titles are bare addresses,
+  sizes overlap heavily across ids → **no clean keyword/size signal**, and the schema has **no
+  `rentals_type` lookup table** (only rentals_property/_photo/_postal_code roots).
+- Weak grouping only: type_id 6/9/10 look commercial (large m², rooms 0/many, commercial-area
+  addresses, all longtime); 2/3/11 look residential (small-medium, rooms 1-5). LOW confidence.
+- **Ruling: do NOT decompose category from type_id.** Mirror the visir lesson — derive category at
+  Step 3d from **size/keyword heuristics** (rent default → residential unless commercial signals),
+  retain `type_id` as a raw signal (tegund_raw-equivalent) for future refinement. type_id mapping
+  can be revisited if the SPA bundle exposes a frontend lookup.
+
+**9. hesthus → TAXONOMY ruling LOCKED**:
+- hesthús (horse stable) is a rural/agricultural structure (v1 TAXONOMY §1.4 grouped it under
+  landbúnaður EXCLUDE).
+- Ruling: **category=plot, sub_type=agricultural** (§5 `agricultural` = "landbúnaðarjörð, býli"
+  absorbs farm/rural buildings + land). MEDIUM confidence; flag for v2 refinement (alternative
+  would be commercial/mixed_use_other, but §5 agricultural is the cleaner fit for an ag structure).
+
+**10. teg_eign decomposition mapping for Step 3d (sale)**:
+- fjolb → residential/apartment · haedir → residential/apartment (floor unit)
+- radpar → residential/townhouse · einb → residential/house · sumarhus → residential/summerhouse
+- atv → commercial (sub_type via keyword classification post-parse, like visir)
+- jord → plot (sub_type via TAXONOMY §5 keyword) · hesthus → plot/agricultural (per #9)
+- annad → other
+
+**11. Source-priority retune candidate (flag-only, NOT relitigated)**:
+- Locked starting point per §2.3-D: visir(1) > mbl(2) > myigloo(3).
+- Empirical case for mbl earning priority 1 over visir post-Step-3b: typed GraphQL > scraped SSR
+  HTML (cleaner parse); fastano on ALL rows (§2.5 Tier-1 universal) vs visir sometimes-only; no
+  "Tilboð"/price=1 sentinel quirks (typed numeric `verd`); larger universe + first-class commercial.
+- Defer retune to the build-phase overlap sample per §2.3-D's locked process. No spec change now.
+
+**12. Two root types** (`fs_fasteign` sale vs `rentals_property` rent) — different field shapes →
+two parser paths at Step 3c (or one with per-type mapping). No detail endpoint needed: all scalar
+fields are list-queryable (the 27/3 "detail-only" fields are just unrequested scalars).
+
+**Næst**: Step 3b — `raw_mbl.db` schema (§2.1) + `canonicalize_mbl.py` (trivial sorted-keys rule)
++ `fetch_mbl.py` (16-cap offset-pagination, multi-night seed plan, day-1 kill-switch incl. HTTP 400,
+draft-row filter). `probe_mbl.py` stays un-tracked.
+
+---
+
 ## 2026-06-08 — Step 2d closed: promote_visir.py + §4 cross-source dedup proving ground
 
 **Hvað**: Step 2d lokuð. `promote_visir.py` (589 línur) + `promote_visir_test.py` (230
