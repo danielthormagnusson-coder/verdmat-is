@@ -135,10 +135,11 @@ class TestFetchMbl(unittest.TestCase):
 
     def test_t7_synthetic_url_format(self):
         self.assertEqual(fm.synthetic_url("list_sale", offset=320),
-                         "https://g.mbl.is/v1/graphql?op=list_sale&offset=320")
+                         "https://g.mbl.is/v1/graphql?op=list_sale&offset=320&fields=v2")
         self.assertEqual(fm.synthetic_url("aggregate_count"),
-                         "https://g.mbl.is/v1/graphql?op=aggregate_count")
-        self.assertTrue(fm.synthetic_url("delta_check_sale", since="2026-06-08").endswith("since=2026-06-08"))
+                         "https://g.mbl.is/v1/graphql?op=aggregate_count&fields=v2")
+        self.assertTrue(fm.synthetic_url("delta_check_sale", since="2026-06-08")
+                        .endswith("since=2026-06-08&fields=v2"))
 
     # ── pagination ──
     def test_t8_pagination_advance_and_terminate(self):
@@ -272,11 +273,11 @@ class TestFetchMbl(unittest.TestCase):
 
     def test_t22_negotiable_rent_synthetic_url(self):
         self.assertEqual(fm.synthetic_url("seed_rent_negotiable", offset=48),
-                         "https://g.mbl.is/v1/graphql?op=seed_rent_negotiable&offset=48")
+                         "https://g.mbl.is/v1/graphql?op=seed_rent_negotiable&offset=48&fields=v2")
 
     def test_t23_negotiable_sale_synthetic_url(self):
         self.assertEqual(fm.synthetic_url("seed_sale_negotiable", offset=96),
-                         "https://g.mbl.is/v1/graphql?op=seed_sale_negotiable&offset=96")
+                         "https://g.mbl.is/v1/graphql?op=seed_sale_negotiable&offset=96&fields=v2")
 
     def test_t24_negotiable_self_establishes_ignoring_main_seed(self):
         # main seed-sale has its own frozen window in-flight, but negotiable must NOT inherit it —
@@ -299,6 +300,52 @@ class TestFetchMbl(unittest.TestCase):
         self.assertEqual(st["seed_sale_negotiable"]["frozen_max_id"], 925)   # its own, not 700
         self.assertEqual(st["seed_sale"]["frozen_max_id"], 700)              # main seed untouched
         self.assertTrue(st["seed_sale_negotiable"]["completed"])
+
+    # ── v2_enriched field selection (2026-06-10) ──
+    def test_t26_enriched_fields_exclusions_and_nested_blocks(self):
+        # deliberate exclusions: generated_fts (huge tsvector), favorite (user-scoped),
+        # fs_count/rt_count (volatile per-postnr counters -> would break content-hash dedup)
+        self.assertNotIn("generated_fts", fm.SALE_FIELDS)
+        self.assertNotIn("favorite", fm.SALE_FIELDS)
+        self.assertNotIn("fs_count", fm.SALE_FIELDS)
+        self.assertNotIn("rt_count", fm.RENT_FIELDS)
+        self.assertNotIn("favorite", fm.RENT_FIELDS)
+        # nested blocks present (positive guard against accidental scalar-only regression)
+        for block in ("images {", "agency {", "attachments {", "latest_openhouse {",
+                      "postal_code {", "promo {"):
+            self.assertIn(block, fm.SALE_FIELDS)
+        for block in ("images {", "agency {", "postal_code {", "promo {"):
+            self.assertIn(block, fm.RENT_FIELDS)
+        # rent ordering field differs from sale imgno
+        self.assertIn("imgno", fm.SALE_FIELDS)
+        self.assertIn("ordering", fm.RENT_FIELDS)
+        self.assertEqual(fm.FIELDS_VERSION, "v2_enriched")
+
+    def test_t27_all_mode_synthetic_urls_carry_fields_v2(self):
+        for mode, cfg in fm.MODECFG.items():
+            if "delta_field" in cfg:
+                url = fm.synthetic_url(cfg["op"], since="2026-06-10T00:00:00+00:00")
+            else:
+                url = fm.synthetic_url(cfg["op"], offset=0)
+            self.assertIn("fields=v2", url, "mode %s missing fields=v2 marker" % mode)
+        self.assertIn("fields=v2", fm.synthetic_url("aggregate_count"))
+
+    def test_t28_enriched_fixtures_hash_deterministic(self):
+        # real enriched probe responses (2026-06-10 mini-probe): canonicalize twice -> same hash
+        from scraper_paths import get_scraper_data_dir
+        from canonicalize_mbl import canonicalize_mbl
+        fixdir = get_scraper_data_dir() / "probe_samples" / "mbl"
+        for fname in ("enriched_sale_16.json", "enriched_rent_16.json"):
+            fpath = fixdir / fname
+            if not fpath.is_file():
+                self.skipTest("fixture %s not present on this machine" % fname)
+            with self.subTest(fixture=fname):
+                raw = fpath.read_bytes()
+                _, h1 = canonicalize_mbl(raw, "application/json")
+                _, h2 = canonicalize_mbl(raw, "application/json")
+                self.assertEqual(h1, h2)
+                # nested shape survives canonicalization (sanity: it really is the enriched form)
+                self.assertIn(b'"images"', raw)
 
     def test_t25_negotiable_fallback_queries_max_when_no_main_seed(self):
         # main seed never started (frozen_max_id None) -> negotiable queries max + aggregate itself

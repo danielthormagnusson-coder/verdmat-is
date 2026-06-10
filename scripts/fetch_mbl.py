@@ -51,6 +51,7 @@ ENDPOINT = "https://g.mbl.is/v1/graphql"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 FETCHER_VERSION = "mbl_fetch_v1"
+FIELDS_VERSION = "v2_enriched"     # enriched selection (2026-06-10 mini-probe); &fields=v2 on synthetic URLs
 PAGE = 16                          # Hasura anonymous-role hard cap
 DEFAULT_MAX_PAGES = 400            # per-run budget (keeps a run under §0.5 <1000/24h)
 DEFAULT_SPACING = 120.0           # seconds between page-loads
@@ -61,12 +62,32 @@ MAX_CONSEC_TIMEOUT = 3
 DEFAULT_STATE_PATH = str(get_scraper_data_dir() / "mbl_fetch_state.json")
 _CAPTCHA_MARKERS = (b"captcha", b"challenge", b"cf-challenge", b"just a moment")
 
+# v2_enriched selection (2026-06-10 mini-probe, enriched_sale_16/enriched_rent_16 fixtures):
+# ALL scalars except generated_fts (huge derived tsvector) + all nested blocks with full image
+# variants (signed CDN URLs, underivable after the fact). Deliberately EXCLUDED: favorite
+# (user-scoped), postal_code.fs_count/rt_count (volatile per-postnr listing counters — would
+# break §2.1.1 content-hash dedup on delta re-fetches).
 SALE_FIELDS = ("eign_id fastano gata heimilisfang normalized_heimilisfang postfang teg_eign "
-               "fermetrar fermetraverd fjoldi_herb fjoldi_svefnhb fjoldi_badherb verd fasteignamat "
-               "brunabotamat bygg_ar nybygging latitude longitude hverfi lysing sent_dags br_dags")
+               "fermetrar fermetraverd fjoldi_herb fjoldi_svefnhb fjoldi_badherb fjoldi_haeda "
+               "verd fasteignamat brunabotamat ahvilandi_lan appended_land bygg_ar nybygging "
+               "latitude longitude hverfi lysing inngangur "
+               "aukaibud bilskur gardur lyfta svalir parking parking_shelter electric_car "
+               "pet_allowed wheelchair_acc seniors makaskipti skiptanleg greidslumat syna "
+               "dealer_email embed created sent_dags br_dags "
+               "address_search_id price_search_id size_search_id zip_search_id "
+               "images { id imgno big big_h e_low low regular regular_h small small_h } "
+               "agency { sala_id nafn heimilisfang postnumer simi email_tl vefslod logo logo_url } "
+               "attachments { id title file } "
+               "latest_openhouse { id date open close dt_search_id } "
+               "postal_code { postnr baer baer_thgf hverfi landshluti } "
+               "promo { seckey }")
 RENT_FIELDS = ("id address normalized_address zipcode title type_id size price rooms "
                "available_from available_until longtime lift pet_allowed wheelchair_acc "
-               "created updated description")
+               "from_leiguskjol show_from_date show_until_date created updated description "
+               "images { id ordering big big_h e_low low regular regular_h small small_h } "
+               "agency { sala_id nafn heimilisfang postnumer simi email_tl vefslod logo logo_url } "
+               "postal_code { postnr baer baer_thgf hverfi landshluti } "
+               "promo { seckey }")
 
 # mode -> config. draft = the publishable/non-draft predicate (excluded from aggregate).
 MODECFG = {
@@ -177,11 +198,15 @@ def verify_schema(conn) -> bool:
 
 
 def synthetic_url(op, offset=None, since=None) -> str:
+    # &fields=v2 = selection-generation marker (FIELDS_VERSION) so the enriched/scalar-only
+    # blob generation boundary is visible in the raw_fetches ledger (P3 querystring-intent pattern).
     if offset is not None:
-        return "%s?op=%s&offset=%d" % (ENDPOINT, op, offset)
-    if since is not None:
-        return "%s?op=%s&since=%s" % (ENDPOINT, op, since)
-    return "%s?op=%s" % (ENDPOINT, op)
+        base = "%s?op=%s&offset=%d" % (ENDPOINT, op, offset)
+    elif since is not None:
+        base = "%s?op=%s&since=%s" % (ENDPOINT, op, since)
+    else:
+        base = "%s?op=%s" % (ENDPOINT, op)
+    return base + "&fields=v2"
 
 
 # ── query builders (kept as functions so tests can assert on the strings) ──
