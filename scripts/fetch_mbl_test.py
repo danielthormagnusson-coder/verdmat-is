@@ -251,6 +251,72 @@ class TestFetchMbl(unittest.TestCase):
         with self.assertRaises(fm.AmbiguousResume):
             f.run()
 
+    # ── supplementary "negotiable" modes (inverted price predicate) ──
+    def test_t19_negotiable_modes_in_argparse_choices(self):
+        self.assertIn("seed-rent-negotiable", fm.MODE_CHOICES)
+        self.assertIn("seed-sale-negotiable", fm.MODE_CHOICES)
+
+    def test_t20_negotiable_rent_query_inverts_price(self):
+        q = fm.seed_query(fm.MODECFG["seed-rent-negotiable"], 9, 0)
+        self.assertIn("price:{_eq:0}", q)          # inverted
+        self.assertIn("size:{_gt:0}", q)
+        self.assertNotIn("price:{_gt:0}", q)
+        self.assertNotIn("syna", q)
+
+    def test_t21_negotiable_sale_query_inverts_verd(self):
+        q = fm.seed_query(fm.MODECFG["seed-sale-negotiable"], 9, 0)
+        self.assertIn("verd:{_eq:0}", q)           # inverted
+        self.assertIn("fermetrar:{_gt:0}", q)
+        self.assertIn("syna:{_eq:true}", q)
+        self.assertNotIn("verd:{_gt:0}", q)
+
+    def test_t22_negotiable_rent_synthetic_url(self):
+        self.assertEqual(fm.synthetic_url("seed_rent_negotiable", offset=48),
+                         "https://g.mbl.is/v1/graphql?op=seed_rent_negotiable&offset=48")
+
+    def test_t23_negotiable_sale_synthetic_url(self):
+        self.assertEqual(fm.synthetic_url("seed_sale_negotiable", offset=96),
+                         "https://g.mbl.is/v1/graphql?op=seed_sale_negotiable&offset=96")
+
+    def test_t24_negotiable_self_establishes_ignoring_main_seed(self):
+        # main seed-sale has its own frozen window in-flight, but negotiable must NOT inherit it —
+        # it self-establishes its own max_id (mbl hard-deletes -> head-of-id negotiable rows matter).
+        st = fm.default_state()
+        st["seed_sale"].update({"frozen_max_id": 700, "last_offset": 320, "completed": False})
+        saw = {"max": False}
+
+        def handler(q, idx):
+            if "limit:1)" in q:                       # negotiable establishes its OWN ceiling
+                saw["max"] = True
+                return FakeResp(200, body({"data": {"fs_fasteign": [{"eign_id": 925}]}}))
+            if "aggregate" in q:
+                return FakeResp(200, agg_body(1698, 0))
+            return FakeResp(200, body({"data": {"fs_fasteign": []}}))   # exhaust immediately
+        sess = FakeSession(handler)
+        f = fetcher(sess, mem_conn(), state=st, mode="seed-sale-negotiable")
+        f.run()
+        self.assertTrue(saw["max"], "negotiable must self-establish, NOT inherit the main seed window")
+        self.assertEqual(st["seed_sale_negotiable"]["frozen_max_id"], 925)   # its own, not 700
+        self.assertEqual(st["seed_sale"]["frozen_max_id"], 700)              # main seed untouched
+        self.assertTrue(st["seed_sale_negotiable"]["completed"])
+
+    def test_t25_negotiable_fallback_queries_max_when_no_main_seed(self):
+        # main seed never started (frozen_max_id None) -> negotiable queries max + aggregate itself
+        st = fm.default_state()
+        saw = {"max": False}
+
+        def handler(q, idx):
+            if "limit:1)" in q:
+                saw["max"] = True
+                return FakeResp(200, body({"data": {"rentals_property": [{"id": 300}]}}))
+            if "aggregate" in q:
+                return FakeResp(200, agg_body(0, 50))
+            return FakeResp(200, body({"data": {"rentals_property": []}}))   # exhaust
+        f = fetcher(FakeSession(handler), mem_conn(), state=st, mode="seed-rent-negotiable")
+        f.run()
+        self.assertTrue(saw["max"], "fallback must query max_id when there is no main seed to inherit")
+        self.assertEqual(st["seed_rent_negotiable"]["frozen_max_id"], 300)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

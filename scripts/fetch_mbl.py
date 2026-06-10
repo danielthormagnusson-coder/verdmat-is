@@ -75,6 +75,16 @@ MODECFG = {
                    "op": "list_sale"},
     "seed-rent":  {"key": "seed_rent", "root": "rentals_property", "pk": "id", "fields": RENT_FIELDS,
                    "draft": "price:{_gt:0}, size:{_gt:0}", "kind": "list_page_rent", "op": "list_rent"},
+    # supplementary "negotiable" slices: inverted price predicate (price/verd _eq:0). Each
+    # SELF-ESTABLISHES its own frozen_max_id (no inheritance from the main seed): mbl hard-deletes
+    # withdrawn listings, head-of-id newest rows skew negotiable, so reusing the publishable
+    # ceiling would permanently miss them. Cross-mode overlap is resolved by §4 promotion dedup.
+    "seed-sale-negotiable": {"key": "seed_sale_negotiable", "root": "fs_fasteign", "pk": "eign_id",
+                   "fields": SALE_FIELDS, "draft": "syna:{_eq:true}, verd:{_eq:0}, fermetrar:{_gt:0}",
+                   "kind": "list_page_sale_negotiable", "op": "seed_sale_negotiable"},
+    "seed-rent-negotiable": {"key": "seed_rent_negotiable", "root": "rentals_property", "pk": "id",
+                   "fields": RENT_FIELDS, "draft": "price:{_eq:0}, size:{_gt:0}",
+                   "kind": "list_page_rent_negotiable", "op": "seed_rent_negotiable"},
     "delta-sale": {"key": "delta_sale", "root": "fs_fasteign", "pk": "eign_id", "fields": SALE_FIELDS,
                    "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}", "kind": "list_page_sale",
                    "op": "delta_check_sale", "delta_field": "br_dags", "since_key": "last_br_dags_seen"},
@@ -82,6 +92,10 @@ MODECFG = {
                    "draft": "price:{_gt:0}, size:{_gt:0}", "kind": "list_page_rent",
                    "op": "delta_check_rent", "delta_field": "updated", "since_key": "last_updated_seen"},
 }
+
+# --mode choices (kept module-level so tests assert on it without invoking main()/the DB).
+MODE_CHOICES = ["seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable",
+                "delta-sale", "delta-rent", "aggregate-check", "resume"]
 
 
 class KillSwitch(RuntimeError):
@@ -122,6 +136,12 @@ def default_state() -> dict:
                       "completed": False, "universe_pages": None, "last_run_at": None,
                       "last_page_at": None, "halt_reason": None},
         "seed_rent": {"frozen_max_id": None, "last_offset": 0, "total_fetched": 0,
+                      "completed": False, "universe_pages": None, "last_run_at": None,
+                      "last_page_at": None, "halt_reason": None},
+        "seed_sale_negotiable": {"frozen_max_id": None, "last_offset": 0, "total_fetched": 0,
+                      "completed": False, "universe_pages": None, "last_run_at": None,
+                      "last_page_at": None, "halt_reason": None},
+        "seed_rent_negotiable": {"frozen_max_id": None, "last_offset": 0, "total_fetched": 0,
                       "completed": False, "universe_pages": None, "last_run_at": None,
                       "last_page_at": None, "halt_reason": None},
         "delta_sale": {"last_br_dags_seen": None, "last_run_at": None, "halt_reason": None},
@@ -280,14 +300,14 @@ class MblFetcher:
             return
         if self.force_restart:
             st.update(default_state()[key])
-        single = (mode == "seed-rent")
-        self.log("=== %s (%s) ===" % (mode, "single-run expected ~85 pages" if single
+        single = (mode != "seed-sale")                        # only main seed-sale is multi-night
+        self.log("=== %s (%s) ===" % (mode, "single-run expected" if single
                                       else "MULTI-NIGHT ~861 pages"))
 
-        if st["frozen_max_id"] is None:                       # establish frozen window once
+        if st["frozen_max_id"] is None:                       # establish frozen window once (self)
             if self.dry_run:
                 self.log("  [dry-run] would query max %s + aggregate count to freeze the window" % cfg["pk"])
-                frozen, st["frozen_max_id"] = 999999999, 999999999
+                st["frozen_max_id"] = 999999999
             else:
                 _, _, _, d = self._gql(max_id_query(cfg))
                 rows = d["data"][cfg["root"]]
@@ -385,7 +405,8 @@ class MblFetcher:
     # ── resume (R1: refuse if multiple in-flight) ──
     def in_flight(self):
         out = []
-        for mode in ("seed-sale", "seed-rent", "delta-sale", "delta-rent"):
+        for mode in ("seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable",
+                     "delta-sale", "delta-rent"):
             s = self.state[MODECFG[mode]["key"]]
             if mode.startswith("seed"):
                 started = (s.get("frozen_max_id") is not None and not s.get("completed")) or s.get("halt_reason")
@@ -411,7 +432,7 @@ class MblFetcher:
         return self.dispatch(inflight[0])
 
     def dispatch(self, mode):
-        if mode in ("seed-sale", "seed-rent"):
+        if mode in ("seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable"):
             return self._seed(mode)
         if mode in ("delta-sale", "delta-rent"):
             return self._delta(mode)
@@ -436,9 +457,7 @@ class MblFetcher:
 
 def main():
     ap = argparse.ArgumentParser(description="mbl Hasura GraphQL raw fetcher")
-    ap.add_argument("--mode", required=True,
-                    choices=["seed-sale", "seed-rent", "delta-sale", "delta-rent",
-                             "aggregate-check", "resume"])
+    ap.add_argument("--mode", required=True, choices=MODE_CHOICES)
     ap.add_argument("--max-pages", type=int, default=DEFAULT_MAX_PAGES)
     ap.add_argument("--min-spacing-sec", type=float, default=DEFAULT_SPACING)
     ap.add_argument("--dry-run", action="store_true")
