@@ -4,6 +4,115 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-10 — Strategic audit + revised priority sequencing + agent architecture sketch
+
+**Hvað**: External audit by independent Claude session (Fable 5) surveyed all D: drive
+data assets, repo state, spec drafts, and live Supabase. Audit surfaced material context
+beyond what scraper-substream handoff documents captured. Findings + strategic
+re-sequencing accepted as new working baseline.
+
+**Data asset inventory (audit-discovered, beyond scraper handoffs)**:
+- **Image archive at D:\Gagnapakkar\** — 196.5 GB across 5 packages, 921,273 images,
+  38,152 fastnum-organized folders, image_index.db with 2.6M rows. NEAR-UNUSED until now.
+  Critical for Step 3e image_mirror: must bootstrap from this archive before fetching
+  anything new. Cross-property-references issue noted (naive layout misses ~20%, use
+  image_index.db).
+- **LLM-extraction batch_results** — 40,000+ listings already processed (condition, floor
+  finish, kitchen, garage, structured features). Cache-efficient pipeline proven. NOT yet
+  integrated into iter4 training set — likely largest single MAPE improvement available
+  (einbýli currently at 16.3% MAPE; condition explains substantial residual variance for
+  that segment).
+- **Leiguskra-legacy scrape** — gleymd eign: ~928 current + ~3,000 historical rent
+  snapshots with fastnum, price, size, first-seen/last-seen dates, images. Should be
+  folded into scraper.listings_canonical as source='leiguskra_legacy'. Combined with
+  mbl-rent + myigloo + visir-rent gives thousands of rent price points with time
+  dimension — primary input for iter_rent_v1.
+- **last_listing_text.csv** — 145 MB ad-text corpus, source for LLM extraction full-scale.
+- **rebuild_properties_v2.py** — 309 lines of multi-source stitch logic, currently
+  un-tracked; should be promoted to tracked as template for future D4/D5 work.
+
+**Top opportunities ranked (T1-T6)**:
+- **T1 — Asking-vs-sold spread analysis**: highest-value single analysis. Only Danni
+  has both sides on Iceland scale (asking from scraper canonical, sold from kaupskrá 227K
+  transactions, joined on fastnum). One SQL view post-mbl-promotion. Mælaborð front-page
+  material; strongest sales argument for realtor subscription. No new data needed.
+- **T2 — LLM extraction full-scale → iter5**: run LLM extraction over full
+  last_listing_text corpus, fold condition/finish features into iter5 training. Likely
+  largest MAPE improvement available.
+- **T3 — Leiguskra-legacy + multi-source rent → iter_rent_v1**: thousands of rent price
+  points with time dimension once leiguskra-legacy is canonicalized. Sufficient for first
+  asking-rent model.
+- **T4 — Image mirror bootstrap from D:\Gagnapakkar**: save weeks of fetch time + GB of
+  bandwidth by reading existing 196 GB archive first, diff-fetching only what's missing.
+  Cross-property-references gotcha already known.
+- **T5 — Street/hverfi aggregates (immediate)**: kaupskrá + properties already in
+  Supabase. Street-level / hverfi-level price-per-m², turnover rate, price trend views
+  are one SQL build. Available TODAY without new data. Doubles as semantic-layer
+  foundation for expert agent.
+- **T6 — Fasteignamat-deviation analysis**: HMS-refresh gives official assessments;
+  iter4 gives market estimates. Mapping where official assessment diverges most from
+  market value (by matsvæði, age, type) is bank-product + media material.
+
+**Expert agent architecture (3 layers + v0/v1/v2 roadmap)**:
+Not a custom-trained model — harness around Claude. Three layers:
+- **Layer 1 — Tools (SQL + data)**: read-only SQL role to Supabase + DuckDB over D:
+  pickles. Critical: semantic layer of 10-15 well-documented analytical views
+  (v_street_prices, v_asking_vs_sold, v_market_heat_by_hood, v_price_history…) so agent
+  writes reliable queries against named views, not raw-table joins. T1 and T5 are the
+  first views.
+- **Layer 2 — Knowledge package**: SKILL.md / system prompt with data dictionary
+  (matsvæði, byggingarstig, ónothæfur samningur definitions), calculation rules (price/m²
+  conventions, multi-unit handling, Tilboð sentinel), gotchas (mbl aggregate-vs-publishable,
+  fastnum 1:N on commercial), and 20-30 exemplar queries.
+- **Layer 3 — Output**: charts, reports, article drafts. Precompute chain + dashboards
+  prove output formats already exist.
+Roadmap: v0 weekend project in Claude Code/Desktop (skill + read-only SQL, validates
+semantic layer cheaply) → v1 internal tool + bank product with 50-100 question eval bank
+for reliability measurement → v2 "Spurðu sérfræðinginn" inside verdmat.is behind Pro
+subscription via Claude Agent SDK with read-only role + rate limits + cost cap +
+mandatory citation guardrails.
+
+**Revised priority sequencing (next 2-4 weeks)**:
+1. Finish mbl seed-sale (Night 2 in-flight + Night 3 finish ~45 min)
+2. Step 3b P3 supplementary negotiable crawls (~5.7h) — captures ~980 rent + ~1,698 sale
+   Tilboð listings
+3. Step 3c parse_mbl.py + Step 3d promote_mbl.py → canonical jumps 1,266 → ~16K rows
+4. **Nightly delta orchestration immediately after Step 3d** — urgency-locked (mbl is
+   closed history; every day without delta = permanent data loss)
+5. **Parallel track A — T5 street/hverfi views**: can start NOW (only needs kaupskrá +
+   properties), no in-flight scraper dependency, foundation for v0 expert agent
+6. **Parallel track B — Step 3e image_mirror with Gagnapakkar bootstrap**: read existing
+   196 GB first, diff-fetch only missing. Starts after Step 3d
+7. T1 asking-vs-sold view (after Step 3d puts mbl in canonical)
+8. v0 expert agent on T1/T5 semantic layer
+9. T2 LLM extraction full-scale → iter5 (independent track)
+10. iter_rent_v1 with leiguskra-legacy + multi-source rent (T3, after canonical mature)
+11. visir corpus production refresh (timed-batch, background)
+
+**Locked policy: delta-cadence urgency**: mbl syna=false = 0 (hard-delete). Every day
+without nightly delta-sale + delta-rent = permanent data loss (observed +19 rent rows in
+hours during diagnostic). Post-Step-3d, §6 delta orchestration jumps AHEAD of most other
+work, even ahead of parser if forced to choose. Raw blobs wait patiently; the market does
+not. Spec amendment to §6 follows this commit (un-tracked draft only).
+
+**Locked policy: image-mirror Gagnapakkar bootstrap**: Step 3e image_mirror must read
+D:\Gagnapakkar\image_index.db first to enumerate already-archived images; fetch only
+missing diff. Saves weeks + GB of bandwidth. NOT a re-fetch from scratch. Cross-property-
+references gotcha known (use image_index.db, not naive folder layout).
+
+**Step 3b P3 closed (commit 56b1a2e)**: fetch_mbl.py negotiable supplementary modes
+implemented with self-establish max_id (NOT inheritance). Rationale captured in commit
+message: head-of-id newest negotiable listings would be permanently lost if negotiable
+inherited main seed's ceiling. Cross-mode dedup handled by §4 promotion-tier R1-R3.
+25/25 tests pass. Scraper chain now 20 commits on origin/main.
+
+**Næst (immediate)**: Night 3 sale seed finish (~45 min, Session A) → P3 supplementary
+crawls (~5.7h, Session A) → Step 3c parser design + impl → Step 3d promotion. Parallel
+track A (T5 street views) can start in a fresh Claude Code session anytime; no in-flight
+scraper dependency.
+
+---
+
 ## 2026-06-09 — Spec correction: §5 #5 + §2.4-C image archival policy
 
 **Hvað**: Spec drift caught during Step 3b P1 review. §5 #5 read "URL-only v1, escalate
