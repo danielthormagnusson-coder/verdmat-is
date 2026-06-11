@@ -4,6 +4,64 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-11 — Step 3b operational closure + enriched re-sweep prioritization
+
+**Hvað**: Öll fjögur mbl seed-modes keyrðu til enda — Step 3b er OPERATIONALLY CLOSED.
+Enriched re-sweep af scalar-generation publishable corpus ákveðinn og settur í gang STRAX
+(ekki á post-P3 backlog). Journal-færslan hér læsir tölurnar, tvö empírísk findings og
+verklagsbreytingar.
+
+**Step 3b closure-tölur (sannreyndar gegn mbl_fetch_state.json + raw_mbl.db ro)**:
+- sale publishable **10.899** listings (exhausted við offset 10.912, frozen_max_id 1.688.820,
+  682 síður), rent publishable **377** (24 síður), sale negotiable **1.694** (ceiling
+  1.689.601, 106 síður), rent negotiable **979** (ceiling 218.255, 62 síður) =
+  **13.949 listings í 874 list-page blobs**.
+- **Self-establish ceilings sönnuðust empírískt**: negotiable modes frusu EIGIN max_id YFIR
+  main-seed ceilingunum (sale 1.689.601 > 1.688.820; rent 218.255 > 218.157) — inheritance
+  hefði misst head-of-id negotiable listings varanlega, eins og P3 rationale spáði.
+
+**EMPIRICAL FINDING læst — publishable-túlkun seed-pagination staðfest**: sale seed tæmdist
+við offset 10.912, hvergi nærri raw aggregate 13.792. Mismunurinn er (a) draft-filterinn
+(verd>0/fermetrar>0) eins og hannað og (b) **churn-effektið** — mbl hard-deletar withdrawn
+listings undir frozen window á multi-nætur seed, svo ~640 raðir hurfu úr glugganum meðan
+crawl-ið stóð. Hvort tveggja vænt; engin merki um pagination-galla.
+
+**GENERATION SPLIT finding**: publishable corpus (682 sale + 24 rent síður) er **scalar-only**
+— Night 2/3 processinn keyrði pre-amendment kóða í minni (in-flight prósess les ekki nýjan
+kóða af diski). Negotiable corpus (168 síður) er **100% v2_enriched**. `fields=v2`
+URL-markerinn í raw_fetches ledger aðgreinir kynslóðirnar nákvæmlega (sannreynt:
+682/0 v2, 106/106 v2, 62/62 v2). **§3c parser SKAL þola báðar kynslóðir** (nested-missing
+OG nested-present blobs).
+
+**DECISION — enriched re-sweep forgangsraðað STRAX**: mbl er closed history (syna=false=0,
+hard-deletes); myndir/agency/nested gögn listings sem dragast til baka á biðtímanum eru
+ÓENDURHEIMTANLEG — re-sweep fer því fram fyrir P3-backlog-hugsunina. Mechanism: existing
+`--force-restart` + nýja history-archive netið (b57b7c0) varðveitir upprunalegu seed-gluggana
+í `<key>_history`. Keyrsluplan: rent (~24 síður) + sale 400 síður í dag/nótt, `--mode resume`
+á morgun þar til exhaust. **Footgun skjalfest**: `--force-restart` má BARA nota á FYRSTU
+keyrslu hvors mode í re-sweepinu — á resume-keyrslum myndi hann núllstilla gluggann aftur
+og henda progress.
+
+**Commits**: 862f86a (v2_enriched field selection — allir scalars nema generated_fts, öll
+10 image-variants, nested agency/attachments/openhouse/postal_code/promo; deliberate
+exclusions: generated_fts, favorite [user-scoped], fs_count/rt_count [volatile counters sem
+brytu §2.1.1 content-hash dedup]) + b57b7c0 (force-restart history-archive). Testar 25 → 30.
+
+**NORM CHANGE — commit attribution**: Co-Authored-By trailer endurspeglar héðan í frá
+RAUNVERULEGT módel sessionar (var harðkóðað "Claude Opus 4.8" í template; röng attribution
+leiðrétt í "Claude Fable 5" frá og með 862f86a).
+
+**Operational verklag fest — gated orchestrator-mynstur**: keðjuskript fyrir multi-mode
+crawl-raðir keyra sem gated chain (eitt mode í einu, vænt-tölur sannreyndar milli skrefa),
+abort-not-retry á óvæntri stöðu, PID-wait á undanfara í stað polling-lykkju. Endurnýtanlegt
+fyrir §6 nightly delta orchestration.
+
+**Næst**: re-sweep lýkur (resume á morgun) → Step 3c parse_mbl.py — skema læst: tvær
+source-flavored töflur, báðar blob-kynslóðir, sentinel-reglur (fastano=0→NULL o.fl.),
+foreign-listing flag (Spánarheimili), Hashie::Mash corruption-strip.
+
+---
+
 ## 2026-06-10 — Strategic audit + revised priority sequencing + agent architecture sketch
 
 **Hvað**: External audit by independent Claude session (Fable 5) surveyed all D: drive
