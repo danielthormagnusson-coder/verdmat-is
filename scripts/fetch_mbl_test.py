@@ -421,5 +421,146 @@ class TestFetchMbl(unittest.TestCase):
         self.assertEqual(st["seed_rent_negotiable"]["frozen_max_id"], 300)
 
 
+class TestDeltaNegotiableAndPrime(unittest.TestCase):
+    """§6-A.1 gap fixes: delta-negotiable modes + prime_delta_since safety gates."""
+
+    # ── delta-negotiable modes ──
+    def test_t31_delta_negotiable_modes_and_predicates(self):
+        self.assertIn("delta-sale-negotiable", fm.MODE_CHOICES)
+        self.assertIn("delta-rent-negotiable", fm.MODE_CHOICES)
+        qs = fm.delta_query(fm.MODECFG["delta-sale-negotiable"], "2026-06-11T00:00:00+00:00", 0)
+        self.assertIn('br_dags:{_gt:"2026-06-11T00:00:00+00:00"}', qs)
+        self.assertIn("verd:{_eq:0}", qs)
+        self.assertIn("fermetrar:{_gt:0}", qs)
+        self.assertIn("syna:{_eq:true}", qs)
+        self.assertNotIn("verd:{_gt:0}", qs)
+        qr = fm.delta_query(fm.MODECFG["delta-rent-negotiable"], "2026-06-11T00:00:00+00:00", 0)
+        self.assertIn('updated:{_gt:"2026-06-11T00:00:00+00:00"}', qr)
+        self.assertIn("price:{_eq:0}", qr)
+        self.assertIn("size:{_gt:0}", qr)
+        self.assertNotIn("price:{_gt:0}", qr)
+        # synthetic URLs carry the op + fields=v2 marker
+        u = fm.synthetic_url(fm.MODECFG["delta-sale-negotiable"]["op"], since="2026-06-11")
+        self.assertIn("op=delta_check_sale_negotiable", u)
+        self.assertIn("fields=v2", u)
+
+    def test_t32_delta_negotiable_own_since_key_and_kind(self):
+        st = fm.default_state()
+        st["delta_sale"]["last_br_dags_seen"] = "2026-06-01T00:00:00+00:00"   # must stay untouched
+
+        def handler(q, idx):
+            off = _offset(q)
+            rows = sale_rows([5, 4]) if off == 0 else []
+            return FakeResp(200, body({"data": {"fs_fasteign": rows}}))
+        conn = mem_conn()
+        f = fetcher(FakeSession(handler), conn, state=st, mode="delta-sale-negotiable")
+        f.run()
+        # own high-water advanced; plain delta-sale untouched
+        self.assertEqual(st["delta_sale_negotiable"]["last_br_dags_seen"],
+                         max(r["br_dags"] for r in sale_rows([5, 4])))
+        self.assertEqual(st["delta_sale"]["last_br_dags_seen"], "2026-06-01T00:00:00+00:00")
+        # new fetch_kind discriminator, still under the list_page_ prefix (parser-compatible)
+        kinds = {r[0] for r in conn.execute("SELECT fetch_kind FROM raw_fetches")}
+        self.assertEqual(kinds, {"list_page_sale_negotiable_delta"})
+
+    # ── prime_delta_since ──
+    def _parsed_mem(self, sale=((1, "2026-06-09T01:00:00+00:00", 0),
+                                (2, "2026-06-09T02:00:00+00:00", 1)),
+                    rent=((10, "2026-06-09T03:00:00", 0),
+                          (11, "2026-06-09T04:00:00", 1))):
+        import init_parsed_mbl_schema as initp
+        pc = sqlite3.connect(":memory:")
+        initp.init_schema_on_conn(pc)
+        for slid, ts, neg in sale:
+            pc.execute("INSERT INTO parsed_mbl_sale(source_listing_id, raw_id, content_hash, "
+                       "fetched_at, fields_version, parser_version, parsed_at, eign_id, "
+                       "br_dags, is_negotiable, is_foreign) VALUES(?,1,'h','f','v1_scalar',"
+                       "'p','t',?,?,?,0)", (slid, slid, ts, neg))
+        for slid, ts, neg in rent:
+            pc.execute("INSERT INTO parsed_mbl_rent(source_listing_id, raw_id, content_hash, "
+                       "fetched_at, fields_version, parser_version, parsed_at, id, "
+                       "updated, is_negotiable, is_foreign, address_corrupt) "
+                       "VALUES(?,1,'h','f','v1_scalar','p','t',?,?,?,0,0)", (slid, slid, ts, neg))
+        pc.commit()
+        return pc
+
+    def setUp(self):
+        import prime_delta_since as pds
+        self.pds = pds
+        self._orig_procs = pds._live_fetcher_processes
+        pds._live_fetcher_processes = lambda: []          # default: no live fetcher
+        self.addCleanup(lambda: setattr(pds, "_live_fetcher_processes", self._orig_procs))
+
+    def test_t33_prime_computes_per_slice_maxima(self):
+        vals = {(k, sk): v for k, sk, v in self.pds.compute_since_values(self._parsed_mem())}
+        self.assertEqual(vals[("delta_sale", "last_br_dags_seen")], "2026-06-09T01:00:00+00:00")
+        self.assertEqual(vals[("delta_sale_negotiable", "last_br_dags_seen")],
+                         "2026-06-09T02:00:00+00:00")
+        self.assertEqual(vals[("delta_rent", "last_updated_seen")], "2026-06-09T03:00:00")
+        self.assertEqual(vals[("delta_rent_negotiable", "last_updated_seen")],
+                         "2026-06-09T04:00:00")
+
+    def test_t34_prime_dry_run_writes_nothing(self):
+        p = tmp_state()
+        changes = self.pds.run_priming(self._parsed_mem(), p, confirm=False, log=silent)
+        self.assertEqual(len(changes), 4)
+        self.assertFalse(os.path.isfile(p))               # dry-run: no state file created
+
+    def test_t35_prime_confirm_writes_all_four(self):
+        p = tmp_state()
+        self.pds.run_priming(self._parsed_mem(), p, confirm=True, log=silent)
+        st = fm.load_state(p)
+        self.assertEqual(st["delta_sale"]["last_br_dags_seen"], "2026-06-09T01:00:00+00:00")
+        self.assertEqual(st["delta_sale_negotiable"]["last_br_dags_seen"],
+                         "2026-06-09T02:00:00+00:00")
+        self.assertEqual(st["delta_rent"]["last_updated_seen"], "2026-06-09T03:00:00")
+        self.assertEqual(st["delta_rent_negotiable"]["last_updated_seen"], "2026-06-09T04:00:00")
+        self.assertFalse(os.path.isfile(p + ".tmp"))      # atomic os.replace path
+        os.remove(p)
+
+    def test_t36_prime_refusal_branches(self):
+        p = tmp_state()
+        # (a) live fetch_mbl process
+        self.pds._live_fetcher_processes = lambda: ["python fetch_mbl.py --mode resume"]
+        with self.assertRaises(self.pds.PrimeRefusal):
+            self.pds.run_priming(self._parsed_mem(), p, confirm=True, log=silent)
+        self.pds._live_fetcher_processes = lambda: []
+        # (b) recent state activity (heuristic also covers scan-unavailable case)
+        st = fm.default_state()
+        st["seed_sale"]["last_page_at"] = fm.now_iso()
+        fm.save_state(p, st)
+        with self.assertRaises(self.pds.PrimeRefusal):
+            self.pds.run_priming(self._parsed_mem(), p, confirm=True, log=silent)
+        os.remove(p)
+        # (c) since_key already set, no --force
+        p2 = tmp_state()
+        st2 = fm.default_state()
+        st2["delta_sale"]["last_br_dags_seen"] = "2026-05-01T00:00:00+00:00"
+        fm.save_state(p2, st2)
+        with self.assertRaises(self.pds.PrimeRefusal):
+            self.pds.run_priming(self._parsed_mem(), p2, confirm=True, log=silent)
+        os.remove(p2)
+        # (d) empty parsed slice
+        with self.assertRaises(self.pds.PrimeRefusal):
+            self.pds.run_priming(self._parsed_mem(sale=(), rent=()), tmp_state(),
+                                 confirm=True, log=silent)
+        self.assertFalse(os.path.isfile(p))               # nothing ever written on refusal
+
+    def test_t37_prime_force_archives_old_value(self):
+        p = tmp_state()
+        st = fm.default_state()
+        st["delta_sale"]["last_br_dags_seen"] = "2026-05-01T00:00:00+00:00"
+        fm.save_state(p, st)
+        self.pds.run_priming(self._parsed_mem(), p, confirm=True, force=True, log=silent)
+        loaded = fm.load_state(p)
+        self.assertEqual(loaded["delta_sale"]["last_br_dags_seen"], "2026-06-09T01:00:00+00:00")
+        hist = loaded["delta_sale_history"]
+        self.assertEqual(hist[0]["last_br_dags_seen"], "2026-05-01T00:00:00+00:00")
+        self.assertIn("archived_at", hist[0])
+        # modes that were NOT previously set get no history entry
+        self.assertNotIn("delta_rent_history", loaded)
+        os.remove(p)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -23,6 +23,7 @@ CLI:
   python fetch_mbl.py --mode aggregate-check                 # 1 request, no writes
   python fetch_mbl.py --mode seed-sale [--max-pages N] [--dry-run]
   python fetch_mbl.py --mode seed-rent | delta-sale | delta-rent
+  python fetch_mbl.py --mode delta-sale-negotiable | delta-rent-negotiable   # Tilboð slices
   python fetch_mbl.py --mode resume                          # continue in-flight seed/delta
 
 deps: stdlib + requests + canonicalize_mbl.
@@ -112,11 +113,25 @@ MODECFG = {
     "delta-rent": {"key": "delta_rent", "root": "rentals_property", "pk": "id", "fields": RENT_FIELDS,
                    "draft": "price:{_gt:0}, size:{_gt:0}", "kind": "list_page_rent",
                    "op": "delta_check_rent", "delta_field": "updated", "since_key": "last_updated_seen"},
+    # negotiable delta slices (§6-A.1 gap fix): plain delta carries the PUBLISHABLE predicate,
+    # so Tilboð-population changes (72.3% of real rent corpus) were delta-blind in steady-state.
+    # Each has its OWN high-water (own state dict); fetch_kind keeps the list_page_ prefix so
+    # parse_mbl's kind->root mapping picks the blobs up unchanged, with a _delta discriminator
+    # so the ledger separates delta pages from seed/re-sweep pages.
+    "delta-sale-negotiable": {"key": "delta_sale_negotiable", "root": "fs_fasteign", "pk": "eign_id",
+                   "fields": SALE_FIELDS, "draft": "syna:{_eq:true}, verd:{_eq:0}, fermetrar:{_gt:0}",
+                   "kind": "list_page_sale_negotiable_delta", "op": "delta_check_sale_negotiable",
+                   "delta_field": "br_dags", "since_key": "last_br_dags_seen"},
+    "delta-rent-negotiable": {"key": "delta_rent_negotiable", "root": "rentals_property", "pk": "id",
+                   "fields": RENT_FIELDS, "draft": "price:{_eq:0}, size:{_gt:0}",
+                   "kind": "list_page_rent_negotiable_delta", "op": "delta_check_rent_negotiable",
+                   "delta_field": "updated", "since_key": "last_updated_seen"},
 }
 
 # --mode choices (kept module-level so tests assert on it without invoking main()/the DB).
 MODE_CHOICES = ["seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable",
-                "delta-sale", "delta-rent", "aggregate-check", "resume"]
+                "delta-sale", "delta-rent", "delta-sale-negotiable", "delta-rent-negotiable",
+                "aggregate-check", "resume"]
 
 
 class KillSwitch(RuntimeError):
@@ -167,6 +182,8 @@ def default_state() -> dict:
                       "last_page_at": None, "halt_reason": None},
         "delta_sale": {"last_br_dags_seen": None, "last_run_at": None, "halt_reason": None},
         "delta_rent": {"last_updated_seen": None, "last_run_at": None, "halt_reason": None},
+        "delta_sale_negotiable": {"last_br_dags_seen": None, "last_run_at": None, "halt_reason": None},
+        "delta_rent_negotiable": {"last_updated_seen": None, "last_run_at": None, "halt_reason": None},
         "session_request_count": 0,
     }
 
@@ -436,7 +453,7 @@ class MblFetcher:
     def in_flight(self):
         out = []
         for mode in ("seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable",
-                     "delta-sale", "delta-rent"):
+                     "delta-sale", "delta-rent", "delta-sale-negotiable", "delta-rent-negotiable"):
             s = self.state[MODECFG[mode]["key"]]
             if mode.startswith("seed"):
                 started = (s.get("frozen_max_id") is not None and not s.get("completed")) or s.get("halt_reason")
@@ -464,7 +481,7 @@ class MblFetcher:
     def dispatch(self, mode):
         if mode in ("seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable"):
             return self._seed(mode)
-        if mode in ("delta-sale", "delta-rent"):
+        if mode in ("delta-sale", "delta-rent", "delta-sale-negotiable", "delta-rent-negotiable"):
             return self._delta(mode)
         if mode == "aggregate-check":
             return self.aggregate_check()
