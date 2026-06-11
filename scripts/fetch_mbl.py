@@ -324,6 +324,11 @@ class MblFetcher:
             self.log("  %s already completed (use --force-restart to re-seed)" % mode)
             return
         if self.force_restart:
+            # archive the old window before wiping — frozen_max_id/total_fetched of a finished
+            # seed are otherwise unrecoverable (state file is overwritten in place)
+            archived = dict(st)
+            archived["archived_at"] = now_iso()
+            self.state.setdefault(key + "_history", []).append(archived)
             st.update(default_state()[key])
         single = (mode != "seed-sale")                        # only main seed-sale is multi-night
         self.log("=== %s (%s) ===" % (mode, "single-run expected" if single

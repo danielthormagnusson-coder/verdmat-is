@@ -347,6 +347,62 @@ class TestFetchMbl(unittest.TestCase):
                 # nested shape survives canonicalization (sanity: it really is the enriched form)
                 self.assertIn(b'"images"', raw)
 
+    # ── force_restart history archive ──
+    def test_t29_force_restart_archives_old_state(self):
+        st = fm.default_state()
+        st["seed_sale"].update({"frozen_max_id": 500, "last_offset": 320, "total_fetched": 800,
+                                "completed": True, "universe_pages": 40})
+        snap = {}
+
+        def handler(q, idx):
+            if "limit:1)" in q:
+                # state at max_id time = right after the reset -> must be clean default
+                snap["at_reset"] = dict(fref["f"].state["seed_sale"])
+                return FakeResp(200, body({"data": {"fs_fasteign": [{"eign_id": 925}]}}))
+            if "aggregate" in q:
+                return FakeResp(200, agg_body(16, 0))
+            return FakeResp(200, body({"data": {"fs_fasteign": []}}))   # exhaust immediately
+        fref = {}
+        f = fetcher(FakeSession(handler), mem_conn(), state=st, mode="seed-sale", force=True)
+        fref["f"] = f
+        f.run()
+        # old window archived intact at history[0], stamped
+        hist = f.state["seed_sale_history"]
+        self.assertEqual(len(hist), 1)
+        self.assertEqual(hist[0]["frozen_max_id"], 500)
+        self.assertEqual(hist[0]["total_fetched"], 800)
+        self.assertTrue(hist[0]["completed"])
+        self.assertIn("archived_at", hist[0])
+        # new state was a clean default at re-establish time...
+        self.assertIsNone(snap["at_reset"]["frozen_max_id"])
+        self.assertEqual(snap["at_reset"]["last_offset"], 0)
+        self.assertFalse(snap["at_reset"]["completed"])
+        self.assertNotIn("archived_at", snap["at_reset"])
+        # ...and the re-seed then self-established the NEW window
+        self.assertEqual(f.state["seed_sale"]["frozen_max_id"], 925)
+
+        # second force_restart -> history grows to 2, in order
+        f2 = fetcher(FakeSession(handler), mem_conn(), state=f.state, mode="seed-sale", force=True)
+        fref["f"] = f2
+        f2.run()
+        hist = f2.state["seed_sale_history"]
+        self.assertEqual(len(hist), 2)
+        self.assertEqual(hist[0]["frozen_max_id"], 500)    # original window first
+        self.assertEqual(hist[1]["frozen_max_id"], 925)    # then the re-seeded one
+        self.assertLessEqual(hist[0]["archived_at"], hist[1]["archived_at"])
+
+    def test_t30_state_roundtrip_preserves_history_key(self):
+        p = tmp_state()
+        st = fm.default_state()
+        st["seed_sale_history"] = [{"frozen_max_id": 500, "total_fetched": 800,
+                                    "completed": True, "archived_at": "2026-06-11T00:00:00+00:00"}]
+        fm.save_state(p, st)
+        self.assertFalse(os.path.isfile(p + ".tmp"))       # atomic path unchanged
+        loaded = fm.load_state(p)
+        self.assertEqual(loaded["seed_sale_history"][0]["frozen_max_id"], 500)
+        self.assertNotIn("seed_sale_history", fm.default_state())   # created lazily, not a default
+        os.remove(p)
+
     def test_t25_negotiable_fallback_queries_max_when_no_main_seed(self):
         # main seed never started (frozen_max_id None) -> negotiable queries max + aggregate itself
         st = fm.default_state()
