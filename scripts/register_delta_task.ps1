@@ -9,7 +9,7 @@
 # Schedule:    Daily at 01:00 local time (§6-A.4 — clears the 03:00 backup window;
 #              delta is normally minutes, worst case ~6.7h at the 100-page/mode cap)
 # Wake:        YES (wakes from sleep to run; AC sleep is disabled anyway)
-# Run whether user logged in: YES (stored creds via Password logon, same as backup)
+# Run whether user logged in: YES (S4U — no stored password; see principal note below)
 # Retry:       NONE — abort-not-retry is chain policy (§6-A.3); a failed night is a
 #              signal for Danni, not something to hammer at. (StartWhenAvailable still
 #              covers "machine was off at 01:00".)
@@ -56,12 +56,17 @@ $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -ExecutionTimeLimit (New-TimeSpan -Hours 8)
 
-# Run whether user logged in or not — same principal pattern as the backup task
-# (user-level per §6-A.4-Q2 decision; delta needs no elevation).
+# Run whether user logged in or not — S4U principal, DELIBERATE DEVIATION from the
+# backup-task pattern: the Password-logon principal NEVER prompts when passed via
+# -Principal (prompting only happens with -User/-Password parameters), so registration
+# failed with "user name or password is incorrect" and no stored credential
+# (2026-06-12 elevated run). S4U needs no password, runs whether the user is logged in
+# or not, and is sufficient for the chain: local disk + outbound HTTPS only, no
+# network-share credentials needed. RunLevel Limited — delta needs no elevation.
 $principal = New-ScheduledTaskPrincipal `
-    -UserId "$env:USERDOMAIN\$env:USERNAME" `
-    -LogonType Password `
-    -RunLevel Highest
+    -UserId $env:USERNAME `
+    -LogonType S4U `
+    -RunLevel Limited
 
 # If task already exists, replace it idempotently.
 $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
@@ -70,16 +75,25 @@ if ($existing) {
     "Unregistered existing $taskName"
 }
 
-# Will prompt for password on first registration.
-Register-ScheduledTask `
-    -TaskName $taskName `
-    -Description 'verdmat.is mbl nightly delta chain (4 modes, fetch-only v1, abort-not-retry). Daily 01:00 local. Exit 0 clean / 1 abort / 2 pre-flight refusal.' `
-    -Action $action `
-    -Trigger $trigger `
-    -Settings $settings `
-    -Principal $principal
+# Success echo is conditional: -ErrorAction Stop + try/catch so "Registered..." can
+# NEVER print after a failed registration (the 2026-06-12 failure printed it anyway —
+# misleading).
+try {
+    Register-ScheduledTask `
+        -TaskName $taskName `
+        -Description 'verdmat.is mbl nightly delta chain (4 modes, fetch-only v1, abort-not-retry). Daily 01:00 local. Exit 0 clean / 1 abort / 2 pre-flight refusal.' `
+        -Action $action `
+        -Trigger $trigger `
+        -Settings $settings `
+        -Principal $principal `
+        -ErrorAction Stop | Out-Null
 
-"Registered $taskName"
-Get-ScheduledTask -TaskName $taskName | Format-List TaskName, State, Triggers
-"Next run time:"
-(Get-ScheduledTaskInfo -TaskName $taskName).NextRunTime
+    "Registered $taskName"
+    Get-ScheduledTask -TaskName $taskName | Format-List TaskName, State, Triggers
+    "Next run time:"
+    (Get-ScheduledTaskInfo -TaskName $taskName).NextRunTime
+}
+catch {
+    "REGISTRATION FAILED: $($_.Exception.Message)"
+    exit 1
+}
