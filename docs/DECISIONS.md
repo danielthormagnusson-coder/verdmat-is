@@ -356,6 +356,20 @@ crawls (~5.7h, Session A) → Step 3c parser design + impl → Step 3d promotion
 track A (T5 street views) can start in a fresh Claude Code session anytime; no in-flight
 scraper dependency.
 
+**LEIÐRÉTT 2026-06-12 (endurmæling):** „196,5 GB / 921K images" talan að ofan var
+snapshot frá 2026-05-08, FYRIR Stage B-myndasóknina. Safnið mælist nú **548,5 GiB /
+2.648.381 skrár / 55.637 distinct fastnum yfir 7 rætur** (robocopy-mæling per rót,
+staðfest gegn image_index.db — diskur og index stemma). image_index.db (790 MB, 2,63M
+raðir, PK fastnum+image_nr, 99,998% downloaded=1) er master-indexið; local_path vísar
+INN í upprunalegu pakkamöppurnar — skrár voru indexaðar á sínum stað, engin tvítekning
+milli Gagnapakkar\images\ og pakkanna. Skráarnöfn eru sequential <fastnum>\<n>.jpg,
+EKKI URL-basename — URL→skrá vörpun virkar EINGÖNGU gegnum image_index.db.
+Leiguskra-myndir (1,7 GiB, 1.145 möppur) eru óindexaðar enn. 350 GB laus á D: —
+diskpláss er héðan í frá vöktuð auðlind (mirror-sókn nýju uppsprettanna bætir 50–150 GB
+við). Opin 3e-hönnunaratriði (ÁKVEÐAST við Step 3e hönnun, ekki nú): (a) framlengja
+image_index.db vs ný mirror-DB — fastnum-þekja mbl-corpussins mælist fyrst; (b)
+backup-staða 548 GiB safns sem er UTAN R2-backupsins.
+
 ---
 
 ## 2026-06-09 — Spec correction: §5 #5 + §2.4-C image archival policy
