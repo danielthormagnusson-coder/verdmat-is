@@ -77,6 +77,25 @@ report **skrá-only þar til §7 delivery** er byggt (Q4 — engin email/Sentry 
 + full-corpus parse_mbl --confirm → prime_delta_since --confirm → register_delta_task
 (elevated) → fyrsta nótt + morgunreport-yfirferð. Hvert skref sér gated go.
 
+**VIÐBÓT 2026-06-12 — öll operational gates kláruð sama dag; §6-A v1 ER LIVE**: Re-sweep
+exhaust staðfest (sale 10.936 / rent 376 enriched). **Full-corpus parse lokið og verified**:
+1.582 blobs (706 v1 + 876 v2) / 25.261 listings → **13.873 sale + 1.371 rent raðir á 52,9s,
+0 DLQ**; nested 100% á v2-röðum; **idempotency sönnuð á alvöru gögnum** (re-run: 25.261
+skipped, 0 breytt). **v1-winners 1.243 sale + 16 rent = fyrsti mældi withdrawal-forsmekkurinn**
+(listing séð í scalar-seedinu 9.–10.6 en aldrei í v2) — MEÐ efri-marka caveat: talan blandar
+alvöru hard-deletes, verd→0/syna→false umbreytingum post-negotiable-seed og offset-drift
+pagination-missum re-sweepsins (4,5%/dag er yfir markaðstakti; rent 1,4%/dag nær raunveru) →
+**tveggja-fjarvista reglan (sbr. v1 §7.2) fer í 3d-hönnunina, single-sweep diff stimplar
+ALDREI withdrawn_at**. **is_foreign 1.140 (8,2% af sale)** — Spánarheimili-blokkin er
+efnisleg promotion-sía í 3d, ekki edge-case. **Prime lokið**: öll fjögur since_keys sett úr
+parsed maxima (sale 12.6T00:34 / rent 11.6T09:05 / negotiable bæði 10.6T18:xx); recency-
+girðingin sannaði sig í leiðinni (neitaði <30 mín frá re-sweep lokum — beðið, ekki bypassað).
+**register_delta_task.ps1 S4U-fix (fc206e6)**: Password-principal via -Principal promptar
+aldrei → skráning féll 12.6 með misvísandi success-echo; nú S4U logon (ekkert geymt lykilorð,
+dugar local-disk + outbound-HTTPS keðju) + RunLevel Limited + skilyrt echo í try/catch.
+**Taskið SKRÁÐ og Ready hjá Danna — fyrsta nótt 13.6.2026 kl. 01:00**, morgunreport í
+scraper_data/night_logs/.
+
 ---
 
 ## 2026-06-11 (T5) — Semantic layer fasi 1+1.5 live: könnun → hönnun → 4 MV í Supabase á einum degi
