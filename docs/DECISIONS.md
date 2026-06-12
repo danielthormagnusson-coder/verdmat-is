@@ -4,6 +4,158 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-11 (§6-A + delta-vélbúnaður) — Nightly delta orchestration spec-amendment + chain v1 smíðuð (ÓVOPNUÐ)
+
+**Hvað**: §6-A amendment skrifað í un-tracked spec-draftinn (SCRAPER_SPEC_v2_draft.md,
+1.066 → 1.230 línur, additive) og allur delta-vélbúnaðurinn smíðaður, testaður og
+live-validated — en VOPNUN bíður operational gates (re-sweep exhaust → full-corpus parse
+→ prime → task-arming). Scraper-commits dagsins: 8abc01e (Step 3c parse_mbl tier, 963
+línur, 17 testar — full-corpus keyrsla gated á re-sweep lok), 471edc7 (delta-göp),
+23726b9 (chain + scheduler).
+
+**§6-A amendment efnislega (lifecycle per source)**: mbl = delta-only nightly
+(urgency-locked); visir = vikulegt timed-batch refresh undir IP-throttle (≤300 req/batch,
+45–60 mín pásur, ~10–15h); myigloo = nightly index-walk (9 síður — gefur ókeypis
+withdrawal-diff) + vikulegt full detail (~22 mín).
+
+**Withdrawal detection — fyrsta flokks hönnun, EKKI neðanmáls**: mbl hard-deletar →
+hvarf ER afskráningardagurinn sem time-on-market og T1 asking-vs-sold þurfa. Lykilinnsýn:
+**16-raða þakið er per REQUEST óháð field-fjölda → id-only liveness-sweep kostar
+nákvæmlega sömu ~950 síður og full enriched sweep** — þar með er vikulega liveness-sweepið
+FULL ENRICHED re-sweep (sama budget kaupir liveness-diff OG content/mynda-refresh í einu;
+re-sweep vélbúnaðurinn b57b7c0 er tólið). Diff: live id-mengi vs is_active mbl-mengi í
+canonical → withdrawn_at. **Interval-semantík á withdrawn_at**: vikuleg sweep gefur bil
+(last_seen_at = neðri mörk, sweep-dagur = efri), ekki punktdag — ±3,5 dagar á metric sem
+mælist í vikum; skjalfest í column-comment. **Cadence: laugardagskvöld vikulega**
+(nightly = allt §0.5 budgetið á hverri nóttu, ósjálfbært; monthly = ±2 vikur, of gróft).
+
+**TVÆR LOCKED RULES**:
+1. **Since-priming er SKYLDA fyrir fyrstu delta-nótt (1970-guard)**: since_key=NULL
+   post-seed þýðir að fyrsta delta sweepar frá epoch og advance-ar high-water framhjá
+   page-budget þakinu — breytingar handan þaksins skippast VARANLEGA. Prime úr parsed
+   corpus maxima (prime_delta_since.py), aldrei 1970-keyrslu af stað.
+2. **§2.3 `is_active` amendað í per-source liveness-semantík**: 2-daga reglan
+   (last_seen_at ≥ run_ts − 2d) gerði ráð fyrir nightly-full-sweep uppsprettum og hefði
+   **mass-false-withdrawað allan mbl-stofninn** undir delta-only steady-state (óbreytt
+   heilbrigð listing sést aldrei milli vikulegra sweepa). mbl: explicit liveness-sweep
+   diff EINGÖNGU; myigloo/visir: absence úr þeirra index; delta-hit refreshar
+   last_seen_at en absence úr delta þýðir EKKERT.
+
+**Delta-göpin tvö + fixar (471edc7)**: (1) negotiable sneiðin var delta-blind (delta-modes
+báru publishable predicate — 72,3% af real rent corpus hefði aldrei fangast í
+steady-state) → delta-sale-negotiable + delta-rent-negotiable með eigin since_keys og
+fetch_kind discriminatorum (haldið undir list_page_ prefix fyrir parser-samhæfni);
+(2) prime_delta_since.py með hörðum REFUSE-girðingum (live fetcher via process-scan +
+recency-heuristik / since þegar sett nema --force m. history-archive / tómur parsed
+slice), dry-run default, atomic state-write. Testar 30 → 37.
+
+**Nightly chain v1 + scheduler smíðuð, live-validated, ÓVOPNUÐ (23726b9)**:
+nightly_delta_chain.sh = 4 delta-modes serial, gated á exit 0 + halt_reason null,
+abort-not-retry, pre-flight girðingar (exit 2): live-fetcher / since-primað / 24h-budget
+≤900 síður; cap-hit WARNING per mode (high-water advance-ar framhjá ósweepuðum síðum við
+cap); morgunreport í night_logs/ (síður/listings/high-water/halt per mode + samtala);
+PYTHONIOENCODING=utf-8 (run_monthly latent-bug #5 lexían — mojibake sást í fyrsta dry-run,
+root-fixað). **Dry-run live-validation sannaði allar þrjár girðingar gegn raunveruleikanum**:
+fann keyrandi re-sweep prósessinn, flaggaði öll fjögur óprimuð since_keys, taldi 488+400=888
+≤ 900. register_delta_task.ps1 = verdmat-nightly-delta 01:00 daily, speglar backup-mynstrið
+MEÐ viljandi fráviki: enginn RestartCount (abort-not-retry er keðjustefnan), 8h limit.
+
+**Automation-þrep eftir blast radius (§6-A.3, HALT-disciplinið lifir af automation)**:
+v1 = fetch-only STRAX post-gates (raw layer append-only + idempotent, versta tilfelli
+sóaðar requests); v2 = + incremental parse eftir EINA sannaða handvirka full-corpus
+keyrslu (sér-DB, idempotent, DLQ soft-fail); v3 = + promote SÍÐAST eftir 2–3 sannaðar
+handvirkar promote-lotur (sama bar og run_monthly push-gate) — prod-skrif fara ekki í
+unattended loop fyrr.
+
+**Scheduling-ákvarðanir (§6-A.4-Q svarað af Danna)**: Task Scheduler 01:00 **user-level**
+(Q2, backup-precedent); **automated WU-re-arm í einangruðu elevated taski + dagatals-
+áminning fyrstu mánuðina** (Q1, belt-and-suspenders þar til re-arm taskið er sannað);
+**vélin er alltaf á** (Q3 — AC sleep/hibernate þegar óvirk per power-settings); morgun-
+report **skrá-only þar til §7 delivery** er byggt (Q4 — engin email/Sentry wiring strax).
+
+**Næst (operational gates, í röð)**: re-sweep exhaust (Session A) → init_parsed_mbl_schema
++ full-corpus parse_mbl --confirm → prime_delta_since --confirm → register_delta_task
+(elevated) → fyrsta nótt + morgunreport-yfirferð. Hvert skref sér gated go.
+
+---
+
+## 2026-06-11 (T5) — Semantic layer fasi 1+1.5 live: könnun → hönnun → 4 MV í Supabase á einum degi
+
+**Hvað**: Track A (T5 úr 2026-06-10 audit) keyrði allan hringinn í einni session:
+empírísk könnun (strangt read-only) → view-hönnunardraft → fasi 1 creation → fasi 1.5
+materialization + composition-bias fix. Nýtt **`semantic` schema live í Supabase: 5
+objektar** — `_sales_base` (venjulegt view, internal grunnlag: sales_history ⋈ properties
+m. götunormaliseringu, −2 nýbyggingarproxy, per-árs p01/p99 ppm2_real outlier-flaggi) +
+**4 MATERIALIZED views** (`v_street_directory` 24.253 raðir, `v_matsvaedi_prices_yearly`
+9.216, `v_street_prices` 3.869, `v_postnr_prices_yearly` 6.554) m. UNIQUE index á natural
+key hvers. Owner-rights (EKKI security_invoker — meðvitað frávik frá Group B mynstri:
+framtíðar agent-role þarf þá bara schema-USAGE + view-SELECT, ekkert á base-töflur), EKKI
+PostgREST-exposed, **ENGIN GRANT enn** (agent-role er sér gated skref). Spec-draft
+(un-tracked per verklagsreglu): `D:\verdmat-is\T5_SEMANTIC_VIEWS_v1_draft.md` — 12 views
+hönnuð m. full-SQL + caveats sem first-class agent-knowledge deliverable; 8 eftir í fasa 2.
+
+**Könnunar-grunnur (læstur í draft §0)**: `sales_history` er pairs-leidd arm's-length
+undirmengi (173.867 raðir, 2006-05 → 2026-04-17, verð í HEILUM kr; full kaupskrá er
+local-only á D:\kaupskra.csv) — 100% fastnum-match við properties. **420 onothaefur=1
+lekar** (þar af 290 frá 2025–26, D3/refresh-append án síunar) → hörð `onothaefur=0` sía
+harðkóðuð í hverju viewi. Gata krefst parsing úr heimilisfang (17.805 götur; 2.619 nöfn í
+>1 sveitarfélagi → **lykill = gata×sveitarfélag**, 24.322 pör; tvær formatting-kynslóðir
+[D3-recovery sviga-form] normaliseraðar í _sales_base). Þéttleiki 2020+ residential clean
+(66,4K sölur): gata median 6 sölur (86% sala á ≥10-götum → pooled 5 ára gluggi + HAVING ≥5
+gat), matsvæði median 140 (~80/175 bera ≥30/ár → árstrend), póstnr fallback-lag. Blöndun
+fjölbýli/sérbýli á 677/1.455 ≥10-götum → per-tegund GROUPING SETS m. 'allt'-rollup.
+
+**§6 ákvarðanir Danna — átta, allar afgreiddar**: (1) owner-rights grant-líkan samþykkt;
+(2) PostgREST-exposure NEI í v1; (3) nýbygging = byggar ≥ söluár−2 (canonical regla,
+samræmi við `is_new_build = FULLBUID=0 OR age_at_sale ≤ 2` í training-pipeline; 17,2% sala
+2020+); (4) heat-þröskuldar v_hood_heat standa sem v1-heuristik MEÐ skyldu-kalibreringar-
+tékki gegn ats_dashboard_monthly_heat við fasa-2 creation; (5) agent-role fær EKKI
+_sales_base í v1 (aggregates eingöngu); (6) **ONOTHAEFUR-append lekinn á backlog sem
+upstream root-fix** (views verja sig sjálf á meðan); (7) sveitarfélaganafna-möppun
+(„Kópavogur"↔„Kópavogsbær") verður statískt lookup-view í fasa 2 per canonical-layer
+reglu; (8) **composition-bias fix (domain-innsýn Danna)**: median á einingu með háa
+nýbyggingahlutdeild er nýbyggingaverð, ekki verðmæti eldri stofnsins — verð-viewin þrjú
+fengu `n_existing` + `median_ppm2_real/nominal_existing` + `median_kaupverd_nominal_existing`
++ `median_ppm2_real_newbuild`, öll með 5-sölu þunn-sellu NULL-vörn. **Empírían**: bítur á
+blönduðum einingum (Ánanaust: 'allt' 1.066þ. vs existing 839þ. real-kr/m² = 227þ. bias;
+Sólbakki Fjarðabyggð 460þ.), ~0 á rótgrónum götum (Hraunbær) — og **Sunnusmára-lærdómurinn**:
+á alnýjum götum þar sem „eldri stofninn" er sjálfur nýlegar endursölur er bilið ~0
+(n_existing=129 hitti spá, bil gerði það ekki) — build-freshness skipting aðgreinir
+sölu-ferskleika, ekki stofn-aldur; skjalfest í caveats.
+
+**Materialization-ákvörðun MÆLD, ekki giskað**: v1-hönnun sagði plain views; creation-
+gátlistinn felldi hana — warm-latency `_sales_base` **25,5s** (properties_pkey full-index-
+scan 23,1s: random heap-IO yfir 232K breiðar jsonb-raðir á litlu instance-i; fyrsta mæling
+33,9s var menguð af samhliða-keyrslu — IO-samkeppni á instance-inu er sjálfstæður lærdómur,
+þung queries keyrast EITT í einu). Storage-mótrökin reyndust draugatala: „424/500 MB" var
+úrelt session-minni; **mælt 1.003 MB / 8 GB Pro-budget (12,5%)**. → 4 output-MV (WITH NO
+DATA í migration = hreint DDL; fyrsta REFRESH sér operational skref), latency eftir:
+**0,145 ms** (indexed götu-lookup) / **116 ms** (full-scan aggregate). Row counts óbreytt
+gegnum materialization. **REFRESH-ábyrgð (draft §4.1)**: handvirkt gated skref eftir HVERJA
+sales_history-uppfærslu þar til run_monthly post-push hook kemur; copy-paste blokk í §4.1;
+eitt í einu, ekki samhliða.
+
+**Migrations + reconciliation-mynstur**: `20260611104645_t5_semantic_phase1` (commit
+0868c42) + `20260611155653_t5_semantic_phase1_5` (commit c29b4b6). **MCP apply_migration
+skráir version sjálft í supabase_migrations.schema_migrations** — ekkert CLI `migration
+repair` þarf (ólíkt psycopg2-leiðinni); reconciliation = disk-skrá nefnd nákvæmlega eftir
+MCP-version. Einfaldara mynstur en 2026-05/06 færslurnar lýsa; gildir framvegis fyrir
+MCP-applied migrations.
+
+**Scraper-schema exposure ráðgáta**: REST-próf (Accept-Profile probe, PGRST106) sýndi
+exposed schemas = public + graphql_public EINGÖNGU — scraper-exposure sem var gerð manually
+~1. júní er horfin. MEÐVITAÐ ekki endurvakin þar til REST-consumer er til; semantic fylgir
+sömu reglu. Aukafinding: authenticator ber statement_timeout=8s — relevant fyrir hvaða
+framtíðar REST-exposure sem er og fyrir agent-role timeout-hönnun.
+
+**Næst (T5 track)**: Fasi 2 creation — 8 views (street_activity, sveitarfelag_market,
+matsvaedi_trend_quarterly, hood_heat, newbuild_share, model_vs_sold_by_hood,
+summerhouse_market, price_distribution_by_hood) + v_sveitarfelag_lookup; gated á tvo §4
+forleiki: predictions-eininga-tékk (liður 3, fyrir model_vs_sold) + heat-kalibrering
+(liður 5). Síðan GRANT-skref samhliða agent-role hönnun (v0 expert agent).
+
+---
+
 ## 2026-06-11 — Step 3b operational closure + enriched re-sweep prioritization
 
 **Hvað**: Öll fjögur mbl seed-modes keyrðu til enda — Step 3b er OPERATIONALLY CLOSED.
