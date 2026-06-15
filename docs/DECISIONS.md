@@ -56,6 +56,33 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 **Næst**: Step 3d hönnunarprompt fyrir `promote_mbl` — afgreiðir þrjú flögg að ofan, mælir atv-tenure raunverulega dreifingu í prómotuninni, promotar mbl-corpus í canonical (1.266 → ~12K raðir). Hvert gated skref sér go.
 
+**VIÐBÓT (síðar 15.6) — STEP 3D HÖNNUNARDRÖG SAMÞYKKT, 5 Q-SVÖR LÆST**
+
+CC3.1 (Opus 4.8) skrifaði `D:\verdmat-is\STEP_3D_DESIGN_v1_draft.md` (341 línur, un-tracked) byggt á empirical foundation að ofan. Chat-Claude (Opus 4.7) tók afstöðu á öllum hönnunaratriðum + 5 open questions; Danni samþykkti. Læsa hér.
+
+**Fimm Q-svör læst**:
+- **Q1 (BLOKKERANDI `ck_price_pos`)** → valkostur (a) **SAMÞYKKTUR**: bæta `is_price_on_request boolean NOT NULL DEFAULT false` við `scraper.listings_canonical`; slaka `ck_price_pos` í `(price_amount > 0 OR is_price_on_request)`. Þriðja schema-breyting í einni migration (með `matshluti_unit_id` + `source_raw_fastnum`). Visir-raðir (price=1 sentinel) fá `is_price_on_request=false` við migration — backfill á þeim er aðskilið verkefni, ekki kritískt fyrir T1.
+- **Q2 (commercial-rent mapping)** → `category='commercial'` + `sub_type='unknown_commercial_rent'` placeholder + `lease_term_class='unknown_commercial'` sentinel-gildi (frekar en NULL — heldur `ck_rent_lease` óbreyttu). LLM-extraction pass (T2-áfangi) refinar síðar. Sentinel-gildi gæti þurft `ck_rent_lease` uppfærslu — staðfesta nákvæmt CHECK við migration-smíði í CC4.x.
+- **Q3 (rent-specific source_priority REVERSAL)** → SAMÞYKKT. Sale: `visir(1) > mbl(2) > myigloo(3)`. Rent: `visir(1) > myigloo(2) > mbl(3)`. Rök: myigloo er rent-sérhæfð (structured lease-term, sqm) með hreinni rent-specific gögn; mbl rent er secondary frá sale-source með þekkta atv-tenure misclassification. **Spec-uppfærsla**: `SCRAPER_SPEC_v2_draft.md §2.3-D` fær tenure-specific source_priority — í sömu lotu og kóðinn fer í verk.
+- **Q4 (within-run mbl↔mbl folding)** → frestað þar til lotu-1 validation. Static snapshot fyrirmynd (eins og visir gerði). Matshluti gerir folding tæknilega öruggt en sannprófun á lotu 1 fyrst.
+- **Q5 (jaðar-encoding 6-/10-stafa, 176 raðir)** → NULL `matshluti` + addr/geo resolution. Engin sérmeðhöndlun.
+
+**Tveggja-lotu slíður LÆST**:
+- **Lota 1 (verðlagt, 11.461 raðir)** = sale-pub 11.069 + rent-pub 392. Óháð Q1. Fer í verk eftir migration. Sannreynir cascade, resolution-pípu og UPSERT-mynstur áður en negotiable corpus snertist.
+- **Lota 2 (negotiable, 2.643 raðir)** = sale-negot 1.664 + rent-negot 979. Gated á Q1 DDL. Reynir á tenure-cascade fyrir alvöru (~1.014 atv → commercial-rent spá; cascade-úttak skráð í promote_mbl stats-counters).
+
+**Schema additions í einni migration (DDL ósamþykkt í Supabase enn)**:
+- `matshluti_unit_id smallint` (NULL cross-source / 0 mbl single-unit / 1–99 suffix)
+- `source_raw_fastnum bigint` (hrái `fastano` lineage; NULL cross-source)
+- `is_price_on_request boolean NOT NULL DEFAULT false`
+- `ck_price_pos` slökun: `(price_amount > 0 OR is_price_on_request)`
+- `ix_lc_fastnum_unit` non-unique composite `(fastnum, matshluti_unit_id) WHERE fastnum IS NOT NULL` (dedup Tier-1 lykla-uppfærsla)
+- Mögulega `ck_rent_lease` uppfærsla fyrir `'unknown_commercial'` sentinel — staðfesta CHECK við migration-smíði.
+
+**4-decision-point promotion-pípa**: `foreign → tenure → price → dedup`; per-row commit (pg + sqlite); watermark-resume á `promoted_to_canonical_at`; UPSERT á `(source, source_listing_id)` með `canonical_version++`; stats-counters á tenure-cascade og dedup-actions.
+
+**Næst**: CC4.x — smíða migration DDL og `promote_mbl.py` í einni session með skýrum gates: (i) migration draft → HALT/samþykki → apply via MCP, (ii) kóði skrifaður, (iii) smoke `--limit 200 --dry-run --slice priced` → HALT, (iv) smoke `--confirm` → HALT, (v) full lota 1 (11.461 raðir), (vi) stats report → HALT á Lotu 2 (sem bíður þá á aðskildu visir-backfill verkefni).
+
 ---
 
 ## 2026-06-11 (§6-A + delta-vélbúnaður) — Nightly delta orchestration spec-amendment + chain v1 smíðuð (ÓVOPNUÐ)
