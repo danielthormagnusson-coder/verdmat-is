@@ -4,6 +4,60 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-15 — Þrjár hreinar nætur + Step 3d empirical foundation
+
+**(1) STEADY-STATE STAÐFEST — sjálfvirka delta-keðjan stöðug yfir 13./14./15.6**:
+- `LastTaskResult=0` öll þrjú kvöld; `halt_reason` null í öllum 6 mode-um; hvert log endar á **CHAIN CLEAN**.
+- Blob-counts: nótt 1 = **68 síður / 1047 listings** (2ja daga uppsöfnun frá priming, vænt); nótt 2 = **20 síður / 293**; nótt 3 = **27 síður / 396**.
+- High-water færist áfram monotónískt á öllum 4 delta-modes; **100% `fields=v2`** á öllum delta-síðum; `fetch_kind *_negotiable_delta` sýnir delta-fix **471edc7** virkan.
+- `session_request_count` = **1727** uppsafnað; pre-flight budget **400/900** með ríflegu borði (mest 68 nýtt á einni nóttu).
+- Engin cap-hit, engin neitun, engin process að lifa milli nætur.
+
+**(2) STEP 3D EMPIRICAL FOUNDATION (CC2.1 könnun 15.6)**:
+
+***Fastnum encoding-uppgötvun (endurnýtanleg þekking)***:
+- mbl-`fastano` er EKKI uniformly 7-stafa HMS-fastnum. Encoding er `fastano = fastnum × 10^k + matshluti` (leiðandi 7 stafir = HMS canonical fastnum, aftari 1–2 stafir = matshluti/eining-index).
+- Empírísk sönnun gegn `public.properties.fastnum` (232.887 raðir 100% 7-stafa, range 2.000.044–2.543.427):
+  * 8-stafa `//10` → **95,4% hittni** (5.639/5.910)
+  * 9-stafa `//100` → **91,0% hittni** (2.944/3.236)
+  * 7-stafa hrátt → 73,8% (foreign + vantar í properties)
+  * Rangir transformar (8`//100`, 9`//10`) → **0%** (afsannar tilviljun)
+  * Random baseline 43%
+- Dreifing í `parsed_mbl_sale` (N=13.873): NULL 5,9% / 7-stafa 10,1% / 6-stafa 1,2% / 8-stafa 50,6% / 9-stafa 32,1%.
+- Implication: Step 3a probe sá „6–9 digit, EKKI uniformly 7-digit" en greindi ekki encoding-ið — pre-amendment sample og engin transform-prófun. Framtíðar uppsprettur (HMS staðfangaskrá, kaupskrá multi-parcel) gætu borið sama mynstur og á að prófa fyrir parser-hönnun.
+
+***Resolution rates***:
+- `parsed_mbl_sale` (N=13.873): derived fastnum ∈ properties = 11.852 (85,4%); non-foreign = **11.789 / 12.733 = 92,6%** (sambærilegt við visir 93%).
+- `parsed_mbl_rent` ber ENGAN fastnum-dálk → 100% rent gegnum address/geo resolution (eins og visir-rent + myigloo).
+
+***Cross-source overlap (mbl × canonical 1.266)***:
+- mbl-sale × visir-sale = **198/208 same-tenure** (95% af visir-sale finnst á mbl, en aðeins **2,4% af mbl-sale** = 198/8.396).
+- mbl × allt canonical fastnum-overlap = 416/1.096 (38% af canonical).
+- mbl er overwhelmingly net-new — bætir ~97,6% net-nýju við sale-corpus.
+- Match-gæði há (sample 10: sama heimilisfang + sama verð beggja vegna).
+- **SOURCE-PRIORITY STATUS QUO LÆST** empírískt: visir(1) > mbl(2) > myigloo(3). Á 198 same-tenure overlap-i vinnur visir (§2.3-D rök: hreinni SSR-parse), mbl foldast í `secondary_source_ids[]`. Munur í endanlegu canonical-i ~10 raðir — ekkert efnislegt rök til að snúa við.
+
+***Post-3d canonical-stærð spá***: 1.266 → **~11.000–13.500 raðir** (efri mörk ef listings haldast per-listing; neðri ef fastnum-dedup þéttir re-lists). mbl bætir 9.000+ nýjum eignum.
+
+***Þrjú LÆST design-flögg fyrir 3d hönnun***:
+
+1. **Unit-collapse (~270 multi-unit nýbyggingar)**: matshluta-suffix VARÐVEITTUR í eigin dálki í canonical-laginu (t.d. `matshluti_unit_id`), ekki sleppt. Rök: kaupskrá vinnur við building-base 7-stafa, en listings auglýsa einstakar einingar; collapse myndi týna per-unit comparables og þétta multi-listings af sama building (t.d. Hringhamar 37 = 16 listings → 1 fastnum) sem ruglar pricing-tölfræðina. Dálkurinn NULL fyrir visir/myigloo (gögn ekki til þar), gildi þaðan sem það er til.
+
+2. **atv-tenure misclassification**: tenure leiðast af parse-merkjum (`tegund_raw` + „(leiga)" í gata + verd=0), EKKI af mbl-endapunkti (`fs_fasteign` er bara root-name, ekki tenure-signal). 1.328 negot-atv bíða prómotunar; hve hátt hlutfall er commercial-rent mælist í prómot-keyrslunni sjálfri. Tenure-cascade sama mynstur og visir/myigloo nota. Án þessa: massíf tenure-mistök OG miss-dedup gegn visir/myigloo commercial-rent (cross-tenure 233-skörun verður þá same-tenure dedup-eligible).
+
+3. **is_foreign sía**: foreign-sía keyrir ÁÐUR EN fastnum-resolution (truncation-collision sönnuð empírískt — spænskar 8–9 stafa fastano truncate-ast óvart í properties-range, t.d. „SPÁNAREIGNIR — Villamartin" fastano 204130526 → 2041305 ∈ props). Íslenskt-override: postfang ∈ {101–902} OR lat 63–67,5 → ekki útilokun jafnvel þótt sentinel-postfang (1053/1000) birtist (Vesturvin-leki, 21 raðir ranglega flaggar). Sentinel-postfang eitt og sér nægir EKKI sem foreign-merki ef íslenskt signal er annars staðar í röðinni.
+
+**(3) JORD-MYSTERY LEYST (mini-probe 15.6)**:
+- mbl aggregate í dag: jord_all 775, fjolb_all 7293 — nánast óbreytt frá Step 3a (9.6) jord 778 / fjolb 7266.
+- parsed jord 387 ≈ publishable jord 306 + negotiable 69 = 375 (mismunur 12 = churn 12.→15.6).
+- „778 → 387" var ALDREI like-for-like — publishable/draft-sían að virka eins og hönnuð; jord/lóðir hafa oft verd=0 eða fermetra=0 drög (~400 raðir) sem seed-crawl síar af ásetningi (`where: verd>0, fermetrar>0`).
+- Hvorki mbl-reclassification né parser-villa. **No-op fyrir 3d.**
+- **Lærdómur**: bera saman like-for-like (publishable vs publishable) áður en flokkunar-shift er kallaður parser-villa. Hasura aggregate-count án where-klausu er EKKI sambærilegt við parsed-corpus.
+
+**Næst**: Step 3d hönnunarprompt fyrir `promote_mbl` — afgreiðir þrjú flögg að ofan, mælir atv-tenure raunverulega dreifingu í prómotuninni, promotar mbl-corpus í canonical (1.266 → ~12K raðir). Hvert gated skref sér go.
+
+---
+
 ## 2026-06-11 (§6-A + delta-vélbúnaður) — Nightly delta orchestration spec-amendment + chain v1 smíðuð (ÓVOPNUÐ)
 
 **Hvað**: §6-A amendment skrifað í un-tracked spec-draftinn (SCRAPER_SPEC_v2_draft.md,
