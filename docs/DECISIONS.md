@@ -4,6 +4,24 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-18 — AGENT_SPEC §6 leyst — v0 expert-agent ólæst
+
+**Hvað**: Átta opnu spurningarnar í AGENT_SPEC_v1_draft.md §6 leystar (chat-Claude tillögur, Danni staðfesti). Þar með er v0 (SKILL.md + read-only MCP, handvirkt, Danni einn notandi) ólæst. ENGIN role, ENGIN GRANT, ekkert SKILL.md skrifað enn — hvert framkvæmdarskref áfram sér gated.
+
+**Ákvarðanir (númer = §6-liður)**:
+1. v2-tenging: NOLOGIN + SET ROLE fyrir v0/v1; LOGIN-role við v2 (Agent SDK á verdmat.ai auðkennir sjálfstætt). Role má verða til fyrr fyrir v1-prófanir.
+2. statement_timeout 15s + lock_timeout 2s + idle_in_transaction_session_timeout 30s + default_transaction_read_only on + search_path=semantic. Stillanlegt án migration; MV svara í 0,1–116 ms, 15s forðar 8s-PostgREST-gildru á þyngri framtíðar-queries.
+3. PUSHBACK gegn spec-tillögu §2.1(a), samþykkt: agent-role fær explicit GRANT SELECT á hverja nefnda public-facing MV (default-deny, §2.5-mynstur) — EKKI GRANT ALL + REVOKE á `_`-prefix + ALTER DEFAULT PRIVILEGES auto-grant. Rök: auto-grant sjálf-grantar ný/fasa-objekt áður en gotchas+exemplars eru til, sem brýtur prinsipp #1 (default-deny) og §2.5 („ósýnilegt þar til skjalfest"). `_sales_base` þarf engan REVOKE ef aldrei GRANT-að (MV eru materialized, þurfa hann ekki við query-tíma). Leysir innri spennu spec-sins (§2.1(a) vs §2.5) í þágu §2.5.
+4. v0 án dedicated role: MCP-sem-owner með read-only sem agareglu (G16) er ásættanlegt fyrir helgar-prótótýpu með Danna einn. Hardening: kveikja á MCP read-only mode ef í boði (§2.3). Role lendir við v1 (fyrir ekki-Danna caller).
+5. Rate/cost (v2): strúktúr samþykktur (dagþak per Pro + ≤6 queries/svar + hart mánaðarþak m. kill-switch); TÖLUR frestað þar til v0/v1 mælir raun-tóken-kostnað per spurningu — „20/dag" væri ágiskun, empirical-first ræður.
+6. Hverfaheita-mappa („Vesturbær" → matsvaedi_numer): statísk í SKILL.md fyrir v0; 14. lookup-view (v_hverfi_lookup) ákvörðun tekin með fasa 2. v_sveitarfelag_lookup leysir sveitarfélaga-nöfn nú þegar; hverfi er fínni.
+7. Eval-dómari: röð, ekki annaðhvort/eða — handvirk gold-standard yfirferð FYRST á fyrstu 25 spurningunum (kvörðun, sbr. GOLD_STANDARD_PROTOCOL), SVO deterministic + LLM-judge blanda sem viðvarandi harness, staðfest gegn gold-settinu. v1-mál.
+8. Tónn: hlutlaus greinandi, ekki ráðgefandi — ráðgefandi rennur í fjárfestingaráðgjöf (R6 + grunnregla um enga slíka ráðgjöf).
+
+**Impact**: v0 SKILL.md-smíð er næsta gated skref (chat-Claude semur forskrift úr §3-beinagrindinni + live view-unum; CC skrifar skrána). T1-könnun má fara parallel. **Scope-leiðrétting**: AGENT_SPEC §5.1 v0-plan (skrifað 2026-06-11) miðar við aðeins 4 live views og að fasa-2 spurningum sé neitað; T5 fasi 2 lokaði 2026-06-12, svo öll 13 MV eru nú live og MCP-sem-owner les þau öll → v0 nær yfir ÖLL 13 views, ekki 4-view undirmengi. „Neita fasa-2 spurningum" exit-skilyrðið í §5.1 á því ekki lengur við.
+
+---
+
 ## 2026-06-18 — verdmat.ai lén keypt (fjórði consumer) + Vercel/hýsingar-ákvörðun + stefnu-endurröðun (agent-v0 + T1 parallel)
 
 **Hvað**: Þrennt læst í dag. (1) verdmat.ai lén keypt gegnum Cloudflare sem heimili expert-agent afurðarinnar — FJÓRÐI consumer ofan á þrjá fyrri (bank-analytics, opinbert mælaborð, realtor-áskrift), allir lesa sama canonical gagnalag. (2) Vercel/hýsingar-ákvörðun fest. (3) Stefna næstu lotu endurröðuð: agent-v0 virk braut, T1 parallel.
