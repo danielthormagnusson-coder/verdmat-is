@@ -1077,3 +1077,13 @@ Byrja á lestri og Section 1-2 draft.
    - **Kaupskrá lookup** for the recovered set — `D:\kaupskra.csv` is canonical for sales history; filter rows where FASTNUM is in the recovered set, ingest.
    - **Supabase promotion** via the Phase D pattern (extract → dryrun → apply scripts in `scripts/phase_d*_*.py`).
    - **Gated on**: HMS recovery completing (canonical recovered set), AND production-template hardening landing (item 5). **Do NOT run evalue pass before either.**
+
+---
+
+## Frestuð scraper-substream verk eftir Step 3d Lota 1 (logged 2026-06-18)
+
+Frestað til að einbeita sér að agent-v0 (AGENT_SPEC §6) + T1. Ekkert af þessu blokkar virku brautirnar; allt vel skilgreint og endurtekið hér svo samhengið tapist ekki.
+
+- **Lota 2 — mbl negotiable promotion** (~2.643 raðir, mest atvinnuhúsnæði). Gated á ákvörðun: 'unknown_commercial' lease_term_enum — (a) ALTER TYPE ADD VALUE vs (b) endurnýta 'unspecified' + sub_type placeholder (tilfinning fyrri sessiona: (a)). Útfæra líka Lota-2 caveat í resolve_price (verd=0 negotiable getur verið residential). Lágur forgangur: snertir hvorki agent né T1.
+- **addr-tier remediation (Finding C)**. normalize_address strippar líklega „íb.X" of-aggressively → over-fold á nýbyggingum með óleyst fastnum (3 targets, ~7 einingar, 0,07% núna). Kerfis-vandi á ALLRI promote-fjölskyldunni, versnar í Lotu 2 og mengar dedup. Afmarkað fix + backfill-staðfesting. Sjá scraper_data/night_logs/HALT_REASON*.txt.
+- **visir is_price_on_request backfill** (407 raðir, price=1 → true). Léttur frágangur, ekki kritískt.

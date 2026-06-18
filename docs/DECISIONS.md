@@ -4,6 +4,22 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-18 — verdmat.ai lén keypt (fjórði consumer) + Vercel/hýsingar-ákvörðun + stefnu-endurröðun (agent-v0 + T1 parallel)
+
+**Hvað**: Þrennt læst í dag. (1) verdmat.ai lén keypt gegnum Cloudflare sem heimili expert-agent afurðarinnar — FJÓRÐI consumer ofan á þrjá fyrri (bank-analytics, opinbert mælaborð, realtor-áskrift), allir lesa sama canonical gagnalag. (2) Vercel/hýsingar-ákvörðun fest. (3) Stefna næstu lotu endurröðuð: agent-v0 virk braut, T1 parallel.
+
+**Tengsl við fyrri ákvarðanir (EKKI endur-skilgreining)**: Þriggja-laga agent-arkitektúrinn (L1 read-only SQL / L2 SKILL.md knowledge package / L3 output) + v0/v1/v2 roadmap er ÞEGAR læstur í DECISIONS 2026-06-10 (strategic audit, „Expert agent architecture"-kaflinn). Þessi færsla endur-skilgreinir hann ekki — hún byggir ofan á honum með þrennu nýju: léninu, hýsingar-módelinu, forgangsröðuninni.
+
+**AGENT_SPEC_v1_draft.md (samhengis-varðveisla)**: Fable 5 session 2026-06-11 skrifaði AGENT_SPEC_v1_draft.md (726 línur) sem formaliserar arkitektúrinn frá 2026-06-10 í fullt spec: L1 verdmat_agent role-kröfur (USAGE+SELECT á semantic eingöngu, eigin statement_timeout), L2 data dictionary yfir öll 13 semantic-views + gotcha-listi G1–G16 + 24 exemplar-queries, L3 svar-snið + neitunarreglur R1–R8, v0/v1/v2 roadmap, fyrstu 25 eval-spurningar, og §6 með 8 opnum spurningum sem gata v0. Skjalið er UN-TRACKED (D:\verdmat-is\, spec-drafts búa utan repo) — ófáanlegt fyrir cloud-Claude. Ákvörðun: promota í docs/specs/ þegar §6 er leyst og spec-ið stöðugt, svo bæði tilvist OG innihald lifi í git. Þangað til er þessi málsgrein eina tracked-tilvísunin.
+
+**Vercel/hýsingar-ákvörðun**: verdmat.ai = SÉR Vercel-verkefni undir núverandi Pro-teymi (afurðin er eðlisólík: samtal vs mælaborð), deilir sama Supabase-bakenda read-only. Ekkert nýtt grunngjald: Pro rukkar per sæti ($20), EKKI per verkefni; verkefni ótakmörkuð, notkun pooled á móti $20-inneign + innifalið 1 TB Fast Data Transfer + 10M edge-requests, og v0/v1-skali er langt undir. v0 þarf ENGAN Vercel (Claude + MCP + SKILL.md, handvirkt). FRESTAÐ til v2: agent-bakenda hýsing — Vercel Fluid Compute (5-mín function-timeout + keyrslutíma-mælir á löngum Claude-streymum) vs Cloudflare Workers (þegar í notkun fyrir R2 + lénið, engin egress-gjöld). Ríkjandi v2-kostnaður er Claude API-tókenar per spurningu, EKKI hýsing; stýrt af §6 #5 rate/cost-þökum.
+
+**Stefnu-endurröðun**: Agent-v0 = virk afurðarbraut, gated EINGÖNGU á AGENT_SPEC §6 (8 ákvarðanir, engin kóðasmíð); getur sýnt sig á 13 lifandi semantic-views strax (götu-verð, markaðshiti). T1 (asking-vs-sold spread) = parallel flaggskips semantic-view (14.), tvöfalt hlutverk: mælaborðs-forsíðuefni OG beittasta spurning agentsins. Probe-before-build: join-þekju-könnun á undan view-frystingu. Hönnuð MEÐVITAÐ um Áfanga 7 ATS-töfluna (DECISIONS 2026-04-20) — T1 endurbyggir EKKI ATS-aðferðafræðina heldur bætir við því sem scraper-lagið eitt hefur: ferskt per-eign ásett verð, time-on-market, withdrawal-dynamics. FRESTAÐ í PLANNING_BACKLOG: Lota 2 (negotiable, mest atvinnuhúsnæði — snertir hvorki agent né T1) og addr-tier remediation (Finding C, 0,07% núna). Hvorug blokkar virku brautirnar.
+
+**Impact**: Næsta vinnulota = AGENT_SPEC §6 í chat (ákvarðanir, ekkert skrif) → v0 SKILL.md. T1-könnun parallel í CC. Engin role, engin GRANT, ekkert SKILL.md skrifað fyrr en §6 er leyst (sér DECISIONS-færsla kemur þá).
+
+---
+
 ## 2026-06-16 — Step 3d Lota 1 KLÁRUÐ + 3 empirical findings
 
 **Hvað**: CC4.1 (Opus 4.8) keyrði Stage 7 + 8 + 8.5 + 9 yfir nótt 15.→16.6. Canonical hopp úr **1.266 í 12.023 raðir** (+10.757 mbl, +724 fold í visir/myigloo secondary_source_ids). 0 villur, 0 systemic over-fold eftir lagfæringu. Þrjú ný empirical findings læstu hér + sett í `SCRAPER_SPEC_v2_draft.md §2.3-D` (un-tracked, +36 línur).
