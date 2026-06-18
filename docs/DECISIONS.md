@@ -4,6 +4,46 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-16 — Step 3d Lota 1 KLÁRUÐ + 3 empirical findings
+
+**Hvað**: CC4.1 (Opus 4.8) keyrði Stage 7 + 8 + 8.5 + 9 yfir nótt 15.→16.6. Canonical hopp úr **1.266 í 12.023 raðir** (+10.757 mbl, +724 fold í visir/myigloo secondary_source_ids). 0 villur, 0 systemic over-fold eftir lagfæringu. Þrjú ný empirical findings læstu hér + sett í `SCRAPER_SPEC_v2_draft.md §2.3-D` (un-tracked, +36 línur).
+
+**(1) STAGE-BREAKDOWN**:
+
+| Stage | Aðgerð | Raðir | Fold | Tími |
+|-------|--------|-------|------|------|
+| Stage 7 sale | priced sale promotion | 10.475 | 614 | ~42,5 mín |
+| Stage 8 rent | priced rent (initial) | 252 residential | 90 | 76 sek |
+| Stage 8.5 rent | commercial-on-request capture | 30 commercial | 20 | 12 sek |
+| Stage 9 spec | §2.3-D additive uppfærsla | (1.230→1.266 línur) | — | — |
+
+- Per-row commit yfir pooler ~0,21 sek/röð (durability kostnaður; crash-resume frítt).
+- Heildar promoted mbl: **10.757 raðir + 724 fold = 11.481 promoted**.
+- Tests 34 → 39 (rent price=1 sentinel × 3, decompose_commercial_sub_type × 2).
+- Resolve-method dreifing: source_supplied 9.961 (93%) > addr 92 > geo 39 > unresolved 665.
+
+**(2) ÞRJÚ NÝ EMPIRICAL FINDINGS (LÆST)**:
+
+***Finding A — matshluti er encoding-suffix, EKKI per-eining ID*** (Stage 7 uppgötvun): mbl `fastano = fastnum*10^k + matshluti` en SAMA eining fær BREYTILEGT matshluti yfir margar listing-instances — Hringhamar 37 íb.104 (fastnum 2528604, 80,5M, 113m²) birtist sem 16 mbl listings með matshluti 0/5/13/15/32. Þ.a. dedup Tier-1 LYKLAR Á BERA `fastnum`, EKKI `(fastnum, matshluti_unit_id)`. matshluti_unit_id dálkurinn er **encoding-lineage / debug artifact**, EKKI dedup-lykill. HMS úthlutar hverri einingu sínu eigin 7-stafa fastnum (Stage 5 Hringhamar 35 íb.208/309 sönnun) — 7-stafa stigið aðgreinir einingar nú þegar. Endurskoða ef HMS gefur út stöðug per-eining ID. **Q4-frestun (within-run mbl↔mbl folding) staðfest sem rétt val empírískt.**
+
+***Finding B — rent listings með price ≤ 1 ISK eru commercial-rent-on-request, EKKI residential junk*** (Stage 8 uppgötvun): 50/392 raðir í priced mbl rent slice voru price=1 sentinel fyrir stór atvinnurými (Bæjarflöt 17 886m², Tónahvarf 10 3186m², Borgartún 25, Suðurlandsbraut 4). Residential íbúðaleiga á Íslandi er aldrei 1 ISK — signal er ábyggilegt. Promotion-leið: `price_amount=1`, `is_price_on_request=true`, `category='commercial'`, `sub_type` via keyword-resolve með `mixed_use_other` fallback, `lease_term_class='unspecified'`. **Lota-2 caveat**: negotiable slice's verd=0 sentinel getur líka verið residential — sá branch verður endurskoðaður þar.
+
+***Finding C — addr-tier over-fold á nýbyggingum með óleyst fastnum*** (Stage 7 jaðar-fund): 3 sale targets (Vorbraut 14 ×2, Hrafnaborg 4) með ólíkar einingar fold-uðust ranglega í eina canonical-röð vegna sama addr+price+stærð + óleyst fastnum (properties-tafla ekki uppfærð á nýbyggingum). ~7 einingar tapaðar af 10.475 = **0,07% gagnatap**, undir mæli-skekkju fyrir T1 asking-vs-sold spread, en bendir til **normalize_address bug** sem strippar „íb.X" suffix of-aggressively. Aðskilið remediation-verkefni post-Lota-1; líklega tengt visir/myigloo addr-mynstri líka (kerfis-vandi á promote-fjölskyldunni, ekki bara mbl).
+
+**(3) ENDURKALIBRUÐ STOP-CONDITION SANNREYND**: gamla `mbl_loses > 250` tripp-aði ranglega á Stage 7 (614 lögmæt fold, 99% same-unit re-lists). Nýtt merki **distinct-fastnum/addr per target > 1 á > 5 targets** tók við og virkaði rétt á Stage 8 (8 multi-fold targets, 0 over-fold). Heildar-fold-count er EKKI lengur tripwire — skalast hreint með re-list-eðli corpus.
+
+**(4) ÁKVÖRÐUN #1 LEYST IN-FLIGHT (commercial-rent capture)**: Stage 8 lenti í gati þar sem rent með price=1 datt í junk-síu (hardkóðað rent→residential). CC4.1 uppfærði `resolve_price(verd, table)` signature + `decompose_commercial_sub_type` fall + run-lúppu, endurkeyrði rent slice via NULL-watermark mekkanisma, og bjargaði öllum 50 raðum án rollback. **Engin gögn glötuð, engin migration þörf, capture-mandate intact.**
+
+**Schema additions í scraper.listings_canonical (læst, live)**: `matshluti_unit_id smallint` + `source_raw_fastnum bigint` + `is_price_on_request boolean` + slökun á `ck_price_pos` + `ix_lc_fastnum_unit` non-unique composite index. Migration `20260615163101_step3d_listings_canonical_mbl_promote` beitt gegnum MCP. 1.266 núverandi raðir fengu defaults við ALTER (NULL, NULL, false) — engin röð raderuð.
+
+**Bíða Lotu 2 (negotiable, 2.673 raðir = 1.694 sale + 979 rent)**: gated á tvær ákvarðanir áður en kóði fer í verk:
+- **Q1 (frá 2026-06-15)**: 'unknown_commercial' enum-gildi fyrir `lease_term_class`. (a) `ALTER TYPE lease_term_enum ADD VALUE` vs (b) endurnýta `'unspecified'` með skýrum sub_type placeholder. Mín núverandi tilfinning er (a) — semantíkin „commercial-rent með ókannaðri lease-term" er ólík „residential-rent með ekki-uppgefnu lease-term" og á að vera aðgreinanleg.
+- **Visir backfill** (407 visir-raðir með price=1 ↔ is_price_on_request=true): aðskilið verkefni, ekki kritískt fyrir T1 en góður frágangur.
+
+**Næst**: Lota 2 hönnunarprompt + addr-tier remediation (Finding C) sem aðskilið verkefni. T1 (asking-vs-sold spread) verður mæld á alvöru gögn í fyrsta sinn — 10.475 mbl sale + 226 visir sale = 10.701 sale raðir í canonical sem hægt er að joina við kaupskrá fyrir spread-greiningu.
+
+---
+
 ## 2026-06-15 — Þrjár hreinar nætur + Step 3d empirical foundation
 
 **(1) STEADY-STATE STAÐFEST — sjálfvirka delta-keðjan stöðug yfir 13./14./15.6**:
