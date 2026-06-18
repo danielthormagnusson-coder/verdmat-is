@@ -85,16 +85,24 @@ Canonical docs (full rules in `docs/WORKING_PROTOCOL.md`):
 - **Long scrapes via curl_cffi**: hms.is sits behind Cloudflare WAF — plain `aiohttp` / `requests` / `Invoke-WebRequest` get 429'd. Use `curl_cffi` with `impersonate="chrome120"` for any HMS API call. The "property does not exist" signal is **HTTP 500 `{"error":"Internal server error"}`**, not 404 — treat 500 as terminal, not retryable.
 - **Supabase pooler**: direct `db.<ref>.supabase.co:5432` is IPv6-only. External scripts must use the transaction-pooler URI on port 6543 (already in `.dbconfig`).
 
-## Phase position (as of 2026-05-21)
+## Current status — read the journals, not this file
 
-See `docs/STATE.md` "Roadmap position" block (near top) for live state. Compressed:
+Don't keep dated phase/status here; it drifts. For current áfangastaða, open items, and next steps, read **docs/STATE.md** + the top of **docs/DECISIONS.md** at the start of every session. The authoritative copy is the working tree on disk — the Project Knowledge panel and raw.githubusercontent.com are both stale.
 
-```
-Phase D (Supabase sync)   D1 ✅  D2 ✅  D3/D4/D5 pending
-Phase X (architecture)    Group A ✅  Group B (Supabase CLI + views) ← NEXT
-                          Group C (migration_helpers + audit + run_monthly) pending
-Phase Y (D3-D5 data)      pending
-Phase Z (UI redesign)     pending
-```
+## Scraper substream · semantic layer · expert agent (built after this file's original draft)
 
-When starting a new session, default to reading `docs/STATE.md` + the top entries of `docs/DECISIONS.md` to get current ground truth before acting.
+Map only; canonical detail in the noted docs.
+
+- **Multi-source listing scraper** → `scraper.listings_canonical` (one row per canonical_id; re-lists in secondary_source_ids[]). Sources: mbl (nightly delta, Task Scheduler 01:00), visir + myigloo (seed only, no ongoing refresh yet). Locked scraper rules (pooler read-only, distrust index-endpoint labels, visir HTTP 400 soft-throttle, cross-source dedup R1–R3) live in docs/DECISIONS.md.
+- **Semantic layer** → `semantic` schema: 13 materialized views (street / postnr / matsvaedi / sveitarfelag prices, newbuild_share, hood_heat, price_distribution, model_vs_sold, summerhouse, sveitarfelag_lookup) reading from public.sales_history, plus one internal `_sales_base` view that agents must NEVER query directly. Spec: docs/specs/T5_SEMANTIC_VIEWS_v1.md.
+- **v0 expert agent** → market-analytics agent (Claude + read-only Supabase MCP + SKILL). Answers aggregate questions from semantic.* only; does not value individual properties, forecast, or advise. Operating doc: docs/specs/SKILL_v0.md; design: docs/specs/AGENT_SPEC_v1.md.
+
+## Locked operational rules (recur every session)
+
+- **Supabase writes** via psycopg2 on the transaction pooler (port 6543) default read-only — the first statement of every write transaction must be `SET TRANSACTION READ WRITE`. SQL migrations go through the Supabase MCP `apply_migration` (CLI is blocked by Windows Smart App Control).
+- **Task Scheduler**: S4U logon type (password principal fails silently).
+- **Docs discipline**: additive str_replace only on the journal files (STATE / DECISIONS / PLANNING_BACKLOG), verify wc -l grows, never regenerate from memory. Git: always explicit paths, never `git add .`. HALT at decision points before consequential actions. Commits carry a Co-Authored-By trailer naming the actual session model. Secrets stay in terminal + .env.
+
+## Launching a session
+
+This file auto-loads only when Claude Code starts with cwd inside `D:\verdmat-is\app`. Start sessions from there (`cd verdmat-is\app` before `claude`) so the orientation loads.
