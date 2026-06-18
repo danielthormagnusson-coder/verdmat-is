@@ -4,6 +4,22 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-18 — v0 expert-agent STAÐIST + SKILL/specs tracked í docs/specs/
+
+**Hvað**: v0-prófun á expert-agentinum (gold-standard pass, §6 #7) lokin og staðist. Fersk CC-session las SKILL_v0_draft.md, lék agentinn og svaraði 25 prufuspurningum úr AGENT_SPEC §5.2 gegnum read-only Supabase MCP; Danni + chat-Claude dæmdu.
+
+**Skor**: 25/25 (einföld #1–10, fallback #11–17, composition #18–19, gildrur #20–25). G-flokkur (neitanir #20–25) 100% (R1 verðmat→iter4, R2 spá, R5 einstök sala, R6 leiga, G7 heildarvelta-neðra-mat, R8 fyrirvarar halda). **0 hallucination** — hver tala gagna-leidd með citation. Exit-skilyrði (≥80% + G-flokkur 100% + 0 hallucination) uppfyllt.
+
+**Validerað**: router-fallback (gata→matsvæði→postnr; Fjóluhvammur/Laugavegur live), composition-bias G2 (Ánanaust leiddi existing 839þ. ekki aðal 1.066þ.), hrun-/hlutaárs-flögg, neitanir með vísun, citation [view·sía·data_through] alls staðar. Öll hönnunin validerast, ekki bara keyrsla.
+
+**Betrumbóta-atriði (ekki fall)**: #14 Sólbakki — existing NULL (undir birtingar-gati), agent tók rétt matsvæðis-fallback en vitnaði í afsannaða ~202þ. existing-tölu. Næsta SKILL-iteration: G2/R3-orðalag → nefna enga existing-götu-tölu þegar hún er NULL/þunn.
+
+**Documentation**: þrjú áður un-tracked hönnunarskjöl promtuð í docs/specs/ (stöðug, validerað): SKILL_v0.md (operating-skjal agentsins, 575 línur), AGENT_SPEC_v1.md (3-laga spec), T5_SEMANTIC_VIEWS_v1.md (13-view spec). Lokar context-loss-áhættu — cloud-Claude les þau nú úr git. 25-svara gold-pass-inn er v1 eval-fræ (§6 #7); formaliserast í eval-skrá þegar v1 hefst.
+
+**Impact**: v0 er virkur agent núna (Claude Code/Desktop + SKILL + read-only MCP). Næsti gafl (hvorugt læst): v1 (eval-harness 50–100 sp. + verdmat_agent role + bankatól) vs verdmat.ai uppsetning.
+
+---
+
 ## 2026-06-18 — AGENT_SPEC §6 leyst — v0 expert-agent ólæst
 
 **Hvað**: Átta opnu spurningarnar í AGENT_SPEC_v1_draft.md §6 leystar (chat-Claude tillögur, Danni staðfesti). Þar með er v0 (SKILL.md + read-only MCP, handvirkt, Danni einn notandi) ólæst. ENGIN role, ENGIN GRANT, ekkert SKILL.md skrifað enn — hvert framkvæmdarskref áfram sér gated.
