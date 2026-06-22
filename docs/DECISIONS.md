@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-22 — Kaupskrá ferskleiki: sales_history rebuild + composite-lykill + endur-ankering; þriggja-brauta arkitektúr
+
+**Vandi**: public.sales_history (+ 13 semantic MV) stóð á 2026-04-17 (~2 mán gamalt) þótt HMS-kaupskrá uppfærist daglega ~02:01 GMT. Tvö göt, bæði ofan við MV: (A) refresh_kaupskra ekki scheduled (síðast 29. maí); (B) load-pípan keyrir hvorki né fullkláruð — run_monthly HALT-ar fyrir push, push_precompute_to_supabase() = NotImplementedError. Enginn náttúrulegur lykill (bara serial id) → ekkert ON CONFLICT-target.
+
+**Arkitektúr (læst)**: þrjár cadence-aðskildar brautir. (1) DAGLEG ferskleiki: kaupskrá → sales_history incremental (composite ON CONFLICT) → REFRESH 13 MV, pinnaður CPI-anker. (2) MÁNAÐARLEG gögn: refresh_cpi → endur-ankera kaupverd_real → REFRESH MV. (3) MÁNAÐARLEG módel: rebuild_training_data → recalibration → predictions (óbreytt, HALT-gated). Daglega braut módel-óháð (CPI úr cpi_verdtrygging.csv, ekki training_data_v2.pkl — staðfest til floating-point, max frávik 4,44e-16).
+
+**Rebuild apply (lent)**: hrein endurgerð sales_history úr núverandi kaupskrá. 173.867 → 227.452 raðir. Composite-lykill (faerslunumer, fastnum) = kanóníski kaupskrá-lykillinn sem refresh_kaupskra reiknar diff á; UNIQUE INDEX uq_sales_faerslunumer_fastnum. Endur-ankering: live var 2026-05, módelið 2026-07 (falin ósamræming); pinnað 2026-07 → kaupverd_real +0,88% einsleitt, lagar 0,88% skekkju í v_model_vs_sold. Víðara universe (properties 232.887, endurheimtar eignir); FK-drop 1.230. data_through nú 2026-06-16. Hrein endurgerð örugg — serial id hefur núll afkomendur (pg_depend/pg_constraint/app-grep). Rollback: D:\sales_history_rollback_20260622.{csv,sql}.
+
+**Grunnreglu-uppfærsla — onothaefur**: ONOTHAEFUR=1 raðir geymast NÚ í SÖMU töflu með flaggi, EKKI aðskilinni töflu. Rök: sölu-sýnileiki á eignarsíðu krefst þess að röðin sé í töflunni (seld eign á að sjást, merkt). Viðmiðun varin: contamination-úttekt staðfesti öll 11 verð-MV + _sales_base sía onothaefur=0 (beinu sales_history-tilvísanir í MV eru EINGÖNGU max(thinglystdags)). Empírískt: Hraunbær n=400 flatt eftir apply (ono1=23% af töflu, ekkert hopp). Víkur frá project-instruction orðalagi („aðskilin tafla") — DECISIONS authoritative; uppfæra instruction-texta. eign/[fastnum] sýnir báðar; aggregöt sía 0.
+
+**Opið / næst**: (i) daily_sales_refresh.py — endurnýtir load_cpi_lookup + derive_sales_rows úr scripts/rebuild_sales_history.py; fetch → derive delta → ON CONFLICT (faerslunumer,fastnum) DO NOTHING → REFRESH 13 MV → log; explicit pinnaður anker geymdur fyrir daglega/mánaðarlega samræmingu. (ii) schedula S4U ~02:30 GMT. (iii) mánaðarlegt CPI-systkin (refresh_cpi automation + endur-ankering). (iv) frontend sölu-merki „seld — ónothæfur samningur" á eignar-skoðun fyrir ono1.
+
+---
+
 ## 2026-06-18 — v0 expert-agent STAÐIST + SKILL/specs tracked í docs/specs/
 
 **Hvað**: v0-prófun á expert-agentinum (gold-standard pass, §6 #7) lokin og staðist. Fersk CC-session las SKILL_v0_draft.md, lék agentinn og svaraði 25 prufuspurningum úr AGENT_SPEC §5.2 gegnum read-only Supabase MCP; Danni + chat-Claude dæmdu.
