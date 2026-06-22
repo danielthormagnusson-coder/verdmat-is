@@ -11,7 +11,7 @@ Reuses the derive core from rebuild_sales_history.py by import (no re-implementa
 and the single-source CPI anchor from anchor_config.read_anchor (public.pipeline_config).
 
 Flow:
-  0. run D:\\refresh_kaupskra.py; gate on content_md5 change (no-op unless --force).
+  0. run D:\\refresh_kaupskra.py; log content_md5 change as diagnostic (no gate).
   1. read pinned anchor + CPI lookup + properties universe (read-only).
   2. re-derive the full rowset from kaupskra.csv (identical transforms).
   3. diff vs live on (faerslunumer, fastnum): NEW + GONE (GONE watched, not deleted).
@@ -22,7 +22,6 @@ Flow:
 CLI:
   python scripts/daily_sales_refresh.py            # live: fetch -> upsert -> refresh
   python scripts/daily_sales_refresh.py --dryrun   # no writes; report what would happen
-  python scripts/daily_sales_refresh.py --force     # ignore md5 no-op gate (test/manual)
 """
 from __future__ import annotations
 
@@ -119,11 +118,9 @@ def keyset(df: pd.DataFrame) -> set[tuple[int, int]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dryrun", action="store_true", help="no writes; report only")
-    ap.add_argument("--force", action="store_true", help="ignore md5 no-op gate")
     args = ap.parse_args()
 
-    log(f"=== daily_sales_refresh ({'DRYRUN' if args.dryrun else 'LIVE'}"
-        f"{', FORCE' if args.force else ''}) ===")
+    log(f"=== daily_sales_refresh ({'DRYRUN' if args.dryrun else 'LIVE'}) ===")
 
     # ---- Step 0: refresh_kaupskra + md5 gate ----
     md5_before = read_md5()
@@ -135,12 +132,11 @@ def main() -> int:
             f"stderr tail: {(res.stderr or '')[-500:]}")
         return 1
     md5_after = read_md5()
-    log(f"[0] md5 before={md5_before} after={md5_after}")
-    if md5_before == md5_after and not args.force:
-        log("[0] kaupskra unchanged (md5) — no-op. Exiting.")
-        return 0
-    if md5_before == md5_after and args.force:
-        log("[0] kaupskra unchanged (md5) but --force set — continuing.")
+    # md5 is logged as a DIAGNOSTIC only — it does NOT gate. kaupskra can mutate
+    # in place (reclassification) without a row-count change, and a same-md5 day
+    # is a cheap no-op downstream (derive+diff yields NEW=0). Always proceed.
+    changed = "changed" if md5_before != md5_after else "unchanged"
+    log(f"[0] kaupskra md5 {changed} today (before={md5_before} after={md5_after})")
 
     # ---- Step 1: anchor + cpi + universe (read-only) ----
     conn_ro = open_ro_conn()
