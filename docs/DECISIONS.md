@@ -4,6 +4,27 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-22 — Daily loader LIFANDI: daily_sales_refresh.py + S4U-task; DO NOTHING fresh-path
+
+**Hvað**: daglega ferskleika-brautin (braut 1 af þremur, sjá kaupskrá-rebuild færsluna neðar) er smíðuð, sönnuð end-to-end og armað. `scripts/daily_sales_refresh.py` keyrir: Step 0 `refresh_kaupskra.py` (sækir kaupskrá) → re-derive + diff á (faerslunumer, fastnum) → upsert AÐEINS nýjar raðir → REFRESH 13 semantic MV.
+
+**Læstar reglur**:
+- **DO NOTHING** (ekki DO UPDATE): kaupskrá-mútanir eru hverfandi noise — módelið meðhöndlar verð-villur sem outliers, svo við skráum nýtt en eltum EKKI endurflokkun/leiðréttingar. Empírískt staðfest 18→22 jún: **0 mútanir / 0 GONE / 88 nýjar** raðir á composite-lykli. Danni domain-call.
+- **Full re-derive + diff (ekki incremental watermark)** → self-healing: hver keyrsla endurreiknar allt settið og diffar við lifandi töflu, svo glatað/sleppt af fyrri nótt jafnar sig sjálfkrafa.
+- **md5 diagnostic-only, ALDREI gate**: Step 0 loggar hvort kaupskrá-md5 breyttist en heldur alltaf áfram í derive+diff (md5-early-exit + `--force` fjarlægð í chunk 3). Forðast sole-fetcher gildruna OG nær in-place reclassification sem breytir md5 án raðafjölda.
+- **REFRESH gated á inserted>0** (0 nýjar → sleppir 13 MV refresh, ~15s no-op keyrsla).
+- **GONE vaktað, engin DELETE-vél í v1** (WARN ef >50); raðir hverfa ekki úr kaupskrá í reynd.
+- **Anker single-source**: `public.pipeline_config` (RLS á, anon/auth læst, key `sales_history_anchor_ym`='2026-07'), lesið af BÁÐUM brautum gegnum `anchor_config.read_anchor(conn)` (raises ef vantar — engin þögul hardkóða-fallback). Mánaðar-CPI-systkinið verður EINI skrifari ankersins (anker + re-anker allra kaupverd_real í einni txn).
+- **Eitt S4U-task** `verdmat-daily-sales-refresh` (02:30 GMT, S4U/Limited, WakeToRun, StartWhenAvailable, 1h limit), ekkert sér-refresh_kaupskra-task (loaderinn sækir sjálfur — sér-task væri auka failure-point). Decoupled frá run_monthly. Tímasetning hrein: mbl-delta 01:00 skrifar í scraper.* (enginn MV-lás-árekstur), backup 03:00 (23 mín borð eftir ~7 mín REFRESH). register-script `scripts/register_daily_sales_task.ps1` (sama S4U-mynstur og delta-taskið).
+
+**AUDIT (reproducibility)**: `rebuild_sales_history.py` var untracked á keyrslutíma 2026-06-22 rebuildsins (keyrt af diski); fyrst committað ae5cf16 með anker lesinn úr pipeline_config — hegðunarlega eins og as-run hardkóði '2026-07'. Reproducibility heil: rollback-CSV `D:\sales_history_rollback_20260622.{csv,sql}` + committað skript + sami anker gefa sömu töflu.
+
+**Fyrsta lifandi keyrsla**: sales_history 227.452→227.540, ferskt til thinglystdags 2026-06-19 (var 16.), 13 MV refresh án villu. **S4U-próf** (on-demand, 2026-06-23-trigger armað): LastTaskResult=0, NEW=0 / 0 inserted / skip REFRESH — sannar idempotency OG að loaderinn keyri gallalaust undir Task-Scheduler S4U (python-path, importin, DB-tenging, read_anchor).
+
+**Næst**: mánaðar-CPI-systkin (refresh_cpi automation + endur-ankering, eini anker-skrifari) þá frontend „seld — ónothæfur samningur" merki fyrir onothaefur=1.
+
+---
+
 ## 2026-06-22 — Kaupskrá ferskleiki: sales_history rebuild + composite-lykill + endur-ankering; þriggja-brauta arkitektúr
 
 **Vandi**: public.sales_history (+ 13 semantic MV) stóð á 2026-04-17 (~2 mán gamalt) þótt HMS-kaupskrá uppfærist daglega ~02:01 GMT. Tvö göt, bæði ofan við MV: (A) refresh_kaupskra ekki scheduled (síðast 29. maí); (B) load-pípan keyrir hvorki né fullkláruð — run_monthly HALT-ar fyrir push, push_precompute_to_supabase() = NotImplementedError. Enginn náttúrulegur lykill (bara serial id) → ekkert ON CONFLICT-target.
