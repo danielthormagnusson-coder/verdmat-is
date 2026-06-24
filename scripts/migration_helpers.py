@@ -438,8 +438,14 @@ def git_sha_head(repo_dir: Path = Path(r"D:\verdmat-is\app")) -> str | None:
 #     later step in the same run crashes.
 # ----------------------------------------------------------------------
 def start_run(conn, run_type: str) -> int:
-    """INSERT a pipeline_runs row at run start; return its id. Commits."""
+    """INSERT a pipeline_runs row at run start; return its id. Commits.
+
+    First statement is SET TRANSACTION READ WRITE: on the transaction pooler a
+    read-only session opened elsewhere (open_ro_conn's set_session readonly=True)
+    can leak READ ONLY into a shared backend, so every write txn must re-assert it.
+    """
     with conn.cursor() as cur:
+        cur.execute("SET TRANSACTION READ WRITE")
         cur.execute(
             """
             INSERT INTO public.pipeline_runs
@@ -457,6 +463,7 @@ def start_run(conn, run_type: str) -> int:
 def start_step(conn, run_id: int, step_name: str, step_order: int) -> int:
     """INSERT a pipeline_steps row at step start; return its id. Commits."""
     with conn.cursor() as cur:
+        cur.execute("SET TRANSACTION READ WRITE")  # pooler read-only-leak guard
         cur.execute(
             """
             INSERT INTO public.pipeline_steps
@@ -484,6 +491,7 @@ def finish_step(
 ) -> None:
     """UPDATE a pipeline_steps row at step end. Commits."""
     with conn.cursor() as cur:
+        cur.execute("SET TRANSACTION READ WRITE")  # pooler read-only-leak guard
         cur.execute(
             """
             UPDATE public.pipeline_steps
@@ -513,6 +521,7 @@ def finish_run(
     For a no-op run pass exit_status='success' with summary={'noop': True, ...}.
     """
     with conn.cursor() as cur:
+        cur.execute("SET TRANSACTION READ WRITE")  # pooler read-only-leak guard
         cur.execute(
             """
             UPDATE public.pipeline_runs

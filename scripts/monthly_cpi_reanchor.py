@@ -50,6 +50,9 @@ from rebuild_sales_history import (  # noqa: E402  reuse derive core, no re-impl
 )
 from anchor_config import read_anchor  # noqa: E402  reads sales_history_anchor_ym
 from daily_sales_refresh import MV_LIST  # noqa: E402  single source of truth for the 13 MV
+from migration_helpers import (  # noqa: E402  shared Group C audit logging
+    start_run, start_step, finish_step, finish_run, open_connection,
+)
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace") if hasattr(
     sys.stdout, "reconfigure") else None
@@ -114,100 +117,172 @@ def main() -> int:
     log(f"=== monthly_cpi_reanchor ({'DRYRUN' if args.dryrun else 'LIVE'}"
         f"{', TEST-ANCHOR ' + args.test_anchor if args.test_anchor else ''}) ===")
 
-    # ---- Step 0: refresh_cpi (diagnostic only) ----
-    if not args.test_anchor:
-        log("[0] running refresh_cpi.py ...")
-        res = subprocess.run([sys.executable, str(REFRESH_CPI)],
-                             capture_output=True, text=True, timeout=300)
-        if res.returncode != 0:
-            log(f"[0] ERROR refresh_cpi exit={res.returncode}; "
-                f"stderr tail: {(res.stderr or '')[-400:]}")
-            return 1
-        tail = (res.stdout or "").strip().splitlines()[-3:]
-        log(f"[0] refresh_cpi tail: {' | '.join(tail)}")
-    else:
-        log("[0] --test-anchor set — skipping refresh_cpi (using CSV on disk)")
+    # Dedicated audit-log connection — independent of conn_ro / conn_w / conn_r so its
+    # per-writer commits never touch the data transactions (mirrors run_monthly).
+    conn_log = open_connection()
+    run_id = start_run(conn_log, "monthly_cpi_reanchor")
+    log(f"  pipeline_runs.id = {run_id}")
+    conn_ro = None
+    try:
+        # ---- Step 0: refresh_cpi (diagnostic only) ----
+        sid = start_step(conn_log, run_id, "fetch_cpi", 1)
+        if not args.test_anchor:
+            log("[0] running refresh_cpi.py ...")
+            res = subprocess.run([sys.executable, str(REFRESH_CPI)],
+                                 capture_output=True, text=True, timeout=300)
+            if res.returncode != 0:
+                log(f"[0] ERROR refresh_cpi exit={res.returncode}; "
+                    f"stderr tail: {(res.stderr or '')[-400:]}")
+                finish_step(conn_log, sid, res.returncode, notes="refresh_cpi failed")
+                finish_run(conn_log, run_id, "failed",
+                           {"step": "fetch_cpi", "exit_code": res.returncode,
+                            "dryrun": args.dryrun})
+                return 1
+            tail = (res.stdout or "").strip().splitlines()[-3:]
+            log(f"[0] refresh_cpi tail: {' | '.join(tail)}")
+            finish_step(conn_log, sid, 0, notes="refresh_cpi ok")
+        else:
+            log("[0] --test-anchor set — skipping refresh_cpi (using CSV on disk)")
+            finish_step(conn_log, sid, 0, notes="skipped (--test-anchor)")
 
-    # ---- Step 2: DB-side gate ----
-    conn_ro = open_ro_conn()
-    cur_anchor = read_anchor(conn_ro)
-    new_anchor = args.test_anchor or csv_max_month()
-    log(f"[2] cur_anchor(live)={cur_anchor}  new_anchor={new_anchor}  "
-        f"(source={'--test-anchor' if args.test_anchor else 'max(csv)'})")
+        # ---- Step 2: DB-side gate ----
+        sid = start_step(conn_log, run_id, "gate", 2)
+        conn_ro = open_ro_conn()
+        cur_anchor = read_anchor(conn_ro)
+        new_anchor = args.test_anchor or csv_max_month()
+        log(f"[2] cur_anchor(live)={cur_anchor}  new_anchor={new_anchor}  "
+            f"(source={'--test-anchor' if args.test_anchor else 'max(csv)'})")
+        finish_step(conn_log, sid, 0, notes=f"cur={cur_anchor} new={new_anchor}")
 
-    if not args.test_anchor and new_anchor <= cur_anchor:
-        log(f"[2] anchor unchanged (new={new_anchor} <= cur={cur_anchor}) — no-op. Exiting.")
-        conn_ro.close()
-        return 0
+        if not args.test_anchor and new_anchor <= cur_anchor:
+            log(f"[2] anchor unchanged (new={new_anchor} <= cur={cur_anchor}) — no-op. Exiting.")
+            finish_run(conn_log, run_id, "success",
+                       {"noop": True, "reason": "anchor unchanged",
+                        "anchor": cur_anchor, "dryrun": args.dryrun})
+            return 0
 
-    # ---- Step 3: re-derive at the new anchor (Python parity) ----
-    cpi = load_cpi_lookup(CPI_CSV, new_anchor)  # raises if new_anchor absent — free HALT guard
-    valid_fastnums = fetch_valid_fastnums(conn_ro)
-    kp = pd.read_csv(KAUPSKRA_CSV, sep=";", encoding="latin-1", low_memory=False)
-    derived, stats = derive_sales_rows(kp, valid_fastnums, cpi)
-    log(f"[3] re-derived at anchor={new_anchor}: final_rows={stats['final_rows']:,}, "
-        f"fk_dropped={stats['fk_dropped_rows']:,}, rows_without_cpi={stats['rows_without_cpi']:,}")
+        # ---- Step 3: re-derive at the new anchor (Python parity) ----
+        sid = start_step(conn_log, run_id, "re_derive", 3)
+        cpi = load_cpi_lookup(CPI_CSV, new_anchor)  # raises if new_anchor absent — free HALT guard
+        valid_fastnums = fetch_valid_fastnums(conn_ro)
+        kp = pd.read_csv(KAUPSKRA_CSV, sep=";", encoding="latin-1", low_memory=False)
+        derived, stats = derive_sales_rows(kp, valid_fastnums, cpi)
+        log(f"[3] re-derived at anchor={new_anchor}: final_rows={stats['final_rows']:,}, "
+            f"fk_dropped={stats['fk_dropped_rows']:,}, rows_without_cpi={stats['rows_without_cpi']:,}")
 
-    # ---- Step 4: measure change vs live (read) ----
-    with conn_ro.cursor() as cur:
-        cur.execute("SELECT faerslunumer, fastnum, kaupverd_real, kaupverd_nominal, "
-                    "thinglystdags, onothaefur FROM public.sales_history "
-                    "WHERE faerslunumer IS NOT NULL")
-        live = pd.DataFrame(cur.fetchall(), columns=[
-            "faerslunumer", "fastnum", "kaupverd_real", "kaupverd_nominal",
-            "thinglystdags", "onothaefur"])
-    conn_ro.close()  # done reading before any write txn
+        # ---- Step 4: measure change vs live (read) ----
+        with conn_ro.cursor() as cur:
+            cur.execute("SELECT faerslunumer, fastnum, kaupverd_real, kaupverd_nominal, "
+                        "thinglystdags, onothaefur FROM public.sales_history "
+                        "WHERE faerslunumer IS NOT NULL")
+            live = pd.DataFrame(cur.fetchall(), columns=[
+                "faerslunumer", "fastnum", "kaupverd_real", "kaupverd_nominal",
+                "thinglystdags", "onothaefur"])
 
-    d = derived[derived["faerslunumer"].notna()].copy()
-    d["faerslunumer"] = d["faerslunumer"].astype("int64")
-    d["fastnum"] = d["fastnum"].astype("int64")
-    live["faerslunumer"] = live["faerslunumer"].astype("int64")
-    live["fastnum"] = live["fastnum"].astype("int64")
-    m = live.merge(
-        d[["faerslunumer", "fastnum", "kaupverd_real", "kaupverd_nominal",
-           "thinglystdags", "onothaefur"]],
-        on=["faerslunumer", "fastnum"], suffixes=("_old", "_new"))
-    log(f"[4] common rows (composite-key join): {len(m):,}")
+        d = derived[derived["faerslunumer"].notna()].copy()
+        d["faerslunumer"] = d["faerslunumer"].astype("int64")
+        d["fastnum"] = d["fastnum"].astype("int64")
+        live["faerslunumer"] = live["faerslunumer"].astype("int64")
+        live["fastnum"] = live["fastnum"].astype("int64")
+        m = live.merge(
+            d[["faerslunumer", "fastnum", "kaupverd_real", "kaupverd_nominal",
+               "thinglystdags", "onothaefur"]],
+            on=["faerslunumer", "fastnum"], suffixes=("_old", "_new"))
+        log(f"[4] common rows (composite-key join): {len(m):,}")
 
-    new_real = pd.to_numeric(m["kaupverd_real_new"], errors="coerce")
-    old_real = pd.to_numeric(m["kaupverd_real_old"], errors="coerce")
-    changed = (new_real.values != old_real.values)
-    n_changed = int(changed.sum())
-    abs_delta = (new_real.values - old_real.values)
-    max_abs = int(pd.Series(abs_delta).abs().max()) if len(abs_delta) else 0
-    log(f"[4] kaupverd_real changes: {n_changed:,} of {len(m):,} common rows; "
-        f"max abs delta={max_abs:,} kr")
-    ex = m[changed].head(10)
-    for _, r in ex.iterrows():
-        ym = pd.to_datetime(r["thinglystdags_old"]).strftime("%Y-%m")
-        log(f"      f={int(r['faerslunumer'])} fn={int(r['fastnum'])} {ym} "
-            f"nominal={int(r['kaupverd_nominal_old']):,} "
-            f"real {int(r['kaupverd_real_old']):,} -> {int(r['kaupverd_real_new']):,}")
-    # SANITY: nominal/thinglystdags/onothaefur must NOT change (re-anchor touches only real)
-    nom_chg = int((pd.to_numeric(m["kaupverd_nominal_new"]).values
-                   != pd.to_numeric(m["kaupverd_nominal_old"]).values).sum())
-    ono_chg = int((pd.to_numeric(m["onothaefur_new"]).values
-                   != pd.to_numeric(m["onothaefur_old"]).values).sum())
-    dt_chg = int((pd.to_datetime(m["thinglystdags_new"]).dt.date.values
-                  != pd.to_datetime(m["thinglystdags_old"]).dt.date.values).sum())
-    log(f"[4] SANITY (must be 0): nominal_changed={nom_chg}, onothaefur_changed={ono_chg}, "
-        f"thinglystdags_changed={dt_chg}")
-    if nom_chg or ono_chg or dt_chg:
-        log("[4] ABORT: re-anchor would change non-real columns — unexpected. No writes.")
-        return 3
+        new_real = pd.to_numeric(m["kaupverd_real_new"], errors="coerce")
+        old_real = pd.to_numeric(m["kaupverd_real_old"], errors="coerce")
+        changed = (new_real.values != old_real.values)
+        n_changed = int(changed.sum())
+        abs_delta = (new_real.values - old_real.values)
+        max_abs = int(pd.Series(abs_delta).abs().max()) if len(abs_delta) else 0
+        log(f"[4] kaupverd_real changes: {n_changed:,} of {len(m):,} common rows; "
+            f"max abs delta={max_abs:,} kr")
+        ex = m[changed].head(10)
+        for _, r in ex.iterrows():
+            ym = pd.to_datetime(r["thinglystdags_old"]).strftime("%Y-%m")
+            log(f"      f={int(r['faerslunumer'])} fn={int(r['fastnum'])} {ym} "
+                f"nominal={int(r['kaupverd_nominal_old']):,} "
+                f"real {int(r['kaupverd_real_old']):,} -> {int(r['kaupverd_real_new']):,}")
+        # SANITY: nominal/thinglystdags/onothaefur must NOT change (re-anchor touches only real)
+        nom_chg = int((pd.to_numeric(m["kaupverd_nominal_new"]).values
+                       != pd.to_numeric(m["kaupverd_nominal_old"]).values).sum())
+        ono_chg = int((pd.to_numeric(m["onothaefur_new"]).values
+                       != pd.to_numeric(m["onothaefur_old"]).values).sum())
+        dt_chg = int((pd.to_datetime(m["thinglystdags_new"]).dt.date.values
+                      != pd.to_datetime(m["thinglystdags_old"]).dt.date.values).sum())
+        log(f"[4] SANITY (must be 0): nominal_changed={nom_chg}, onothaefur_changed={ono_chg}, "
+            f"thinglystdags_changed={dt_chg}")
+        finish_step(conn_log, sid, 0, rowcount_after=stats["final_rows"],
+                    notes=f"n_changed={n_changed} max_delta={max_abs}")
+        if nom_chg or ono_chg or dt_chg:
+            log("[4] ABORT: re-anchor would change non-real columns — unexpected. No writes.")
+            finish_run(conn_log, run_id, "failed",
+                       {"step": "sanity", "reason": "non-real columns would change",
+                        "nominal_changed": nom_chg, "onothaefur_changed": ono_chg,
+                        "thinglystdags_changed": dt_chg})
+            return 3
 
-    # rows to write: composite key + new real (write all common rows; UPDATE is idempotent
-    # on unchanged values). Built vectorized from the merged frame.
-    upd_rows = [(int(f), int(fn), py(r))
-                for f, fn, r in zip(m["faerslunumer"], m["fastnum"], m["kaupverd_real_new"])]
+        # rows to write: composite key + new real (write all common rows; UPDATE is idempotent
+        # on unchanged values). Built vectorized from the merged frame.
+        upd_rows = [(int(f), int(fn), py(r))
+                    for f, fn, r in zip(m["faerslunumer"], m["fastnum"], m["kaupverd_real_new"])]
 
-    import psycopg2
-    from psycopg2.extras import execute_values
+        import psycopg2
+        from psycopg2.extras import execute_values
 
-    # ---- Step 5a: DRYRUN — measure UPDATE on a rolled-back txn ----
-    if args.dryrun:
+        # ---- Step 5a: DRYRUN — measure UPDATE on a rolled-back txn ----
+        if args.dryrun:
+            sid = start_step(conn_log, run_id, "atomic_update", 4)
+            url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
+            conn_w = psycopg2.connect(url); conn_w.autocommit = False
+            try:
+                with conn_w.cursor() as cur:
+                    cur.execute("SET TRANSACTION READ WRITE")
+                    cur.execute("SET LOCAL statement_timeout='10min'")
+                    cur.execute("CREATE TEMP TABLE _reanchor "
+                                "(faerslunumer bigint, fastnum bigint, kaupverd_real bigint) "
+                                "ON COMMIT DROP")
+                    execute_values(cur,
+                        "INSERT INTO _reanchor (faerslunumer, fastnum, kaupverd_real) VALUES %s",
+                        upd_rows, page_size=5000)
+                    t0 = time.time()
+                    cur.execute(
+                        "UPDATE public.sales_history s SET kaupverd_real = d.kaupverd_real "
+                        "FROM _reanchor d "
+                        "WHERE s.faerslunumer = d.faerslunumer AND s.fastnum = d.fastnum")
+                    updated = cur.rowcount
+                    elapsed = time.time() - t0
+                conn_w.rollback()  # NOTHING committed
+                verdict = "OK (vel innan 10min borðs)" if elapsed < 120 else \
+                          "ENDURMETA — nálægt/yfir 2min; íhuga lotuskiptingu (Leið 2)"
+                log(f"[5a] DRYRUN: UPDATE myndi snerta {updated:,} raðir á {elapsed:.1f}s "
+                    f"(rúllað til baka, ekkert committað). statement_timeout=10min; "
+                    f"raunmæling {elapsed:.1f}s -> {verdict}")
+            except Exception as e:
+                conn_w.rollback()
+                log(f"[5a] DRYRUN ERROR (rolled back): {type(e).__name__}: {e}")
+                conn_w.close()
+                finish_step(conn_log, sid, 1, notes=f"dryrun update error: {type(e).__name__}")
+                finish_run(conn_log, run_id, "failed",
+                           {"step": "atomic_update", "dryrun": True, "error": str(e)[:500]})
+                return 1
+            conn_w.close()
+            log("[5a] DRYRUN complete — anchor ÓBREYTTUR, engin skrif, enginn REFRESH.")
+            finish_step(conn_log, sid, 0, rowcount_after=updated,
+                        notes=f"dryrun measured {elapsed:.1f}s (rolled back)")
+            finish_run(conn_log, run_id, "success",
+                       {"dryrun": True, "noop": False, "old_anchor": cur_anchor,
+                        "new_anchor": new_anchor, "rows_would_update": updated,
+                        "measured_seconds": round(elapsed, 1)})
+            return 0
+
+        # ---- Step 5b: LIVE — one atomic txn (all or nothing) ----
+        sid = start_step(conn_log, run_id, "atomic_update", 4)
+        cpi_upserts = csv_rows_at_or_after(cur_anchor)  # any months from old anchor forward
         url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
         conn_w = psycopg2.connect(url); conn_w.autocommit = False
+        updated = 0; t0 = time.time()
         try:
             with conn_w.cursor() as cur:
                 cur.execute("SET TRANSACTION READ WRITE")
@@ -218,81 +293,66 @@ def main() -> int:
                 execute_values(cur,
                     "INSERT INTO _reanchor (faerslunumer, fastnum, kaupverd_real) VALUES %s",
                     upd_rows, page_size=5000)
-                t0 = time.time()
                 cur.execute(
                     "UPDATE public.sales_history s SET kaupverd_real = d.kaupverd_real "
                     "FROM _reanchor d "
                     "WHERE s.faerslunumer = d.faerslunumer AND s.fastnum = d.fastnum")
                 updated = cur.rowcount
-                elapsed = time.time() - t0
-            conn_w.rollback()  # NOTHING committed
-            verdict = "OK (vel innan 10min borðs)" if elapsed < 120 else \
-                      "ENDURMETA — nálægt/yfir 2min; íhuga lotuskiptingu (Leið 2)"
-            log(f"[5a] DRYRUN: UPDATE myndi snerta {updated:,} raðir á {elapsed:.1f}s "
-                f"(rúllað til baka, ekkert committað). statement_timeout=10min; "
-                f"raunmæling {elapsed:.1f}s -> {verdict}")
+                cur.execute(
+                    "UPDATE public.pipeline_config SET value=%s, updated_at=now() "
+                    "WHERE key=%s", (new_anchor, LIVE_ANCHOR_KEY))
+                execute_values(cur,
+                    "INSERT INTO public.cpi_index (year_month, cpi) VALUES %s "
+                    "ON CONFLICT (year_month) DO UPDATE SET cpi=EXCLUDED.cpi",
+                    cpi_upserts, page_size=1000)
+            conn_w.commit()  # anchor + real + cpi_index synced atomically
+            elapsed = time.time() - t0
+            log(f"[5b] LIVE committed: updated={updated:,} real, anchor {cur_anchor}->{new_anchor}, "
+                f"cpi_index upserts={len(cpi_upserts)}, {elapsed:.1f}s")
         except Exception as e:
             conn_w.rollback()
-            log(f"[5a] DRYRUN ERROR (rolled back): {type(e).__name__}: {e}")
+            log(f"[5b] LIVE ERROR rolled back (anchor unchanged): {type(e).__name__}: {e}")
             conn_w.close()
+            finish_step(conn_log, sid, 1, notes=f"atomic update rolled back: {type(e).__name__}")
+            finish_run(conn_log, run_id, "failed",
+                       {"step": "atomic_update", "error": str(e)[:500]})
             return 1
         conn_w.close()
-        log("[5a] DRYRUN complete — anchor ÓBREYTTUR, engin skrif, enginn REFRESH.")
+        finish_step(conn_log, sid, 0, rowcount_after=updated,
+                    notes=f"updated={updated} anchor {cur_anchor}->{new_anchor} {elapsed:.1f}s")
+
+        # ---- Step 6: REFRESH 13 MV (iff updated > 0) ----
+        sid = start_step(conn_log, run_id, "refresh_mv", 5)
+        if updated > 0:
+            conn_r = psycopg2.connect(url); conn_r.autocommit = True
+            with conn_r.cursor() as cur:
+                cur.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE")
+                for mv in MV_LIST:
+                    cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
+                    log(f"[6] refreshed {mv}")
+            conn_r.close()
+            finish_step(conn_log, sid, 0, notes=f"{len(MV_LIST)} MV refreshed")
+        else:
+            log("[6] 0 updated — sleppi REFRESH.")
+            finish_step(conn_log, sid, 0, notes="skipped (0 updated)")
+
+        log(f"[7] done. anchor {cur_anchor}->{new_anchor}, rows_changed={n_changed:,}, "
+            f"updated={updated:,}")
+        finish_run(conn_log, run_id, "success",
+                   {"noop": False, "old_anchor": cur_anchor, "new_anchor": new_anchor,
+                    "rows_updated": updated, "rows_changed": n_changed})
         return 0
-
-    # ---- Step 5b: LIVE — one atomic txn (all or nothing) ----
-    cpi_upserts = csv_rows_at_or_after(cur_anchor)  # any months from old anchor forward
-    url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-    conn_w = psycopg2.connect(url); conn_w.autocommit = False
-    updated = 0; t0 = time.time()
-    try:
-        with conn_w.cursor() as cur:
-            cur.execute("SET TRANSACTION READ WRITE")
-            cur.execute("SET LOCAL statement_timeout='10min'")
-            cur.execute("CREATE TEMP TABLE _reanchor "
-                        "(faerslunumer bigint, fastnum bigint, kaupverd_real bigint) "
-                        "ON COMMIT DROP")
-            execute_values(cur,
-                "INSERT INTO _reanchor (faerslunumer, fastnum, kaupverd_real) VALUES %s",
-                upd_rows, page_size=5000)
-            cur.execute(
-                "UPDATE public.sales_history s SET kaupverd_real = d.kaupverd_real "
-                "FROM _reanchor d "
-                "WHERE s.faerslunumer = d.faerslunumer AND s.fastnum = d.fastnum")
-            updated = cur.rowcount
-            cur.execute(
-                "UPDATE public.pipeline_config SET value=%s, updated_at=now() "
-                "WHERE key=%s", (new_anchor, LIVE_ANCHOR_KEY))
-            execute_values(cur,
-                "INSERT INTO public.cpi_index (year_month, cpi) VALUES %s "
-                "ON CONFLICT (year_month) DO UPDATE SET cpi=EXCLUDED.cpi",
-                cpi_upserts, page_size=1000)
-        conn_w.commit()  # anchor + real + cpi_index synced atomically
-        elapsed = time.time() - t0
-        log(f"[5b] LIVE committed: updated={updated:,} real, anchor {cur_anchor}->{new_anchor}, "
-            f"cpi_index upserts={len(cpi_upserts)}, {elapsed:.1f}s")
     except Exception as e:
-        conn_w.rollback()
-        log(f"[5b] LIVE ERROR rolled back (anchor unchanged): {type(e).__name__}: {e}")
-        conn_w.close()
-        return 1
-    conn_w.close()
-
-    # ---- Step 6: REFRESH 13 MV (iff updated > 0) ----
-    if updated > 0:
-        conn_r = psycopg2.connect(url); conn_r.autocommit = True
-        with conn_r.cursor() as cur:
-            cur.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE")
-            for mv in MV_LIST:
-                cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
-                log(f"[6] refreshed {mv}")
-        conn_r.close()
-    else:
-        log("[6] 0 updated — sleppi REFRESH.")
-
-    log(f"[7] done. anchor {cur_anchor}->{new_anchor}, rows_changed={n_changed:,}, "
-        f"updated={updated:,}")
-    return 0
+        log(f"*** CRASH: {type(e).__name__}: {e}")
+        finish_run(conn_log, run_id, "crashed", {"error": str(e)[:500]})
+        raise
+    finally:
+        if conn_ro is not None:
+            try:
+                conn_ro.close()
+            except Exception:
+                pass
+        conn_log.close()
 
 
 if __name__ == "__main__":
