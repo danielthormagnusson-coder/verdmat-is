@@ -23,7 +23,9 @@ Usage in a script:
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -412,3 +414,111 @@ def git_sha_head(repo_dir: Path = Path(r"D:\verdmat-is\app")) -> str | None:
         return out or None
     except Exception:
         return None
+
+
+# ----------------------------------------------------------------------
+# pipeline_runs / pipeline_steps writers (shared by ALL orchestrators)
+# ----------------------------------------------------------------------
+# One source of truth for Group C audit logging. run_monthly.py, the daily
+# sales-refresh loader, and the monthly CPI re-anchor engine all call these,
+# so every orchestrator logs identically.
+#
+# CONVENTIONS (all three orchestrators MUST follow):
+#   - exit_status is free-form text but kept to a small vocabulary so a future
+#     /heilsa health check can treat it as essentially binary:
+#       'success'  — run finished its intended work (INCLUDING a clean no-op).
+#       'failed'   — an error aborted the run (writes rolled back).
+#       'halted'   — a deliberate gate stopped the run before consequential work.
+#       'crashed'  — an unexpected exception (caught by the orchestrator).
+#   - NO-OP runs are RECORDED, never dropped: a no-op (kaupskra unchanged →
+#     NEW=0; CPI anchor unchanged) finishes with exit_status='success' AND
+#     summary={'noop': True, 'reason': '...'} so success/failed stays a clean
+#     binary while the no-op remains visible/queryable in the summary.
+#   - Each writer commits on its own so the audit trail survives even if a
+#     later step in the same run crashes.
+# ----------------------------------------------------------------------
+def start_run(conn, run_type: str) -> int:
+    """INSERT a pipeline_runs row at run start; return its id. Commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO public.pipeline_runs
+              (run_type, started_at, host, git_sha)
+            VALUES (%s, now(), %s, %s)
+            RETURNING id
+            """,
+            (run_type, socket.gethostname(), git_sha_head() or "unknown"),
+        )
+        run_id = cur.fetchone()[0]
+    conn.commit()
+    return run_id
+
+
+def start_step(conn, run_id: int, step_name: str, step_order: int) -> int:
+    """INSERT a pipeline_steps row at step start; return its id. Commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO public.pipeline_steps
+              (run_id, step_name, step_order, started_at)
+            VALUES (%s, %s, %s, now())
+            RETURNING id
+            """,
+            (run_id, step_name, step_order),
+        )
+        step_id = cur.fetchone()[0]
+    conn.commit()
+    return step_id
+
+
+def finish_step(
+    conn,
+    step_id: int,
+    exit_code: int,
+    *,
+    rowcount_before: int | None = None,
+    rowcount_after: int | None = None,
+    notes: str | None = None,
+    output_paths: list[str] | None = None,
+    log_path: str | None = None,
+) -> None:
+    """UPDATE a pipeline_steps row at step end. Commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE public.pipeline_steps
+            SET ended_at=now(),
+                exit_code=%s,
+                rowcount_before=%s,
+                rowcount_after=%s,
+                notes=%s,
+                output_paths=%s,
+                log_path=%s
+            WHERE id=%s
+            """,
+            (
+                exit_code, rowcount_before, rowcount_after, notes,
+                json.dumps(output_paths) if output_paths else None,
+                log_path, step_id,
+            ),
+        )
+    conn.commit()
+
+
+def finish_run(
+    conn, run_id: int, exit_status: str, summary: dict | None = None
+) -> None:
+    """UPDATE a pipeline_runs row at run end. Commits.
+
+    For a no-op run pass exit_status='success' with summary={'noop': True, ...}.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE public.pipeline_runs
+            SET ended_at=now(), exit_status=%s, summary=%s
+            WHERE id=%s
+            """,
+            (exit_status, json.dumps(summary) if summary else None, run_id),
+        )
+    conn.commit()

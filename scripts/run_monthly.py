@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import socket
 import sys
 import time
 from datetime import datetime, timezone
@@ -57,6 +56,12 @@ from migration_helpers import (  # noqa: E402
     file_md5_hex,
     git_sha_head,
     unnest_upsert,
+    # Group C audit logging — single source of truth in migration_helpers.
+    # Imported under the original local names so call sites are unchanged.
+    start_run as create_pipeline_run,
+    start_step as create_pipeline_step,
+    finish_step as finalize_pipeline_step,
+    finish_run as finalize_pipeline_run,
 )
 
 DATA = Path(r"D:\\")
@@ -126,86 +131,10 @@ STEPS: list[dict] = [
 
 
 # ----------------------------------------------------------------------
-# pipeline_runs / pipeline_steps writers (via service-role .dbconfig)
+# pipeline_runs / pipeline_steps writers now live in migration_helpers
+# (start_run / start_step / finish_step / finish_run), imported above under
+# the original local names. Single source of truth shared by all orchestrators.
 # ----------------------------------------------------------------------
-def create_pipeline_run(conn, run_type: str) -> int:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO public.pipeline_runs
-              (run_type, started_at, host, git_sha)
-            VALUES (%s, now(), %s, %s)
-            RETURNING id
-            """,
-            (run_type, socket.gethostname(), git_sha_head() or "unknown"),
-        )
-        run_id = cur.fetchone()[0]
-    conn.commit()
-    return run_id
-
-
-def create_pipeline_step(conn, run_id: int, step_name: str, order: int) -> int:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO public.pipeline_steps
-              (run_id, step_name, step_order, started_at)
-            VALUES (%s, %s, %s, now())
-            RETURNING id
-            """,
-            (run_id, step_name, order),
-        )
-        step_id = cur.fetchone()[0]
-    conn.commit()
-    return step_id
-
-
-def finalize_pipeline_step(
-    conn,
-    step_id: int,
-    exit_code: int,
-    *,
-    rowcount_before: int | None = None,
-    rowcount_after: int | None = None,
-    notes: str | None = None,
-    output_paths: list[str] | None = None,
-    log_path: str | None = None,
-) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE public.pipeline_steps
-            SET ended_at=now(),
-                exit_code=%s,
-                rowcount_before=%s,
-                rowcount_after=%s,
-                notes=%s,
-                output_paths=%s,
-                log_path=%s
-            WHERE id=%s
-            """,
-            (
-                exit_code, rowcount_before, rowcount_after, notes,
-                json.dumps(output_paths) if output_paths else None,
-                log_path, step_id,
-            ),
-        )
-    conn.commit()
-
-
-def finalize_pipeline_run(
-    conn, run_id: int, exit_status: str, summary: dict | None = None
-) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE public.pipeline_runs
-            SET ended_at=now(), exit_status=%s, summary=%s
-            WHERE id=%s
-            """,
-            (exit_status, json.dumps(summary) if summary else None, run_id),
-        )
-    conn.commit()
 
 
 # ----------------------------------------------------------------------
