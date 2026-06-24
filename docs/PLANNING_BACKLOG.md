@@ -1089,3 +1089,20 @@ Frestað til að einbeita sér að agent-v0 (AGENT_SPEC §6) + T1. Ekkert af þe
 - **visir is_price_on_request backfill** (407 raðir, price=1 → true). Léttur frágangur, ekki kritískt.
 - **Step 3e — myndaspegill (image mirror) / Gagnapakkar bootstrap** (parkað). ~196,5 GB image-skjalasafn á D:\Gagnapakkar\images\ (921K myndir, 38K fastnum-möppur, image_index.db ~2,6M raðir) NÆR-ÓNOTAÐ. Bootstrap: lesa safnið fyrst, diff-fetch eingöngu vantandi myndir; long-term-owned archive er source of truth, CloudFront-URL transient acquisition (sjá Amendment 4 image-ownership policy). Engin scraper-dependency; má byrja hvenær sem er. Image-bootstrap re-run fyrir 58 failed URLs úr Phase 3 fellur hér undir.
 - **myigloo-delta — áframhaldandi refresh** (parkað). myigloo (+ visir) eru SEED-ONLY núna, engin delta-vél (ólíkt mbl sem hefur nightly delta-keðju, Task Scheduler 01:00). Þarf since-priming + delta-mode hliðstætt fetch_mbl/prime_delta_since svo myigloo-listings haldist fersk. Lágur forgangur þar til canonical-layer neytendur (T1 asking-vs-sold) krefjast ferskra myigloo-gagna.
+
+---
+
+## Módel-gæðavél (lokað mæli- og endurbóta-kerfi) — þríþætt, lagskipt (logged 2026-06-23)
+
+**Forsenda**: daglega ferskleika-brautin (LIFANDI frá 2026-06-22, sjá DECISIONS 2026-06-22 daily loader) gerir þessa mælingu fyrst marktæka — áður stóð sales_history á ~2ja mán gömlum gögnum, nú lendir sala innan dags ⇒ módel-einkunn nánast rauntíma. Þrjár aðgreindar vélar, ólíkt þungar, MEGA EKKI renna saman (sama agi og þriggja-brauta CPI/ferskleika-aðskilnaðurinn).
+
+**VÉL 1 — afturvirk módel-vöktun (létt, NÆST eftir CPI-systkin)**:
+Frosnar version-stimplaðar spár (public.predictions, iter4 prod) joinaðar við NÝLENT raunverð í sales_history → rúllandi MAPE / bias / coverage á 80% + 95% bilunum, brotið niður eftir hverfi / eignagerð / verðbili. Out-of-sample í eðli sínu (salan gerist EFTIR að spáin var fryst). Engin LLM þörf — hreinn join frosin-spá × ný-sala. Fæðir public.model_metrics + /heilsa mælaborð (þegar á horizon). Byggir beint á því sem armað var 2026-06-22. Nóta: point-in-time nákvæmni → bera saman á SAMA anker (nominal/nominal eða af-ankerað), sjá v_model_vs_sold anker-óháð ákvörðun.
+
+**VÉL 2 — LLM ask-to-sale mæling (þyngri, tengist ask-to-sale gap módelinu í hönnun)**:
+Les nýja auglýsingu → LLM-extraction á SÖMU reiti og ítarlega verðmatið → spá → bíða eftir sölu → bera saman. Mælir allt rörið (extraction + verðmat) í rauntíma, ekki bara frosna spá. LÆST fyrirvari: ask-to-sale bilið er markaðs-fyrirbæri (yfir/undirverð, samningar, tími-á-sölu) EKKI módel-skekkja — verður að aðgreina tvennt. Sömu extraction-reitir í mælingu OG framleiðslu halda því hreinu: residual eftir extraction-parity = annaðhvort módel-skekkja eða markaðs-spread, og ask-to-sale gap módelið á að taka spread-hlutann.
+
+**VÉL 3 — sjálfvirk jústering (FRYST MEÐVITAÐ, endurskoðast síðar)**:
+Auto-retrain sem eltir nýjustu mælingu áhættar (a) að elta hávaða, (b) ofbregðast árstíðasveiflu, (c) feedback-lykkju þar sem módel spáir sjálfu sér. Mannlega-gated til langs tíma: mælingin segir HVENÆR iter5 borgar sig og HVAR módelið er veikt, en endurþjálfunar-ÁKVÖRÐUN er Danna, ekki sjálfvirk. Mánaðarlegt iteration raunhæft sem mannlega-samþykkt cadence informað af mælingu — EKKI blint auto-retrain. Bíður þar til VÉL 1 hefur safnað nógu mörgum vikum til að eðlilegur breytileiki sé þekktur (annars jústering gegn hávaða = plástur).
+
+**Röðun**: CPI-systkin (í gangi) → VÉL 1 → VÉL 2 (með ask-to-sale gap módeli) → VÉL 3 (gated, frestað).
