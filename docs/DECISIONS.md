@@ -4,6 +4,31 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-24 — CPI-systkin FORVINNA: cpi_index + tveggja-lykla anker-aðskilnaður + v_model_vs_sold nominal/nominal
+
+Samhengi: undirbúningur fyrir mánaðarlegu CPI-endur-ankeringu (braut 2). Þrjár DB-breytingar lentu, ALLAR á undan sjálfri re-anchor-vélinni (sem bíður fyrsta nýja VNV-mánaðar):
+
+1. **public.cpi_index** (year_month PK, cpi numeric) — spegill D:\cpi_verdtrygging.csv (376 raðir, 1995-04…2026-07), RLS á / anon-læst. CPI-systkinið verður skrifari hennar (uppfærir í sömu txn og það endur-ankerar). Gerir CPI-tímaröðina queryanlega í Postgres í fyrsta sinn.
+
+2. **Tveggja-lykla anker-aðskilnaður í pipeline_config**:
+   - sales_history_anchor_ym (live-anker) — CPI-systkinið hreyfir mánaðarlega.
+   - model_pred_anchor_ym (módel-anker) — hreyfist BARA við iter5 deploy, mannlega-gated.
+   Þeir MEGA og EIGA að vera ósamstilltir: predictions eru frosnar (iter4), sales hreyfast áfram. Báðir 2026-07 í dag → enginn desync núna.
+
+3. **v_model_vs_sold_by_hood endurskrifað nominal/nominal (anker-óháð)**:
+   sold_to_pred_ratio = kaupverd_nominal / (real_pred_median × cpi[saleM]/cpi[model_anchor]).
+   Báðar hliðar de-ankeraðar í nominal við view-tíma → point-in-time spá-nákvæmni, ónæmt fyrir live-anker hreyfingu. Var EINA MV sem bar saman ólíkt-ankeraðar stærðir (real-live ÷ real-módel); hin 12 aggregera kaupverd_real innbyrðis → þegar ónæm. Þetta fjarlægir desync-gate-ið svo CPI-systkinið má endur-ankera kaupverd_real frjálst.
+   Rounding: nominal_pred í SQL numeric (ratio-mæling, ekki geymt verð) → Python-parity á EKKI við.
+   Vantandi-cpi: LEFT JOIN með countable drop (ekki þögult NULL); 0 í dag (2-mán CPI-forskot).
+
+**JAFNGILDIS-SÖNNUN**: af því anker==anker==2026-07 í dag mældist gamalt real/real == nýtt nominal/nominal EXAKT (pct_diff 0.0000 í öllum 10 stærstu hverfum, 5 aukastafir) → breytingin er anker-rétt, ekki bara öðruvísi reiknuð; merking óbreytt, aðeins framsetning de-ankeruð.
+
+**AUDIT**: módel-anker '2026-07' er ÁLYKTAÐUR úr samhengi fyrir iter4 (inputs_snapshots run-level cpi_factor_at_val ≈ cpi[2026-07]/cpi[2026-05]; live-predictions cohort iter4_final_v1 applíeruð 2026-05-27, predicted_at 2026-04-01 — nákvæmt per-prediction real-anker hvergi skráð). iter5 SKAL skrifa model_pred_anchor_ym per-rebuild svo þetta sé LESIÐ, ekki ályktað.
+
+**Migrations**: cpi_index (20260624102101) + v_model_vs_sold DROP+CREATE (MCP version). Eftir: sjálf re-anchor-vélin (refresh_cpi-vír + Python-parity re-derive + cpi_index/anker-uppfærsla í einni txn + REFRESH 13 MV), bíður fyrsta nýja VNV-mánaðar (2026-08).
+
+---
+
 ## 2026-06-22 — Daily loader LIFANDI: daily_sales_refresh.py + S4U-task; DO NOTHING fresh-path
 
 **Hvað**: daglega ferskleika-brautin (braut 1 af þremur, sjá kaupskrá-rebuild færsluna neðar) er smíðuð, sönnuð end-to-end og armað. `scripts/daily_sales_refresh.py` keyrir: Step 0 `refresh_kaupskra.py` (sækir kaupskrá) → re-derive + diff á (faerslunumer, fastnum) → upsert AÐEINS nýjar raðir → REFRESH 13 semantic MV.

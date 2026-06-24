@@ -1,5 +1,7 @@
 # STATE — Núverandi staða verkefnis
 
+**2026-06-24:** CPI-systkin FORVINNA lokið — cpi_index tafla (spegill cpi_verdtrygging.csv, queryanleg CPI-röð í Postgres), tveggja-lykla anker-aðskilnaður í pipeline_config (sales_history_anchor_ym live vs model_pred_anchor_ym módel, mega vera ósamstilltir), v_model_vs_sold_by_hood endurskrifað nominal/nominal (desync-gate fjarlægt, jafngildi EXAKT staðfest pct_diff 0.0000). Braut 1 SANNUÐ Í FRAMLEIÐSLU: fyrsta sjálfvirka nótt (2026-06-23 02:30) færði sales_history í data_through 2026-06-23. Næst: sjálf CPI-re-anchor-vélin (bíður 2026-08 VNV). Sjá DECISIONS 2026-06-24.
+
 **2026-06-22 (loka):** kaupskrá DAGLEG-BRAUT LIFANDI — daily_sales_refresh.py smíðaður, sannaður end-to-end (88 raðir + 13 MV refresh), armað+sannað S4U-task `verdmat-daily-sales-refresh` 02:30 GMT (LastTaskResult=0, næst 2026-06-23). sales_history ferskt til thinglystdags 2026-06-19. Þriggja-brauta arkitektúr: dagleg ✓ lifandi; mánaðarleg CPI-systkin + mánaðarleg módel eftir. Næst: mánaðar-CPI-systkin (refresh_cpi automation + endur-ankering, eini anker-skrifari) þá frontend „seld — ónothæfur samningur" merki fyrir onothaefur=1. Sjá DECISIONS 2026-06-22 (daily loader).
 
 **2026-06-22:** sales_history ferskt til 2026-06-16 (rebuild 2026-06-22, composite-lykill, anker 2026-07); kaupskrá daglega-braut: rebuild lent, loader+schedula eftir. Sjá DECISIONS 2026-06-22.
