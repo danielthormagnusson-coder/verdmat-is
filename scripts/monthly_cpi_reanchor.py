@@ -20,6 +20,12 @@ parity with how the rows were built (no SQL-round drift).
 Gate is DB-side, not refresh_cpi stdout: max(cpi_verdtrygging.csv) vs the live
 sales_history_anchor_ym. New month => re-anchor; else no-op.
 
+Pre-flight backup: the LIVE path first creates public.sales_history_real_backup_<ts>
+(faerslunumer, fastnum, kaupverd_real as of before the UPDATE) in its own committed
+txn — a rollback net for kaupverd_real. These tables are NOT permanent storage:
+drop them manually once the re-anchor is confirmed good (auto-pruning is a backlog
+item). Service-role-only (RLS on, anon/auth revoked), ~5-7 MB each.
+
 CLI:
   python scripts/monthly_cpi_reanchor.py --dryrun                 # gate + measure, no writes
   python scripts/monthly_cpi_reanchor.py --dryrun --test-anchor 2026-06  # force anchor for test
@@ -231,9 +237,20 @@ def main() -> int:
         import psycopg2
         from psycopg2.extras import execute_values
 
+        # Pre-flight snapshot table name (rollback net — captures kaupverd_real BEFORE the UPDATE).
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
+        backup_table = f"sales_history_real_backup_{ts}"
+
+        # ---- Step 4: pre-flight backup (DRYRUN — describe only, no table) ----
+        if args.dryrun:
+            sid = start_step(conn_log, run_id, "preflight_backup", 4)
+            log(f"[4b] DRYRUN — would create public.{backup_table} "
+                f"(snapshot of faerslunumer, fastnum, kaupverd_real before UPDATE)")
+            finish_step(conn_log, sid, 0, notes=f"dryrun: would create {backup_table}")
+
         # ---- Step 5a: DRYRUN — measure UPDATE on a rolled-back txn ----
         if args.dryrun:
-            sid = start_step(conn_log, run_id, "atomic_update", 4)
+            sid = start_step(conn_log, run_id, "atomic_update", 5)
             url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
             conn_w = psycopg2.connect(url); conn_w.autocommit = False
             try:
@@ -274,11 +291,45 @@ def main() -> int:
             finish_run(conn_log, run_id, "success",
                        {"dryrun": True, "noop": False, "old_anchor": cur_anchor,
                         "new_anchor": new_anchor, "rows_would_update": updated,
-                        "measured_seconds": round(elapsed, 1)})
+                        "measured_seconds": round(elapsed, 1),
+                        "would_backup_table": backup_table})
             return 0
 
+        # ---- Step 4: pre-flight backup (LIVE) — own committed txn BEFORE re-anchor ----
+        # Committed first so the snapshot survives regardless of whether the re-anchor txn
+        # succeeds: if re-anchor rolls back, the snapshot == current data (harmless); if it
+        # commits, the snapshot is the rollback net for kaupverd_real.
+        sid = start_step(conn_log, run_id, "preflight_backup", 4)
+        url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
+        conn_b = psycopg2.connect(url); conn_b.autocommit = False
+        try:
+            with conn_b.cursor() as cur:
+                cur.execute("SET TRANSACTION READ WRITE")
+                cur.execute(
+                    f"CREATE TABLE public.{backup_table} AS "
+                    f"SELECT faerslunumer, fastnum, kaupverd_real FROM public.sales_history")
+                # service-role-only, same posture as cpi_index / pipeline_config
+                cur.execute(f"ALTER TABLE public.{backup_table} ENABLE ROW LEVEL SECURITY")
+                cur.execute(f"REVOKE ALL ON public.{backup_table} FROM anon")
+                cur.execute(f"REVOKE ALL ON public.{backup_table} FROM authenticated")
+                cur.execute(f"SELECT count(*) FROM public.{backup_table}")
+                n_backup = cur.fetchone()[0]
+            conn_b.commit()
+            log(f"[4] pre-flight backup committed: public.{backup_table} ({n_backup:,} rows)")
+        except Exception as e:
+            conn_b.rollback()
+            conn_b.close()
+            log(f"[4] ERROR pre-flight backup failed: {type(e).__name__}: {e}")
+            finish_step(conn_log, sid, 1, notes=f"backup failed: {type(e).__name__}")
+            finish_run(conn_log, run_id, "failed",
+                       {"step": "preflight_backup", "error": str(e)[:500]})
+            return 1
+        conn_b.close()
+        finish_step(conn_log, sid, 0, rowcount_after=n_backup,
+                    notes=f"created public.{backup_table} ({n_backup} rows)")
+
         # ---- Step 5b: LIVE — one atomic txn (all or nothing) ----
-        sid = start_step(conn_log, run_id, "atomic_update", 4)
+        sid = start_step(conn_log, run_id, "atomic_update", 5)
         cpi_upserts = csv_rows_at_or_after(cur_anchor)  # any months from old anchor forward
         url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
         conn_w = psycopg2.connect(url); conn_w.autocommit = False
@@ -322,7 +373,7 @@ def main() -> int:
                     notes=f"updated={updated} anchor {cur_anchor}->{new_anchor} {elapsed:.1f}s")
 
         # ---- Step 6: REFRESH 13 MV (iff updated > 0) ----
-        sid = start_step(conn_log, run_id, "refresh_mv", 5)
+        sid = start_step(conn_log, run_id, "refresh_mv", 6)
         if updated > 0:
             conn_r = psycopg2.connect(url); conn_r.autocommit = True
             with conn_r.cursor() as cur:
@@ -340,7 +391,8 @@ def main() -> int:
             f"updated={updated:,}")
         finish_run(conn_log, run_id, "success",
                    {"noop": False, "old_anchor": cur_anchor, "new_anchor": new_anchor,
-                    "rows_updated": updated, "rows_changed": n_changed})
+                    "rows_updated": updated, "rows_changed": n_changed,
+                    "backup_table": backup_table})
         return 0
     except Exception as e:
         log(f"*** CRASH: {type(e).__name__}: {e}")
