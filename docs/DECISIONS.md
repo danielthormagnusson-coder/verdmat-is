@@ -4,6 +4,15 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-25 — CPI re-anchor-vél + samræmd pipeline-loggun
+
+- **monthly_cpi_reanchor.py smíðuð**: DB-hlið gate (max(cpi_csv) vs sales_history_anchor_ym), ein atómísk txn (Leið 1: real-UPDATE + anker + cpi_index samstillt), Python-parity re-derive (endurnýtir derive_sales_rows — 1/227k SQL-round dyfja útilokuð), REFRESH 13 MV. Dry-run mældi 227.615-raða UPDATE á 14,4s (síðar 11,7s/11,9s) ≪ 2min default → Leið 1 örugg, engin lotuskipting. SANITY: aðeins kaupverd_real breytist (nominal/dags/onothaefur 0). **Pre-flight snapshot** (public.sales_history_real_backup_<ts>, service-role-only, eigin committuð txn fyrir UPDATE) = afturköllunar-net; dropað handvirkt eftir staðfestingu (auto-prune á backlog).
+- **Samræmd loggun**: fjögur pipeline-logg-föll (start_run/start_step/finish_step/finish_run) factoruð í migration_helpers → run_monthly + daily + cpi deila EINNI heimild. No-op convention: exit_status='success' + summary.noop=true (success/failed hreint binary, no-op greinanlegt, aldrei sleppt). **Pooler read-only-leak fix**: SET TRANSACTION READ WRITE fyrst í öllum fjórum helper-föllum (read-only session úr open_ro_conn lekur inn í deilda pgbouncer-backend annars → ReadOnlySqlTransaction á write). run_type-gildi: daily_sales_refresh, monthly_cpi_reanchor (auk monthly).
+- **AUDIT**: id 11/12 í pipeline_runs eru danglandi frá föllnum dryrun-tilraunum fyrir leak-fix — látnar standa sem heiðarlegt audit-ummerki (hálf-keyrslur, ekkert lifandi snert).
+- **Eftir**: arm (3b, S4U mánaðarlegt task með DB-gate) + fyrsta lifandi keyrsla bíður 2026-08 VNV.
+
+---
+
 ## 2026-06-24 — CPI-systkin FORVINNA: cpi_index + tveggja-lykla anker-aðskilnaður + v_model_vs_sold nominal/nominal
 
 Samhengi: undirbúningur fyrir mánaðarlegu CPI-endur-ankeringu (braut 2). Þrjár DB-breytingar lentu, ALLAR á undan sjálfri re-anchor-vélinni (sem bíður fyrsta nýja VNV-mánaðar):
