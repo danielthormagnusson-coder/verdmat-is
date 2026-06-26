@@ -4,6 +4,24 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-26 — VÉL 1 módel-gæðakerfi: Einkunn 1 (baseline/all_oos) LIVE; Einkunn 2 blokkað á API-lykli
+
+**Markmið**: vikulegt out-of-sample gæðakerfi, tvær einkunnir á SÖMU ferskum sölum — E1 (iter4 structured, extraction nulluð) vs E2 (iter4 + Haiku-extraction úr söluyfirliti), BIL = framlag extraction-lagsins. Mælt nominal/nominal (de-anker eins og v_model_vs_sold), skrifað í nýja `public.model_metrics`, loggað gegnum migration_helpers.
+
+**OOS-cutoff aðferðafræði (leiðrétti forsendu)**: iter4 `.lgb` var ÞJÁLFAÐ 2026-04-21 (mtime) á kaupskrá ~2026-04-20 — `predicted_at`=2026-04-01 er bara stimpill, EKKI cutoff; current `training_data_v2.pkl` (2026-05-28 max) er síðari endur-SKORUN, ekki endur-þjálfun. **OOS_CUTOFF = 2026-04-20**; sölur eftir það eru hreint out-of-sample. **onothaefur=0 SKYLDA** í OOS-úrtaki (uppgötvað í dryrun: án síu MAPE 56% / bias −37% af ómarkaðs-sölum; með síu MAPE 16% / bias −0,8%).
+
+**`public.model_metrics`** (migration 20260626004530): metric_run_id, oos_cutoff, score_type (baseline|full|gap), segment_dim (overall|hood|property_type|price_band|new_build), segment_value, sample_scope (all_oos|paired_oos), n_pairs, mape/med_ape/bias/cov80/cov95, extra. RLS service-role-only. UNIQUE (metric_run_id, score_type, segment_dim, segment_value, sample_scope) → idempotent.
+
+**SKREF B LIVE — Einkunn 1 (baseline/all_oos)**: `scripts/model_quality_eval.py` reiknar á frosnum public.predictions ⋈ sales_history (onothaefur=0, eftir cutoff), metric-kjarni speglar validate_metrics (MAPE real-space, coverage scale-invariant, bias), de-anker nominal/nominal. **Fyrsta keyrsla: n=1.313 OOS pör, MAPE 15,94% / medAPE 7,80% / bias −0,84% / cov80 67,2% / cov95 87,4%** (62 raðir: overall + 47 hverfi + 8 eignagerðir + 4 verðbil + 2 nýbygging). Lærdómur: medAPE 7,8% ≈ held-baseline 7,0% (módel alhæfir vel miðlægt); MAPE 15,9% tail-drifið af <40M bandi (MAPE 62%); cov80 67% < held 73% → OOS-undirþekja á bilunum (raunverulegur fundur).
+
+**SKREF C GRÆNT — matsvél kallanleg per-eign**: þrjú hrein importanleg callables staðfest: `score_new_listing.score_property` (nullar vantandi → baseline vs full = sami dict), `build_training_data_v2.build_extraction_features(extraction, sale_year, canonical_code)` (raw 108-field → módel-features), `pilot_extract_v022.extract_listing` (single-listing synchronous Haiku-call, claude-haiku-4-5, tvinguð tool, 108 fields). Pörun: 126 OOS-fastnums (af 1.313) með söluyfirliti (~9,6%).
+
+**SKREF D BLOKKAÐ — `ANTHROPIC_API_KEY` ekki sett í session**: Haiku-extraction-helmingurinn óprófanlegur → D-vélin EKKI smíðuð (óprófaður greiddur-API-stígur = áhætta). Bíður þess að lykill sé settur; þá: per paraða OOS-eign → score_property(baseline) + extract_listing→build_extraction_features→score_property(full), skrifa full/paired_oos + gap, + selection-tékk (baseline/all_oos vs baseline/paired_oos). Kostnaður ~$1 (126 × ~$0,007).
+
+**Eftir**: (i) setja API-lykil → smíða+keyra D (E2/gap). (ii) SKREF E vikuleg cadence (óvopnuð, register-script eins og daily/cpi; N lágt ~126 svo fyrstu vikur hávaðasamar — vélin SAFNAR því afturkölluð auglýsing týnir söluyfirliti). (iii) frontend onothaefur-merki / heilsa-flipi les model_metrics.
+
+---
+
 ## 2026-06-26 — CPI re-anchor ARMAÐ (verdmat-weekly-cpi-reanchor) — CPI-braut fullkláruð
 
 **Armað**: `verdmat-weekly-cpi-reanchor` S4U-task, **sunnudag 04:00 GMT, VIKULEGT** (local==GMT). Keyrir `monthly_cpi_reanchor.py` án flagga; DB-hlið gate (max(cpi_verdtrygging.csv) vs sales_history_anchor_ym) **no-op-ar þar til 2026-08 VNV birtist** (~seint júlí), grípur hann þá sjálfkrafa næsta sunnudag. register-script `scripts/register_cpi_reanchor_task.ps1` (sama S4U-mynstur og daily/delta; Danni keyrði elevated).
