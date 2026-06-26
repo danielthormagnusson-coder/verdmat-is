@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-26 — CPI re-anchor ARMAÐ (verdmat-weekly-cpi-reanchor) — CPI-braut fullkláruð
+
+**Armað**: `verdmat-weekly-cpi-reanchor` S4U-task, **sunnudag 04:00 GMT, VIKULEGT** (local==GMT). Keyrir `monthly_cpi_reanchor.py` án flagga; DB-hlið gate (max(cpi_verdtrygging.csv) vs sales_history_anchor_ym) **no-op-ar þar til 2026-08 VNV birtist** (~seint júlí), grípur hann þá sjálfkrafa næsta sunnudag. register-script `scripts/register_cpi_reanchor_task.ps1` (sama S4U-mynstur og daily/delta; Danni keyrði elevated).
+
+**Cadence-rök**: re-anchor er EKKI dag-viðkvæmt (~0,1% real-munur per CPI-mánuð, t.d. 07→08); vikulegt er nóg og færri keyrslur. **Röðun á grípu-degi** (sunnudag sem nýr mánuður er kominn): daily 02:30 (bætir nýjum sölum á GAMLA ankerinn) → backup 03:00 → re-anchor 04:00 (endur-ankerar ALLT, fulla töflu, atómískt: pre-flight snapshot + real-UPDATE + anker + cpi_index í einni txn → REFRESH 13 MV). Engin árekstur (re-anchor ~12-15s).
+
+**S4U-próf** (on-demand, scheduluðu samhengi): LastTaskResult=0; pipeline_runs id=17 `monthly_cpi_reanchor / success / {noop:true, dryrun:false, anchor:2026-07, reason:'anchor unchanged'}` → sannar gate + loggun + refresh_cpi-subprocess undir S4U (python-path, importin, DB-tenging). 0 backup-töflur (no-op skrifar ekkert). Trigger Weekly/Sunday 04:00, S4U/Limited, næst 2026-06-28.
+
+**CPI-braut (braut 2) er fullkláruð og óvopnuð-bíður-mánaðar**: forvinna (cpi_index, tveggja-lykla anker, v_model_vs_sold nominal/nominal) + vél (Python-parity re-derive, atómísk txn, pre-flight snapshot) + samræmd loggun + armað task. Fyrsta raun-keyrsla bíður 2026-08 VNV.
+
+---
+
 ## 2026-06-25 — CPI re-anchor-vél + samræmd pipeline-loggun
 
 - **monthly_cpi_reanchor.py smíðuð**: DB-hlið gate (max(cpi_csv) vs sales_history_anchor_ym), ein atómísk txn (Leið 1: real-UPDATE + anker + cpi_index samstillt), Python-parity re-derive (endurnýtir derive_sales_rows — 1/227k SQL-round dyfja útilokuð), REFRESH 13 MV. Dry-run mældi 227.615-raða UPDATE á 14,4s (síðar 11,7s/11,9s) ≪ 2min default → Leið 1 örugg, engin lotuskipting. SANITY: aðeins kaupverd_real breytist (nominal/dags/onothaefur 0). **Pre-flight snapshot** (public.sales_history_real_backup_<ts>, service-role-only, eigin committuð txn fyrir UPDATE) = afturköllunar-net; dropað handvirkt eftir staðfestingu (auto-prune á backlog).
