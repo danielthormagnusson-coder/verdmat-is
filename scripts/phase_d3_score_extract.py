@@ -136,6 +136,22 @@ def build_X_matrix(scor: pd.DataFrame, feat_names: list[str],
     if "has_extraction_data" in feat_names:
         X["has_extraction_data"] = 0
 
+    # E2 full-path (VÉL 1): honor LLM-extraction feature columns when the caller
+    # provides them in `scor` (e.g. from build_extraction_features). For the D3
+    # batch (no such columns) this is a no-op and has_extraction_data stays 0,
+    # preserving the original structured-only behaviour byte-for-byte.
+    _structural = set(col_map) | set(CATEGORICALS) | {
+        "sale_year", "sale_month", "age_at_sale", "has_extraction_data",
+        "is_main_unit", "is_new_build", "LOD_FLM"}
+    _ext_present = False
+    for fn in feat_names:
+        if fn in _structural or fn not in scor.columns:
+            continue
+        X[fn] = pd.to_numeric(scor[fn], errors="coerce").to_numpy(dtype="float64")
+        _ext_present = True
+    if _ext_present and "has_extraction_data" in feat_names:
+        X["has_extraction_data"] = 1
+
     for cat in CATEGORICALS:
         if cat not in feat_names:
             continue
