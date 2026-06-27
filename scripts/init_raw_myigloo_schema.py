@@ -47,6 +47,23 @@ CREATE TABLE IF NOT EXISTS raw_fetches (
 );
 """
 
+# myigloo-specific additive migration (2026-06-27): a per-process run id stamped on every
+# fetch row, so the active-set diff (promote_myigloo_listings_append) can group a run's
+# 200-detail ids UNAMBIGUOUSLY — robust against adjacent nightly runs (fetched_at-gap
+# clustering is the fallback only for legacy rows predating this column). Added via ALTER
+# (not the §2.1 verbatim DDL) to keep the shared spec DDL clean.
+def _ensure_run_id_column(cur):
+    cols = {r[1] for r in cur.execute("PRAGMA table_info(raw_fetches)")}
+    if "fetch_run_id" not in cols:
+        cur.execute("ALTER TABLE raw_fetches ADD COLUMN fetch_run_id TEXT")
+        return True
+    return False
+
+
+IX_RUN = (
+    "CREATE INDEX IF NOT EXISTS ix_fetch_run "
+    "ON raw_fetches(source, fetch_kind, fetch_run_id) WHERE fetch_run_id IS NOT NULL;"
+)
 IX_LISTING = (
     "CREATE INDEX IF NOT EXISTS ix_fetch_listing "
     "ON raw_fetches(source, source_listing_id, fetched_at);"
@@ -69,6 +86,8 @@ def init_schema(db_path: Path) -> dict:
         cur.execute("PRAGMA foreign_keys=ON")  # per-connection; fetchers must also set it
         cur.executescript(RAW_BLOBS_DDL)
         cur.executescript(RAW_FETCHES_DDL)
+        run_id_added = _ensure_run_id_column(cur)
+        cur.execute(IX_RUN)
         cur.execute(IX_LISTING)
         cur.execute(IX_PARSE)
         cur.execute(DLQ_VIEW)
@@ -77,7 +96,8 @@ def init_schema(db_path: Path) -> dict:
         tables = [r[0] for r in cur.execute(q, ("table",))]
         indexes = [r[0] for r in cur.execute(q, ("index",))]
         views = [r[0] for r in cur.execute(q, ("view",))]
-        return {"journal_mode": journal_mode, "tables": tables, "indexes": indexes, "views": views}
+        return {"journal_mode": journal_mode, "tables": tables, "indexes": indexes,
+                "views": views, "run_id_added": run_id_added}
     finally:
         conn.close()
 
@@ -91,6 +111,7 @@ def main():
     print("tables       : %s" % info["tables"])
     print("indexes      : %s" % info["indexes"])
     print("views        : %s" % info["views"])
+    print("fetch_run_id : %s" % ("ADDED" if info["run_id_added"] else "already present"))
     print("OK (idempotent - safe to re-run).")
 
 

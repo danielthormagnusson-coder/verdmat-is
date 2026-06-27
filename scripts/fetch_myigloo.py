@@ -30,6 +30,7 @@ import json
 import sqlite3
 import sys
 import time
+import uuid
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -48,12 +49,21 @@ MAX_ATTEMPTS = 3
 POLITE_DELAY_S = 1.0
 OUTAGE_THRESHOLD = 5         # consecutive 5xx -> abort
 
-# §2.1.1 — per-source volatile JSON paths nulled before hashing. These are
-# server-stamped per-request timestamps; left in, they make every fetch's body
-# unique and defeat content-hash idempotency. Additive list as discovered.
+# §2.1.1 — per-source volatile JSON paths nulled before hashing. "Additive list as
+# discovered": each dotted path's value (LEAF OR WHOLE SUBTREE) is set to None before
+# canonical hashing so server-side churn that is NOT a real listing change cannot defeat
+# content-hash idempotency. Validated 2026-06-27 against 24-day stored-blob diffs (seed
+# 06-03 vs re-sweep 06-27): with only *.verification.as_of nulled, 0/622 listings deduped —
+# the whole verification subtrees + application_count + description_translations churn on
+# EVERY fetch with no listing edit. Nulling the four subtrees below recovers 82% dedup; the
+# remaining ~17% are genuine edits (last_edit / price / new photos). images[] are KEPT
+# verbatim on purpose: only 2/622 showed signed-URL/order churn — far below the risk of
+# masking a real photo update (a false-positive changed=1 is cheaper than a missed change).
 MYIGLOO_VOLATILE_PATHS = (
-    "organization.verification.as_of",
-    "owner.verification.as_of",
+    "organization.verification",    # whole subtree: signals[], member_since, tier, verified_at, as_of
+    "owner.verification",           # whole subtree (same shape)
+    "application_count",            # per-listing applicant counter (rises as people apply)
+    "description_translations",     # auto-generated translation array (re-generated server-side)
 )
 
 
@@ -120,16 +130,20 @@ def should_retry(status: "int | None" = None, exc: "BaseException | None" = None
     return status == 429 or 500 <= status <= 599
 
 
-def _nullify_path(obj, path):
-    """Walk a dotted path and set the leaf to None. No-op if the path is missing."""
+def _strip_path(obj, path):
+    """Walk a dotted path and DELETE the leaf-or-subtree key. No-op if the path is missing.
+    Deletion (not set-None) is required for canonicalization: a volatile field that is
+    PRESENT in one fetch but ABSENT in another (e.g. application_count omitted when 0) would,
+    under set-None, serialize as `"key":null` vs an absent key — different json.dumps output,
+    different hash. Deleting makes present and absent both collapse to absent (symmetric)."""
     keys = path.split(".")
     cur = obj
     for k in keys[:-1]:
         if not isinstance(cur, dict) or k not in cur:
             return
         cur = cur[k]
-    if isinstance(cur, dict) and keys[-1] in cur:
-        cur[keys[-1]] = None
+    if isinstance(cur, dict):
+        cur.pop(keys[-1], None)
 
 
 def _canonical_hash(body: bytes, content_type: str) -> str:
@@ -139,7 +153,7 @@ def _canonical_hash(body: bytes, content_type: str) -> str:
         try:
             payload = json.loads(body)
             for path in MYIGLOO_VOLATILE_PATHS:
-                _nullify_path(payload, path)
+                _strip_path(payload, path)
             canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"),
                                    ensure_ascii=False).encode("utf-8")
             return hashlib.sha256(canonical).hexdigest()
@@ -169,7 +183,7 @@ def compute_changed(conn, kind, source_listing_id, url, new_hash):
 
 # ──────────────────────────────────────────────────────────────── DB writes
 def record_success(conn, kind, source_listing_id, url, fetched_at, status, retries,
-                   body, content_type="application/json", elapsed_ms=0.0) -> FetchResult:
+                   body, content_type="application/json", elapsed_ms=0.0, run_id=None) -> FetchResult:
     h = _canonical_hash(body, content_type)
     body_gz = gzip.compress(body)
     byte_len = len(body)
@@ -180,25 +194,27 @@ def record_success(conn, kind, source_listing_id, url, fetched_at, status, retri
         "VALUES(?,?,?,?,?)", (h, body_gz, content_type, byte_len, fetched_at))
     conn.execute(
         "INSERT INTO raw_fetches(source, source_listing_id, url, fetch_kind, fetched_at, "
-        "http_status, content_hash, changed, retry_count, parse_status) VALUES('myigloo',?,?,?,?,?,?,?,?,?)",
-        (source_listing_id, url, kind, fetched_at, status, h, changed, retries, parse_status))
+        "http_status, content_hash, changed, retry_count, parse_status, fetch_run_id) "
+        "VALUES('myigloo',?,?,?,?,?,?,?,?,?,?)",
+        (source_listing_id, url, kind, fetched_at, status, h, changed, retries, parse_status, run_id))
     conn.commit()
     return FetchResult(kind, source_listing_id, status, h, byte_len, len(body_gz),
                        changed, retries, elapsed_ms, new_blob, body)
 
 
-def record_failure(conn, kind, source_listing_id, url, fetched_at, status, retries, elapsed_ms=0.0) -> FetchResult:
+def record_failure(conn, kind, source_listing_id, url, fetched_at, status, retries, elapsed_ms=0.0, run_id=None) -> FetchResult:
     # parse_error is reserved for parser failures (Step 1d), not HTTP — leave NULL.
     conn.execute(
         "INSERT INTO raw_fetches(source, source_listing_id, url, fetch_kind, fetched_at, "
-        "http_status, content_hash, changed, retry_count, parse_status) VALUES('myigloo',?,?,?,?,?,NULL,0,?,'pending')",
-        (source_listing_id, url, kind, fetched_at, status, retries))
+        "http_status, content_hash, changed, retry_count, parse_status, fetch_run_id) "
+        "VALUES('myigloo',?,?,?,?,?,NULL,0,?,'pending',?)",
+        (source_listing_id, url, kind, fetched_at, status, retries, run_id))
     conn.commit()
     return FetchResult(kind, source_listing_id, status, None, 0, 0, 0, retries, elapsed_ms, False, None)
 
 
 # ───────────────────────────────────────────────────────────── HTTP + write
-def fetch_one(url, kind, source_listing_id, conn, sleep_fn=time.sleep) -> FetchResult:
+def fetch_one(url, kind, source_listing_id, conn, sleep_fn=time.sleep, run_id=None) -> FetchResult:
     status = None
     body = None
     content_type = "application/json"
@@ -232,9 +248,10 @@ def fetch_one(url, kind, source_listing_id, conn, sleep_fn=time.sleep) -> FetchR
     fetched_at = datetime.now(timezone.utc).isoformat()
     if status is not None and 200 <= status < 300 and body is not None:
         result = record_success(conn, kind, source_listing_id, url, fetched_at, status, retries,
-                                body, content_type, elapsed_ms)
+                                body, content_type, elapsed_ms, run_id=run_id)
     else:
-        result = record_failure(conn, kind, source_listing_id, url, fetched_at, status, retries, elapsed_ms)
+        result = record_failure(conn, kind, source_listing_id, url, fetched_at, status, retries,
+                                elapsed_ms, run_id=run_id)
     sleep_fn(POLITE_DELAY_S)  # politeness, after the logical fetch (outside retry-backoff)
     return result
 
@@ -279,18 +296,20 @@ def run(dry_run: bool, conn, log=print) -> RunStats:
     use_order_by = True
     order_by_verdict = "untested"
     page = 1
+    run_id = uuid.uuid4().hex[:16]   # per-process run boundary (active-set diff; §run-mark)
 
-    log("=== myigloo fetch: %s ===" % ("DRY-RUN (1 page + 10 details)" if dry_run else "FULL RUN"))
+    log("=== myigloo fetch: %s (run_id=%s) ==="
+        % ("DRY-RUN (1 page + 10 details)" if dry_run else "FULL RUN", run_id))
     log("--- Phase 1: index-walk (page_size=%d, order_by=-published_at) ---" % PAGE_SIZE)
     while True:
-        res = fetch_one(_page_url(page, use_order_by), "api_page", None, conn)
+        res = fetch_one(_page_url(page, use_order_by), "api_page", None, conn, run_id=run_id)
         _log_fetch(res, log)
         # order_by fallback only on the first page
         if page == 1 and use_order_by and res.status in (400, 404):
             log("  WARNING: order_by=-published_at returned %s — falling back to no order_by." % res.status)
             use_order_by = False
             order_by_verdict = "rejected (%s) -> fell back" % res.status
-            res = fetch_one(_page_url(1, False), "api_page", None, conn)
+            res = fetch_one(_page_url(1, False), "api_page", None, conn, run_id=run_id)
             _log_fetch(res, log)
         stats.pages_fetched += 1
         _tally(stats, res)
@@ -326,7 +345,7 @@ def run(dry_run: bool, conn, log=print) -> RunStats:
         % (min(10, len(ids)) if dry_run else len(ids), ", dry-run first 10" if dry_run else ""))
     detail_ids = ids[:10] if dry_run else ids
     for lid in detail_ids:
-        res = fetch_one("%s%s/" % (API_BASE, lid), "detail", str(lid), conn)
+        res = fetch_one("%s%s/" % (API_BASE, lid), "detail", str(lid), conn, run_id=run_id)
         _log_fetch(res, log)
         stats.details_fetched += 1
         _tally(stats, res)
