@@ -4,6 +4,26 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-27 — Söluferils-líkan Lag 1 (auglýsinga-grain) ADDITÍFT + nætur-promote ARMAÐ í BÆÐI lög (BLOKK 4-6)
+
+**Markmið**: tveggja-laga söluferils-líkan ofan á mbl-auglýsingar svo verð-ferill eignar varðveitist (tapaðist í canonical-fold), OG sjálfvirkja promote-brautina (handvirk frá 13. júní). ALLT additíft — `scraper.listings_canonical` ALDREI snert; nýtt lag lifir samhliða; enginn consumer fluttur.
+
+**ADDR-PARSER (BLOKK 4 ÞREP 1)**: `normalize_address` er botn-strengja-normaliserun (diacritics→ASCII, lowercase) — strippar HVORKI né aðgreinir íb.nr (docstring: útdráttur „lives in source-specific mappers"). Sér-íb.nr-extractor (regex `íb\.?|íbúð|\(` + víkkað `\s-\s+\d{3,4}` fyrir „- NNN" án að grípa götusvið „2-4") er ÁREIÐANLEGUR (stöðugur per einingu, ólíkt matshluti) EN lág-þekju: **23,7%** auglýsinga hafa íb.nr; 69% multi-hópa engan.
+
+**EININGAR-LYKILL (festur, BLOKK 4)**: `(fastnum, stærð±2% klasi)` frum-lykill + **íb.nr COALESCED splitter** — kljúfa (fastnum,stærð)-hóp AÐEINS þegar ≥2 aðgreind non-null íb.nr (t.d. Eskiás íb106 vs íb206); íb.nr=None = wildcard (kljúfar ekkert → 510 mixed-None hópar haldast saman; falskar-neikvæðar fram yfir falskar-jákvæðar). matshluti HENT (ónýtur, BLOKK 2: sama eining → {0,6,7,8}). Bakreikningur: bert fastnum 8.949 → frum 9.160 → coalesced 9.177 (splitter +17, ekki naive 842). Lifandi keyrsla gaf 8.640 einingar (resolve_fastnum FK-gated strangari en hrá-trunc).
+
+**LAG 1 MIGRATION `20260627134046` (additíft)**: `scraper.listings` (auglýsinga-grain, UNIQUE(source, source_listing_id), ENGIN fold), `scraper.listing_price_history` (append-only, UNIQUE(source, source_listing_id, observed_at, price_amount)), `scraper.v_units` (deterministic rollup á unit_key + sales_history sold-join). RLS service-role-only. Beitt gegnum psycopg2 (MCP ekki tengt) með SET TRANSACTION READ WRITE; skráð í schema_migrations (ekkert phantom).
+
+**POPULATOR `promote_listings_append.py` (BLOKK 5)**: watermark-ÓHÁÐ (vinnur ALLAR priced auglýsingar, ekki bara unpromoted → heill ferill; canonical-promote át margar). Endurnýtir promote_mbl resolution-föll (fastnum/category/price/foreign) → paritet. ON CONFLICT DO UPDATE ferskar volatile dálka = **Vandi-1-fix** (field-staleness). Keyrsla: 19.046 listings + 19.046 price_history (1.184 foreign, 13 split, 8.640 einingar). Staðfest: Hrafnaborg 1 íb.101 ferill HEILL í price_history (89,9M→75,9M→68,5M), Vandi-1 birti 71 slid með ferskara verði en canonical, engin fold (19.046 distinct=raðir), idempotent (endurkeyrsla +0), canonical 13.320 óbreytt, sold-join virkar (62M).
+
+**ÞEKKT TAKMÖRKUN (Vandi-2b, fundið BLOKK 5)**: í nýbyggingum REKUR fastnum í tíma — snemmbúnar íb.nr-lausar almenn-auglýsingar leysast í foreldra-fastnum, síðari per-íbúð auglýsingar í sér-fastnum → ferill getur klofnað NEÐAN unit_key. Ekkert gagnatap (allar auglýsingar geymdar); takmarkar rollup-nákvæmni á forsölu-tímabili. Beint inntak í síðari Vandi-2b fínni dedup.
+
+**NÆTUR-ÖRMUN (BLOKK 6)**: `nightly_delta_chain.sh` framlengt með `run_promote` EFTIR 4 hreinu fetch-modes (rót-lagfæring — EKKI sér-task; engin tímasetningar-ágiskun): parse_mbl → promote_mbl priced sale+rent (canonical fold) → promote_listings_append (Lag 1). BÆÐI lög fersk hverja nótt; **frysting gamla fold-skrifa er meðvitað SÍÐARA skref við consumer-flutning**. NEGOTIABLE útilokað (lease_term útistandandi). Enginn API-lykill (engin Haiku). Gated á hreina fetch, abort-not-retry (promote-fall skilur raw/fetch eftir ósnert). Power: AC sefur aldrei; WakeToRun + RTCWAKE=1 (Danni 2026-06-26) vekur líka úr rafhlöðu-svefni. Gætt handvirk fyrsta keyrsla hrein (parse no-op, promote_mbl 0 priced=canonical current, append idempotent, lyklalaust). Taskinn keyrir nú þegar keðjuna → engin ný skráning.
+
+**Eftir**: (a) consumer-flutningur dashboard → `scraper.listings`/`v_units`, ÞÁ frysta gamla fold-skrif; (b) Vandi-2b fastnum-rek fínni dedup; (c) extraction-tafla + post-promote extraction-þrep.
+
+---
+
 ## 2026-06-27 — VÉL 1 tveggja-einkunna gæðakerfi FULLKLÁRAÐ (Einkunn 2 full + gap LIVE)
 
 **Markmið náð**: vikulegt out-of-sample gæðakerfi með TVEIMUR einkunnum á SÖMU ferskum OOS-sölum. Einkunn 1 (baseline/all_oos) var LIVE (sjá 2026-06-26-færslu); þessi færsla lokar Einkunn 2 (full/paired_oos, Haiku les söluyfirlit) + BILINU (gap = framlag extraction-lagsins). Bæði í `public.model_metrics`, loggað gegnum migration_helpers. Adapter = `phase_d3_score_extract` (iter4a + conformal/stretch) sem HEIÐRAR extraction-dálka (úr `build_training_data_v2.build_extraction_features`); Haiku-extraction = `pilot_extract_v022.extract_listing` (claude-haiku-4-5, 108-field tool-call).
