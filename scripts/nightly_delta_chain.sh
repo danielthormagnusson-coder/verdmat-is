@@ -3,9 +3,16 @@
 #
 # Runs the FOUR delta modes serially (sale, rent, sale-negotiable, rent-negotiable),
 # each gated on exit 0 + halt_reason null (resweep_runner gate pattern). ABORT-NOT-RETRY
-# on any failure or kill-switch. Fetch-only by design (§6-A.3): raw layer is append-only
-# + content-hash idempotent, so the worst unattended failure is wasted requests — parse
-# (v2) and promote (v3) stay manually gated until proven.
+# on any failure or kill-switch. The raw layer is append-only + content-hash idempotent,
+# so the worst unattended failure is wasted requests.
+#
+# v2/v3 ACTIVE (BLOKK 6, 2026-06-27): after the four fetch modes complete cleanly, run_promote
+# parses pending raw and promotes priced sale+rent into BOTH layers — old fold path
+# (promote_mbl -> listings_canonical) AND new append layer (promote_listings_append ->
+# scraper.listings + listing_price_history). NEGOTIABLE is NOT promoted (lease_term pending).
+# No API key is ever read (no Haiku in this chain). promote is gated on a clean fetch and is
+# abort-not-retry; a promote failure leaves raw/fetch untouched. Freezing the old fold write
+# is a deliberate LATER step at consumer migration — both layers stay fresh until then.
 #
 # PRE-FLIGHT GATES (all must pass before ANY fetcher call; exit 2 on refusal):
 #   (a) no live fetch_mbl process (reuses prime_delta_since detection; state-recency
@@ -178,8 +185,32 @@ print("TOTAL night: pages=%d listings=%d" % (tot_p, tot_l))
 PY
 }
 
+# ── v2/v3: parse + promote BOTH layers (BLOKK 6); only after four clean fetch modes ──
+run_promote() {
+  if [ $DRY -eq 1 ]; then
+    say "[dry-run] would run: parse_mbl --confirm; promote_mbl --slice priced --table {sale,rent}; promote_listings_append --confirm"
+    return 0
+  fi
+  local plog=$MODELOGS/promote_${TS}.log
+  ( cd "$APP" || exit 90
+    echo "=== parse ===";                  python -m scripts.parse_mbl --confirm                                || exit 11
+    echo "=== promote canonical sale ===";  python -m scripts.promote_mbl --confirm --slice priced --table sale  || exit 12
+    echo "=== promote canonical rent ===";  python -m scripts.promote_mbl --confirm --slice priced --table rent  || exit 13
+    echo "=== append Lag 1 ===";            python -m scripts.promote_listings_append --confirm                  || exit 14
+  ) > "$plog" 2>&1
+  local rc=$?
+  local nact
+  nact=$(grep -cE "wrote listings|promoted|inserted=" "$plog")
+  say "promote: exit=$rc (${nact} action lines) -> $plog"
+  if [ $rc -ne 0 ]; then
+    say "ABORT promote (exit $rc) — NO RETRY (abort-not-retry); raw/fetch untouched, both layers stay at last-clean"
+    return 1
+  fi
+  return 0
+}
+
 # ════════════════════════════════ main ═══════════════════════════════════════
-say "=== nightly delta chain start (v1 fetch-only, dry_run=$DRY) ==="
+say "=== nightly delta chain start (v2/v3 fetch+parse+promote, dry_run=$DRY) ==="
 
 PRE=$(preflight)
 PRERC=$?
@@ -198,6 +229,10 @@ run_mode delta-sale            delta_sale            last_br_dags_seen  || exit 
 run_mode delta-rent            delta_rent            last_updated_seen  || exit 1
 run_mode delta-sale-negotiable delta_sale_negotiable last_br_dags_seen  || exit 1
 run_mode delta-rent-negotiable delta_rent_negotiable last_updated_seen  || exit 1
+
+# v2/v3: parse + promote BOTH layers (priced sale+rent; negotiable excluded). Gated on the
+# four clean fetch modes above; abort-not-retry. Added BLOKK 6 (2026-06-27).
+run_promote || exit 1
 
 if [ $DRY -eq 1 ]; then
   say "[dry-run] would append night totals + CHAIN CLEAN to $REPORT"
