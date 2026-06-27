@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-27 — Næturkeyrslu-gat 2026-06-25 (svefn á rafhlöðu) + delta-sale cap → (b)-recovery 502 raðir í raw (stopp í raw)
+
+**Rót**: nóttin 2026-06-25 keyrði ekki — vélin svaf á rafhlöðu (Kernel-Power sleep 06-24 21:28 → resume 06-25 23:44). WakeToRun-flögg voru sett á þrjú af fjórum task en orkustefnan „Allow wake timers" var AC=important-only (0x2) / DC=disabled (0x0) → scheduluð vakning kviknaði aldrei. **Lagað elevated** (Danni): `powercfg /set{ac,dc}valueindex SCHEME_CURRENT SUB_SLEEP RTCWAKE 1` + `verdmat-nightly-backup` WakeToRun=true (hin þrjú höfðu flaggið þegar, bara gagnslaust án orkustefnu).
+
+**Afleiðing**: delta-sale 2026-06-26 spannaði 2 daga (since 2026-06-24T00:36:19.600482) og rakst í 100-síðna þakið — **fyrsta cap-hit í sögunni** (nætur 06-13..06-24 voru 18–89 síður). `br_dags>since ORDER BY eign_id DESC`: gamlar listings (lágt eign_id) með nýtt br_dags lentu aftan við offset 1600, sleppt, og high-water færðist fram yfir þær → varanlega týndar úr delta-straumnum.
+
+**(b)-recovery (raw-only)**: temp-reset high-water í júní-24 gildið, custom fetch sem endurnýtir tested `MblFetcher._gql`+`_record_page` með WHERE `eign_id<1686918` (efra mark, ekkert neðra, self-terminating á 0-row síðu). **Niðurstaða: 32 síður, 502 raðir (eign_id 1199011..1686906), self-terminated (ekki cap); í raw_mbl.db sem list_page_sale / parse_status=pending, content-hash idempotent.** Live-aggregate staðfesti 502/502 → engin lág-eign_id röð eftir utan raw. High-water endurstillt í `2026-06-26T01:05:58.782541+00:00`; `delta_sale_negotiable` óbreytt. State-afrit: `scraper_data/mbl_fetch_state.json.bak_20260626_recovery`. Log: `scraper_data/night_logs/recovery_20260626.log`.
+
+**Stopp í raw (meðvitað)**: parse+promote EKKI keyrt. Hálf-promote (502 af 827 pending) myndi skilja `scraper.listings_canonical` ósamræmt (recovery-raðir promaðar meðan nýrri pending-breytingar sömu listings bíða) → recovery-raðirnar flæða í Supabase með venjulegu gated parse+promote lotunni. Markmið náð: 0 raðir týndar úr 25.-júní gatinu.
+
+**NÓTA (aðskilið verk)**: parse hefur ekki keyrt síðan 2026-06-13 → **827 pending síður (~2 vikur af venjulegu delta: 737 sale m/recovery, 42 sale-neg, 22 rent, 26 rent-neg)** bíða parse+promote. Sjálfstætt catch-up verk síðar, með eigin validation.
+
+---
+
 ## 2026-06-26 — VÉL 1 módel-gæðakerfi: Einkunn 1 (baseline/all_oos) LIVE; Einkunn 2 blokkað á API-lykli
 
 **Markmið**: vikulegt out-of-sample gæðakerfi, tvær einkunnir á SÖMU ferskum sölum — E1 (iter4 structured, extraction nulluð) vs E2 (iter4 + Haiku-extraction úr söluyfirliti), BIL = framlag extraction-lagsins. Mælt nominal/nominal (de-anker eins og v_model_vs_sold), skrifað í nýja `public.model_metrics`, loggað gegnum migration_helpers.
