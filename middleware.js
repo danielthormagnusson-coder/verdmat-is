@@ -1,12 +1,36 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+const OPS_COOKIE = "ops_session";
+
+// Edge-runtime SHA-256 (Web Crypto). The /ops cookie holds sha256(OPS_PASSWORD); we
+// recompute the expected hash from the server-only env var and compare. The password
+// itself is never stored in a cookie, never NEXT_PUBLIC, never in the client bundle.
+async function sha256hex(s) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-  // /ops is the internal operator dashboard — gate it behind the same pro_users
-  // lock as /pro so the operational signals (run logs, costs, drift) are not
-  // served on a known public path.
-  if (!pathname.startsWith("/pro") && !pathname.startsWith("/ops")) {
+
+  // /ops — internal operator dashboard. Gated by a STANDALONE OPS_PASSWORD cookie
+  // (decoupled from the Supabase pro_users lock, 2026-06-28): /ops serves only
+  // aggregate operational signals, not per-user pro data, so it gets its own simple
+  // password gate. /ops/login (form + server action) is the only open path; it sets
+  // an HttpOnly+Secure cookie that we verify here against the env hash.
+  if (pathname.startsWith("/ops")) {
+    if (pathname.startsWith("/ops/login")) return NextResponse.next();
+    const secret = process.env.OPS_PASSWORD;
+    const token = request.cookies.get(OPS_COOKIE)?.value;
+    if (secret && token && token === (await sha256hex(secret))) {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL("/ops/login", request.url));
+  }
+
+  // /pro — existing Supabase auth + pro_users gate (unchanged).
+  if (!pathname.startsWith("/pro")) {
     return NextResponse.next();
   }
 
