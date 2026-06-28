@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request) {
-  if (!request.nextUrl.pathname.startsWith("/pro")) {
+  const { pathname } = request.nextUrl;
+  // /ops is the internal operator dashboard — gate it behind the same pro_users
+  // lock as /pro so the operational signals (run logs, costs, drift) are not
+  // served on a known public path.
+  if (!pathname.startsWith("/pro") && !pathname.startsWith("/ops")) {
     return NextResponse.next();
   }
 
@@ -47,5 +51,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/pro/:path*"],
+  matcher: ["/pro/:path*", "/ops/:path*"],
 };
