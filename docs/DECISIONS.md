@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-28 — ops_scraper_signals GRANT hert aftur í service_role only + /ops scraper-cache leyst
+
+**Einkenni:** eftir að service-role lykill var lagaður lásu public-töflur + model_metrics á /ops, EN scraper-RPC (`ops_scraper_signals`) sýndi „engin gögn" + scraper-ferskleiki „—".
+
+**Greining (read-only) útilokaði lykil OG GRANT-brot:** prod les `model_metrics` sem aðeins `service_role` getur (RLS á, engin policy, anon SELECT=False) → **prod-lykill ER gildur service_role**. RPC skilar fullum gögnum via REST með service_role lyklinum (sannreynt, keys=5). Fall keyrir beint + via REST; engin timeout (service_role engin; töflur litlar). Svo allt DB-megin heilt → líklegast **tímabundið PostgREST schema-cache (PGRST202)**.
+
+**Rót GRANT-víkkunar (staðfest, flögguð):** live proacl hafði `anon=X, authenticated=X` þvert á hönnun. Migration 20260628093000 gerði rétt `REVOKE ALL FROM PUBLIC` + `GRANT service_role`, EN **Supabase default privileges** (`ALTER DEFAULT PRIVILEGES ... GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role`) höfðu þegar veitt anon+authenticated EXECUTE sem **skýr hlutverk-grant** við CREATE. `REVOKE FROM PUBLIC` fjarlægir EKKI skýr hlutverk-grant → þau héldust. (716f0e0 hafði enga SQL-migration → víkkaði ekki.) Klassísk Supabase-gildra; **nýjar `public.*` SECURITY DEFINER föll þurfa skýrt `REVOKE EXECUTE FROM anon, authenticated`, ekki bara FROM PUBLIC.**
+
+**Aðgerð:** migration `20260628122047_ops_scraper_signals_revoke_anon` — `REVOKE EXECUTE ... FROM anon, authenticated, PUBLIC` (heldur service_role) + `NOTIFY pgrst, 'reload schema'`. Eftir: proacl = `{postgres, service_role}` only (anon/authenticated EXECUTE=False), fall keyrir enn. `/ops` óbreytt (notar service_role lykil). NOTIFY-reloadið **endurhleður líka schema-cache → leysir PGRST202 cache-málið** sem hliðarverkun. Þ.e. herðir öryggi (þrönga LEIÐ 2 yfirborðið) OG lagar scraper-spjöldin í einni aðgerð.
+
+---
+
 ## 2026-06-28 — Módel-gæðamælikvarði: overall = íbúðarhúsnæði (sumarhús útilokuð) + segment-sundurliðun á /ops
 
 **Könnun (read-only, VÉL 1 OOS-úrtak n≈1416):** heildar-MAPE 16,9% / cov80 67% er **þung blanda ólíkra þýða**, ekki einsleit gæði. Sundurliðun (sama de-anker/aðferð og `model_quality_eval`):
