@@ -47,6 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scraper_paths import get_raw_db_path                      # noqa: E402
 from promote_myigloo import (                                  # noqa: E402  reuse identical resolution
     TAXONOMY_LOOKUP, JUNK_PRICE_MAX, _is_junk, _listing_title, _addr_text,
+    resolve_fastnum, preload_props,
 )
 
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
@@ -133,12 +134,17 @@ def pick_active(runs):
 
 
 # ───────────────────────────────────── record build
-def build_record(p, active_ids, seen, run_max_dt):
+def build_record(p, active_ids, seen, run_max_dt, props):
     """One parsed_myigloo row (dict) -> a scraper.listings record, or None to skip (junk)."""
     tag = p.get("listing_type_tag")
     cat, ten, sub = TAXONOMY_LOOKUP.get(tag, ("other", "rent", "other"))
     if _is_junk(p, cat):
         return None
+    # fastnum: source-supplied landreg_id (FK-gated, ~88.5% direct) -> address/geo for the rest.
+    # Returned fastnums are FK-valid by construction (Tier-1 gates on idx.exists; Tier-2/3 come
+    # from the props index). unit_key STAYS NULL — rent does not enter the sale-trajectory rollup;
+    # fastnum only links the rental to its HMS property for rental-extraction/context.
+    fastnum, _conf, _method = resolve_fastnum(p, props, sub)
     price = p.get("price_amount")
     price = _i(price) if price is not None else None
     # commercial price<=100 ISK = 'verð samkvæmt tilboði' (price-on-request), kept as-is;
@@ -151,7 +157,7 @@ def build_record(p, active_ids, seen, run_max_dt):
     return {
         "source": SOURCE,
         "source_listing_id": sid,
-        "fastnum": None,                 # rent: no rollup, unit_key stays NULL (A2 decision)
+        "fastnum": fastnum,              # HMS link for rental-extraction; unit_key still NULL (rent)
         "unit_key": None,
         "ibnr": None,
         "tenure": ten,
@@ -277,17 +283,28 @@ def run(dry_run, log=print):
             ") m ON p.source_listing_id=m.source_listing_id AND p.raw_id=m.mr")]
         log("  parsed universe (latest per listing): %d" % len(parsed))
 
+        # preload the HMS props index for fastnum resolution (source-supplied FK gate + addr/geo).
+        # read-only SELECT; rollback after so the first write-tx's SET READ WRITE is its first stmt.
+        postcodes = {p["addr_postcode"] for p in parsed if p.get("addr_postcode")}
+        fastnums = [p["fastnum_supplied"] for p in parsed if p.get("fastnum_supplied") is not None]
+        props = preload_props(pg, postcodes, fastnums)
+        if not dry_run:
+            pg.rollback()
+        log("  preloaded props: present_fastnums=%d addr_keys=%d" % (len(props.present), len(props.by_addr)))
+
         records, n_junk = [], 0
         for p in parsed:
-            rec = build_record(p, active_ids, seen, run_max_dt)
+            rec = build_record(p, active_ids, seen, run_max_dt, props)
             if rec is None:
                 n_junk += 1
             else:
                 records.append(rec)
         n_active = sum(1 for r in records if r["status"] == "active")
         n_withdrawn = sum(1 for r in records if r["status"] == "withdrawn")
-        log("  records=%d  active=%d  withdrawn(diff)=%d  skipped_junk=%d"
-            % (len(records), n_active, n_withdrawn, n_junk))
+        n_fastnum = sum(1 for r in records if r["fastnum"] is not None)
+        log("  records=%d  active=%d  withdrawn(diff)=%d  skipped_junk=%d  fastnum_resolved=%d (%.1f%%)"
+            % (len(records), n_active, n_withdrawn, n_junk, n_fastnum,
+               100 * n_fastnum / len(records) if records else 0))
 
         if dry_run:
             log("  [dry-run] no writes. sample withdrawn ids: %s"
