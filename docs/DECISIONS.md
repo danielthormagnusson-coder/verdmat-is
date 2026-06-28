@@ -4,6 +4,30 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-28 — Módel-gæðamælikvarði: overall = íbúðarhúsnæði (sumarhús útilokuð) + segment-sundurliðun á /ops
+
+**Könnun (read-only, VÉL 1 OOS-úrtak n≈1416):** heildar-MAPE 16,9% / cov80 67% er **þung blanda ólíkra þýða**, ekki einsleit gæði. Sundurliðun (sama de-anker/aðferð og `model_quality_eval`):
+
+| segment | n | MAPE | medAPE | cov80 |
+|---|---:|---:|---:|---:|
+| **höfuðborg · íbúðir (KJARNI)** | 900 | **10,8** | 6,2 | 69,6 |
+| ↳ Reykjavík kjarni · íbúðir | 467 | 10,5 | 5,8 | 72,6 |
+| ↳ nágr.sveitarf. · íbúðir | 433 | 11,1 | 6,5 | 66,3 |
+| höfuðborg · sérbýli | 83 | 12,3 | 8,6 | 68,7 |
+| landsbyggð · íbúðarhúsnæði | 374 | 17,8 | 11,8 | 67,6 |
+| **sumarhús** | 59 | **110,4** | 19,2 | 30,5 |
+| **íbúðarhúsnæði alls (nýtt overall)** | 1357 | **12,8** | 7,5 | 69,0 |
+
+**ÁKVÖRÐUN 1 — overall = íbúðarhúsnæði (APT_\* + SFH/ROW/SEMI); sumarhús + ekki-íbúð útilokuð (grunnregla).** Sumarhús eru **4,2% af n en 27,3% af allri MAPE**: módelið stór-ofmetur ódýra bústaði (t.d. raun 4,7M → spá 65M = 1290% skekkja; bias −86%, cov80 30,5%) — út-af-léni fyrir iter4 hedóníska módelið. Útilokun færir overall 16,9 → **12,8**. Þetta er **mælikvarða-síun, EKKI módel-breyting** — iter4 frosið óbreytt. Sumarhús haldast MÆLD sem sér `region_type='summerhouse'` segment. Útfært í `model_quality_eval.segments()` (residential-maska + nýtt `region_type`-dim).
+
+**ÁKVÖRÐUN 2 — /ops MÓDEL-spjald leiðir með kjarna-markaði.** Borðið las áður aðeins `segment_dim='overall'` (sem hefði sýnt 16,9% og vanmetið kjarnann um ~6pp). Sýnir nú **höfuðborg · íbúðir (10,8%)** sem aðal-tölu + sundurliðun (RVK_core, nágr.sveitarf., sérbýli, landsbyggð, sumarhús sér) + heild (íbúðarhúsnæði 12,8%). Les nýju `region_type`-raðirnar (keyrt í run 38).
+
+**GAGNAGÆÐA-GAT (flaggað, EKKI lagað):** af hverju falla 3–6M „sölur" á eignir sem módelið metur á 30–65M EKKI á `onothaefur=1`? Líklega **hlutasölur/lóða-sölur/makaskipti** sem HMS-flokkun grípur ekki. Þetta mengar líka landsbyggðar/sumarhúsa-segment. Til skoðunar (gæti þurft viðbótar-síu á `kaupverd_nominal` vs `fasteignamat`-hlutfall), ekki lagað í þessari lotu.
+
+**RADAR (iter5, EKKI núna — iter4 frosið):** conformal **per-segment** endurkvörðun. Jafnvel kjarninn (RVK_core íbúð) er cov80 72,6% — undir 80%-markmiði → bilin örlítið of þröng í kjarnanum (kerfislægt, ekki bara útlagar). Sumarhús (30,5%) + landsbyggð stór-miskvörðuð → sér-kvörðun eða sér-módel fyrir sumarhús, ekki almenn breikkun.
+
+---
+
 ## 2026-06-28 — WU truflar nætur-keðju; Leið B: aðskilin WU-guard task (ekki í keðju)
 
 Nótt 27→28 drap Windows Update bakgrunns-virkni (install 01:53–01:55) mbl delta-keðjuna (`verdmat-nightly-delta`, 01:00→~03:30) milli delta-sale og delta-rent — ekkert ABORT-line (ferlistréð drepið samtímis), promote/extraction keyrðu aldrei → mbl staðnaði í `scraper.listings`. Stutta myigloo-task-ið (02:00–02:19) slapp. **Rót**: virka WU-pause-ið (HKLM UX, til 11. júlí) nær yfir quality/feature updates en **ekki servicing/Defender**, sem keyrir samt daglega.

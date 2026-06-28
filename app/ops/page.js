@@ -56,13 +56,15 @@ async function loadOps() {
   const db = createSupabaseAdmin();
   const top = (q) => q.limit(1).maybeSingle();
 
-  const [runs, salesMax, predMax, propsMax, compsMax, metricRow, scsRes] = await Promise.allSettled([
+  const [runs, salesMax, predMax, propsMax, compsMax, metricRow, segRows, scsRes] = await Promise.allSettled([
     db.from("pipeline_runs").select("run_type,exit_status,started_at,ended_at,summary").order("started_at", { ascending: false }).limit(40),
     top(db.from("sales_history").select("thinglystdags").order("thinglystdags", { ascending: false })),
     top(db.from("predictions").select("predicted_at,model_version,calibration_version").order("predicted_at", { ascending: false })),
     top(db.from("properties").select("scraped_at_latest").order("scraped_at_latest", { ascending: false })),
     top(db.from("comps_index").select("last_sale_date").order("last_sale_date", { ascending: false })),
-    top(db.from("model_metrics").select("model_version,mape,med_ape,bias,cov80,cov95,oos_cutoff,n_pairs,computed_at").eq("segment_dim", "overall").eq("sample_scope", "all_oos").eq("score_type", "baseline").order("computed_at", { ascending: false })),
+    top(db.from("model_metrics").select("model_version,mape,med_ape,bias,cov80,cov95,oos_cutoff,n_pairs,computed_at,metric_run_id").eq("segment_dim", "overall").eq("sample_scope", "all_oos").eq("score_type", "baseline").order("computed_at", { ascending: false })),
+    // region_type breakdown (capital apts = core market) — keyed to the latest overall run below.
+    db.from("model_metrics").select("segment_value,n_pairs,mape,med_ape,bias,cov80,cov95,metric_run_id,computed_at").eq("segment_dim", "region_type").eq("sample_scope", "all_oos").eq("score_type", "baseline").order("computed_at", { ascending: false }).limit(18),
     // scraper.* lives in a non-REST-exposed schema → read aggregate-only via SECURITY DEFINER RPC.
     db.rpc("ops_scraper_signals"),
   ]);
@@ -75,6 +77,16 @@ async function loadOps() {
   const scs = scsSettled?.data || null;
   const scsErr = scsSettled?.error || (scsRes.status === "rejected" ? scsRes.reason : null);
   const chain = scs?.chain || {};
+
+  // model-quality segments (latest run only): core = capital apartments. Lead with it so the
+  // blended overall (which would otherwise be ~16.9% incl. summerhouses) doesn't hide that
+  // the core market is ~10.8% MAPE; the rest feed the breakdown table.
+  const metric = val(metricRow)?.data || null;
+  const segByVal = {};
+  for (const r of (val(segRows)?.data || [])) {
+    if (metric?.metric_run_id && r.metric_run_id !== metric.metric_run_id) continue;
+    if (!(r.segment_value in segByVal)) segByVal[r.segment_value] = r;
+  }
 
   return {
     scsErr,
@@ -95,7 +107,9 @@ async function loadOps() {
     extraction: scs?.extraction || null,
     backlog: scs?.backlog || null,
     sources: scs?.sources || null,
-    model: val(metricRow)?.data,
+    model: metric,
+    core: segByVal.capital_apt || null,
+    segs: segByVal,
     evalSummary: latestByType["model_quality_eval"]?.summary || null,
   };
 }
@@ -112,6 +126,31 @@ function Card({ title, children, sub }) {
 }
 const th = { textAlign: "left", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--vm-ink-faint)", padding: "4px 10px 6px 0", fontWeight: 600 };
 const td = { padding: "5px 10px 5px 0", fontSize: "0.85rem", color: "var(--vm-ink)", borderTop: "1px solid var(--vm-border)", whiteSpace: "nowrap" };
+
+// region_type breakdown labels/order for the MÓDEL card (capital apts lead as the core).
+const SEG_LABELS = {
+  rvk_core_apt: "Reykjavík kjarni · íbúðir",
+  capital_sub_apt: "Höfuðb. nágr.sveitarf. · íbúðir",
+  capital_serbyli: "Höfuðborg · sérbýli",
+  country_resi: "Landsbyggð · íbúðarhúsnæði",
+  summerhouse: "Sumarhús (út-af-léni · sér)",
+};
+const SEG_ORDER = ["rvk_core_apt", "capital_sub_apt", "capital_serbyli", "country_resi", "summerhouse"];
+
+function SegRow({ label, r, strong }) {
+  if (!r) return null;
+  const mape = +r.mape;
+  const mlvl = mape <= 12 ? "green" : mape <= 18 ? "amber" : "red";
+  return (
+    <tr>
+      <td style={{ ...td, fontWeight: strong ? 700 : 400, whiteSpace: "normal" }}>{label}</td>
+      <td style={{ ...td, fontFamily: "var(--font-mono)" }} className="tabular">{r.n_pairs}</td>
+      <td style={{ ...td, fontFamily: "var(--font-mono)", color: LEVEL_COLOR[mlvl], fontWeight: 600 }} className="tabular">{mape.toFixed(1)}%</td>
+      <td style={{ ...td, fontFamily: "var(--font-mono)" }} className="tabular">{(+r.med_ape).toFixed(1)}%</td>
+      <td style={{ ...td, fontFamily: "var(--font-mono)", color: (+r.cov80) >= 77 ? "var(--vm-success)" : "var(--vm-accent)" }} className="tabular">{(+r.cov80).toFixed(0)}%</td>
+    </tr>
+  );
+}
 
 function FreshRow({ label, ts, cfg, note }) {
   const h = ageHours(ts);
@@ -154,7 +193,8 @@ export default async function OpsPage() {
     );
   }
 
-  const { latestByType, chain, fresh, predMeta, extraction, backlog, sources, model, evalSummary, scsErr } = data;
+  const { latestByType, chain, fresh, predMeta, extraction, backlog, sources, model, core, segs, evalSummary, scsErr } = data;
+  const head = core || model;   // lead with the core market (capital apts); fall back to overall
   const predAge = ageHours(fresh.predictions);
   const predRed = freshLevel(predAge, OPS_CONFIG.monthly) === "red";
   const fastnumPct = sources?.total ? Math.round((100 * sources.fastnum_filled) / sources.total) : null;
@@ -244,33 +284,45 @@ export default async function OpsPage() {
         </table>
       </Card>
 
-      {/* SPJALD 4 — MÓDEL */}
-      <Card title="Módel · VÉL 1 einkunn" sub="model_metrics — nýjasta overall / all_oos / baseline">
-        {model ? (
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end" }}>
-            {[
-              ["MAPE", `${(+model.mape).toFixed(1)}%`, model.mape <= 15 ? "green" : model.mape <= 18 ? "amber" : "red"],
-              ["medAPE", `${(+model.med_ape).toFixed(1)}%`, "green"],
-              ["bias", `${(+model.bias).toFixed(1)}%`, Math.abs(model.bias) <= 3 ? "green" : "amber"],
-              ["cov80", `${(+model.cov80).toFixed(0)}%`, model.cov80 >= 77 ? "green" : "amber"],
-              ["cov95", `${(+model.cov95).toFixed(0)}%`, model.cov95 >= 92 ? "green" : "amber"],
-            ].map(([k, v, lvl]) => (
-              <div key={k}>
-                <div style={{ fontSize: "0.7rem", color: "var(--vm-ink-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{k}</div>
-                <div className="tabular" style={{ fontSize: "1.4rem", fontWeight: 600, color: LEVEL_COLOR[lvl] || "var(--vm-ink)" }}>{v}</div>
-              </div>
-            ))}
-            <div style={{ marginLeft: "auto", textAlign: "right", fontSize: "0.78rem", color: "var(--vm-ink-muted)" }}>
-              <div>{model.model_version} · N={model.n_pairs}</div>
-              <div>OOS cutoff {String(model.oos_cutoff)} · {fmtTs(model.computed_at)}</div>
-              <div style={{ color: predRed ? "var(--vm-danger)" : "var(--vm-ink-muted)" }}>
-                predictions-batch: <strong>{fresh.predictions}</strong>{predRed ? " 🔴" : ""} ({predMeta?.model_version})
+      {/* SPJALD 4 — MÓDEL (kjarna-markaður fremst; heild blandaði áður inn sumarhúsum) */}
+      <Card title="Módel · VÉL 1 einkunn" sub="all_oos / baseline — kjarna-markaður fremst (höfuðborg · íbúðir); heild = íbúðarhúsnæði (sumarhús útilokuð)">
+        {head ? (
+          <>
+            <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", color: "var(--vm-ink-faint)", marginBottom: 4 }}>
+              KJARNA-MARKAÐUR · HÖFUÐBORG · ÍBÚÐIR{core ? ` · n=${core.n_pairs}` : ""}
+            </div>
+            <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end" }}>
+              {[
+                ["MAPE", `${(+head.mape).toFixed(1)}%`, head.mape <= 12 ? "green" : head.mape <= 15 ? "amber" : "red"],
+                ["medAPE", `${(+head.med_ape).toFixed(1)}%`, "green"],
+                ["bias", `${(+head.bias).toFixed(1)}%`, Math.abs(head.bias) <= 3 ? "green" : "amber"],
+                ["cov80", `${(+head.cov80).toFixed(0)}%`, head.cov80 >= 77 ? "green" : "amber"],
+                ["cov95", `${(+head.cov95).toFixed(0)}%`, head.cov95 >= 92 ? "green" : "amber"],
+              ].map(([k, v, lvl]) => (
+                <div key={k}>
+                  <div style={{ fontSize: "0.7rem", color: "var(--vm-ink-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{k}</div>
+                  <div className="tabular" style={{ fontSize: "1.4rem", fontWeight: 600, color: LEVEL_COLOR[lvl] || "var(--vm-ink)" }}>{v}</div>
+                </div>
+              ))}
+              <div style={{ marginLeft: "auto", textAlign: "right", fontSize: "0.78rem", color: "var(--vm-ink-muted)" }}>
+                <div>{model?.model_version || "iter4_final_v1"} · OOS {String(model?.oos_cutoff || "—")}</div>
+                <div>{fmtTs(model?.computed_at)}</div>
+                <div style={{ color: predRed ? "var(--vm-danger)" : "var(--vm-ink-muted)" }}>
+                  predictions-batch: <strong>{fresh.predictions}</strong>{predRed ? " 🔴" : ""} ({predMeta?.model_version})
+                </div>
               </div>
             </div>
-          </div>
+            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 14 }}>
+              <thead><tr><th style={th}>Segment</th><th style={th}>n</th><th style={th}>MAPE</th><th style={th}>medAPE</th><th style={th}>cov80</th></tr></thead>
+              <tbody>
+                <SegRow label="Íbúðarhúsnæði alls (heild)" r={model} strong />
+                {SEG_ORDER.map((k) => (segs?.[k] ? <SegRow key={k} label={SEG_LABELS[k]} r={segs[k]} /> : null))}
+              </tbody>
+            </table>
+          </>
         ) : <span style={{ color: "var(--vm-ink-muted)" }}>engin gögn</span>}
         <div style={{ fontSize: "0.75rem", color: "var(--vm-ink-faint)", marginTop: 10 }}>
-          cov80 markmið 80% / cov95 markmið 95% — undir = intervalar of þröngir á nýlegri sölu.
+          Heild = íbúðarhúsnæði (APT_* + sérbýli). Sumarhús{segs?.summerhouse ? ` (n=${segs.summerhouse.n_pairs}, MAPE ${(+segs.summerhouse.mape).toFixed(0)}%)` : ""} eru út-af-léni og útilokuð úr heild — mæld sér. cov80 markmið 80%; kjarni örlítið undir = intervalar aðeins þröngir.
         </div>
       </Card>
 

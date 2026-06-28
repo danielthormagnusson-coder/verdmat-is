@@ -202,17 +202,66 @@ def compute_metrics(sub: pd.DataFrame) -> dict | None:
     )
 
 
+# Overall metric = residential DWELLINGS only. Summerhouses (and any non-dwelling) are
+# out-of-domain for the iter4 hedonic model — at n≈59 they are ~27% of total OOS error
+# (cheap rural cabins predicted at urban prices: e.g. real 4.7M -> pred 65M) and their
+# conformal coverage collapses (cov80≈30%). They are still MEASURED as their own segment;
+# they are just excluded from the headline 'overall' (base rule, 2026-06-28). iter4 stays
+# frozen — this is metric SCOPING, not a model change.
+APT_PREFIX = "APT_"
+SERBYLI_CODES = {"SFH_DETACHED", "ROW_HOUSE", "SEMI_DETACHED"}
+CAPITAL_TIERS = {"RVK_core", "Capital_sub"}
+
+
+def _is_apt(cc):
+    return isinstance(cc, str) and cc.startswith(APT_PREFIX)
+
+
+def _is_residential(cc):
+    """Dwelling for valuation: apartment or sérbýli. Excludes SUMMERHOUSE + non-dwelling."""
+    return _is_apt(cc) or cc in SERBYLI_CODES
+
+
 def segments(df: pd.DataFrame):
-    """Yield (segment_dim, segment_value, sub) for every breakdown."""
-    yield ("overall", "", df)
+    """Yield (segment_dim, segment_value, sub) for every breakdown.
+
+    'overall' is RESIDENTIAL DWELLINGS ONLY (summerhouse + non-dwelling excluded — base
+    rule). The 'region_type' dim is the /ops core-market view: capital apartments are the
+    headline (the blended overall otherwise hides that the core market is ~10.8% MAPE, not
+    ~16.9%); summerhouse is measured but isolated.
+    """
+    cc = df["canonical_code"]
+    rt = df["region_tier"]
+    is_apt = cc.apply(_is_apt)
+    is_resi = cc.apply(_is_residential)
+    is_serbyli = cc.isin(SERBYLI_CODES)
+    is_summer = cc == "SUMMERHOUSE"
+    is_cap = rt.isin(CAPITAL_TIERS)
+
+    # overall = residential dwellings (the headline model-quality number)
+    yield ("overall", "", df[is_resi])
+
+    # region × type — so the blended overall never hides the core market on /ops
+    for val, mask in [
+        ("capital_apt", is_cap & is_apt),               # höfuðborg · íbúðir (AÐAL/core)
+        ("rvk_core_apt", (rt == "RVK_core") & is_apt),
+        ("capital_sub_apt", (rt == "Capital_sub") & is_apt),
+        ("capital_serbyli", is_cap & is_serbyli),
+        ("country_resi", ~is_cap & is_resi),            # landsbyggð íbúðarhúsnæði
+        ("summerhouse", is_summer),                     # sumarhús — measured, isolated
+    ]:
+        sub = df[mask]
+        if len(sub) > 0:
+            yield ("region_type", val, sub)
+
     # hood (matsvaedi) — only segments with >= 10 pairs (stable medians)
     for mv, sub in df.dropna(subset=["matsvaedi_numer"]).groupby("matsvaedi_numer"):
         if len(sub) >= 10:
             yield ("hood", str(int(mv)), sub)
     # property type
-    for cc, sub in df.dropna(subset=["canonical_code"]).groupby("canonical_code"):
+    for c, sub in df.dropna(subset=["canonical_code"]).groupby("canonical_code"):
         if len(sub) >= 10:
-            yield ("property_type", str(cc), sub)
+            yield ("property_type", str(c), sub)
     # price band
     nom = df["kaupverd_nominal"].astype(float)
     for lo, hi, label in PRICE_BANDS:
