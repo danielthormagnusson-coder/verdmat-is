@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-28 — /ops auth: aftengt frá pro_users → sjálfstætt OPS_PASSWORD-hlið
+
+`/ops` reiddi sig á sömu Supabase `pro_users`-vörn og `/pro` (sjá /ops RPC-færsluna að neðan). En `/ops` birtir **aðeins aggregöt rekstrarmerki** (engin per-notanda pro-gögn), svo það fær nú **eigið einfalt leyniorðs-hlið** — aftengt frá pro-innskráningu.
+
+**Vél**: `/ops/login` (server-component + server action) ber saman innslegið leyniorð við `process.env.OPS_PASSWORD` með constant-time jafn-lengdar SHA-256 digest-um, og setur við réttu svari **HttpOnly+Secure cookie = `sha256(OPS_PASSWORD)`**. `middleware.js` endurreiknar vænta hashið úr env (Web Crypto, edge) og ber saman; `/ops/login` er eina opna `/ops`-slóðin. **Leyniorðið er eingöngu server-megin** — aldrei `NEXT_PUBLIC`, aldrei í cookie, aldrei í client-bundle (grep-staðfest). `/pro` heldur óbreyttri `pro_users`-vörn. Service-role client (`lib/supabase-admin.js`, force-dynamic) óbreyttur — aðskilin, nauðsynleg vörn. OPS_PASSWORD í `app/.env.local` (local) + Vercel (prod). Build grænt; `/ops` + `/ops/login` báðar dynamic. Commit `f49a6c6`.
+
+**schema_migrations reconcile**: `ops_scraper_signals()` var applyað gegnum TVÆR íterativar MCP-migrations (`20260628091307` create + `20260628091405` latest-day-counts) en á diski er ein **consolidated kanónísk skrá** `20260628093000_ops_scraper_signals.sql`. Staðfest að skráin == lifandi fall (27/27 json-keys eins, SECURITY DEFINER + search_path='' + GRANT service_role only). Ledger samræmt: INSERT `093000`, DELETE báðar fileless MCP-raðir — **fallið óbreytt** (md5 before==after, aðeins bókhald snert). Ledger nú: ein ops-færsla sem speglar repo-skrána.
+
+**Opin vöktuð atriði** (ótengd /ops-kóða, flögguð á borðinu): mbl-skröpunar-drift (WU/keðja, önnur CC vinnur) og `predictions` staðnað (apríl — precompute, önnur CC). `/ops` SÝNIR þessi sem rauð/gul flögg — það er eiginleiki, ekki bilun í /ops.
+
+---
+
 ## 2026-06-28 — /ops scraper-merki: public RPC (SECURITY DEFINER) yfir REST-expose (LEIÐ 2)
 
 Innra `/ops` rekstrar-mælaborð les Supabase gegnum supabase-js (REST). `scraper`-skema er **ekki** REST-exposed (app + nætur-scriptin lesa það gegnum beina psycopg2-tengingu), svo jafnvel service-role fær `Invalid schema: scraper` gegnum REST. Tvær leiðir skoðaðar:
