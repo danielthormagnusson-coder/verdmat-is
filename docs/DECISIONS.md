@@ -4,6 +4,16 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-28 — /ops scraper-merki: public RPC (SECURITY DEFINER) yfir REST-expose (LEIÐ 2)
+
+Innra `/ops` rekstrar-mælaborð les Supabase gegnum supabase-js (REST). `scraper`-skema er **ekki** REST-exposed (app + nætur-scriptin lesa það gegnum beina psycopg2-tengingu), svo jafnvel service-role fær `Invalid schema: scraper` gegnum REST. Tvær leiðir skoðaðar:
+- **LEIÐ 1 — opna `scraper` fyrir PostgREST** (Settings → API → Exposed schemas). Hafnað: breikkar API-yfirborð, virkjar 5 anon-granted `scraper.v_*` views fyrir public REST, og krefst dashboard-aðgerðar.
+- **LEIÐ 2 — public RPC (VALIN)**: `public.ops_scraper_signals()` `SECURITY DEFINER`, `search_path=''`, les `scraper.*` innra og skilar **aðeins aggregötum/tímastimplum** (engar raw raðir). `GRANT EXECUTE` aðeins til `service_role` (ekki anon). Heldur `scraper` innra, þrengra yfirborð, beitt gegnum MCP `apply_migration`.
+
+**Aðgangur að `/ops`**: anon er meðvitað **ekki** með SELECT á `pipeline_runs`/`model_metrics`/`predictions`/`scraper.*` (staðfest í grants). Því les `/ops` með **service-role lykli, aðeins server-megin** (`lib/supabase-admin.js`, `SUPABASE_SERVICE_ROLE_KEY` — ekki `NEXT_PUBLIC`), og middleware auth-læsir `/ops` bak við sömu `pro_users`-vörn og `/pro`. Rekstrar-gögn fara aldrei til client nema sem rendered HTML fyrir innskráðan pro-notanda. Migration-skrá: `supabase/migrations/20260628093000_ops_scraper_signals.sql` (spegill MCP-applysins). Commit `0164c89`.
+
+---
+
 ## 2026-06-28 — Mynda-varðveisla: URL-fyrst capture + dauðamörk-laus fs-pool STAÐFEST (byte-bæti-sókn í gangi)
 
 **Staðfest fyrsta-hendi úr `D:\verdmat-is\scraper_data\listing_images.db`** (CC1 read-only query — aðeins tölur sem mældust í DB):

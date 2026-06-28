@@ -2416,3 +2416,21 @@ Two compounding root causes surfaced during launch-blocker investigation:
 ### Sprint 2 Áfangi 4 — comps-pricing closure (Bug 15, 2026-04-29)
 
 Bug 15 (2026-04-29) leyst — `last_sale_price_real` CPI corruption í `comps_index`. Mitigation via direct UPDATE og root-fix í `build_precompute.py` shipped í sömu session. Invariant: `comps_index.last_sale_price_real == sales_history.kaupverd_real` WHERE matched on `(fastnum, thinglystdags) AND onothaefur=0`. Verified 100/100 sample bit-identical post-fix. Root cause: `kaupverD_VISITALA_NEYSLUVERDS` is a CPI-treated price column, not a CPI index — `build_comps` was using it as the denominator of a CPI ratio, collapsing real prices to ~650 K kr range. Fix: mirror `build_sales_history` pattern using `training_data_v2.cpi_factor`. See `docs/DATA_SCHEMA.md § HMS kaupskra column-naming gotchas` for the column-name pitfall.
+
+### /ops operator-mælaborð LIFANDI (2026-06-28, commit `0164c89`)
+
+Nýtt innra `/ops` route — hrátt rekstrar-mælaborð sem sýnir hvort vélin er heilbrigð og grípur hljóðlátar staðnanir sem public `/markadur/modelstada` sér ekki. Auth-læst (sama `pro_users`-vörn og `/pro`, middleware matcher), `force-dynamic`, `noindex`, ekki í nav.
+
+**6 spjöld** (service-role server-megin, `lib/supabase-admin.js`):
+- **Ferskleiki** (kjarni): nýjasti tímastimpill per lykiltöflu vs `now()`, aldurs-litakóðaður. Grípur `predictions=2026-04-01` (precompute-staðnan, ~88d) sem topp-🔴.
+- **Batch-keðja**: `pipeline_runs` nýjasta per run_type; `monthly_cpi_reanchor` sanity-halt = 🟡 (ætluð hegðun) ekki 🔴.
+- **Skröpun (afleitt)**: mbl/myigloo/promote/extraction/valuation ferskleiki.
+- **Módel**: nýjasta `model_metrics` (MAPE 16,1 / cov80 67 / cov95 87), predictions-batch aldur.
+- **Extraction**: N síðasta dags vs þak 200 (200/200), model `claude-haiku-4-5`, schema v0.2.2, **ekta backlog** (9.936 óunnar af 10.330 virkum); $ merkt „ekki loggað í DB".
+- **Heimildir**: mbl 12.054 / myigloo 1.110 / visir 407 (seed only), fastnum-þekja 93%.
+
+Scraper-merki gegnum `public.ops_scraper_signals()` RPC (LEIÐ 2, sjá DECISIONS 2026-06-28) því `scraper` er ekki REST-exposed. Staðfest smoke (gögn passa DB-probe) + `npm run build` ✓ + push á origin/main.
+
+**OPIN ATRIÐI sem /ops afhjúpar (fyrir næstu lotur):**
+- 🔴 **predictions=apríl (precompute-staðnan)**: `predictions`/`properties`/`comps_index` frosin 1.–16. apríl; mánaðarlega precompute-batch (sér-repo `verdmat-is-precompute`) hefur ekki keyrt → 2 cyclar misstir. Síðan birtir gömul per-eign verðmöt. **Sérlota næst** að kortleggja+keyra nýtt batch (rótin, ekki vefurinn).
+- 🟡 **mbl-drift**: `scraper.listings` mbl `last_seen` 27. jún 03:18 vs myigloo 28. jún → mbl missti nætur-glugga (~30 klst við skoðun). /ops grípur það sjálfkrafa; rót (mbl 01:00 task) óstaðfest.
