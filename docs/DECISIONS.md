@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-28 — WU truflar nætur-keðju; Leið B: aðskilin WU-guard task (ekki í keðju)
+
+Nótt 27→28 drap Windows Update bakgrunns-virkni (install 01:53–01:55) mbl delta-keðjuna (`verdmat-nightly-delta`, 01:00→~03:30) milli delta-sale og delta-rent — ekkert ABORT-line (ferlistréð drepið samtímis), promote/extraction keyrðu aldrei → mbl staðnaði í `scraper.listings`. Stutta myigloo-task-ið (02:00–02:19) slapp. **Rót**: virka WU-pause-ið (HKLM UX, til 11. júlí) nær yfir quality/feature updates en **ekki servicing/Defender**, sem keyrir samt daglega.
+
+**Leið B valin** (yfir Leið A = WU-stop inni í keðjunni): **tveir sjálfstæðir elevated task** þagga WU aðeins í nætur-glugga, **aðskildir frá keðjunni**:
+- `verdmat-wu-guard-stop` @00:55 → `Stop` wuauserv + UsoSvc
+- `verdmat-wu-guard-start` @03:35 → `Start` wuauserv + UsoSvc (öryggisnetið)
+
+Rök fyrir B umfram A: (1) keðjan helst RunLevel=Limited — **engin privilege-breikkun** (A hefði krafist þess að keyra alla skröpunina elevated); (2) start-task er sjálfstæður svo **WU er ALLTAF endurkveikt þótt keðjan deyi** (A skildi WU slökkt ef trap brást við SIGKILL); (3) **stop, ekki disable** — þjónustur trigger-restart-a, við þöggum aðeins gluggann. Gluggi 00:55→03:35 þekur delta (01:00→~03:30) + myigloo (02:00). **Viðbót** við WU-pause, ekki í staðinn. Task-arnir keyra sem `NT AUTHORITY\SYSTEM` (RunLevel Highest) — áreiðanleg þjónustu-stýring án lykilorðs. Armað gegnum `scripts/arm_wu_nightly_guard.ps1` (idempotent, í repo); task-skráning er á vél, ekki í repo. Vakta gegnum /ops (mbl-row 🔴 ef endurtekur). UsoSvc getur verið þrjóskt jafnvel fyrir admin → scriptið prófar stop/start og tilkynnir.
+
+---
+
 ## 2026-06-28 — /ops auth: aftengt frá pro_users → sjálfstætt OPS_PASSWORD-hlið
 
 `/ops` reiddi sig á sömu Supabase `pro_users`-vörn og `/pro` (sjá /ops RPC-færsluna að neðan). En `/ops` birtir **aðeins aggregöt rekstrarmerki** (engin per-notanda pro-gögn), svo það fær nú **eigið einfalt leyniorðs-hlið** — aftengt frá pro-innskráningu.

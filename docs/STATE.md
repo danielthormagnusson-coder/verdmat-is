@@ -2434,3 +2434,11 @@ Scraper-merki gegnum `public.ops_scraper_signals()` RPC (LEIÐ 2, sjá DECISIONS
 **OPIN ATRIÐI sem /ops afhjúpar (fyrir næstu lotur):**
 - 🔴 **predictions=apríl (precompute-staðnan)**: `predictions`/`properties`/`comps_index` frosin 1.–16. apríl; mánaðarlega precompute-batch (sér-repo `verdmat-is-precompute`) hefur ekki keyrt → 2 cyclar misstir. Síðan birtir gömul per-eign verðmöt. **Sérlota næst** að kortleggja+keyra nýtt batch (rótin, ekki vefurinn).
 - 🟡 **mbl-drift**: `scraper.listings` mbl `last_seen` 27. jún 03:18 vs myigloo 28. jún → mbl missti nætur-glugga (~30 klst við skoðun). /ops grípur það sjálfkrafa; rót (mbl 01:00 task) óstaðfest.
+
+### mbl-drift RÓT GREIND + LEYST + WU-guard (Leið B) — 2026-06-28
+
+**Rót**: nótt 27→28 ræsti Task Scheduler `verdmat-nightly-delta` rétt (01:00), pre-flight OK, delta-sale tókst (29 síður, 01:58) — en **Windows Update install 01:53–01:55 truflaði** og keðjan dó milli delta-sale og delta-rent (ekkert ABORT-line → drepin utanfrá; enginn reboot, vélin lifði, myigloo keyrði 02:00–02:19). Promote/extraction keyrðu aldrei → mbl staðnaði. **WU-pause (til 11. júlí) nær ekki servicing/Defender** sem keyrir daglega þrátt fyrir pause. Annað frávik: 25. jún engin keyrsla (engir loggar) — aðskilið, óstaðfest rót. Sjá DECISIONS 2026-06-28.
+
+**ÞREP 2 — handvirkt promote á 28. (leyst)**: parse_mbl 29 blöð/464 listings → promote_mbl sale +38 canonical → promote_listings_append 19.344 raðir (idempotent, engin tvíföldun). **mbl `last_seen` = 28. 01:56 (8 klst → grænt í /ops)**. Hráa gagnið var aldrei tapað (append-only). Extraction sleppt meðvitað (þak 200/dag náð; nætur-keðja tekur ný listings í kvöld).
+
+**ÞREP 1 — WU-guard (Leið B)**: `scripts/arm_wu_nightly_guard.ps1` committað (tveir SYSTEM-task: stop 00:55 / start 03:35, stop-not-disable, aðskilið frá keðju). Delta-task keyrir RunLevel=Limited → getur ekki sjálft stöðvað WU; þess vegna sjálfstæðir SYSTEM-task. **Arming bíður elevated keyrslu Danna** (`powershell -ExecutionPolicy Bypass -File ...arm_wu_nightly_guard.ps1` as Administrator); task-skráning er á vél, ekki í repo. Keðju-seigla (resume/retry) ekki gerð — sér-mál ef WU-guard dugar ekki.
