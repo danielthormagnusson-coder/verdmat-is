@@ -4,6 +4,22 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-28 — Extraction-lag: content-addressed 108-reita ástands-extraction + frosin verðmöt + expected-vs-real, ARMAÐ í nætur-keðju
+
+**Markmið**: framvirk extraction-vél — hver lifandi mbl-auglýsing fær 108-reita ástands-extraction → frosið extraction-bætt verðmat → expected-vs-real monitoring þegar eign selst (VÉL-1-mynstrið alhæft á LIFANDI strauminn). Additíft; gamla allt ósnert.
+
+**KOSTNAÐAR-GÁTT (apríl-safn HAFNAÐ sem seed)**: Áfangi-3 batch (37.544 distinct, ~$156, v0.2.2) extractaði `listings_text_v2.pkl` (EVALUE-augl-texti) með `sha256[:500]`-dedup. Hash-skörun við lifandi mbl-lysingar (md5(lysing)[:12]) = **1,09%** (evalue-texti ≈ aldrei byte-eins og mbl). Tap-laust seed því aðeins **149 (VÉL 1 cache, mbl-texti) + 4 (apríl-md5-skörun) = 153**. Apríl-fastnum-approx-seed HAFNAÐ (myndi blanda evalue-texta við mbl-auglýsingu → mengar monitoring). Raunbil ~11,5K distinct mbl-lysingar → fyllist FRAMVIRKT + LAZY, EKKERT blint backfill.
+
+**TÖFLUR (migration `20260627211837`, RLS service-role-only)**: (a) `scraper.listing_extractions` CONTENT-ADDRESSED á `lysing_hash`=md5(lysing)[:12] (PK) — endurbirtingar deila hash → ein extraction/Haiku-kall þjónar öllum; extraction jsonb + schema/model/`source_trigger`(seed_vel1|seed_april|nightly|ondemand). (b) `scraper.listing_valuations` FROSINN snapshot per (source_listing_id, model_version): `expected_base` (structured) vs `expected_extraction` (+108 reitir) — `public.predictions` er mánaðarlega endurnýjað → getur EKKI endurgert sögulegt expected. (c) `scraper.v_expected_vs_real` SÝN (deterministic eins og v_units; frosna hliðin er þegar í (b), real úr sales_history): expected/real/gap/pct_error + full extraction jsonb + verð-ferill + cpi-við-sölu, allt-geymt fyrir framtíðar-módel-rannsókn.
+
+**VÉL (`extraction_engine.py`)**: `value_listings` skorar gegnum VÉL-1 freeze-anchored adapter (`phase_d3_score_extract.score` pinnar sale_year/month í 2026-04 → `expected_base` endurgerir predictions, D2 parity 0,0000%; `expected_extraction` overlay-ar extraction-dálka via `build_extraction_features`). `extract_and_store` = Haiku 108-reita, content-addressed. Þrír triggerar, eitt fall (lazy-trigger byggður, ótengdur agenti). Seed: 153 extractions, 256 verðmöt (gap í báðar áttir: +17,6% / −11,7%). Gætt 5-Haiku: las raunverulega meiningu (vörumerki, einkasala-rás, varfærið not_mentioned, engin hallusination); content-addressed skip staðfest.
+
+**ARMAÐ í nætur-keðju (`run_extract` í `nightly_delta_chain.sh` eftir `run_promote`)**: framvirkt **N=200** ferskar-fyrst (ORDER BY max(listed_at) DESC → nýjar auglýsingar í mestri hverfis-hættu fyrst, svo ~11,5K bakslag). **Hart kostnaðar-þak**: `--max-n` (500) + `--daily-cap-usd` $10 (state `extraction_cost_state.json`) → cache-galli getur ALDREI brennt hundruð dollara óséð; kostnaður logaður í morgunreport. ~57 mín, klárast ~02:10 (hreint fyrir 02:30 sales-refresh). gated/abort-not-retry (extraction-fall skilur promote/raw/lög ósnert). **mbl-eingöngu**: verðmat krefst fastnum → predictions; myigloo (leiga, enginn fastnum) hefur enga verðmatsleið → ekki extractað hér (frestað). **$8-leki lokaður**: Haiku-lykill EINGÖNGU úr `D:\env.local` (dotenv_values) inni í run_extraction-ferlinu, aldrei exportað/os.environ → keðja/CC lyklalaus. **Sync N=500 = ~2,4 klst HAFNAÐ** (tímaárekstur við 02:30/03:00); batch-API (50% ódýrara, ~15 mín) geymt þar til bakslags-hraði skiptir máli. Gætt fyrsta N=200 keyrsla hrein: 200 extractað 0 fail $1,42, 636 verðmöt, key TOMT eftir.
+
+**Eftir**: (a) expected-vs-real fyllist þegar listings seljast (0 enn — frosið núna); re-baseline úr morgunreport. (b) myigloo-extraction þegar leigu-verðmatsleið til. (c) lazy/agent-trigger. (d) batch-API ef bakslags-hraði krefst. Commits 0a5a103 (lag) + 3f0bdef (örmun). Sjá STATE 2026-06-28.
+
+---
+
 ## 2026-06-27 — Söluferils-líkan Lag 1 (auglýsinga-grain) ADDITÍFT + nætur-promote ARMAÐ í BÆÐI lög (BLOKK 4-6)
 
 **Markmið**: tveggja-laga söluferils-líkan ofan á mbl-auglýsingar svo verð-ferill eignar varðveitist (tapaðist í canonical-fold), OG sjálfvirkja promote-brautina (handvirk frá 13. júní). ALLT additíft — `scraper.listings_canonical` ALDREI snert; nýtt lag lifir samhliða; enginn consumer fluttur.
