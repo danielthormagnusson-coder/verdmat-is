@@ -4,6 +4,30 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-28 — Mynda-varðveisla: URL-fyrst capture + dauðamörk-laus fs-pool STAÐFEST (byte-bæti-sókn í gangi)
+
+**Staðfest fyrsta-hendi úr `D:\verdmat-is\scraper_data\listing_images.db`** (CC1 read-only query — aðeins tölur sem mældust í DB):
+- **488.395 URL-raðir** (248.863 distinct url) — mbl + myigloo. Dálkar: url/url_kind/listing_status/sent_dags/content_sha256/local_path/byte_len/status.
+- **URL-fyrst arkitektúr** (capture aðskilið frá byte-fetch; status url_only → fetched/lost): mbl **45.237 fetched + 763 lost + 436.419 url_only**; myigloo **5.976 fetched**. Sótt alls 51.213 = **15,4 GiB** local (local_path á D:).
+- **sha256-dedup** (content_sha256): 488K url-raðir → 248K distinct url (endurbirtingar deila myndum).
+- **DAUÐAMÖRK-LAUS staðfest**: sent_dags **2014-10-06 → 2026-06-27** (100% ≥2014). Fetch-árangur **98,5%** (763 lost af 51.976 reyndum); per-ár sýnir eldri ár (2014-2020) **~100% sótt** → **engin aldurs-brún** — Thumbor/fs-pool serverar gamlar myndir varanlega (öfugt við spá um aldurs-expiry). 763 „lost" dreifðar, ekki aldurs-bundnar.
+- **Local-fyrst D:** (local_path); R2-sync síðar (sama mynstur og nightly-backup).
+
+**Bæti-sókn Í GANGI (CC2)**: 436.419 mbl url_only bíða byte-fetch (2026-bunki 450K raðir, 14,5K sóttar); myigloo lokið. **Lokatölur bæti-sóknar festir CC2** — þessi færsla staðfestir arkitektúr + dauðamarka-leysi, EKKI lokastöðu sóknar. Sjá minni [[project_listing_images_url_capture]].
+
+---
+
+## 2026-06-28 — myigloo LIFANDI (POINTER; CC3 festir full rök)
+
+Pointer-færsla — myigloo-substraumurinn er nú lifandi með nætur-örmun. **CC3 er höfundur** (vinnur í myigloo fastnum-fyllingu núna) og festir full rök/tölur; ég fullyrði EKKI rök úr annarri hendi. Commits á origin/main:
+- `6734c8e` fix(myigloo): restore content-hash idempotency (volatile subtrees + delete-not-null)
+- `219d7af` feat(myigloo): sales-trajectory Layer 1 promoter with active-set lifecycle diff
+- `f364f83` feat(myigloo): nightly full-sweep chain + S4U task registration
+
+myigloo er í Lag 1 (`scraper.listings`, ~1.109 raðir) en er **leiga án fastnum → engin verðmatsleið** (extraction-lagið sleppir myigloo meðvitað, sjá 2026-06-28 extraction-færslu). Full rök (active-set lifecycle diff, S4U-takt, fastnum-fylling): CC3.
+
+---
+
 ## 2026-06-28 — Extraction-lag: content-addressed 108-reita ástands-extraction + frosin verðmöt + expected-vs-real, ARMAÐ í nætur-keðju
 
 **Markmið**: framvirk extraction-vél — hver lifandi mbl-auglýsing fær 108-reita ástands-extraction → frosið extraction-bætt verðmat → expected-vs-real monitoring þegar eign selst (VÉL-1-mynstrið alhæft á LIFANDI strauminn). Additíft; gamla allt ósnert.
