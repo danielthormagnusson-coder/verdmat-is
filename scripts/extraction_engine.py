@@ -118,17 +118,19 @@ def value_listings(pg, models, rows, log=print):
 # ───────────────────────── forward / lazy Haiku half ─────────────────────────
 def fetch_listings_needing_extraction(pg, limit):
     """Distinct mbl lysingar (>=300) with NO extraction yet — one representative listing each."""
+    # FRESH FIRST: order distinct lysingar by most-recent listing date so newly-posted listings
+    # (highest withdrawal risk) extract before the older backlog (ÞREP 2).
     sql = f"""
       WITH need AS (
         SELECT substr(md5(l.lysing), 1, 12) AS h, min(l.source_listing_id) AS slid,
-               max(l.lysing) AS lysing
+               max(l.lysing) AS lysing, max(l.listed_at) AS fresh
         FROM scraper.listings l
         LEFT JOIN scraper.listing_extractions e ON e.lysing_hash = substr(md5(l.lysing), 1, 12)
         WHERE l.source = 'mbl' AND l.lysing IS NOT NULL AND length(l.lysing) >= 300
           AND e.lysing_hash IS NULL
         GROUP BY 1
       )
-      SELECT h, slid, lysing FROM need LIMIT {int(limit)}
+      SELECT h, slid, lysing FROM need ORDER BY fresh DESC NULLS LAST LIMIT {int(limit)}
     """
     cur = pg.cursor()
     cur.execute(sql)

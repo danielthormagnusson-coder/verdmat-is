@@ -209,8 +209,33 @@ run_promote() {
   return 0
 }
 
+# ── extraction: forward 108-field condition extract + frozen valuation (EXTRACTION ÞREP 5) ──
+# Runs after promote (both layers fresh). mbl only — valuation needs a fastnum, which only mbl
+# resolves; myigloo (rent, no fastnum) has no valuation path, so it is intentionally not extracted
+# here. Fresh-first ordering + N=200 cap (~57 min, finishes ~02:10, clean before 02:30) + a $10/day
+# hard cost cap (runaway guard if the content-addressed cache ever regresses). The Haiku key is read
+# ONLY from D:\env.local inside the run_extraction process (dotenv_values) — never exported, so the
+# chain/CC environment stays keyless and cannot self-bill.
+run_extract() {
+  if [ $DRY -eq 1 ]; then
+    say "[dry-run] would run: run_extraction --forward 200 --confirm (max-n 500, daily-cap \$10)"
+    return 0
+  fi
+  local xlog=$MODELOGS/extraction_${TS}.log
+  ( cd "$APP" && python -u -m scripts.run_extraction --forward 200 --confirm ) > "$xlog" 2>&1
+  local rc=$?
+  local summary
+  summary=$(grep -oE "(effective_n=[0-9]+|day_total=\\\$[0-9.]+|valued [0-9]+ listings)" "$xlog" | tr '\n' ' ')
+  say "extraction: exit=$rc ${summary}-> $xlog"
+  if [ $rc -ne 0 ]; then
+    say "ABORT extraction (exit $rc) — NO RETRY (abort-not-retry); promote/raw/layers untouched"
+    return 1
+  fi
+  return 0
+}
+
 # ════════════════════════════════ main ═══════════════════════════════════════
-say "=== nightly delta chain start (v2/v3 fetch+parse+promote, dry_run=$DRY) ==="
+say "=== nightly delta chain start (fetch+parse+promote+extraction, dry_run=$DRY) ==="
 
 PRE=$(preflight)
 PRERC=$?
@@ -233,6 +258,9 @@ run_mode delta-rent-negotiable delta_rent_negotiable last_updated_seen  || exit 
 # v2/v3: parse + promote BOTH layers (priced sale+rent; negotiable excluded). Gated on the
 # four clean fetch modes above; abort-not-retry. Added BLOKK 6 (2026-06-27).
 run_promote || exit 1
+
+# forward extraction + frozen valuation (mbl), after both layers are fresh. Added EXTRACTION ÞREP 5.
+run_extract || exit 1
 
 if [ $DRY -eq 1 ]; then
   say "[dry-run] would append night totals + CHAIN CLEAN to $REPORT"
