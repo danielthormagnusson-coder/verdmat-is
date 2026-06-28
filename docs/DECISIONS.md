@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-28 — Precompute apríl→júlí endurræsing REYND + ROLLBÖKUÐ (properties_v2 lineage-gap vs canonical)
+
+**Vandi:** prediction-batch (167.503, `predicted_at=2026-04-01`, iter4_final_v1) hafði ekki keyrt síðan apríl — precompute-pipeline var ALDREI sjálfvirkt (ekkert Task Scheduler), datt niður eins og promote; `VALUATION_MONTH=4` harðkóðað. /ops apríl-🔴, verðmöt ~3 mán gömul.
+
+**Anker-greining (kjarni, sannreynt):** módel-real-skali er FASTUR á **2026-05** (parity afsannar 07: FREEZE_ANCHOR_YM=05 endurgerir frosnu predictions). `valuation_month` (verðmats-dagur) er AÐSKILINN frá módel-ankri → val á júlí HREYFIR EKKI frosna ankerinn (frozen-until-iter5 heldur). cpi_index = **verðtryggingar**vísitala (birt 2 mán fram, ENDANLEG; CSV hafði þegar ágúst) → júlí (684,3) er endanlegt, EKKI bráðabirgða. **Leið B (root-fix):** `rebuild_predictions_iter4` pinnar `cpi_factor_valuation = cpi[2026-05]/cpi[2026-07] = 0,991232` úr `cpi_verdtrygging.csv` (óháð pkl-ankri sem driftar) = `freeze_cpi_factor` adaptersins → parity by construction.
+
+**Útfært + LIVE-loadað:** training_data endurbyggt (sölur til 26. jún), júlí-CSV (167.503, predicted_at 2026-07-01, skali +1,42% vs apríl = cpi[07]/cpi[04], 0 innra artifact), idempotent loader (`load_predictions_batch.py`, snapshot `predictions_2026_04`/`feature_attributions_2026_04` service-role-RLS + UPSERT/TRUNCATE-COPY). /ops varð grænt.
+
+**ROLLBÖKUÐ — af hverju:** atomic-flip adapter (phase_d3 VALUATION_MONTH=7 + PRED_VALUATION_YM=07) → **parity-gate REVIEW: 233/300 innan 0,1% (max 21,4%, median 0,0000%)**. Apríl-grunnlína = **300/300 PASS** → júlí-batch INNLEIDDI 67 útlaga (REGRESSION). Orsök: rebuild las `properties_v2.pkl` (28. maí) sem VÍKUR frá **canonical `public.properties`** fyrir ~22% (0% nýbygging, 85% APT_FLOOR → íbúða-eining-features, scrape-vs-Phase-D-auðgað lineage-gap; SOURCES_OF_TRUTH-mál). public.properties er authoritative → 22% drifted íbúða-verðmöt = brot á canonical-reglu. **Ákvörðun: correctness-first — rétt-en-gamalt (apríl canonical) > ferskt-en-drifted (júlí).** Rollback: TRUNCATE+INSERT predictions/feature_attributions úr 2026_04-snapshot + `git checkout` skrár 2+3 → apríl-grunnlína parity **300/300 PASS** staðfest hreint. Vikuvél `verdmat-weekly-model-quality` aftengd (Danni elevated) meðan unnið; **enn Disabled — má endurtengja nú (apríl=PASS)**.
+
+**Forsenda fyrir júlí-endurkeyrslu:** `properties_v2.pkl`-canonical-sync frá public.properties (= lagfæring á þessu broti OG fyrsta skref b-skopunar/full ferskleika). Þá á júlí-batch að gefa parity 0,0000% (canonical-samræmt). **Anker-vinnan sjálf er rétt og endurnýtanleg** (Leið-B pin, loader, stdout-fix í rebuild_predictions_iter4 — ÓCOMMITAÐ, tilbúið fyrir endurkeyrslu). comps_index ósnert (apríl; rebuild framleiðir ekki comps). SÉR-LOTA með probe-first. Sjá STATE 2026-06-28 (precompute).
+
 ## 2026-06-28 — ops_scraper_signals GRANT hert aftur í service_role only + /ops scraper-cache leyst
 
 **Einkenni:** eftir að service-role lykill var lagaður lásu public-töflur + model_metrics á /ops, EN scraper-RPC (`ops_scraper_signals`) sýndi „engin gögn" + scraper-ferskleiki „—".
