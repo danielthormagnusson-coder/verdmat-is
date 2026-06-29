@@ -81,3 +81,8 @@ validate_metrics_log_*.txt
 audit/stage_a_fastnum_manifest.txt
 audit/supabase_fastnums.txt
 audit/known_real_fastnums.txt
+
+# opin_gogn harvest: downloaded public datasets live at ../data/raw/opin_gogn
+# (sibling of repo root, already outside git). This guard covers app/data too.
+# Never git add the harvested data — only pipelines/opin_gogn/harvest.py is tracked.
+data/raw/opin_gogn/
