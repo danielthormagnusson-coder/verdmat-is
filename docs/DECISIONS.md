@@ -4,6 +4,26 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-06-30 — properties_v2 canonical-sync LEYST: rebuild speglar adapter (4 canonical features) → júlí LIVE
+
+**Niðurstaða:** júlí-batch er LIVE (predictions **167.503 @ `2026-07-01`**, feature_attributions 1.675.030), DB-parity adapter@júlí vs live **300/300, max 0,0000%** → VÉL 1 óbrotin. Leysir apríl-stöðnunina (forsenda úr 2026-06-28 rollback). commit `090de2c` (precompute) pushað.
+
+**Root-cause (sannreynt, LEIÐRÉTTIR fyrri frásögn):** rollbackið 2026-06-28 sagði „properties_v2.pkl víkur frá canonical fyrir ~22% (scrape-vs-Phase-D lineage-gap)". Það var OF-ALHÆFT. Numeric HMS (einflm/flatarmal, fasteignamat, matsvæði) er ALLT synkað (0% drift, full 232K). Raunvandinn: `rebuild_predictions_iter4.build_master_frame` sótti canonical structured-features úr **sölu/listing-fallback** (kaupskra last-sale, listings_v2) í stað `public.properties` BEINT — en VÉL-1 adapter (`phase_d3_score_extract`) les þá úr public.properties. Fyrir 67 D3-íbúðir er sölu/listing-fallback NULL → drift → júlí-parity 233/300.
+
+**byggar var DRIVER, lod_flm fylgni-PROXY:** fyrsta greining negldi lod_flm sem „eina orsök, 67/67 fullkominn discriminator" — RANGT. Búggað NaN-próf (`abs(NaN−gildi)>0.01`=False → NaN-vs-gildi taldist match) faldi byggar-muninn. Rétt NaN-aware X-matrix-diff sýndi byggar+age_at_sale víkja á sömu 67; lod_flm lagðist ofan á sem fylgni (sömu D3-íbúðir vantaði bæði í fallback). **GLOBAL X-diff (öll 175.929, EKKI 300-sýni) fann `is_new_build` sem FJÓRÐA** (4.152 raðir, ósýnilegt í sýni — rebuild deriveraði `(2026−byggar)<=2` en phase_d3 geymir eigin lógík). Lærdómur: 300-sýni grípur ekki universe-dreift drift → **universe-sweep nauðsynlegur**.
+
+**Meginregla (lokuð):** rebuild speglar adapter EXACT — `_load_canonical_props()` les **byggar, lod_flm, landeign_nr, is_new_build úr `public.properties` BEINT**, engin sölu/listing-fallback (adapter hefur enga; fallback bryti parity þar sem DB-NULL ∧ fallback-gildi). `properties_v2.pkl` heldur ENGAN lod_flm-dálk; cache er aðeins fyrir ÓBÆTANLEGT raw-HMS floor-data (merking, flatarmal) sem Supabase geymir ekki. Numeric/categorical (flatarmal=einflm, matsvæði, canonical_code, unit_category, buckets) haldast pkl/derived — sannreynt 0-drift global.
+
+**Flip-arkitektúr (load==flip):** `v_current_predictions` er LIVE-view (`DISTINCT ON (fastnum) … ORDER BY predicted_at DESC`); UPSERT ON CONFLICT yfirskrifar apríl→júlí → public birtir júlí UM LEIÐ. Enginn aðskilinn flip-pointer. Aðferð: **staging-tafla → DB-parity + COPY-fidelity checksum FYRIR live → atomic flip**. Verify-path ≠ production-path (villu-flokkurinn sem hefur bitið) → staging sannar COPY skrifaði DB byte-trútt á öllu universe (167.503 / 1.675.030).
+
+**replica-mode flip:** FK `feature_attributions_fastnum_fkey1 → properties` triggar per-röð check; 1,675M INSERT > **2-mín statement_timeout** (dauðaorsök fyrstu flip-tilraunar). FK EKKI deferrable → `SET CONSTRAINTS DEFERRED` ófært. Lausn: `SET LOCAL session_replication_role='replica'` (txn-scoped, sleppir FK-trigger; PK+indexar+einkvæmni haldast; engir user-triggerar) + **in-txn universe-recheck** (0 orphans) sem kemur í stað FK-trigger-sins. Mælt 87s→16,7s scratch, **46s live** (vs 120s+ timeout). Atomic ein-txn (predictions UPSERT + feature_attributions TRUNCATE/INSERT) → rollback-öryggi SANNAÐ (fyrsta tilraun féll á timeout, live ósnortið apríl).
+
+**Pooler-gildra:** `REFRESH MATERIALIZED VIEW` þarf write-txn; pooler-autocommit er read-only sjálfgefið → REFRESH féll fyrst. Lausn: explicit `SET TRANSACTION READ WRITE` í non-autocommit txn. Af 13 MV les AÐEINS `semantic.v_model_vs_sold_by_hood` predictions → refresh-að; hinar 12 lesa sales_history, óháðar flipinu.
+
+**Dauðaorsök bakgrunns-rebuild (aðskilið):** harness drepur bakgrunns-Bash-verk ~33 mín (létt núll-minni waiter dó líka → EKKI OOM). Root-fix: þungar keyrslur DETACHED (`Start-Process`, lifir óháð harness) — full SHAP-rebuild (40 mín) kláraðist þá.
+
+Sjá STATE 2026-06-30.
+
 ## 2026-06-28 — Precompute apríl→júlí endurræsing REYND + ROLLBÖKUÐ (properties_v2 lineage-gap vs canonical)
 
 **Vandi:** prediction-batch (167.503, `predicted_at=2026-04-01`, iter4_final_v1) hafði ekki keyrt síðan apríl — precompute-pipeline var ALDREI sjálfvirkt (ekkert Task Scheduler), datt niður eins og promote; `VALUATION_MONTH=4` harðkóðað. /ops apríl-🔴, verðmöt ~3 mán gömul.
