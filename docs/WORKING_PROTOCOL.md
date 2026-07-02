@@ -220,3 +220,21 @@ Eftir str_replace, verify wc -l increased (additive principle). Negative line-co
 ### Changelog
 
 **2026-05-06**: D:\\ ↔ docs/ sync pattern retired. Canonical er `docs/` direct via Claude Code editing í `/d/verdmat-is/app/docs/`. D:\\ working copies frá pre-2026-05-06 era left as immutable historical snapshots, ekki touched. Reason: empirical drift Apr 21 → May 6 — all sessions edited docs/ directly without syncing back, D:\\ fell 392 lines behind across STATE+DECISIONS over 15 days. Pattern was solving problem that didn't exist í practice (D:\\ as separate working copy added overhead without preventing any actual data loss). Verbatim-check + line-count + create_file rules retained, just applied til docs/ instead of D:\\. Surfaced 2026-05-06 Bug-24-pattern halt during STATE+DECISIONS catch-up post RLS-baseline-audit — `cp D:\\<file> docs/<file>` would have destroyed 392 lines of recent work; halt + spec-revision averted.
+
+---
+
+## Audit- og heiðarleika-reglur (added 2026-07-02)
+
+Bætt við eftir sannleiks-úttekt sem fann eina nefnara-villu (92,8% vs 31,1% — hvorug var production-tala; sjá `docs/fable_prep/audit/PRIOR_SALE_COVERAGE.md` og DECISIONS 2026-07-02). Þrjár reglur til að forða transcript-confabulation og ephemeral-tapi.
+
+### (a) NEFNARA-SKYLDA
+
+**Engin prósenta í audit-skjali án teljara, nefnara OG nefnara-skilgreiningar í sömu línu.** „X %" eitt og sér er merkingarlaust — sama hugtakið (t.d. own-prior-sale þekja) gefur 28 %, 40 %, 58 % eða 93 % eftir því hvort nefnarinn er scored-universe, ever-sold, sold-in-window eða comp-heims-undirmengi. Ritháttur: `28,48 % = 2.538 / 8.911 (nefnari = scored universe v_current_predictions ⨝ properties)`. Ef sama stærð er mæld á fleiri en einum nefnara skal EIN skjal-heimild vera lýst „kanónísk" og hinar vísa í hana.
+
+### (b) SCRATCHPAD-BJÖRGUN
+
+**Prototype-kóði sem lota byggir OG keyrir afritast í `docs/fable_prep/prototypes/` áður en lotan HALT-ar.** Temp-scratchpad (`C:\Users\...\Temp\claude\<session-id>\scratchpad\`) er ephemeral — hann hverfur með session-inu og er EKKI í git. Ef tala eða niðurstaða í audit-skjali var framleidd af scratchpad-kóða, þá er sá kóði heimild um aðferðina og verður að lifa af lotuna. README-lína skal fylgja (uppruni, dagsetning, „prototype ekki production").
+
+### (c) TÖLUR FERÐAST Á DISKI
+
+**Spjall-lög (transcript) framleiða hönnun, ekki staðreyndir.** Hver tala sem lota notar skal vísa í disk-artifact (CSV/JSON/pkl/DB-mælingu), aldrei í transcript-samantekt fyrri lotu. Transcript telst EKKI sönnun — aðeins diskur, DB og git. Ef lota vitnar í „fyrri lota fann X" án disk-artifacts að baki, skal talan endurmælast eða flaggast sem óstaðfest.

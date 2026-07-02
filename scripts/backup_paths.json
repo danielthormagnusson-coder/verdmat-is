@@ -8,6 +8,13 @@
       "recurse": true,
       "kind": "dir"
     },
+    {
+      "_comment": "fable_prep is UNTRACKED in git — backup is its only safety net (added 2026-07-02).",
+      "local_path": "D:\\verdmat-is\\app\\docs\\fable_prep",
+      "remote_subpath": "app_docs_fable_prep",
+      "recurse": true,
+      "kind": "dir"
+    },
     { "local_path": "D:\\Gagnapakkar\\fasteignir.db",  "remote_subpath": "Gagnapakkar/fasteignir.db",  "kind": "file" },
     { "local_path": "D:\\Gagnapakkar\\fasteignir1.db", "remote_subpath": "Gagnapakkar/fasteignir1.db", "kind": "file" },
     { "local_path": "D:\\Gagnapakkar\\fasteignir2.db", "remote_subpath": "Gagnapakkar/fasteignir2.db", "kind": "file" },

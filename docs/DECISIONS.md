@@ -4,6 +4,22 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-02 — Eftirmál sannleiks-úttektar: nefnara-læsing á own-prior-sale + 3 verklags-reglur + backup-þekja á fable_prep
+
+**Samhengi:** Sannleiks-úttekt (read-only, diskur/DB/git — transcript ekki sönnun) staðfesti fable_prep-korpusinn: öll skjöl FANNST, og þrjár af fjórum fullyrtum tölum voru NÁKVÆMAR gegn lifandi DB/artifact — grade-dreifing 60.518/59.158/35.933/11.894, `is_suspect_comparable`-count 79.622, held-MAPE 8,19% (`MODEL_CARD_iter4.md`, sourced `iter4a_training_log.txt`; held main N=2.084, heild m/summer 11,87%). Fjórða atriðið var **nefnara-villa**.
+
+**Nefnara-villan (leyst):** „92,8% vs 31,1%" deilan var **flokkunar-villa** — tvær ólíkar stærðir bornar saman sem rival-ágiskanir. Disk-heimildir: **92,8%** = `comp_probe3b_prior_sale.csv` röð SFH_DETACHED×Country, dálkur `pct_has1_noKV`, nefnari **n=2.982 (comp-heims-undirmengi)** (74,2% með kv-bandi); **31,1%** = `COMP_PROBES_2.md` §1 „S1 tími" fyrir SFH·Country, n=61 = **≥3-comp þekja á S1-þrepi** (allt annað hugtak, ekki fyrri-sala). Hvorug lýsti production-universinu.
+
+**Ákvörðun — kanónísk skilgreining á akkeris-þekju (lokuð):** own-prior-sale þekja mælist framvegis með EINNI skilgreiningu — nefnari = scored universe (`v_current_predictions ⨝ properties`), teljari = eignir með ≥1 sölu á sama fastnum í `sales_history` sem stenst `onothaefur=0 ∧ is_suspect_comparable=false`. Mælt (read-only DB): **HEILD 43,77% = 73.315 / 167.503; SFH_DETACHED×Country 28,48% = 2.538 / 8.911.** Skrifað í `docs/fable_prep/audit/PRIOR_SALE_COVERAGE.md` (teljari/nefnari á hverri línu) sem **EINA heimildin** um akkeris-þekju. Hönnun sem gerir ráð fyrir að „flest Country-SFH eigi fyrri sölu" er röng — aðeins 28,48% gera það.
+
+**Ákvörðun — 3 additive reglur í WORKING_PROTOCOL** (forða transcript-confabulation + ephemeral-tapi): (a) **nefnara-skylda** (engin prósenta án teljara/nefnara/nefnara-skilgreiningar í sömu línu); (b) **scratchpad-björgun** (prototype-kóði sem lota byggir OG keyrir afritast í `docs/fable_prep/prototypes/` áður en HALT-að er — Temp er ephemeral); (c) **tölur ferðast á diski** (hver tala vísar í disk-artifact, aldrei í transcript-samantekt).
+
+**Aðgerð — prototype-björgun:** 4 scratchpad-kóðar (`comp_e2e_proto.py`, `comp_e2e_sample.py`, `rent_p1_p2.py`, `rent_fix_experiments.py`) afritaðir úr ephemeral Temp í `docs/fable_prep/prototypes/` + README.
+
+**Aðgerð — backup-gat lokað:** `backup_paths.json` þakti `app/audit` + `D:\` top-level glob (non-recursive) en EKKI `docs/fable_prep` → mappan (untracked í git) hafði núll öryggisnet. Bætt við include-entry `D:\verdmat-is\app\docs\fable_prep` (recurse → `app_docs_fable_prep`); 1,36 MB/83 skrár, hverfandi á 7–15 GB pre-flight glugga. **`docs/fable_prep/` fer EKKI á origin/main** (untracked scratch) — lifir á diski + R2-backupi; PRIOR_SALE_COVERAGE.md og prototypes/ þar með talin.
+
+**Umfang:** öll DB-aðgerð read-only; engin DB-skrif. Push bíður sama stöðugleika-glugga og venjulega (næsta næturkeyrsla 03:00 með nýju backup-þekjunni er gate-ið). Sjá STATE 2026-07-02 + `docs/fable_prep/audit/PRIOR_SALE_COVERAGE.md`.
+
 ## 2026-07-02 — is_suspect_comparable skilgreint (REFINED-B) + fest á sales_history (dálkar, EKKI vali enn)
 
 **Niðurstaða:** comp-sýnileikasía `is_suspect_comparable` (síðasta óútfærða comp-filterið, COMP_PROBES §0.2.3 „ÓÚTFÆRT/TBD") skilgreind og fest sem 3 dálkar á `public.sales_history` (`is_suspect_comparable` bool, `suspect_reason` text, `suspect_ruleset_version` text). Síar tæknilega-gildar (`ONOTHAEFUR=0`) en ótraustar sölur sem SÝNILEGAR comps — aðgreint frá ONOTHAEFUR-útilokun (upstream) og comp-VAL kv-bandinu.
