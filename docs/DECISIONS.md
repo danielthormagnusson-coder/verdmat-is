@@ -4,6 +4,94 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-02 — Markaðsyfirlit (fimmta mode) #1: launch-umfang — átta fastir reitir, staða-gated birting
+
+**Samhengi:** Markaðsyfirlits-vélin (Markaðurinn) er síðasta óhannaða stoðin. Mæling (`docs/fable_prep/MARKET_OVERVIEW_CARD.md`, read-only DB + on-disk artifacts) sýnir að vísitölurnar átta eru á GJÖRÓLÍKUM þroska: þrjár byggjanlegar strax á kjarna (repeat-sale kjarna-sellur, list-to-sale sögulegt, model-/orðatíðni-aggregöt), tvær þurfa nýja pípu (#3 months-of-supply, #5 TOM), ein er nær tóm (#4 withdrawal), ein þarf ytri gögn (#8 affordability).
+
+**Ákvörðun:** allar átta vísitölur fá FASTAN stað á degi eitt (stöðug UI-beinagrind — notandi lærir kortið einu sinni), en hver TALA birtist aðeins ef reiknuð staða leyfir — þrígilt: `lifandi` / `með-fyrirvara` / `birtist-ekki`.
+- **Staðan er LESIN, aldrei handstillt.** Hún leiðist af heilsu-panel per vísitölu (þekja / ferskleiki / censoring gegn þröskuldum), aldrei sett á í kóða né handvirkt — sama meginregla og VÉL-1 heilsuflipinn les `model_metrics`.
+- **Stöðu-config version-stimplað:** þröskuldar per vísitölu (t.d. „≥N sellur með ≥10 pör í nýjasta fjórðungi", „ferskleiki < X dagar", „censoring < Y%") liggja í version-stimplaðri config `status_ruleset_version` — SAMA mynstur og `suspect_ruleset_version` (DECISIONS 2026-07-02 is_suspect) svo þröskulds-breyting sé rekjanleg/endurgeranleg.
+- **Stöðubreyting er logguð atburður** (vísitala fór lifandi→fyrirvara osfrv., tímastimpill + ástæða) — ekki þögul.
+
+**Rök með tölum (nefnari í sviga):** hví staða VERÐUR að vera reiknuð, ekki gefin — #1 repeat-sale hefur aðeins **6/33 sellur ≥10 pör í 2026Q2** (nefnari = allar sellur í `repeat_sale_index`) → kjarna-apt lifandi, langur hali „birtist-ekki"; #2 list-to-sale **42,5% paruð (52.001/122.436 arms-length sölur 2014Q2–2025Q2)** EN endar 2025Q2 → „með-fyrirvara" (stöðnuð) þar til refresh; #4 withdrawal **320/1.179 myigloo-leiga en mbl-sala 0/19.012** → „birtist-ekki"; #5 TOM **467/18.201 = 2,56% paruð** → „birtist-ekki". Handstillt staða myndi óhjákvæmilega sýna dauðar/stölnaðar tölur sem lifandi. Sjá kortið §0 + §9.
+
+## 2026-07-02 — Markaðsyfirlit #2: lífsferils-líkan auglýsinga (append-only atburða-log = sannleikur)
+
+**Samhengi:** #3/#4/#5 stranda allar á sama rótarvanda (kortið §3–5): mbl merkir **0 af 19.537 auglýsingum sem withdrawn** (sweep óvírt), `first_seen_at == listed_at` í **18.879/19.012 = 99,3%** mbl-sölu (uppgötvun ó-aðgreind frá HTML-skráningardegi), og **11.712/19.012 = 61,6%** mbl-sölu eru „horfin en opin" (last_seen >14 d). Núverandi lög geyma STÖÐU (`is_active`/`withdrawn_at`) sem er ofsögð og á-eyðanleg.
+
+**Ákvörðun:** append-only atburða-log `scraper.listing_lifecycle_events` verður SANNLEIKURINN um lífsferil auglýsingar — ein röð per atburður, aldrei uppfærð/eydd:
+- Atburðir: `discovered`, `price_changed`, `confirmed_absent_1` (fyrsta fjarvist í sweep), `withdrawn_confirmed` (önnur fjarvist ≥2 vikum síðar), `sale_matched` — hver með tímastimpli + sönnunargagni (sweep-run-id / kaupskrár-faerslunumer / verð).
+- **Staða, tímalengd og censoring eru AFLEIDDIR precompute-dálkar** (materialized úr loginu), aldrei frumgögn — svo endurbygging sé lossless og saga glatist ekki.
+- **Tveggja-vikna sweep-reglan útvíkkuð á mbl sem ids-listi** (sækja núverandi virk id, diffa gegn þekktum → confirmed_absent), EKKI rotation-crawl (kortið: single-sweep stimplar aldrei withdrawn; visir IP-throttle bannar rotation).
+- **`first_seen_at` = write-once scraper-uppgötvun**, AÐSKILIÐ frá `listed_at` (HTML-fullyrðing sem endursetst við edits) — tvær dálkar, aldrei samslegnar aftur.
+- **Vinstri-censoring epoch prentað á allar lífsferils-vísitölur** („lífsferilsgögn hefjast <epoch>; eldri auglýsingar vinstri-censoraðar") — saga fyrir sweep-vírun er ófullkomin.
+- **Withdrawn-flokkun (vegna-sölu / án-sölu) ber PENDING-biðskyldu** þar til kaupskrár-ferskleiki nær út fyrir pörunargluggann `[withdrawn−90d, withdrawn+180d]`.
+
+**Rök með tölum:** núverandi 0-flokkun er artifact, ekki merking — myigloo withdrawn→sala **0/319** (nefnari = withdrawn myigloo-leiga með fastnum) er þvingað af því 6-mán glugginn fer fram úr kaupskrár-ferskleika (2026-06-29) og öll 320 withdrawn eru dagsett 2026-07 (ein viku saga). Sjá kortið §3/§4/§5 + `audit/market_withdrawn_to_sale.csv`, `market_tom_distribution.csv`.
+
+## 2026-07-02 — Markaðsyfirlit #3: foreldra-lag repeat-sale vísitölu (fjögurra þrepa upplausn)
+
+**Samhengi:** `repeat_sale_index` (2.673 raðir = 33 sellur × 81 fjórðungar) hefur AÐEINS sella-lag; kortið §1: foreldra-lag er EKKI til (engir sentinel-lyklar, 12 canonical × 3 region), aðeins **6/33 sellur ná ≥10 pörum í 2026Q2**, og 6 sellur hafa <50 pör all-time (insufficient_sample). Fallback sella→foreldri→CPI þarf byggingu.
+
+**Ákvörðun:** fjögurra þrepa upplausnarstigi **sella → canonical-fjölskylda×region_tier → landsheild → CPI**.
+- Foreldri byggt með **pooled BMN-fit á öllum pörum fjölskyldunnar** (EKKI vegið meðaltal barna-vísitalna — vegið meðaltal erfir suð barnanna og brýtur BMN-óvissu), sömu **læstu síur** og sella-fitið (nýbygging-t1, |EINFLM|≤5%, FULLBUID 1→0, span≥90 d, canonical/region-stöðugleiki, |log-hlutfall|≤2), **≥50 pör all-time fyrir fit**, **≥10 pör/fjórðung fyrir dense-flagg**.
+- Artifact: **sama `repeat_sale_index` tafla með `aggregation_level`-dálki** (`cell`/`family`/`national`) — aggregation_level greinir þrepin, ENGIR sentinel-lyklar (`canonical_code='ALL'` bannað) — + build-stamp (script-version, inntaks-hash, byggingartími) á hverri röð.
+- **EIN upplausnarfall** þjónar öllum þremur neytendum (comp-vél, svæðisband, mælaborð) svo þau velji aldrei ólík þrep á sömu eign; **`index_level_used` fylgir hverri birtri tölu** í audit-slóð.
+- **Heilsu-viðbót:** barn-vs-foreldri frávik vaktað þar sem barn hefur eigið fit (dense) — stórt frávik = merki um suð/mis-flokkun.
+
+**Rök með tölum:** kjarna-fjölskyldan (APT_FLOOR+APT_STANDARD × 3 region) ber stærstu sellurnar (cell_n_pairs 11.031/10.594/9.322/7.300 all-time) → dense; en SFH/ROW/SEMI/ATTIC/ROOM falla oft undir 10 pör/fjórðung → foreldri (fjölskylda/landsheild) er eina leiðin til að sýna nokkuð annað en „insufficient". CPI-neðsta-þrep gap-laust (`cpi_index` 376/376 mán). Sjá kortið §1 + `audit/market_repeat_sale_cell_pairs.csv`.
+
+## 2026-07-02 — Markaðsyfirlit #4: TOM-dómur (birtist EKKI núna; KM-langtímaform; millileikur undir eigin heiti)
+
+**Samhengi:** kortið §5: markaðs-TOM er óreiknanlegt á núverandi gögnum — **97,44% censored (17.734/18.201 mbl+visir sölu-augl með fastnum)**, upphafsstimpill brotinn á mbl (`first_seen==listed` 99,3%), og enginn endapunktur til fyrir óseldar auglýsingar (mbl withdrawn 0/19.012).
+
+**Ákvörðun:**
+- **Markaðs-TOM BIRTIST EKKI** fyrr en lífsferils-loggið (#2) gefur alvöru upphaf + endi og censoring fellur. Engin „reiknum úr því sem við höfum"-bráðabirgðatala undir TOM-heiti.
+- **Langtímaform: Kaplan–Meier á discovery-cohortum eftir epoch**, með **withdrawal sem competing risk** (auglýsing dregin til baka án sölu er önnur útkoma, ekki „langur TOM"); **hrá-talningar (at-risk / atburðir per bin) birtar** við hlið kúrfunnar (endurgeranleiki).
+- **Millileikur leyfður: „sölutími seldra eigna"** úr `pairs_v1` (52.001 asking↔sold pör) — en það er **skilyrt, survivorship-bjöguð mæling sem birtist undir SÍNU EIGIN heiti**, ALDREI merkt „time-on-market".
+
+**Rök með tölum:** matched-mengið sem þó parast (467/18.201 = 2,56%, nefnari = mbl+visir sölu-augl með fastnum) gefur miðgildi 59 daga (p25 29 / p75 124) — en 2,56%-svarhlutfall er ónothæft sem markaðsmæling. Sjá kortið §5 + `audit/market_tom_distribution.csv`.
+
+## 2026-07-02 — Markaðsyfirlit #5: model-tracking sameining + as_of-vídd (ein canonical sería)
+
+**Samhengi:** kortið §7: tvær ósamræmdar módel-gæða-töflur — `model_metrics` (275 raðir, allt `iter4_final_v1`, oos_cutoff FAST 2026-04-20, 4 keyrslur 26.–29. jún = dagar EKKI mánuðir) og `model_tracking_history` (11 raðir = EINN snapshot 2026-04, model `iter4a`, einingar í BROTUM). „comp-e2e +4–6% drift síðan jan" er EKKI geymt sem tíma-drift (engin as_of-vídd; til er aðeins extraction-framlags-gap run 32).
+
+**Ákvörðun:**
+- **`model_tracking_history` lagt niður / innlimað;** `model_metrics` með nýrri **`as_of`-vídd** verður EINA canonical tracking-serían (einingar = prósentur alls staðar, skýr/samræmd módel-merki).
+- **Mánaðarleg snapshot á rúllandi mengi nýþinglýstra per segment.** Það sem er FROSIÐ er **SPÁIN sem var lifandi fyrir söluna** (expected-vs-real, VÉL-1-mynstrið), EKKI eigna-mengið (mengið rúllar; snapshot festir spá-vs-raun á sölutíma).
+- **Geymt á AGGREGAT-stigi per segment** (ekki per-eign — geymslu-/RLS-rök: per-eign expected-vs-real er þegar í `scraper.listing_valuations`; serían þarf aðeins segment-samantekt).
+- **Tracking-serían OG drift-triggerinn eru SAMA artifact** — driftið les as_of-seríuna, engin sér drift-tafla.
+
+**Rök með tölum:** nýjasta model_metrics-keyrsla (run 42, all_oos) gefur overall MAPE 12,81% / medAPE 7,54% / bias +1,79% (nefnari n=1.357 OOS-pör) — þversniðs-mæling; „+4–6% drift síðan jan" krefst ≥2 as_of-snapshot (jan vs nú) af aggregat-spástigi per segment með föstu mengi, sem frosna cutoff-vélin getur ekki gefið. Sjá kortið §7.
+
+## 2026-07-02 — Markaðsyfirlit #6: affordability-lína (aldrei módeluð leiga í samsettri tölu)
+
+**Samhengi:** kortið §8: leiga í DB er **100% módeluð, 0% mæld** (`predictions_rent_staging` 158.314/158.314 en `predictions_rent` live = 0; engin leiguskrá-observ-tafla). Að byggja affordability á módel-leigu = spá ofan á spá.
+
+**Ákvörðun:**
+- **Affordability-vísitala má ALDREI hvíla á módelaðri leigu.**
+- **Affordability v1 = greiðslubyrðar-vísitala:** miðgildisverð/m² (MÆLT úr kaupskrá) + launavísitala (Hagstofa) + vextir (Seðlabanki) + CPI; per region_tier.
+- **Módeluð leiga birtist AÐEINS sem sér, loudly-merkt módel-úttak** („módel-spá, ekki mæld leiga"), aldrei inni í samsettri affordability-tölu.
+- **Ytri ingest fylgir CPI-mynstrinu** (`cpi_index`-fordæmi): eigin ingest-töflur, **source + vintage per röð**, vikuleg S4U-sótt, pinned viðmið í config, vintage-stimpill í audit-slóð.
+
+**Rök með tölum:** mælda hliðin er til strax — verð/m² **nothæf 9.242/14.083 sölur = 65,6%** (nefnari = sölur síð. 12 mán), miðgildi 738.556 ISK/m²; CPI **376/376 mán gap-laust**. Ytri þættir (laun/vextir/LTV/heimili) eru **0% í DB** → v1 stendur og fellur með ytri ingest (Hagstofa launavísitala/ráðstöfunartekjur, SÍ stýri-/íbúðalánavextir). Sjá kortið §8.
+
+## 2026-07-02 — Endurþjálfunar-cadence + drift-trigger + skylduskref hrings (LÆST; mælt, ekki ágiskað)
+
+**Samhengi:** Sölumódelið (iter4_final_v1) er frosið artifact án endurþjálfunarleiðar; comp-e2e fann raunverulegt aggregat-drift (RVK/Capital-íbúðir, mælt +4-6% YFIR markaði í júní — formerkið er OFMAT, ekki „vanmat"). Fable-lota keyrði rúllandi rotnunar-backtest (16 T-punktar 2021-12→2025-09, replica-sönnuð aðferð: endurgerði held MAPE 8,19%/medAPE 5,54% upp á 0,01 pp; 185.947 skoraðar raðir; nefnari = training_data_v2 main-raðir í 18-mán gluggum) — full heimild með nefnurum: `docs/fable_prep/audit/RETRAIN_CADENCE.md` + undirtöflur/parquet í sömu möppu. Allar tölur hér vísa þangað.
+
+**Ákvörðun 1 — cadence: 6 mánaða grunn-cadence (2 hringir/ár).** Rök: per-árgangs þolmörk (fyrsti mánuður með |med bias|>0,03 sustained, endurgrunnlínað) dreifast 3–16 mán eftir markaðsskeiði; í rólegum skeiðum (10 árgangar 2023-06→2025-09) hélst mán-6 |med_err| heildar ≤ 0,024, brotin voru öll í sjokk-árgöngum (2021-12: −0,16; 2022-12: +0,057; 2023-03: +0,049) sem triggerinn grípur á mán 3-5. 3-mán cadence bætir ~0,3 pp bias en tvöfaldar ops-byrði; 12-mán skilur eftir 0,03–0,06 exposure (2025-06 árgangur: m12 +0,047). MAPE-kostnaður rotnunar ≈ +0,085 pp/mán (m1 7,63% n=5.593 → m18 9,17% n=2.559; 2024-25 árgangar, heild).
+
+**Ákvörðun 2 — drift-trigger (flýtir hring, breytir ALDREI módeli sjálfur):** mörkin |med d| > 0,03 heild / > 0,05 segment í 2 mánuði í röð HALDA, með tveimur lagfæringum sem backtestið knúði fram: **(i) d endurgrunnlínað á flip-grunnlínu** (miðgildi d fyrstu 2 mán eftir flip, per segment) — annars brennur triggerinn á strúktúrelta Country-vanmatinu (−2 til −4% frá mánuði 1, EKKI rotnun); **(ii) mánaðar-n ≥ 50 gólf á segment-regluna** — þunn segment (sfh_country, mánaðar-n 15–40, median-suð SD≈0,04-0,05) vaktast á 3-mán rúllandi safni (n≥50) með sömu mörkum. Mælt (16 árgangar, `retrain_backtest_trigger_eval.csv`): hrá reglan grípur sann-drift en false-fire-ar á 7/16 árgöngum (10/14 segment-fire á sfh_country); lagfærða reglan **grípur 10/10 sann-drift skeið, 1 falskt fire, miðgildis-töf 0,0 mán**.
+
+**Ákvörðun 3 — skylduskref hvers hrings (ófrávíkjanleg röð):** retrain (`precompute/retrain_sales_model.py`, version-stampað artifact í `D:\model_artifacts\<version>\`, live aldrei yfirskrifað) → **conformal-endurkvörðun ALLTAF með, ALDREI erfð milli útgáfa** (`recalibrate_conformal.py`; backtest §3: þekjutap er 100% bias-drifið — bias-miðjuð cov80 80,0–81,1% á öllum 18 mánuðum — symmetrísk breidd um skekkta miðju getur hvorki lagað drift né má hún erfast) → parity-gate (`parity_check.py`, G1-G5 m/ akkeris-leiðréttingu δ̂) → **mannlegt GO** → flip (staging + DB-parity + `model_pred_anchor_ym` uppfært í SÖMU txn — dress rehearsal mældi δ̂=+2,07% skala-mun milli pkl-ankeringa; án anchor-uppfærslu brotnar VÉL 1) → næturkeyrslu-gate (fyrsta weekly-model-quality keyrsla + d-panel |med d| heild < 0,02 fyrsta mánuð). Full útfærsla: `docs/RETRAIN_RUNBOOK.md` (skrifað svo Opus-CC lota keyri hringinn).
+
+**Ákvörðun 4 — þögull vísitölu-skalar á módel-úttak er HAFNAÐ.** Enginn index-margfaldari á `real_pred_*` sem „ódýr endurkvörðun". Ef neyðarbrú þarf milli endurþjálfana: (a) hávært merkt í `calibration_version`, (b) skráð gildislok, (c) sér-samþykki Danna. Rök: þögull skalar felur rotnunina fyrir öllum mælum (d-panel mælir gegn spánni; parity missir samanburðargrunn) og backtestið sýnir að bias-vandinn er tíma/segment-háður — flatur skalar er röng lögun.
+
+**Vitneskja sem breytir framtíðarhönnun (mælt):** (a) módel fæðist EKKI óbjagað í trend-markaði — tré framreikna ekki út fyrir þjálfunarbil (2021-12 árgangur −14,4% n=544 í mánuði 1; kandídat 2026-07 +2,3% á eigin calib-glugga) → endurþjálfun ein lokar ekki drifti sem myndast EFTIR gagnaenda; vor-2026 ofmatið er að hluta slíkt; (b) pooled-rotnunarferlar eru blekking (drift-formerki snýst milli skeiða og jafnast út) — öll vöktun per-árgangur/endurgrunnlínuð; (c) strúktúrelt Country-vanmat lifir endurþjálfun af → iter5-verk (features/quality-filter), ekki cadence-verk.
+
+Full heimild: `docs/fable_prep/audit/RETRAIN_CADENCE.md` + `docs/RETRAIN_RUNBOOK.md` + parity-skýrslur í `D:\model_artifacts\iter4r_20260702*\`. (STATE-færsla bíður sér-go — þessi lota skrifaði ekki í STATE.)
+
 ## 2026-07-02 — Eftirmál sannleiks-úttektar: nefnara-læsing á own-prior-sale + 3 verklags-reglur + backup-þekja á fable_prep
 
 **Samhengi:** Sannleiks-úttekt (read-only, diskur/DB/git — transcript ekki sönnun) staðfesti fable_prep-korpusinn: öll skjöl FANNST, og þrjár af fjórum fullyrtum tölum voru NÁKVÆMAR gegn lifandi DB/artifact — grade-dreifing 60.518/59.158/35.933/11.894, `is_suspect_comparable`-count 79.622, held-MAPE 8,19% (`MODEL_CARD_iter4.md`, sourced `iter4a_training_log.txt`; held main N=2.084, heild m/summer 11,87%). Fjórða atriðið var **nefnara-villa**.
