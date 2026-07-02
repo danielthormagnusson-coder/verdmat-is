@@ -39,6 +39,7 @@ from rebuild_sales_history import (  # noqa: E402  reuse derive core, no re-impl
     load_cpi_lookup,
     derive_sales_rows,
     fetch_valid_fastnums,
+    fetch_hms_einflm,
     open_ro_conn,
     CPI_CSV,
     KAUPSKRA_CSV,
@@ -77,6 +78,7 @@ MV_LIST = [
 INSERT_COLS = [
     "faerslunumer", "fastnum", "thinglystdags", "kaupverd_nominal",
     "kaupverd_real", "einflm_at_sale", "byggar_at_sale", "onothaefur",
+    "is_suspect_comparable", "suspect_reason", "suspect_ruleset_version",
 ]
 
 GONE_WARN_THRESHOLD = 50
@@ -161,10 +163,11 @@ def main() -> int:
         log(f"[1] anchor={anchor_ym} (pipeline_config); cpi months={len(cpi)}")
         valid_fastnums = fetch_valid_fastnums(conn_ro)
         log(f"[1] properties universe={len(valid_fastnums):,}")
+        hms_einflm = fetch_hms_einflm(conn_ro)  # R3 input for is_suspect_comparable
 
         kp = pd.read_csv(KAUPSKRA_CSV, sep=";", encoding="latin-1", low_memory=False)
         log(f"[2] kaupskra raw rows={len(kp):,}")
-        derived, stats = derive_sales_rows(kp, valid_fastnums, cpi)
+        derived, stats = derive_sales_rows(kp, valid_fastnums, cpi, hms_einflm)
         log(f"[2] derive stats: fk_dropped={stats['fk_dropped_rows']:,} "
             f"({stats['fk_dropped_distinct_fastnums']:,} distinct), "
             f"rows_in_universe={stats['rows_in_universe']:,}, "

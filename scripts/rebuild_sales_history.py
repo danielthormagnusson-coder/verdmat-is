@@ -36,6 +36,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 from anchor_config import read_anchor  # noqa: E402  single source of truth for CPI anchor
+from suspect_rules import compute_suspect  # noqa: E402  is_suspect_comparable single source of truth
 
 sys.stdout.reconfigure(encoding="utf-8") if hasattr(sys.stdout, "reconfigure") else None
 
@@ -77,15 +78,33 @@ def derive_sales_rows(
     kp: pd.DataFrame,
     valid_fastnums: set[int],
     cpi_factor_by_ym: dict[str, float],
+    hms_einflm_by_fastnum: dict[int, float] | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     """Re-derive sales_history rows (sans id, plus faerslunumer) from kaupskra.
 
     Transforms identical to phase_d3_sales_extract.py except FAERSLUNUMER is
     carried, the fastnum-universe is the live properties set, and cpi_factor is
     the pinned-anchor lookup. Returns (out_df, stats).
+
+    When hms_einflm_by_fastnum is provided, the three is_suspect_comparable columns
+    (REFINED-B ruleset, suspect_rules.compute_suspect) are added — computed on the FULL
+    incoming kaupskra (so multi-unit deed spans are counted correctly) and merged onto
+    the output rows by (faerslunumer, fastnum). See docs/DECISIONS.md 2026-07-02.
     """
     stats: dict = {}
     n_raw = len(kp)
+
+    # is_suspect flags on the FULL kaupskra (before FK/date filtering) keyed (faerslunumer, fastnum)
+    suspect = None
+    if hms_einflm_by_fastnum is not None:
+        sf = compute_suspect(kp, hms_einflm_by_fastnum)
+        suspect = pd.DataFrame({
+            "faerslunumer": pd.to_numeric(kp["FAERSLUNUMER"], errors="coerce").astype("Int64"),
+            "fastnum": pd.to_numeric(kp["FASTNUM"], errors="coerce").astype("Int64"),
+            "is_suspect_comparable": sf["is_suspect_comparable"].values,
+            "suspect_reason": sf["suspect_reason"].values,
+            "suspect_ruleset_version": sf["suspect_ruleset_version"].values,
+        })
 
     kp = kp.copy()
     kp["FASTNUM_i"] = pd.to_numeric(kp["FASTNUM"], errors="coerce").astype("Int64")
@@ -135,6 +154,11 @@ def derive_sales_rows(
     before = len(out)
     out = out[out["kaupverd_nominal"].notna() & (out["kaupverd_nominal"] > 0)]
     stats["dropped_zero_nominal"] = int(before - len(out))
+
+    if suspect is not None:
+        out = out.merge(suspect, on=["faerslunumer", "fastnum"], how="left")
+        stats["suspect_rows"] = int(out["is_suspect_comparable"].fillna(False).sum())
+
     stats["final_rows"] = len(out)
     stats["n_raw"] = n_raw
     return out.reset_index(drop=True), stats
@@ -155,6 +179,13 @@ def fetch_valid_fastnums(conn) -> set[int]:
     with conn.cursor() as cur:
         cur.execute("SELECT fastnum FROM public.properties")
         return {int(r[0]) for r in cur.fetchall()}
+
+
+def fetch_hms_einflm(conn) -> dict[int, float]:
+    """Current HMS registered size per fastnum (canonical: public.properties.einflm) — R3 input."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT fastnum, einflm FROM public.properties WHERE einflm IS NOT NULL")
+        return {int(f): float(e) for f, e in cur.fetchall()}
 
 
 # ======================================================================
@@ -204,8 +235,10 @@ def main() -> int:
 
     valid_fastnums = fetch_valid_fastnums(conn)
     print(f"  properties fastnum universe = {len(valid_fastnums):,}")
+    hms_einflm = fetch_hms_einflm(conn)
+    print(f"  properties HMS einflm (R3 input) = {len(hms_einflm):,}")
 
-    out, stats = derive_sales_rows(kp, valid_fastnums, cpi_lookup)
+    out, stats = derive_sales_rows(kp, valid_fastnums, cpi_lookup, hms_einflm)
 
     print("\n" + "=" * 70)
     print("[2] Write staging parquet (NO Supabase writes)")

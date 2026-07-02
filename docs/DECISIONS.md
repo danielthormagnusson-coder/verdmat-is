@@ -4,6 +4,44 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-02 — is_suspect_comparable skilgreint (REFINED-B) + fest á sales_history (dálkar, EKKI vali enn)
+
+**Niðurstaða:** comp-sýnileikasía `is_suspect_comparable` (síðasta óútfærða comp-filterið, COMP_PROBES §0.2.3 „ÓÚTFÆRT/TBD") skilgreind og fest sem 3 dálkar á `public.sales_history` (`is_suspect_comparable` bool, `suspect_reason` text, `suspect_ruleset_version` text). Síar tæknilega-gildar (`ONOTHAEFUR=0`) en ótraustar sölur sem SÝNILEGAR comps — aðgreint frá ONOTHAEFUR-útilokun (upstream) og comp-VAL kv-bandinu.
+
+**Skilgreining (locked, 4 reglur; suspect ef EITTHVERT):**
+- **R1 sentinel_price:** `KAUPVERD ≤ 1` (kaupskrá KAUPVERD er alltaf tölulegt þús. kr, lágmark 1; „Tilboð"-sentinel er listings-scraper fyrirbæri, EKKI kaupskrá — étur ~3 arms-length, ytra net).
+- **R2 kv_extreme:** `kv = KAUPVERD/FASTEIGNAMAT ∉ [0,50; 2,00]` óháð region (ytra net; comp-VAL bandið `[0,70;1,70]` Country / `[0,70;1,50]` annars er strangara innar → R2 étur 0 á comp-eligible pool).
+- **R3 size_mismatch REFINED-B:** sala-`EINFLM` > núverandi HMS `einflm` (public.properties) um **>10%** — **EINGÖNGU þessi átt** — EÐA fjöleigna-deed (SKJALANUMER spannar >1 fastnum).
+- **R4 new_build_first_sale:** `FULLBUID=0` OR `(sale_year − BYGGAR) ≤ 2`.
+
+**REFINED-B rök (tímadrift-offlöggun):** symmetrísk R3 (`|Δ|>10%`) offlaggaði — **63% flagga voru „sala < HMS"** á gömlum sölum (miðgildi söluár **2014** vs 2018 CLEAN) = eignir **stækkaðar EFTIR söluna** (löglegar, ekki vondar sölur; hentu ~1.900 sögulegum comps). REFINED-B flaggar aðeins sölu>HMS (raun-grunsamlega áttin) + multi-deed.
+
+**Kostnaður (comp-eligible CLEAN pool, #6b band, n=118.551):** suspect **3,36% (3.978)** — R1=0, R2=0, R3=1.130, R4=2.853. **SFH·Country ≥3-þekja helst á 19,7%** (fellur úr #6b-21,3% aftur á birtu grunnlínuna; ≥5 óbreytt); aðrar hörð rural-cell 0,0 pp. Á fullri sales_history (öll sölusaga, m.a. comp-ineligible) er hlutfallið 34,9% (arms-length 28,4%) — vænt, því flest af því er þegar kv-band/deed-fall.
+
+**Persist-arkitektúr (FER GEGNUM PRECOMPUTE svo það lifi re-run af):** reikniregla í `app/scripts/suspect_rules.py` (`compute_suspect`, single source of truth, `RULESET_VERSION='refinedB-v1-2026-07-02'`), wired inn í `derive_sales_rows` (rebuild_sales_history + daily_sales_refresh — bæði endurgera dálkana við hverja keyrslu, keyed `(faerslunumer, fastnum)`). Migration `add_is_suspect_comparable_to_sales_history` (3 nullable dálkar, additive/reversible via DROP COLUMN). Einskiptis-backfill 227.871 raða (`backfill_suspect_sales_history.py`, `SET TRANSACTION READ WRITE` á 6543, temp-tafla UPDATE...FROM) → version-stimplað í `pipeline_runs` (run_type `sales_history_suspect_backfill`). RLS: sales_history er public_read SELECT-only, nýir dálkar erfa (engin ný grant). Rollback SQL: `app/scripts/suspect_persist_rollback.sql`.
+
+**Af hverju EKKI build_comps-wire enn (Val #2):** comp-vélin velur comps LOKALT í `precompute/build_precompute.py::build_comps` (comps_index, top-N nearest per fastnum) og les í dag AÐEINS ONOTHAEFUR+recency — hvorki COMP_PROBES hörð-filter-stafla (kv-band/single-deed/newbuild) né is_suspect. Að sía suspect úr comp-VALINU er **sér skref með comp-útfærslu-spec-inu (Fable-vél)**; í dag er flaggið TIL STAÐAR á sales_history (audit + display + framtíðar-vél) en **óvirkt í vali** → comps_index-þekja ÓBREYTT (þ.a. SFH·Country live-þekja er trivially óbreytt). Sjá `docs/fable_prep/audit/SUSPECT_COMP_DEF.md` + `suspect_comp_*.csv`.
+
+Sjá STATE 2026-07-02.
+
+## 2026-07-02 — Conformal PI (iter4_conformal_v1) + width-based A/B/C/D confidence-grade FLIPPAÐ LIVE í predictions
+
+**Niðurstaða:** `public.predictions` (167.503 @ 2026-07-01) uppfært live: PI-dálkar (`real_pred_lo/hi 80/95`) endurbyggðir úr **split-conformal artefaktinu `iter4_conformal_v1`** (verified held cov 79,1% / 94,6%) með segcal-stretch sem fallback, + tveir nýir dálkar `confidence_grade` (A/B/C/D) og `calibration_source`. **Punktmat (`real_pred_mean`/`real_pred_median`) ÓSNERT** — aðeins óvissulagið breyttist. `calibration_version`: `iter4_segcal_v1` → `iter4_conformal_v1+segcal_fb`. Precompute-branch `conformal-abc-grading` (`c7ee344`) — **ÓPUSHAÐ** (bíður 24-klst stöðugleika).
+
+**Grade-regla (lokuð):** width-based úr hlutfallslegri 80%-breidd `rel80 = (hi80−lo80)/mean`: **A < 0,20 · B < 0,36 · C annars**. `GRADE_D_CODES = {SUMMERHOUSE, APT_HOTEL, APT_MIXED, APT_ROOM}` → grade D beint (width hunsuð; atvinnuhúsnæði/grunnregla utan íbúða-nákvæmnisloforðsins). **APT_SENIOR er EKKI D** — öldrunar-íbúðir eru íbúðarhúsnæði, conformal-breidd flokkar þær rétt (mældust B 45 / C 44). Þröskuldar kvarðaðir á held: einhalla MAPE **A 6,43% / B 8,71% / C 13,07%** (D=SUMMERHOUSE 175%); medAPE einhalla líka.
+
+**Conformal-þekja (Mondrian cascade `cc|region → cc → segcal`):** artefaktið hefur AÐEINS 7 canonical-kóða (APT_ATTIC/BASEMENT/FLOOR/STANDARD, ROW_HOUSE, SEMI_DETACHED, SFH_DETACHED) → 17 cc|region + 7 cc sellur. **SUMMERHOUSE + allir D-kóðar + APT_SENIOR + APT_UNAPPROVED falla á segcal_fallback → PI BYTE-IDENTICAL við fyrir-flip.**
+
+**Parity-hlið (staging vs live, FYRIR flip — GATE):** 167.503 báðum megin, allir fastnum match, **mean/median 0 raðir breyttar** (harða gate-ið), PI breytt **155.304**, byte-identical **12.199**. Source-mix: `conformal_seg_reg` 154.079 · `conformal_seg` 1.225 · `segcal_fallback` 12.199. Grade: **A 60.518 / B 59.158 / C 35.933 / D 11.894** (0 NULL). Rebuild-parity (nýtt CSV vs live) og DB-parity (staging vs live) gáfu SÖMU tölur → COPY skrifaði byte-trútt.
+
+**Flip-arkitektúr (aðgreint frá 2026-06-30 replica-flipinu):** migration (2 nullable text-dálkar, MCP apply_migration, schema_migrations reconcilað í canonical ts `20260701233908` ekki MCP-ts) → staging COPY á pooler (`SET TRANSACTION READ WRITE` fyrsta statement) → DB-parity gate → **atomic UPDATE** (`predictions ← predictions_staging` á PI+grade+source+calver, mean/median EKKI í SET). **Enginn replica-mode nauðsynlegur:** UPDATE snertir ekki `fastnum` → FK `predictions_fastnum_fkey1` triggar ekki; engir user-triggerar á predictions. In-txn universe-recheck (167.503/167.503/167.503) FYRIR commit; rowcount-assert 167.503; post-verify point_est_moved=0 → COMMIT.
+
+**PENDING (flip er í DB en EKKI enn sýnilegt notendum):** (1) `v_current_predictions` (það sem appið les, `select *`) birtir AÐEINS upprunalegu 12 dálkana → **grade kemst ekki til appsins fyrr en view-ið er víkkað (+2 dálkar, additive CREATE OR REPLACE)** — SÉR go. (2) Framenda-UI sem sýnir grade er ekki til í app-repo enn (engin `confidence_grade`-tilvísun í `app/app`). (3) Backup/staging-cleanup + branch-push eftir 24-klst stöðugleika = sér ákvörðun.
+
+**VIÐBÓT 2026-07-02 (view-víkkun LEYST → DB-hlið flipsins FULLKLÁRAÐ):** `v_current_predictions` víkkað additive (`CREATE OR REPLACE VIEW`, sama `DISTINCT ON (fastnum) … ORDER BY predicted_at DESC`, migration `20260702002140` canonical-reconcilað): **12 → 14 dálkar**, upprunalegu 12 óbreyttir í röð+gildi, `confidence_grade`+`calibration_source` aftast. Sömu 167.503 raðir; grade-dreifing gegnum view = base-tafla EXACT (A 60.518/B 59.158/C 35.933/D 11.894, 0 NULL). App-smoke (`select *`): 2000263→A, 2100041→C, 2032832→D koma nú gegnum viewið. Appið les `select *` → fær 2 auka-dálka sem það hunsar þar til UI notar → brotnar ekki. **DB-hlið flipsins lokið.** Eftir stendur aðeins: framenda-UI sem SÝNIR grade (sér verk, með comp-vél/agent), branch-push (`c7ee344`) + staging-cleanup — bæði 24-klst gate.
+
+Sjá STATE 2026-07-02.
+
 ## 2026-06-30 — properties_v2 canonical-sync LEYST: rebuild speglar adapter (4 canonical features) → júlí LIVE
 
 **Niðurstaða:** júlí-batch er LIVE (predictions **167.503 @ `2026-07-01`**, feature_attributions 1.675.030), DB-parity adapter@júlí vs live **300/300, max 0,0000%** → VÉL 1 óbrotin. Leysir apríl-stöðnunina (forsenda úr 2026-06-28 rollback). commit `090de2c` (precompute) pushað.
