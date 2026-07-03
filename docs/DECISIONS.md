@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-03 — Þrep 5: vélrænt punktmat ALDREI í fyrirsögn/aðalsýn — aðeins í banka-audit-annex
+
+**Niðurstaða:** Á þrepi 5 (þunnt svæði: ¬prior ∧ comps<K_min ∧ n_svæði<N_min) birtist vélræna punktmatið (LightGBM-spáin) **ALDREI í fyrirsögn eða aðalsýn — í ENGRI dreifingarleið** (vef-eign, PDF, agent-svar, banka-útflutningur). Talan lifir eingöngu í **banka-audit-annexinum**, harðmerkt „flokksmat — ónothæft sem veðmatsgrundvöllur".
+
+**Rök:** (1) Freistnivandi útlánadeildar undir tímapressu — sýnileg tala verður notuð sem veðmat óháð fyrirvörum — vegur þyngra en þægindin af að sýna hana. (2) Endurgeranleiki tapast EKKI: talan er alltaf afleiðanleg úr version-stimpluðu artifacti (`predictions` + `calibration_version`), svo annex-geymsla nægir fyrir audit-slóð. (3) Samræmt Fable-tillögu úr akkeris-síðu-hönnun og almennu þrep-5 framsetningarreglunni (ekkert punktmat í fyrirsögn þegar comps<K_min og svæðisband er of þunnt). Sjá `docs/fable_prep/audit/TIER_PROBE.md` + STATE 2026-07-03.
+
+## 2026-07-03 — predictions_staging: CLEANUP (DROP) valið yfir RLS-policy
+
+**Niðurstaða:** `public.predictions_staging` (167.503 raðir) verður **DROPPAÐ** í sér CC-lotu — ekki varið með RLS-policy. Taflan er tímabundinn flip-artifact (staging-COPY fyrir atomic predictions-flip) sem átti alltaf að hverfa eftir stöðugleika-glugga; glugginn er löngu liðinn (hreinar næturkeyrslur síðan flip 2026-07-01).
+
+**Af hverju DROP en ekki RLS-policy:** RLS-policy á töflu sem á að deyja er plástur — hún festir í sessi artifact sem á ekki að vera til. DROP lokar líka Supabase-advisory flagginu beint (anon-exposed 167.503 raðir gegnum anon-lykil) í stað þess að fela það á lífi.
+
+**Framkvæmd (sér lota, HALT-gate):** (1) staðfesta FYRST að ekkert les úr töflunni — grep á kóðabasa (app + scripts + precompute) + engin view-dependency (`pg_depend` / `information_schema.view_table_usage`); (2) HALT og relaya áður en DROP; (3) rollback = endurbygging úr precompute (`rebuild_predictions_iter4.py` staging-skref) ef þarf. Sjá STATE 2026-07-03.
+
 ## 2026-07-02 — Þrep-arkitektúr: þröskuldar LÆSTIR (K_min,K_full)=(3,5), N_min=8 · prior-aldur = flöggun · conformal-gólf hart
 
 **Samhengi:** Fimm-þrepa evidence-tier arkitektúrinn (T1–T5 fallback-framsetning verðmats) var hannaður með þrjá þröskulda til kvörðunar. Þrep-próban (`docs/fable_prep/audit/TIER_PROBE.md` 2026-07-02 + 11 CSV; read-only, sanity-tékk reproduce-uð nákvæmlega gegn COMP_ENGINE_E2E og PRIOR_SALE_COVERAGE fyrir keyrslu) mældi þrep-dreifingu á öllu scored universe, N_min-þol per matsvæði og band-raunþekju í back-testi (772 held-sölur, 24 mán). Þrír liðir, allir mældir:
