@@ -33,6 +33,7 @@ import sqlite3
 import sys
 import time
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg2
@@ -170,13 +171,24 @@ _LISTING_COLS = [
     "sub_type", "tegund_raw", "price_amount", "is_price_on_request", "size_sqm", "rooms",
     "bedrooms", "bathrooms", "byggar", "addr_text", "addr_postcode", "addr_municipality",
     "lat", "lng", "lysing", "photos_json", "listed_at", "first_seen_at", "last_seen_at",
+    "discovered_at",
     "status", "surviving_parse_id", "br_dags", "promoter_version",
 ]
 # volatile columns refreshed on re-promote (Vandi-1 fix); immutable ones preserved.
-_UPDATE_COLS = [c for c in _LISTING_COLS if c not in ("source", "source_listing_id", "first_seen_at")]
+# first_seen_at + discovered_at are write-once: excluded from the update set so a
+# re-promote never overwrites them (and pre-existing NULL discovered_at rows stay NULL).
+_UPDATE_COLS = [c for c in _LISTING_COLS
+                if c not in ("source", "source_listing_id", "first_seen_at", "discovered_at")]
 
 
 def write_batch(pg, records, log=print):
+    # discovered_at: write-once system-discovery stamp = now() at first INSERT.
+    # One run timestamp for the whole batch (honest "when WE first recorded it",
+    # NOT derived from listed_at/first_seen_at). Excluded from the ON CONFLICT update
+    # set above, so re-promotes preserve the original and pre-existing NULL rows stay NULL.
+    run_ts = datetime.now(timezone.utc)
+    for r in records:
+        r.setdefault("discovered_at", run_ts)
     rows = []
     for r in records:
         vals = []
