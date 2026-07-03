@@ -4,6 +4,26 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-02 — Þrep-arkitektúr: þröskuldar LÆSTIR (K_min,K_full)=(3,5), N_min=8 · prior-aldur = flöggun · conformal-gólf hart
+
+**Samhengi:** Fimm-þrepa evidence-tier arkitektúrinn (T1–T5 fallback-framsetning verðmats) var hannaður með þrjá þröskulda til kvörðunar. Þrep-próban (`docs/fable_prep/audit/TIER_PROBE.md` 2026-07-02 + 11 CSV; read-only, sanity-tékk reproduce-uð nákvæmlega gegn COMP_ENGINE_E2E og PRIOR_SALE_COVERAGE fyrir keyrslu) mældi þrep-dreifingu á öllu scored universe, N_min-þol per matsvæði og band-raunþekju í back-testi (772 held-sölur, 24 mán). Þrír liðir, allir mældir:
+
+**1. ÞRÖSKULDAR LÆSTIR: (K_min, K_full) = (3, 5), N_min = 8 — mælt, ekki ágiskað.**
+- T5 („þunnt svæði") heild **2,03 % = 3.407/167.503** (nefnari = scored universe) — innan hönnunarmarks ~2–3 %; á markmiðs-segmentinu SFH×Country aðeins **6,31 % = 562/8.911**. Grunnlínu-dreifingin öll (heild: T1 41,85 % / T2 49,11 % / T3 1,92 % / T4 5,09 % / T5 2,03 %; SFH×Country: 22,61/43,84/5,87/21,37/6,31) í TIER_PROBE.md §1.1 + `tier_dist_base_k3.csv`.
+- **K_min=2 hafnað:** hefði fært aðeins 546/8.911 = 6,1 % SFH×Country (eignir með nákvæmlega 2 comps) upp í T1/T2 — 2-comp „sett" er brothætt (vigtað miðgildi tveggja talna) og **87,8 % no-prior-hoppara (382/435) fá T4-band hvort sem er** (`tier_hop_k2_k3.csv`).
+- **K_min=6 hafnað:** kostar 12,4 pp af T1+T2 á SFH×Country (66,5 % → 54,1 % = 5.922→4.821/8.911) án mælds gæðaábata — E2E §4 sýndi comp-miðgildi óbjagað einmitt á 3–5-comp sellunum.
+- **N_min=8 staðfest:** **93,2 % = 8.375/8.989** (nefnari = universe-SFH-eignir í 99 geo-Country matsvæðum) ná n≥8 með S3-nágranna-viðbótinni; **fjölskyldu-víkkun (SFH+SEMI+ROW) þarf aðeins 1 svæði af 99 = 49 eignir = 0,55 % → FELLUR ÚT sem valkvæð flækja** (`nmin_country_sfh_summary.csv`). 6,29 % eigna (565/8.989, 19 svæði) ná ekki 8 hvort sem er = T5.
+- **Band-raunþekja innan marka:** Country 71,99 % (nefnari = 332 bönd af 358 held-sölum), Capital 70,00 % (320/326), RVK 57,95 % (88/88) — allt innan [45; 85], nominal 60 %; stærðarband ±30/±50 hreyfir ≤2 pp (`band_backtest_summary.csv`).
+
+**2. PRIOR-ALDUR = FLÖGGUN, EKKI ÞAK.** Aldurs-þak fer **EKKI** í þrep-lógíkina: þak (prior ⟺ ≤8 ára sala) hefði fellt T1 SFH×Country úr 22,6 % (2.015/8.911) í ~13,5 % og fargað gildum akkerum sem index-framreikningurinn tíma-leiðréttir (E2E §5: prior-akkeris MAD stöðugt 0,12–0,14 frá <3 upp í >10 ára bili). Í staðinn:
+- **Söludagur + vísitölu-version alltaf sýnileg** við framreiknað akkeri (audit-slóð).
+- **Akkeri eldra en 8 ár fær loudly-flagg „gamalt akkeri".** Mælt umfang: **40,25 % T1-akkera á SFH×Country eru >8 ára** (nefnari = 2.015 T1-eignir), miðgildi 6,69 ár, P90 15,0 ár (`tier_prior_age.csv`).
+- Regla: **aldur er framsetningar-lýsigagn, aldrei þrep-ákvörðun.**
+
+**3. CONFORMAL-GÓLF HELST HART.** Svæðisband (T4) aldrei þrengra en conformal-80 sellunnar — óbreytt. Próban sýndi gólfið bíta í 81–95 % banda (Country 81,0 %, Capital 95,3 %, RVK 61,4 %; nefnari = held-sölur með band per region) → **T4-virðisaukinn er svæðis-STAÐSETNING miðjunnar, ekki breiddin — og það er rétt:** hrá [P20,P80] kvantíl ein gæfu 52,71 % þekju á Country (175/332) og 48,86 % á RVK við ±50 % (43/88) — rétt OFAN við 45 %-felunarmarkið en án nokkurs öryggisborðs (leiðrétting: hráa talan er ekki UNDIR markinu, hún strýkst við það). Einhalla-reglan (eignarbil ≤ svæðisband) stendur. Í útfærslu-spec skjalfestist einnig: **S3-hlutdeild comp-setta á SFH×Country er 15,5 % (919/5.922 sem ná ≥3 comps)** → „yfir svæðismörk"-merking er skyldu-element í Country-UX, ekki jaðartilvik (`tier_only_s3.csv`).
+
+**Mæld hliðar-staðfesting:** foreldra-lags-stiginn (Markaðsyfirlit #3, sella→fjölskylda→landsheild→CPI) er forsenda T4-bandsins, ekki bara mælaborðs — SFH×RVK_core sellu-akkerið er stale síðan 2022Q3 og back-testið notaði foreldra-region-lagið í **88/88** RVK-tilfellum (CPI-lagið þurfti aldrei).
+
 ## 2026-07-02 — Markaðsyfirlit (fimmta mode) #1: launch-umfang — átta fastir reitir, staða-gated birting
 
 **Samhengi:** Markaðsyfirlits-vélin (Markaðurinn) er síðasta óhannaða stoðin. Mæling (`docs/fable_prep/MARKET_OVERVIEW_CARD.md`, read-only DB + on-disk artifacts) sýnir að vísitölurnar átta eru á GJÖRÓLÍKUM þroska: þrjár byggjanlegar strax á kjarna (repeat-sale kjarna-sellur, list-to-sale sögulegt, model-/orðatíðni-aggregöt), tvær þurfa nýja pípu (#3 months-of-supply, #5 TOM), ein er nær tóm (#4 withdrawal), ein þarf ytri gögn (#8 affordability).
