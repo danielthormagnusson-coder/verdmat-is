@@ -270,14 +270,17 @@ class MblFetcher:
             save_state(self.state_path, self.state)
 
     # ── transport + kill-switch ──
-    def _gql(self, query):
+    def _gql(self, query, ctx=None):
         for _ in range(3):
             try:
                 r = self.s.post(ENDPOINT, json={"query": query},
                                 headers={"User-Agent": UA, "Accept": "application/json",
                                          "Content-Type": "application/json"}, timeout=TIMEOUT_S)
-            except requests.RequestException:
+            except requests.RequestException as exc:
                 self._consec_timeout += 1
+                self.log("  !! timeout %d/%d%s (%s) at %s" % (
+                    self._consec_timeout, MAX_CONSEC_TIMEOUT,
+                    " [%s]" % ctx if ctx else "", exc.__class__.__name__, now_iso()))
                 if self._consec_timeout >= MAX_CONSEC_TIMEOUT:
                     raise KillSwitch("%d consecutive timeouts" % self._consec_timeout)
                 self._sleep(2)
@@ -422,7 +425,7 @@ class MblFetcher:
                 break
             if pages > 0:
                 self._sleep(self.min_spacing)
-            status, body, ctype, data = self._gql(q)
+            status, body, ctype, data = self._gql(q, ctx="%s offset=%d" % (cfg["op"], offset))
             rows = data["data"][cfg["root"]]
             if not rows:
                 break
@@ -436,7 +439,8 @@ class MblFetcher:
             pages += 1
         st[cfg["since_key"]] = high
         st["last_run_at"] = now_iso()
-        self._save()
+        st["halt_reason"] = None          # clean close clears any stale kill-switch flag —
+        self._save()                      # the chain gate trusts this field, so it must tell the truth
         self.log("  delta done — %d pages, new high-water %s = %s" % (pages, cfg["delta_field"], high))
 
     # ── aggregate-check (1 request, no writes) ──
