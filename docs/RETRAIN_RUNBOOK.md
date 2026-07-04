@@ -104,7 +104,7 @@ vera ≈ log(cpi[nýtt akkeri]/cpi[gamalt]) (dress rehearsal: δ̂=+2,07% vs CPI
 | G2 bias | \|cand bias(log)\| ≤ 0,02 heild; ≤ 0,04 kjarnasegment | ferskt módel á að vera ~óbjagað á eigin samtíma; 0,02 ≈ helmingur drift-viðvörunarmarka |
 | G3 þekja | cov80 ∈ [75, 85], cov95 ∈ [91, 98] | conformal-markmið ± úrtaksóvissa á ~2.000 raða glugga |
 | G4 drift-lokun | median Δlog(cand−live) per kjarnasegment = −(live bias) ± 0,03 | skiftið á að LOKA mældu drifti; stærra skift en driftið bendir á skema-breytingu, ekki endurkvörðun |
-| G5 grade | \|Δ A-hlutdeild\| ≤ 10 pp | grade-dreifing á ekki að umturnast við hring; stórt stökk = conformal-gluggi óheilbrigður |
+| G5 grade | round-to-round \|Δ A-hlutdeild\| ≤ 5 pp milli hringja (sjá DECISIONS 2026-07-04) | grade-dreifing á ekki að umturnast við hring; stórt stökk = conformal-gluggi óheilbrigður |
 
 Fyrirvari sem skýrslan ber sjálf: kandídatinn notaði gluggann í early-stop +
 conformal (quasi-OOS, væg bjartsýni); live er ekta OOS þar. Bias-samanburðurinn
