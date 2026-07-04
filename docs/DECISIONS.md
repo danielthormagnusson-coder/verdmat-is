@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-04 — G5 grade-stöðugleiki: 6-mán OOS conformal sem staðall, breiddar-blöndun sem skjalfestur neyðarhemill
+
+**Heimild:** `docs/fable_prep/audit/G5_PROBE.md` + CSV-in (`G5_PROBE_comparison.csv`, `G5_PROBE_backtest_by_T.csv`, `G5_PROBE_cellstab.csv`). Allar tölur hér eru þaðan — **engin ný tala í þessari færslu án tilvísunar þangað.**
+
+**Samhengi:** Dress rehearsal retrain-hringsins féll á G5 (grade): 3-mán conformal-calib gaf rétta þekju (79,9%) en A-hlutdeild hrundi úr live 46,8% í 26,6% (nefnari = 1.819 gluggaraðir). Próban mældi rótarorsök og báða runbook-kostina; niðurstaðan læsir fjórum liðum.
+
+**1. STAÐALL frá og með næsta retrain-hring: conformal-calib = 6 mán OOS** (train_end −3 mán m.v. núverandi 3-mán viðmið). **Rök:** rótarorsök G5 er sýnatöku-suð í sellu-kvantílum við 0,20/0,36 grade-mörkin — pivot-sellan `APT_FLOOR|Capital_sub` (stærsti einstaki hlutinn) situr ofan á A/B-þröskuldinum (q80≈0,096 vs mörk 0,0998) og flöktir A↔B milli hringja. 6-mán OOS þéttir pivot-sellu q80 std **0,0082→0,0038 (~2,2×)** og fækkar grade-flippum **5→3 á 7 hringjum** (`G5_PROBE_cellstab`; `APT_FLOOR|RVK_core` 2→0). Öldrunar-kostnaður mældur **~0,1–0,3 pp bias / ~0,26 pp MAPE** — nettó helst kandídat betri en live (retrain-ávinningur −0,56 pp MAPE étur ~0,26 pp öldrun → ~−0,3 pp nettó; bias-öldrun innan G2-svigrúms 0,02 log). **Ódýra útgáfan (6-mán með train_end óbreytt) er HÖFNUÐ sem ÓGILD:** eldri helmingur gluggans er in-sample (breidd 4,14 pp of þröng) → A rýkur í 74,3% og cov80 fellur í 73,3% (undir G3-gólfi 75).
+
+**2. Víxlverkun við G4 — skráð berum orðum:** OOS-glugginn færir train_end aftur um 3 mán → sölur sem eiga að loka markaðsdrifti (júl–ágú eftir-falls sölur, sbr. G4-fæðingar-offset úr RETRAIN_CADENCE §2.1) komast **3 mán SEINNA** í þjálfunargögn en með 3-mán calib. **Fyrsti flipp-kandídati reiknast út frá þessari OOS-forsendu, ekki frá 3-mán viðmiðinu;** G4-túlkun runbook §4 stendur óbreytt en gagnaendinn er 3 mán eldri.
+
+**3. NEYÐARHEMILL (skilgreindur, ÓVIRKUR):** breiddar-blöndun α=0,5 við breiddir **SÍÐASTA RETRAIN-HRINGS** — **aldrei live** (live eldist, og snapshot-„sigur" hennar í próbunni var confounded af hagstæðri live-römmun þröskuldsins). Virkjast **aðeins með sér-ákvörðun** ef bið eftir hreinum 6-mán hring verður óásættanleg; þá með round-to-round A-hlutdeildar-vakt. **Backtest-fyrirvari skráður:** blöndun **yfirskýtur í trendi** (round-to-round A-std 9,8→12,7 á nýlegu skeiði) af EWMA-töf gegn hörðum þröskuldi. Regla óbreytt úr runbook: **aðeins BREIDDIR blandast — punktspá kemur ALLTAF úr fersku módeli.**
+
+**4. G5-MÆLIKVARÐINN ENDURSKILGREINDUR:** G5 = **round-to-round |Δ A-hlutdeild| ≤ 5 pp milli retrain-hringja** (pivot-sellu q80 std sem stuðningsmælir), í stað mun-frá-live sem er confounded (live er 18 mán gamalt annað módel á annarri CPI-ankeringu). RETRAIN_RUNBOOK.md fær samsvarandi additive leiðréttingu í G5-kaflanum (sama lota, sama verklag, vísar í þessa færslu).
+
 ## 2026-07-03 — Þrep 5: vélrænt punktmat ALDREI í fyrirsögn/aðalsýn — aðeins í banka-audit-annex
 
 **Niðurstaða:** Á þrepi 5 (þunnt svæði: ¬prior ∧ comps<K_min ∧ n_svæði<N_min) birtist vélræna punktmatið (LightGBM-spáin) **ALDREI í fyrirsögn eða aðalsýn — í ENGRI dreifingarleið** (vef-eign, PDF, agent-svar, banka-útflutningur). Talan lifir eingöngu í **banka-audit-annexinum**, harðmerkt „flokksmat — ónothæft sem veðmatsgrundvöllur".

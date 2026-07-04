@@ -128,6 +128,19 @@ næstliðins hrings breiddar — ATH breiddar-stöðgun, ekki erfð kvörðunar-
 miðjan kemur alltaf úr fersku módeli). Ákvörðun áður en flippað er á grade-bera
 kandídata.
 
+**LEYST (DECISIONS 2026-07-04, heimild `docs/fable_prep/audit/G5_PROBE.md`):** rótarorsök G5
+mæld = sýnatöku-suð í sellu-kvantílum við 0,20/0,36 mörkin (pivot-sella `APT_FLOOR|Capital_sub`
+situr ofan á A/B-þröskuldi og flöktir A↔B milli hringja). **STAÐALL frá og með næsta hring: 6-mán
+OOS conformal-calib** (train_end −3 mán m.v. núverandi 3-mán) — þéttir pivot-sellu q80 std
+0,0082→0,0038 og fækkar grade-flippum 5→3 á 7 hringjum; öldrunar-kostnaður ~0,26 pp MAPE /
+~0,1–0,3 pp bias (ásættanlegt, nettó betri en live). Ódýra 6-mán útgáfan (train_end óbreytt) er
+ÓGILD (eldri helmingur in-sample → cov80 73,3% fellur G3-gólf). **G5-hliðið endurskilgreint:
+G5 = round-to-round |Δ A-hlutdeild| ≤ 5 pp milli hringja** (ekki mun-frá-live, sem er confounded;
+pivot-sellu q80 std = stuðningsmælir) — leysir af 10 pp / mun-frá-live regluna í G4/G5-töflunni að
+ofan. Breiddar-stöðgunin (kostur b) = skjalfestur **NEYÐARHEMILL** (α=0,5 við SÍÐASTA retrain-hring,
+aldrei live; virk aðeins með sér-ákvörðun; backtest-fyrirvari: yfirskýtur í trendi); aðeins BREIDDIR
+blandast, miðjan alltaf fersk.
+
 **HALT-punktur 3 (aðal):** parity-skýrslan fer til Danna með GO/NO-GO tillögunni.
 **Ekkert flip án skýrs „go" frá honum** — líka þegar öll hlið standast.
 
