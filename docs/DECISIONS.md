@@ -4,6 +4,42 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-04 — Auth verdmat.ai = Supabase Auth (Leið B); Clerk-endurnýting (heyaskr) hafnað
+
+**Heimild:** `docs/fable_prep/audits/HEYASKR_AUTH_2026-07-04.md` (read-only samanburðarúttekt; lið 3 ræður). Allar staðhæfingar hér þaðan.
+
+**Ákvörðun:** verdmat.ai notar **Supabase Auth millisíðunnar** (`@supabase/ssr`, cookie-based session) — **EKKI** endurnýtingu á Clerk-lausn heyaskr. Eitt identity-kerfi um allt: `auth.users.id` (**uuid**), sama auðkenni og `pro_users`-taflan er þegar keyed á. Native RLS (`auth.uid()`) ver per-notanda gögn.
+
+**Vistuð dashboards = ný tafla `public.saved_dashboards`:** `id uuid pk`, `user_id uuid` (→ `auth.users.id`), `name text`, `config jsonb`, `created_at`, `updated_at`. RLS: `USING (auth.uid() = user_id)` fyrir SELECT/INSERT/UPDATE/DELETE — hrein per-notanda einangrun án service-role-króka.
+
+**Af hverju Leið B en ekki Clerk:** Clerk auðkennir með **`userId` text-streng** (`user_xxx`) sem er notaður BEINT sem foreign key í Supabase-töflum → **RLS er í reynd sniðgengið** (appið keyrir á service-role-lykli með handvirkri eignaathugun, `auth.uid()`-policies dauðar). Endurnýting flytur það text/uuid-misræmi + RLS-bypass-skattinn inn í verdmat.ai. Drop-in Clerk-UI (tilbúið innskráningarform) er eini ávinningurinn — hann vegur léttar en tvö ósamræmd identity-kerfi + tapað native-RLS.
+
+**Eina gatið:** innskráningar-UI millisíðunnar er EKKI byggt (`/login/page.js` = „coming soon"). **Login-form smíðast** — það er eina nýsmíðin sem Leið B kallar á.
+
+## 2026-07-04 — Myndir á dashboard: image_index.db aðalheimild, ódagsettar safnmyndir, myndalaus fallback skyldu-hönnun
+
+**Heimild:** `docs/fable_prep/audits/MYNDA_THEKJA_2026-07-04.md` (read-only þekjuúttekt). Tölur þaðan (nefnari í sviga).
+
+**Aðalheimild mynda = `image_index.db`** (long-term-owned skjalasafn); `properties.photo_urls_json` til vara. Þekja: seldar eignir 2024–2026 (gilt, `onothaefur=0`) **58,8% = 16.396/27.894** með ≥1 mynd (nefnari = gildar seldar 2024–26); dýpt **miðgildi 33** myndir/eign (p25 21, p75 58; ≥3 í 98,7%); comps **66,8% = 759/1.136** (úrtak 10.000) → placeholder-þumall fyrir ~1/3.
+
+**ENGAR ártals-/auglýsinga-fullyrðingar á myndum.** image_index geymir engan tímastimpil per mynd → myndir birtast sem **ódagsettar safnmyndir**, aldrei „mynd úr auglýsingu [ár]" né aldurs-merking. (properties „lifandi" auglýsinga-myndir eru 20,9% og allar úr einni skröpun apríl 2026 — skyndimynd, ekki söguleg; nýtist sem varaheimild, ekki tímastimpils-heimild.)
+
+**Myndalaus fallback er skyldu-hönnun**, ekki jaðartilvik: **~41,2% = 11.498/27.894** gildra seldra eigna eru myndalausar (fyllitala 58,8%-þekjunnar; úttektin: „~41% … myndalaus fallback nauðsynleg"). Fallback = kort/kennitala/lykiltölur.
+
+**Ástandsmerki á comps: byggingarleg merki FYRST** (byggingarstig, byggár, stærð) — extraction-þekja nær ekki comp-laginu enn (sbr. tveggja-laga-verðmat sömu dag), svo ástands-þumlar mega ekki reiða sig á extraction fyrir comps.
+
+## 2026-07-04 — Tveggja laga verðmat: grunnmat ósnertanlegt, skilyrt talnalag GATE-að á iter5-próbu; manual_q-lagið fellt
+
+**Heimild:** `docs/fable_prep/audits/ITER4_FEATURES_2026-07-04.md` (extraction-birgðir + handstuðla-lag) + `docs/fable_prep/audits/FRAMENDA_UTTEKT_2026-07-04.md` (millisíðu-route). Tölur þaðan.
+
+**Grunnmat = deterministic, version-stimplað, ósnertanlegt** — **eina krónutalan í öllum dreifingarleiðum** (vef-eign, PDF, agent-svar, banka-útflutningur). Sama agi og þrep-5 punktmats-reglan (DECISIONS 2026-07-03): talan er alltaf afleiðanleg úr version-stimpluðu artifacti.
+
+**Skilyrt mat (ástandsforsendur inn í SAMA versjónaða módel) birtist EKKI** fyrr en áhrifastærðar-próba sýnir marktækar effektir. **Forsendan er ekki uppfyllt í dag:** extraction = **133 af 154 features (86,4%)** eru LLM-extraction-afleidd en leggja aðeins **0,83%** til gain (LIVE iter4a); hinar 21 (strúktúr+staðsetning+tími) leggja 99,17%. Rót: (a) aðeins **~24% þjálfunarraða** hafa extraction-merki (rest NaN), (b) merkin dreifð/near-constant → iter4 er *mettað* af extraction að nafninu til en dregur nánast enga forspá úr því.
+
+**`manual_q_effects`/`adjust-valuation`-lagið er FELLT.** Það er `sprint2_v1.1_hardcoded` (calibrated_on 2026-04-23) — 12 handvalin, ókvörðuð, margföldunar-stöfluð áhrif (+30%/−10%), ekki gagna-kvarðað, með ósamræmi milli skjala og route. **Deyr með millisíðunni, kemur aldrei í verdmat.ai.**
+
+**Dashboard v1:** ástandssnið birt ÞAR SEM extraction er til + **notenda-inntak SAFNAST** (upprunamerkt, vistað) — **án talnaáhrifa** á grunnmatið; söfnunin fæðir iter5-áhrifastærðar-próbuna. iter5-umfang (og gate lið (c)) í `docs/PLANNING_BACKLOG.md`.
+
 ## 2026-07-04 — G5 grade-stöðugleiki: 6-mán OOS conformal sem staðall, breiddar-blöndun sem skjalfestur neyðarhemill
 
 **Heimild:** `docs/fable_prep/audit/G5_PROBE.md` + CSV-in (`G5_PROBE_comparison.csv`, `G5_PROBE_backtest_by_T.csv`, `G5_PROBE_cellstab.csv`). Allar tölur hér eru þaðan — **engin ný tala í þessari færslu án tilvísunar þangað.**

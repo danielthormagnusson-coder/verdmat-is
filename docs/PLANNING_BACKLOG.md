@@ -1106,3 +1106,18 @@ Les nýja auglýsingu → LLM-extraction á SÖMU reiti og ítarlega verðmatið
 Auto-retrain sem eltir nýjustu mælingu áhættar (a) að elta hávaða, (b) ofbregðast árstíðasveiflu, (c) feedback-lykkju þar sem módel spáir sjálfu sér. Mannlega-gated til langs tíma: mælingin segir HVENÆR iter5 borgar sig og HVAR módelið er veikt, en endurþjálfunar-ÁKVÖRÐUN er Danna, ekki sjálfvirk. Mánaðarlegt iteration raunhæft sem mannlega-samþykkt cadence informað af mælingu — EKKI blint auto-retrain. Bíður þar til VÉL 1 hefur safnað nógu mörgum vikum til að eðlilegur breytileiki sé þekktur (annars jústering gegn hávaða = plástur).
 
 **Röðun**: CPI-systkin (í gangi) → VÉL 1 → VÉL 2 (með ask-to-sale gap módeli) → VÉL 3 (gated, frestað).
+
+---
+
+## ITER5 — umfang skilgreint (logged 2026-07-04)
+
+**Heimild:** `docs/fable_prep/audits/ITER4_FEATURES_2026-07-04.md` (kjarna-niðurstaða + iter5-ályktun, gap-mat). **Gate-ar skilyrða talnalagið** í DECISIONS 2026-07-04 (tveggja laga verðmat) — liður (c) er GO/NO-GO hlið þess lags.
+
+iter4 **inniheldur nú þegar** 133 af 154 features (86,4%) sem extraction-afleidd, en dregur úr þeim aðeins **0,83% gain** (LIVE) — iter5 snýst því EKKI um að bæta við extraction-features heldur að **hækka merki-þéttleika og lærða áhrifastærð**:
+
+- **(a) Eignastigs-extraction backfill** — hækka þjálfunarþekju úr **~24% þjálfunarraða** (16,1% birtra eigna): extracta á EIGNASTIGI, ekki bara sölur, svo hver birt eign hafi ástandsvektor. Rótin (24% þekja + dreifð merki) er af hverju gain er 0,83% þrátt fyrir 86% feature-hlutdeild.
+- **(b) Merkjaþétting** — 108 extraction-svið (schema v0.2.2) → sameina þunn one-hot flögg í ríkari, hærri-þekju samsett ástandsmerki (t.d. `has_any_recent_renovation` í stað 18 status-dálka með <50% þekju hvor; 5 features hafa nákvæmlega 0 gain). Prófa aggregate-rásina (`llm_aggregates_quarterly`) sem markaðs-feature.
+- **(c) Áhrifastærðar-próba = GO/NO-GO hlið á skilyrða lagið** — endurþjálfa með nægu jákvæðu extraction-magni og MÆLA áhrifastærð; skilyrt talnalag birtist aðeins ef próban sýnir marktækar effektir. Kvarða um leið handstuðla-lagið á gögn (partial-dependence á iter4a) í stað hardcoded +30%/−10% (`sprint2_v1.1_hardcoded`).
+- **(d) Verðsaga/vísitölu-features metin í leiðinni** — 0 í dag (VERÐSAGA „FANNST EKKI" í feature-menginu), meðvitað; endurmeta með rökum í iter5-hringnum.
+
+Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref), sbr. iter5-blokkun í CLAUDE.md.
