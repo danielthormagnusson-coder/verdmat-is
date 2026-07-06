@@ -40,6 +40,12 @@ from geography import region_tier  # noqa: E402
 
 STAGING_DB = Path(r"D:\verdmat-is\app\audit\hms_archive_staging.db")
 STADFANG_CSV = Path(r"D:\Stadfangaskra.csv")
+# Canonical postnr → póstheiti map (Byggðastofnun postnúmeraskrá 2024, with
+# 9 postnr held to the pre-D3 clean short forms the app has always shown —
+# see docs/fable_prep/audits/POSTHEITI_PROBE_2026-07-04.md). postheiti must
+# ALWAYS derive from this map, NEVER from Stadfangaskra HEITI_NF (a street
+# name in nominative), which was the D3 root cause.
+POSTNR_MAP_CSV = Path(__file__).with_name("postnr_postheiti_map.csv")
 GEO_PKL = Path(r"D:\geography_features.pkl")
 T_FILE = Path(r"D:\phase_d3_matsvaedi_T_deg.txt")
 OUT_PARQUET = Path(r"D:\phase_d3_insert_rows.parquet")
@@ -123,6 +129,15 @@ def derive_is_main_unit(merking):
     return s[-2:] == "01"
 
 
+def load_postnr_map() -> dict:
+    """postnr (int) → póstheiti (str), canonical. Single source of truth for
+    postheiti shared with the D3 backfill; see POSTNR_MAP_CSV header."""
+    pm = pd.read_csv(POSTNR_MAP_CSV)
+    m = {int(r.postnr): str(r.postheiti).strip() for r in pm.itertuples(index=False)}
+    print(f"  loaded postnr→póstheiti map: {len(m):,} postnr")
+    return m
+
+
 def load_stadfangaskra_lookup() -> dict:
     """Build (LANDNR, HEINUM) → row dict for lat/lng/postheiti lookup.
     LANDNR + HEINUM uniquely identify a stadfang in Stadfangaskra; HMS
@@ -140,7 +155,9 @@ def load_stadfangaskra_lookup() -> dict:
             continue  # first-wins for duplicates
         lookup[key] = {
             "postnr_sf": int(r.POSTNR) if pd.notna(r.POSTNR) else None,
-            "postheiti": str(r.HEITI_NF).strip() if pd.notna(r.HEITI_NF) else None,
+            # HEITI_NF is the STREET name in nominative, NOT the póstheiti.
+            # Kept under a truthful key; postheiti is derived from POSTNR_MAP.
+            "gata": str(r.HEITI_NF).strip() if pd.notna(r.HEITI_NF) else None,
             "husnr": float(r.HUSNR) if pd.notna(r.HUSNR) else None,
             "lat": float(r.N_HNIT_WGS84) if pd.notna(r.N_HNIT_WGS84) else None,
             "lng": float(r.E_HNIT_WGS84) if pd.notna(r.E_HNIT_WGS84) else None,
@@ -200,7 +217,8 @@ def load_matsvaedi_donor() -> tuple[cKDTree, np.ndarray, dict, float]:
     return tree, matsvaedi_array, sales_2015, T_deg
 
 
-def extract_one(payload: dict, fastnum: int, sf_lookup: dict) -> dict:
+def extract_one(payload: dict, fastnum: int, sf_lookup: dict,
+                postnr_map: dict) -> dict:
     """Map one HMS fasteign_data dict + Stadfangaskra row → properties INSERT row."""
     # Identity
     heimilisfang = coerce_text(payload.get("heimilisfang"))
@@ -228,10 +246,14 @@ def extract_one(payload: dict, fastnum: int, sf_lookup: dict) -> dict:
 
     lat = sf_row["lat"] if sf_row else None
     lng = sf_row["lng"] if sf_row else None
-    postheiti = sf_row["postheiti"] if sf_row else None
     husnr = sf_row["husnr"] if sf_row else None
     if postnr_int is None and sf_row and sf_row.get("postnr_sf"):
         postnr_int = sf_row["postnr_sf"]
+
+    # postheiti is derived SOLELY from postnr via the canonical map — never
+    # from Stadfangaskra (whose HEITI_NF is a street name). NULL if postnr
+    # is missing or not in the map.
+    postheiti = postnr_map.get(postnr_int) if postnr_int is not None else None
 
     # tegund_raw + classification
     tegund_raw = coerce_text(payload.get("notkun_texti"))
@@ -352,6 +374,9 @@ def main() -> int:
         print(f"ERROR: staging DB not found at {STAGING_DB}")
         return 2
 
+    print(f"Loading postnr→póstheiti map ...")
+    postnr_map = load_postnr_map()
+
     print(f"Loading Stadfangaskra.csv lookup ...")
     sf_lookup = load_stadfangaskra_lookup()
 
@@ -388,7 +413,7 @@ def main() -> int:
             json_failures += 1
             continue
         try:
-            extracted = extract_one(payload, fastnum, sf_lookup)
+            extracted = extract_one(payload, fastnum, sf_lookup, postnr_map)
         except Exception as e:
             print(f"  WARN extract failure on fastnum={fastnum}: {type(e).__name__}: {e}")
             json_failures += 1
