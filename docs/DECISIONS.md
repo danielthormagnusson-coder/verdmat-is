@@ -4,6 +4,28 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-09 — CPI-reanchor: valkostur (iii) — bíða HMS m/ anker læst; onothaefur-plástur; 20.07-varða
+
+**Heimild:** `docs/fable_prep/audits/CPI_REBUILD_4c_FRAMHALD_2026-07-09T2220Z.md` (SKREF 5 valkosta-mat).
+
+**Ákvörðun:** Vísvitandi frávikin 3 (744059/84/85 — DB ber rétt ÷1000 verð eftir 4c-plástur, kaupskra.csv enn HMS-spillt ×1000) fá **enga undanþágu og engan CSV-plástur að svo stöddu** — beðið er HMS-leiðréttingar með CPI-anker læst á 2026-07. Fordæmi: HMS lagaði 744058 í kaupskránni á ≤3 dögum frá uppgötvun. **Sanity-reglan í `monthly_cpi_reanchor.py` er réttur skynjari og víkur ekki** — hún á að ABORTa á þessum 3 þar til uppruninn lagast.
+
+- **Einskiptis onothaefur-plástur framkvæmdur:** 744200/2284451 („Sóltún 14") onothaefur 0→1 í samræmi við HMS/CSV (HMS endurflokkaði samninginn eftir upphafshleðslu). Sanity-mynd eftir plástur staðfest með dry-run: **nominal_changed=3 + onothaefur_changed=0**.
+- **Varða ~2026-07-20:** ef 744059/84/85 enn blásin í kaupskra.csv → sameinuð override-leið (**inntaks-override í derive, gildisvarin**: KAUPVERD÷1000 aðeins meðan CSV ber blásna gildið) FYRIR fyrstu 2026-08 reanchor-tilraun. Hrein talningu-undanþága í sanity dugar EKKI — reanchor skrifar new real á allar common raðir og myndi skrifa blásið real yfir plástraðar; útilokun úr UPDATE frysti real á gömlu ankeri.
+- **Rótargat í backlog sem varanleg lausn:** `daily_sales_refresh` er `ON CONFLICT DO NOTHING` (insert-only) → status-breytingar HMS á þegar-innfærðum röðum (onothaefur, verð-leiðréttingar) ná ALDREI inn. Varanlega lausnin er DO-UPDATE á status-/verðdálka (sjá PLANNING_BACKLOG).
+
+## 2026-07-09 — SKREF 4a-viðmið endurskilgreint: join-óbreytileiki í stað hrás kr/m²-þaks
+
+**Heimild:** `CPI_REBUILD_4c_2026-07-06.md` (FLAGG eftir SKREF 2) + `CPI_REBUILD_4c_FRAMHALD_2026-07-09T2220Z.md` (SKREF 4).
+
+Sannprófunar-viðmið ×1000-viðgerða er **„0 ×1000 DB≠CSV ósamræmi utan skjalfestra vísvitandi frávika + 0 ÓFLÖGGÐ raðir kr/m²>10M"** — EKKI hrátt „0 raðir kr/m²>10M". Hráa þakið er ekki næanlegt: **25 lögmætar raðir** fara yfir 10M kr/m² (21 = ein fjöleininga-þinglýsing 672256 með heildarverð á örsmáa per-einingar-fleti; 4 örsmá-flatar stakar sölur 2,6–3,7 m²), allar réttilega `is_suspect_comparable=true`. Rétti óbreytileikinn er samkeyrslu-join við kaupskrá (aðgreint: DB-blásin = ósamræmi; CSV-blásin m/ rétt DB = vísvitandi frávik).
+
+## 2026-07-09 — MV-refresh verklag: CONCURRENTLY + pooler krefst session-level read-write
+
+**Heimild:** `CPI_REBUILD_4c_FRAMHALD_2026-07-09T2220Z.md` (SKREF 3 liður 3, féll 0/13 í fyrstu tilraun).
+
+`REFRESH MATERIALIZED VIEW CONCURRENTLY` bannar txn-blokk → keyrist á autocommit-sessjón. Á transaction-poolernum (6543, default read-only) dugar `SET TRANSACTION READ WRITE` þá EKKI (gildir aðeins innan txn-blokkar) — nota **`SET default_transaction_read_only = off`** (eða `SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE`, sbr. monthly_cpi_reanchor.py) sem fyrstu setningu á sessjóninni. Locked verklag fyrir allar MV-refresh skriftur.
+
 ## 2026-07-04 — Auth verdmat.ai = Supabase Auth (Leið B); Clerk-endurnýting (heyaskr) hafnað
 
 **Heimild:** `docs/fable_prep/audits/HEYASKR_AUTH_2026-07-04.md` (read-only samanburðarúttekt; lið 3 ræður). Allar staðhæfingar hér þaðan.

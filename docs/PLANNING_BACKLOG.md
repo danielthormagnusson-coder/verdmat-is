@@ -1121,3 +1121,13 @@ iter4 **inniheldur nú þegar** 133 af 154 features (86,4%) sem extraction-aflei
 - **(d) Verðsaga/vísitölu-features metin í leiðinni** — 0 í dag (VERÐSAGA „FANNST EKKI" í feature-menginu), meðvitað; endurmeta með rökum í iter5-hringnum.
 
 Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref), sbr. iter5-blokkun í CLAUDE.md.
+
+---
+
+## Eftirmál CPI-REBUILD 4c (logged 2026-07-09)
+
+**Heimild:** `docs/fable_prep/audits/CPI_REBUILD_4c_FRAMHALD_2026-07-09T2220Z.md` + DECISIONS 2026-07-09 (valkostur iii).
+
+- **daily_sales_refresh DO-UPDATE (varanleg lausn hönnunargatsins):** `ON CONFLICT DO NOTHING` er insert-only → HMS status-/verð-leiðréttingar á þegar-innfærðum röðum ná aldrei inn (dæmi: 744200 onothaefur 0→1 þurfti handvirkan plástur; ×1000-leiðréttingar HMS sömuleiðis). Hanna `DO UPDATE` á breytanlega dálka (onothaefur, kaupverd_nominal/real, einflm/byggar_at_sale) með sanity-vörðum — leysir líka framtíðar-útgáfur 4c-vandans við rótina.
+- **tiers/comps_v2 endurbygging (handvirk, sjálfstæð ákvörðun):** `build_comps_v2.py` + `load_comps_v2.py` (HALT-gated fasar, enginn scheduler). Hreinsar AKKERI-lekann á `/eign/2315156` (valuation_tiers.prior_* ber enn blásið 33.450 M — les kaupskrá beint, nú leiðrétt fyrir 744058). 744059/84/85 priors haldast blásnir+prior_suspect þar til HMS lagar CSV. Breytingaflötur = full comps/tiers endurbygging.
+- **properties.fasteignamat árgangs-frávik á 2533315:** properties ber 2.060 (þús) vs kaupskrá FASTEIGNAMAT_GILDANDI 20.150 — eldra árgangs-gildi á nýbyggingu 2024. Á heima í Phase-D/HMS-sync farveginum (metið hvort fleiri nýbyggingar bera úrelt fasteignamat í properties).
