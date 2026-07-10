@@ -8,26 +8,50 @@ Does NOT touch scraper.listings_canonical or promote_mbl.py — the old fold pat
 canonical unchanged; this is a parallel additive layer. Reuses promote_mbl resolution helpers
 (fastnum / category / price / foreign filter) so resolution is identical to the canonical path.
 
-Watermark-INDEPENDENT: processes ALL priced listings (not just promoted_to_canonical_at IS NULL)
-so a unit's FULL re-listing trajectory is captured (canonical promote already consumed many rows).
+v2 DELTA-WRITE (cc11 rótarfix, 2026-07-10): v1 re-upserted the FULL parsed corpus nightly
+(~25K rows, ~364MB TOAST churn) and hit the instance-level 120s statement_timeout as the
+corpus grew (nights 07-07→08 and 08→09 aborted). v2 still RESOLVES the full corpus in memory
+(unit_key clustering needs every row of a fastnum group — that part is local and cheap) but
+ships to Postgres only:
+  (a) rows whose parse_id is above the per-table watermark of the last clean run
+      (parse_mbl re-parse = DELETE+INSERT -> new parse_id, so this is exactly the
+      changed/new set),
+  (b) rows whose computed unit_key differs from the stored one (cluster drift caused
+      by (a) rows joining/leaving a size cluster), and
+  (c) rows missing from scraper.listings entirely (self-healing).
+The upsert also carries a no-op guard (DO UPDATE ... WHERE (row) IS DISTINCT FROM (EXCLUDED))
+so a content-identical row is never physically rewritten (protects TOAST/WAL independently of
+the watermark). Watermarks live in scraper_data/mbl_promote_append_state.json and advance
+ONLY after a full clean run (--limit and --dry-run never advance them; a missing/unreadable
+state file falls back to the full write-set, which the no-op guard keeps cheap server-side).
+The 120s statement_timeout is deliberately NOT raised — it is the safety net that should
+bark if the delta path ever regresses to full-corpus writes.
+
+Watermark-INDEPENDENT trajectory rationale (v1 docstring) still holds for CONTENT: every
+priced listing is resolved each run; only the shipping of unchanged rows is skipped.
 
 unit_key = (fastnum, size-cluster ±2%) + íb.nr coalesced splitter:
   - split a (fastnum, size-cluster) group into íb.nr sub-units ONLY when >=2 distinct non-null
     íb.nr are present; íb.nr=None is a wildcard (no split). matshluti is discarded (BLOKK 2).
 
 Idempotent: scraper.listings ON CONFLICT (source, source_listing_id) DO UPDATE refreshes volatile
-fields (= Vandi-1 field-staleness fix); price_history ON CONFLICT DO NOTHING.
+fields (= Vandi-1 field-staleness fix); price_history ON CONFLICT DO NOTHING. A failed run never
+advances the watermark, so the re-run re-ships the same delta (upsert-idempotent, abort-not-retry).
 
 Pooler READ-ONLY default: every write-tx opens with SET TRANSACTION READ WRITE as the first stmt.
 
 CLI:
-  python -m scripts.promote_listings_append                 # docstring + exit 0
-  python -m scripts.promote_listings_append --confirm        # full run (sale priced + rent priced)
-  python -m scripts.promote_listings_append --confirm --limit 200   # smoke
+  python -m scripts.promote_listings_append                          # docstring + exit 0
+  python -m scripts.promote_listings_append --confirm                # delta run (sale+rent priced)
+  python -m scripts.promote_listings_append --confirm --dry-run      # full compute + write-set
+                                                                     #   report, ZERO writes
+  python -m scripts.promote_listings_append --confirm --limit 200    # smoke (never advances
+                                                                     #   watermark)
 """
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sqlite3
 import sys
@@ -44,10 +68,12 @@ from promote_mbl import (  # noqa: E402  reuse identical resolution logic
     foreign_filter, tenure_cascade, resolve_price, decompose_category,
     decompose_fastano, resolve_fastnum, preload_props, extract_common, parsed_db_path,
 )
+from scraper_paths import get_scraper_data_dir  # noqa: E402
 
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
-PROMOTER_VERSION = "listings_append_v1"
+PROMOTER_VERSION = "listings_append_v2"
 SIZE_TOL = 0.02
+STATE_FILE = "mbl_promote_append_state.json"
 
 # íb.nr extractor (BLOKK 4, widened for "- NNN" without grabbing street ranges like "2-4")
 _IBRX = re.compile(r"(?:íb\.?\s*|íbúð\s*|\()\s*(\d{1,4})|\s-\s+(\d{3,4})\b", re.IGNORECASE)
@@ -181,6 +207,35 @@ _UPDATE_COLS = [c for c in _LISTING_COLS
                 if c not in ("source", "source_listing_id", "first_seen_at", "discovered_at")]
 
 
+def state_path() -> Path:
+    return get_scraper_data_dir() / STATE_FILE
+
+
+def load_watermarks(log=print):
+    """Per-table parse_id watermarks of the last clean run, or None (-> full write-set)."""
+    p = state_path()
+    if not p.is_file():
+        log("  WARNING: no watermark state (%s) — full write-set fallback" % p.name)
+        return None
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        return {"sale": int(d["sale_max_parse_id"]), "rent": int(d["rent_max_parse_id"])}
+    except (KeyError, TypeError, ValueError) as e:
+        log("  WARNING: watermark state unreadable (%s) — full write-set fallback" % e)
+        return None
+
+
+def save_watermarks(max_ids, n_written):
+    """Advance watermarks (atomic replace). Called ONLY after a full clean run."""
+    p = state_path()
+    d = {"sale_max_parse_id": max_ids["sale"], "rent_max_parse_id": max_ids["rent"],
+         "last_clean_run": datetime.now(timezone.utc).isoformat(),
+         "last_written_rows": n_written, "promoter_version": PROMOTER_VERSION}
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, indent=2), encoding="utf-8")
+    tmp.replace(p)
+
+
 def write_batch(pg, records, log=print):
     # discovered_at: write-once system-discovery stamp = now() at first INSERT.
     # One run timestamp for the whole batch (honest "when WE first recorded it",
@@ -195,7 +250,6 @@ def write_batch(pg, records, log=print):
         for c in _LISTING_COLS:
             v = r[c]
             if c == "photos_json":
-                import json
                 v = Json(json.loads(v) if isinstance(v, str) else (v or []))
             vals.append(v)
         rows.append(vals)
@@ -203,9 +257,13 @@ def write_batch(pg, records, log=print):
     cur.execute("SET TRANSACTION READ WRITE")
     cols = ", ".join(_LISTING_COLS)
     upd = ", ".join(f"{c}=EXCLUDED.{c}" for c in _UPDATE_COLS) + ", updated_at=now()"
+    # no-op guard: content-identical rows are not physically rewritten (no TOAST/WAL churn)
+    guard_l = ", ".join(f"l.{c}" for c in _UPDATE_COLS)
+    guard_e = ", ".join(f"EXCLUDED.{c}" for c in _UPDATE_COLS)
     execute_values(cur,
-        f"INSERT INTO scraper.listings ({cols}) VALUES %s "
-        f"ON CONFLICT (source, source_listing_id) DO UPDATE SET {upd}", rows, page_size=1000)
+        f"INSERT INTO scraper.listings AS l ({cols}) VALUES %s "
+        f"ON CONFLICT (source, source_listing_id) DO UPDATE SET {upd} "
+        f"WHERE ({guard_l}) IS DISTINCT FROM ({guard_e})", rows, page_size=1000)
     # price history: one observed price per listing (observed_at = listed_at), append-idempotent
     ph = [(r["source"], r["source_listing_id"], r["listed_at"], r["price_amount"], "ISK")
           for r in records if r["listed_at"] is not None and r["price_amount"] is not None]
@@ -218,7 +276,7 @@ def write_batch(pg, records, log=print):
     return len(rows), len(ph)  # rows attempted (cur.rowcount only reflects the last page)
 
 
-def run(limit, log=print):
+def run(limit, dry_run=False, log=print):
     sq = sqlite3.connect(str(parsed_db_path()))
     sq.row_factory = sqlite3.Row
     dsn = DBCONFIG.read_text(encoding="utf-8-sig").strip()
@@ -228,6 +286,7 @@ def run(limit, log=print):
         all_recs = []
         derived_all, postcodes_all = [], set()
         staged = []
+        max_parse_id = {"sale": 0, "rent": 0}
         for table in ("sale", "rent"):
             q = (f"SELECT * FROM parsed_mbl_{table} WHERE is_negotiable=0 ORDER BY parse_id"
                  + (f" LIMIT {int(limit)}" if limit else ""))
@@ -240,6 +299,8 @@ def run(limit, log=print):
                 if c.get("postcode"):
                     postcodes_all.add(c["postcode"])
                 staged.append((p, c, table))
+                if p["parse_id"] > max_parse_id[table]:
+                    max_parse_id[table] = p["parse_id"]
             log(f"  loaded parsed_mbl_{table} (priced): {len(parsed)}")
         props = preload_props(pg, postcodes_all, derived_all)
         pg.rollback()  # close preload read-tx so first write-tx SET READ WRITE is first stmt
@@ -250,15 +311,59 @@ def run(limit, log=print):
             if rec is None:
                 n_skip += 1
                 continue
+            rec["_parse_id"] = p["parse_id"]
+            rec["_table"] = table
             all_recs.append(rec)
         n_split = assign_unit_keys(all_recs)
         n_units = len(set(r["unit_key"] for r in all_recs if r["unit_key"]))
         log(f"  records={len(all_recs)} foreign_skip={n_skip} unit_keys={n_units} split_clusters={n_split}")
-        # write in chunks
+
+        # v2 write-set: parse-delta ∪ unit_key-drift ∪ missing-in-db (full corpus if no watermark)
+        wm = load_watermarks(log)
+        cur = pg.cursor()
+        cur.execute("SELECT source_listing_id, unit_key FROM scraper.listings WHERE source='mbl'")
+        db_units = {row[0]: row[1] for row in cur.fetchall()}
+        pg.rollback()  # close read-tx; next write-tx SET READ WRITE stays first stmt
+        n_delta = n_drift = n_missing = 0
+        write_recs = []
+        for r in all_recs:
+            slid = str(r["source_listing_id"])
+            if slid not in db_units:
+                n_missing += 1
+                write_recs.append(r)
+            elif wm is None or r["_parse_id"] > wm[r["_table"]]:
+                n_delta += 1
+                write_recs.append(r)
+            elif db_units[slid] != r["unit_key"]:
+                n_drift += 1
+                write_recs.append(r)
+        wm_txt = ("NO WATERMARK -> full fallback" if wm is None
+                  else f"watermark sale>{wm['sale']} rent>{wm['rent']}")
+        log(f"  write-set: total={len(write_recs)} (parse-delta={n_delta} unit-drift={n_drift} "
+            f"missing-in-db={n_missing}; unchanged-skipped={len(all_recs) - len(write_recs)}; {wm_txt})")
+
+        if dry_run:
+            for r in write_recs[:10]:
+                log(f"    would-write: slid={r['source_listing_id']} table={r['_table']} "
+                    f"parse_id={r['_parse_id']} unit_key={r['unit_key']}")
+            log(f"  DRY-RUN: no writes, watermark untouched ({time.perf_counter() - t0:.1f}s)")
+            return 0, 0, n_units
+
+        # write in chunks, per-batch progress (a timeout now names its batch)
         nL = nP = 0
-        for i in range(0, len(all_recs), 2000):
-            a, b = write_batch(pg, all_recs[i:i+2000])
+        n_batches = (len(write_recs) + 1999) // 2000
+        for bi, i in enumerate(range(0, len(write_recs), 2000), start=1):
+            tb = time.perf_counter()
+            a, b = write_batch(pg, write_recs[i:i + 2000])
             nL += a; nP += b
+            log(f"  batch {bi}/{n_batches}: listings={a} price_history={b} "
+                f"({time.perf_counter() - tb:.1f}s)")
+        if limit is None:
+            save_watermarks(max_parse_id, nL)
+            log(f"  watermark advanced: sale={max_parse_id['sale']} rent={max_parse_id['rent']} "
+                f"-> {state_path().name}")
+        else:
+            log("  --limit run: watermark NOT advanced")
         log(f"  wrote listings rows={nL}, price_history rows={nP} ({time.perf_counter()-t0:.1f}s)")
         return nL, nP, n_units
     finally:
@@ -266,16 +371,18 @@ def run(limit, log=print):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Append parsed_mbl -> scraper.listings + price_history (additive)")
+    ap = argparse.ArgumentParser(description="Append parsed_mbl -> scraper.listings + price_history (additive, delta-write)")
     ap.add_argument("--confirm", action="store_true")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--dry-run", action="store_true",
+                    help="full compute + write-set report, zero writes, watermark untouched")
     args = ap.parse_args()
     if not args.confirm:
         print(__doc__)
-        print("\nRe-invoke with --confirm (add --limit N for a smoke run).")
+        print("\nRe-invoke with --confirm (add --dry-run for a zero-write report, --limit N for a smoke run).")
         return 0
-    print(f"promote_listings_append {PROMOTER_VERSION} limit={args.limit}")
-    run(args.limit)
+    print(f"promote_listings_append {PROMOTER_VERSION} limit={args.limit} dry_run={args.dry_run}")
+    run(args.limit, dry_run=args.dry_run)
     return 0
 
 
