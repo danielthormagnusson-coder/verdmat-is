@@ -1131,3 +1131,15 @@ Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref
 - **daily_sales_refresh DO-UPDATE (varanleg lausn hönnunargatsins):** `ON CONFLICT DO NOTHING` er insert-only → HMS status-/verð-leiðréttingar á þegar-innfærðum röðum ná aldrei inn (dæmi: 744200 onothaefur 0→1 þurfti handvirkan plástur; ×1000-leiðréttingar HMS sömuleiðis). Hanna `DO UPDATE` á breytanlega dálka (onothaefur, kaupverd_nominal/real, einflm/byggar_at_sale) með sanity-vörðum — leysir líka framtíðar-útgáfur 4c-vandans við rótina.
 - **tiers/comps_v2 endurbygging (handvirk, sjálfstæð ákvörðun):** `build_comps_v2.py` + `load_comps_v2.py` (HALT-gated fasar, enginn scheduler). Hreinsar AKKERI-lekann á `/eign/2315156` (valuation_tiers.prior_* ber enn blásið 33.450 M — les kaupskrá beint, nú leiðrétt fyrir 744058). 744059/84/85 priors haldast blásnir+prior_suspect þar til HMS lagar CSV. Breytingaflötur = full comps/tiers endurbygging.
 - **properties.fasteignamat árgangs-frávik á 2533315:** properties ber 2.060 (þús) vs kaupskrá FASTEIGNAMAT_GILDANDI 20.150 — eldra árgangs-gildi á nýbyggingu 2024. Á heima í Phase-D/HMS-sync farveginum (metið hvort fleiri nýbyggingar bera úrelt fasteignamat í properties).
+
+---
+
+## Opið eftir cc10 EIGINDALAG (logged 2026-07-10)
+
+- **vm-bera stöflun ≤720px hlaðin en ósjónprófuð** (verdmat-ai repo, commit 581d35a) — prófa við næsta viðmóts-tékk eða á síma þegar deploy er komið. Heimild: `verdmat-ai/docs/fable_prep/audits/EIGINDALAG_UI_2026-07-10T0900Z.md` §3.1.
+
+---
+
+## Full extraction-backfill — endurmeta við mælda notkun (logged 2026-07-13)
+
+- **On-demand extraction er live í verdmat-ai** (cc5: route `/api/eigindi/soekja`, dagsþak 200 köll/dag, keyrslu-log í `eigindi_extraction_runs`) — full-korpus backfill var HAFNAÐ á þessum tímapunkti. Endurmeta þegar rekstrargögn liggja fyrir: hvaða eigindi eru raunverulega sótt (attrs_written per attr_key úr runs/property_attributes), og haiku vs sonnet gæði úr rekstri (mæld kostnaður sonnet-5 ~2–4,3¢/kall). Heimild: `verdmat-ai/docs/fable_prep/audits/ONDEMAND_EXTRACTION_2026-07-13T2229Z.md`. — ákvörðun 2026-07-13.
