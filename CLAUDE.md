@@ -53,6 +53,8 @@ Supabase migrations land in `supabase/migrations/YYYYMMDD_<name>.sql` and are ap
 
 **Authentication + RLS**: 14 dashboard-public tables have RLS enabled with `public_read FOR SELECT TO anon, authenticated USING (true)`, anon grants reduced to SELECT-only (commit `1d61257`, 2026-05-06). New tables ship with the same pattern by default.
 
+> **EVERY new `public` table gets RLS + tight grants in the SAME migration it is created — including snapshot / staging / scratch tables.** Everything in `public` is auto-exposed over PostgREST; a bare `CREATE TABLE ... AS` inherits default `arwdDxtm` grants to `anon`+`authenticated`, so a "temporary" snapshot table silently ships full anon read+write. If the table is **not** app-read: `ENABLE ROW LEVEL SECURITY` + `REVOKE ALL FROM anon, authenticated` (default-deny; no policy; `service_role` still works for ops). If it **is** app-read: add the `public_read` SELECT policy as usual. Never leave a `public` table with neither an RLS flag nor a deliberate known-accepted note. This rule exists because cc9 (2026-07-14) found `postheiti_snapshot_pre_d3fix_20260706` (232K rows) with anon DELETE genuinely open — full write-path, proven with a live anon REST test. Audit: `docs/RLS_FIX_20260714T214739Z.md`. Note: `public.spatial_ref_sys` (PostGIS, owned by `supabase_admin`) is an unfixable `rls_disabled_in_public` flag — known-accepted, holds no app data.
+
 ## Working with canonical documentation files
 
 Several Markdown files in `docs/` are **point-in-time append-only logs**, not regenerable narratives. Treat them as you would a database journal: read, find the right anchor, str_replace additively. Never overwrite with a regenerated version — past sessions have lost 200+ lines twice when this rule was broken.
