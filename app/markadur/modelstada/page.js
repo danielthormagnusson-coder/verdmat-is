@@ -85,7 +85,8 @@ async function loadPipelineHealth() {
     supabase
       .from("v_properties")
       .select("scraped_at_latest")
-      .order("scraped_at_latest", { ascending: false })
+      .not("scraped_at_latest", "is", null)
+      .order("scraped_at_latest", { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle(),
   ]);

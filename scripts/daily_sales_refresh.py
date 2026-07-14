@@ -17,7 +17,9 @@ Flow:
   3. diff vs live on (faerslunumer, fastnum): NEW + GONE (GONE watched, not deleted).
   4. --dryrun: report + examples, no writes.
   5. upsert ONLY the new rows (INSERT ... ON CONFLICT DO NOTHING).
-  6. REFRESH 13 MV CONCURRENTLY iff inserted > 0.
+  6. REFRESH MV CONCURRENTLY iff inserted > 0 — aðeins MV sem lesa breytta töflu
+     (MV_SOURCES vörpunin; sales_history-only umferð sleppir v_sveitarfelag_lookup),
+     með SET work_mem='64MB' session-vís (sjá DECISIONS 2026-07-14, Disk-IO mótvægi).
 
 CLI:
   python scripts/daily_sales_refresh.py            # live: fetch -> upsert -> refresh
@@ -73,6 +75,33 @@ MV_LIST = [
     "semantic.v_price_distribution_by_hood",
     "semantic.v_sveitarfelag_lookup",
 ]
+
+# MV -> grunntöflur sem MV-ið les (staðfest gegn pg_depend 2026-07-14, sjá
+# D:\DISK_IO_GREINING_20260714T2131Z.md og DECISIONS 2026-07-14). REFRESH CONCURRENTLY
+# á ÓBREYTTU MV les samt heimildir + allt MV-ið (~300 MB+ IO per MV á Micro) — því
+# refreshum við aðeins MV sem lesa töflu sem breyttist í umferðinni. Nýtt semantic-MV
+# VERÐUR að fá færslu hér; mvs_touching() hendir KeyError annars (hávær, ekki hljóðlát).
+MV_SOURCES = {
+    "semantic.v_street_directory":           {"public.properties", "public.sales_history"},
+    "semantic.v_matsvaedi_prices_yearly":    {"public.sales_history"},
+    "semantic.v_street_prices":              {"public.sales_history"},
+    "semantic.v_postnr_prices_yearly":       {"public.sales_history"},
+    "semantic.v_street_activity":            {"public.sales_history"},
+    "semantic.v_sveitarfelag_market":        {"public.sales_history"},
+    "semantic.v_matsvaedi_trend_quarterly":  {"public.sales_history"},
+    "semantic.v_hood_heat":                  {"public.sales_history"},
+    "semantic.v_newbuild_share":             {"public.sales_history"},
+    "semantic.v_model_vs_sold_by_hood":      {"public.sales_history", "public.predictions",
+                                              "public.cpi_index", "public.pipeline_config"},
+    "semantic.v_summerhouse_market":         {"public.sales_history"},
+    "semantic.v_price_distribution_by_hood": {"public.sales_history"},
+    "semantic.v_sveitarfelag_lookup":        {"public.properties"},
+}
+
+
+def mvs_touching(changed_tables: set[str]) -> list[str]:
+    """MV úr MV_LIST (röð varðveitt) sem lesa a.m.k. eina breytta töflu."""
+    return [mv for mv in MV_LIST if MV_SOURCES[mv] & changed_tables]
 
 # INSERT column order (id is auto-generated via nextval -> skipped).
 INSERT_COLS = [
@@ -276,15 +305,25 @@ def main() -> int:
         # ---- Step 6: REFRESH MV (iff inserted > 0) ----
         sid = start_step(conn_log, run_id, "refresh_mv", 4)
         if inserted > 0:
+            # Daglega umferðin skrifar AÐEINS í sales_history -> MV sem lesa hana eingöngu.
+            to_refresh = mvs_touching({"public.sales_history"})
+            skipped = [mv for mv in MV_LIST if mv not in to_refresh]
             conn_r = psycopg2.connect(url)
             conn_r.autocommit = True  # REFRESH ... CONCURRENTLY must be outside a txn block
             with conn_r.cursor() as cur:
+                # READ WRITE er ÁFRAM allra-fyrsta statement (pooler-default er read-only);
+                # work_mem kemur á eftir — session-vís, ALDREI globalt (60 conn x 64MB > RAM).
+                # Án hennar spillir 13-MV umferð ~1,3 GiB í temp (work_mem 2,2MB á Micro).
                 cur.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE")
-                for mv in MV_LIST:
+                cur.execute("SET work_mem = '64MB'")
+                for mv in to_refresh:
                     cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
                     log(f"[6] refreshed {mv}")
             conn_r.close()
-            finish_step(conn_log, sid, 0, notes=f"{len(MV_LIST)} MV refreshed")
+            if skipped:
+                log(f"[6] sleppt (heimildir óbreyttar): {', '.join(skipped)}")
+            finish_step(conn_log, sid, 0,
+                        notes=f"{len(to_refresh)} MV refreshed, {len(skipped)} skipped (sources unchanged)")
         else:
             log("[6] 0 inserted — sleppi REFRESH.")
             finish_step(conn_log, sid, 0, notes="skipped (0 inserted)")

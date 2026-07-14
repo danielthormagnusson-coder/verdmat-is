@@ -55,7 +55,7 @@ from rebuild_sales_history import (  # noqa: E402  reuse derive core, no re-impl
     DBCONFIG,
 )
 from anchor_config import read_anchor  # noqa: E402  reads sales_history_anchor_ym
-from daily_sales_refresh import MV_LIST  # noqa: E402  single source of truth for the 13 MV
+from daily_sales_refresh import MV_LIST, mvs_touching  # noqa: E402  single source of truth for the 13 MV + MV_SOURCES vörpunin
 from migration_helpers import (  # noqa: E402  shared Group C audit logging
     start_run, start_step, finish_step, finish_run, open_connection,
 )
@@ -372,17 +372,28 @@ def main() -> int:
         finish_step(conn_log, sid, 0, rowcount_after=updated,
                     notes=f"updated={updated} anchor {cur_anchor}->{new_anchor} {elapsed:.1f}s")
 
-        # ---- Step 6: REFRESH 13 MV (iff updated > 0) ----
+        # ---- Step 6: REFRESH MV (iff updated > 0) — aðeins MV sem lesa breyttar töflur ----
         sid = start_step(conn_log, run_id, "refresh_mv", 6)
         if updated > 0:
+            # Re-anchor breytir sales_history.kaupverd_real + pipeline_config (anchor)
+            # + cpi_index (upserts) -> MV_SOURCES vörpunin velur (sleppir properties-only MV).
+            to_refresh = mvs_touching({"public.sales_history", "public.pipeline_config",
+                                       "public.cpi_index"})
+            skipped = [mv for mv in MV_LIST if mv not in to_refresh]
             conn_r = psycopg2.connect(url); conn_r.autocommit = True
             with conn_r.cursor() as cur:
+                # READ WRITE fyrst (pooler-default read-only); work_mem session-vís á eftir
+                # (sjá DECISIONS 2026-07-14, Disk-IO mótvægi).
                 cur.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE")
-                for mv in MV_LIST:
+                cur.execute("SET work_mem = '64MB'")
+                for mv in to_refresh:
                     cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
                     log(f"[6] refreshed {mv}")
             conn_r.close()
-            finish_step(conn_log, sid, 0, notes=f"{len(MV_LIST)} MV refreshed")
+            if skipped:
+                log(f"[6] sleppt (heimildir óbreyttar): {', '.join(skipped)}")
+            finish_step(conn_log, sid, 0,
+                        notes=f"{len(to_refresh)} MV refreshed, {len(skipped)} skipped (sources unchanged)")
         else:
             log("[6] 0 updated — sleppi REFRESH.")
             finish_step(conn_log, sid, 0, notes="skipped (0 updated)")

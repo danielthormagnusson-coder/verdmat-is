@@ -4,6 +4,17 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-14 — Disk-IO mótvægi: MV-refresh eftir heimildum + work_mem session-vís (cc8)
+
+**Heimild:** `D:\DISK_IO_GREINING_20260714T2131Z.md` (Supabase Disk-IO-Budget viðvörun 14.07; lestur — ekki skrif — tæmir budget á Micro).
+
+**Ákvörðun (locked verklag fyrir allar MV-refresh skriftur):**
+1. **Refresh aðeins MV sem lesa töflu sem breyttist í umferðinni.** Vörpunin MV→heimildir er hard-kóðuð í `scripts/daily_sales_refresh.py::MV_SOURCES` (einn sannleikur; monthly_cpi_reanchor flytur inn `mvs_touching`), staðfest gegn `pg_depend` 2026-07-14. Nýtt semantic-MV VERÐUR að fá MV_SOURCES-færslu — `mvs_touching()` hendir KeyError annars (viljandi hávær). REFRESH CONCURRENTLY á óbreyttu MV er ekki ókeypis: það les heimildir + allt MV-ið + temp-diff (~300 MB+ IO per MV).
+2. **`SET work_mem = '64MB'` session-vís á undan REFRESH-lykkjunni.** Global work_mem er 2,2 MB á Micro → hver 13-MV umferð spillti ~1,3 GiB í temp-skrár. ALDREI hækka work_mem globalt (ALTER SYSTEM/role) á þessum grunni — 60 tengingar × 64 MB rúmast ekki í RAM.
+3. **Röðin víkur ekki frá read-only lærdómnum frá SKREF 3** (sjá 2026-07-09 færsluna hér að neðan, féll 0/13): FYRSTA setning á ferskri autocommit-refresh-sessjón er áfram `SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE` (eða `SET default_transaction_read_only = off`); `SET work_mem` kemur á eftir henni, aldrei á undan.
+
+**Tengt (sama greining):** ops/modelstada „nýjast"-fyrirspurnir fá `not-null + nullsFirst:false` í app-kóða + partial/DESC-index (migration `20260714214500_disk_io_read_indexes.sql`) — `ORDER BY col DESC LIMIT 1` án þeirra var 160–240 MB disk-IO á kall OG skilaði NULL-röð fyrst (PostgREST DESC = NULLS FIRST). Nætur-promoterarnir og fetch_hms_einflm fá covering/partial index á properties í sömu migration í stað 413 MB full-skanna.
+
 ## 2026-07-09 — CPI-reanchor: valkostur (iii) — bíða HMS m/ anker læst; onothaefur-plástur; 20.07-varða
 
 **Heimild:** `docs/fable_prep/audits/CPI_REBUILD_4c_FRAMHALD_2026-07-09T2220Z.md` (SKREF 5 valkosta-mat).

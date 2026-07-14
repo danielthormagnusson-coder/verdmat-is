@@ -60,8 +60,10 @@ async function loadOps() {
     db.from("pipeline_runs").select("run_type,exit_status,started_at,ended_at,summary").order("started_at", { ascending: false }).limit(40),
     top(db.from("sales_history").select("thinglystdags").order("thinglystdags", { ascending: false })),
     top(db.from("predictions").select("predicted_at,model_version,calibration_version").order("predicted_at", { ascending: false })),
-    top(db.from("properties").select("scraped_at_latest").order("scraped_at_latest", { ascending: false })),
-    top(db.from("comps_index").select("last_sale_date").order("last_sale_date", { ascending: false })),
+    // not-null + nullsFirst:false: án þeirra er DESC = NULLS FIRST (rangt svar við NULL-röðum)
+    // og planner þarf full-skann+sortu (~460MB/160MB á kall) í stað partial-index (sjá DECISIONS 2026-07-14).
+    top(db.from("properties").select("scraped_at_latest").not("scraped_at_latest", "is", null).order("scraped_at_latest", { ascending: false, nullsFirst: false })),
+    top(db.from("comps_index").select("last_sale_date").not("last_sale_date", "is", null).order("last_sale_date", { ascending: false, nullsFirst: false })),
     top(db.from("model_metrics").select("model_version,mape,med_ape,bias,cov80,cov95,oos_cutoff,n_pairs,computed_at,metric_run_id").eq("segment_dim", "overall").eq("sample_scope", "all_oos").eq("score_type", "baseline").order("computed_at", { ascending: false })),
     // region_type breakdown (capital apts = core market) — keyed to the latest overall run below.
     db.from("model_metrics").select("segment_value,n_pairs,mape,med_ape,bias,cov80,cov95,metric_run_id,computed_at").eq("segment_dim", "region_type").eq("sample_scope", "all_oos").eq("score_type", "baseline").order("computed_at", { ascending: false }).limit(18),
