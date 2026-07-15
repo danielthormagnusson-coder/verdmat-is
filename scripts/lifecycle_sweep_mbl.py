@@ -613,4 +613,17 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Scheduler runs have no visible stdout/stderr; an unhandled exception used to
+    # vanish (Task Scheduler shows only exit code 1). Persist the traceback so
+    # 06:00 failures are diagnosable after the fact (cc3 2026-07-15).
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except BaseException:
+        import traceback
+        err_path = get_scraper_data_dir() / "lifecycle_sweep_error.log"
+        with open(err_path, "a", encoding="utf-8") as fh:
+            fh.write("=== unhandled exception @ %s ===\n" % now_utc().isoformat())
+            traceback.print_exc(file=fh)
+        raise
