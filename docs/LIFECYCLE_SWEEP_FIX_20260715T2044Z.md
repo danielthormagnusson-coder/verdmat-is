@@ -96,12 +96,15 @@ resepta (HKLM, max 35 d) er til en er ekki varanleg vörn.
 - Þetta skjal. Engin DB-skemabreyting; öll DB-skrif voru venjuleg sweep-rekstrargögn (append).
 - Tímabundið greiningarverk `cc3-sweep-diag` var skráð og **fjarlægt** (residue = 0).
 
-## 7. Lokastaða elevation-atriðanna (go-svar eiganda, 15.07)
+## 7. Lokastaða elevation-atriðanna (uppfært 15.07 ~22Z — ÖLL þrjú keyrð)
 
-- **A (restart-on-failure)** og **C (Task Scheduler-loggur)**: Danni keyrir sjálfur upphækkað.
-- **B (BitLocker autounlock á D:)**: **MEÐVITAÐ OPIN ákvörðun hjá eiganda** — öryggis-
-  ávinningur (D: læst án innskráningar) veginn á móti rekstraráhættunni. Afleiðing á meðan
-  óákveðið er: **næturverk sem keyra fyrir innskráningu falla eftir WU-endurræsingu** — öll
-  verk með WD/gögn á D: (01:00 delta, 02:00 myigloo, 02:30 sales-refresh, 03:00 backup,
-  06:00 sweep) eru útsett ef WU endurræsir á undan þeim; restart-config (A) mildar aðeins
-  gluggann fram að innskráningu. Ákvörðunin liggur hjá Danna.
+- **A (restart-on-failure)**: VIRKT — RestartCount=8, RestartInterval=PT30M (sannreynt með
+  Get-ScheduledTask úr óupphækkaðri skel).
+- **C (Task Scheduler-loggur)**: VIRKUR — Microsoft-Windows-TaskScheduler/Operational
+  IsEnabled=True (sannreynt); framtíðar-launch-bilanir verða greinanlegar í atburðaskrá.
+- **B (BitLocker autounlock á D:)**: **ÁKVÖRÐUN TEKIN og VIRKJAÐ 15.07** — Danni keyrði
+  `manage-bde -autounlock -enable D:` upphækkað og staðfesti með `manage-bde -status`
+  ("Automatic Unlock: Enabled"). D: aflæsist nú sjálfkrafa við boot → **rótarorsökin er
+  lokuð fyrir ÖLL næturverk** (01:00 delta, 02:00 myigloo, 02:30 sales-refresh, 03:00
+  backup, 06:00 sweep lifa nú WU-endurræsingar). A er þar með belti-og-axlabönd fyrir
+  aðrar transient launch-bilanir. Afturkræft: `manage-bde -autounlock -disable D:`.
