@@ -86,3 +86,11 @@ audit/known_real_fastnums.txt
 # (sibling of repo root, already outside git). This guard covers app/data too.
 # Never git add the harvested data — only pipelines/opin_gogn/harvest.py is tracked.
 data/raw/opin_gogn/
+
+# heimildasafn: raw source archive for the monthly Fable market reports
+# (PDFs/HTML/CSV stay on disk + nightly backup; only the manifest and the
+# frettir metadata JSONs — headline/date/link, no article content — are tracked).
+heimildasafn/**
+!heimildasafn/MANIFEST.json
+!heimildasafn/frettir/
+!heimildasafn/frettir/**

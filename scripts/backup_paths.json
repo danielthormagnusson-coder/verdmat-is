@@ -15,6 +15,13 @@
       "recurse": true,
       "kind": "dir"
     },
+    {
+      "_comment": "heimildasafn: raw source archive for monthly Fable market reports. Data files are gitignored — backup is their only safety net (added 2026-07-15, cc5, go from Danni).",
+      "local_path": "D:\\verdmat-is\\app\\heimildasafn",
+      "remote_subpath": "app_heimildasafn",
+      "recurse": true,
+      "kind": "dir"
+    },
     { "local_path": "D:\\Gagnapakkar\\fasteignir.db",  "remote_subpath": "Gagnapakkar/fasteignir.db",  "kind": "file" },
     { "local_path": "D:\\Gagnapakkar\\fasteignir1.db", "remote_subpath": "Gagnapakkar/fasteignir1.db", "kind": "file" },
     { "local_path": "D:\\Gagnapakkar\\fasteignir2.db", "remote_subpath": "Gagnapakkar/fasteignir2.db", "kind": "file" },

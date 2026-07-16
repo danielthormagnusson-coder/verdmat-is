@@ -1,0 +1,48 @@
+{
+  "_skyring": "Fréttametadata eingöngu (copyright-reglan: engin endurbirting efnis). Fyrirsögn/miðill/dags/hlekkur. Sótt 2026-07-15.",
+  "timabil": "2026-06-01 til 2026-07-15",
+  "frettir": [
+    {
+      "fyrirsogn": "Fasteignasali varar við stöðunni og birtir lygilegar tölur – „Það er ekki of seint að snúa þessu við“",
+      "midill": "DV",
+      "dags": "2026-06-01",
+      "url": "https://www.dv.is/frettir/2026/6/1/fasteignasali-varar-vid-stodunni-og-birtir-lygilegar-tolur-thad-er-ekki-seint-ad-snua-thessu-vid/",
+      "athugasemd": "Fasteignasali um hæga sölu nýbygginga."
+    },
+    {
+      "fyrirsogn": "Fasteignamat lækkar að raunvirði milli ára",
+      "midill": "RÚV",
+      "dags": "2026-06-02",
+      "url": "https://www.ruv.is/frettir/innlent/2026-06-02-fasteignamat-laekkar-ad-raunvirdi-milli-ara-476941",
+      "athugasemd": "Umfjöllun um fasteignamat 2027 (+2,1% nafnvirði)."
+    },
+    {
+      "fyrirsogn": "Fasteignamat lækkar að raunvirði",
+      "midill": "Vísir",
+      "dags": "2026-06-02",
+      "url": "https://www.visir.is/g/20262891654d/fast-eigna-mat-laekkar-ad-raun-virdi",
+      "athugasemd": "Umfjöllun um fasteignamat 2027."
+    },
+    {
+      "fyrirsogn": "Fasteignamat lækkar að raunvirði",
+      "midill": "Viðskiptablaðið (vb.is)",
+      "dags": "2026-06-02",
+      "url": "https://vb.is/frettir/fasteignamat-laekkar-ad-raunvirdi/",
+      "athugasemd": "Umfjöllun um fasteignamat 2027."
+    },
+    {
+      "fyrirsogn": "Miskalt á tvískiptum íbúðamarkaði",
+      "midill": "Viðskiptablaðið (vb.is)",
+      "dags": "2026-06-03",
+      "url": "https://vb.is/frettir/miskalt--a-tviskiptum-ibudamarkadi/",
+      "athugasemd": "Viðtal við Bergþóru Baldursdóttur (greining Íslandsbanka): kólnun en ekkert frost; hálfgert frost í sölu nýbygginga; Q1 kaupsamningar 2.443 vs 2.727 í fyrra (HMS-tölur)."
+    },
+    {
+      "fyrirsogn": "Verðbólgan eykst og mælist 5,2%",
+      "midill": "mbl.is",
+      "dags": "2026-06-26",
+      "url": "https://www.mbl.is/vidskipti/frettir/2026/06/26/verdbolgan_eykst_og_maelist_5_2_prosent/",
+      "athugasemd": "VNV júní 2026, hækkun úr 5,1% í 5,2%."
+    }
+  ]
+}

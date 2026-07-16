@@ -1,0 +1,70 @@
+{
+  "_skyring": "Fasi 2 talnagrunnur fyrir FASTEIGNASKYRSLA_2026-06. Allar fyrirspurnir read-only á Supabase (szzjsvmvxfrhyexblzvq) 2026-07-15 ~23:30Z. Sía nema annað sé tekið fram: onothaefur=0, is_suspect_comparable=false, kaupverd_nominal>0 (=\"metanlegir íbúðasamningar\", þrengra mengi en HMS-talningar).",
+  "gagnafersla": {
+    "sales_history_max_thinglystdags": "2026-07-14",
+    "sales_history_n_alls": 228453,
+    "sott_dags": "2026-07-15"
+  },
+  "velta_juni_eftir_arum_siad": {
+    "2021": {"n": 993, "midgildi_kr_m2": 483015},
+    "2022": {"n": 659, "midgildi_kr_m2": 577947},
+    "2023": {"n": 628, "midgildi_kr_m2": 608988},
+    "2024": {"n": 848, "midgildi_kr_m2": 665098},
+    "2025": {"n": 705, "midgildi_kr_m2": 701813},
+    "2026": {"n": 609, "midgildi_kr_m2": 719512}
+  },
+  "velta_juli_1_15_eftir_arum_siad": {
+    "_fyrirvari": "Þinglýsingartöf: 2026-talan er vanmetin (skráningar berast enn); samanburður milli ára EKKI marktækur fyrr en eftir á.",
+    "2021": {"n": 558}, "2022": {"n": 328}, "2023": {"n": 282},
+    "2024": {"n": 399}, "2025": {"n": 530}, "2026": {"n": 277}
+  },
+  "velta_2026_manadarleg": {
+    "_skyring": "n_alls = allar færslur í sales_history (allar tegundir); n_siad = metanlegir íbúðasamningar.",
+    "jan": {"n_alls": 1143, "n_siad": 519}, "feb": {"n_alls": 1005, "n_siad": 415},
+    "mar": {"n_alls": 1372, "n_siad": 720}, "apr": {"n_alls": 928, "n_siad": 467},
+    "mai": {"n_alls": 1125, "n_siad": 526}, "jun": {"n_alls": 1175, "n_siad": 609}
+  },
+  "midgildi_kr_m2_eftir_sveitarfelagi_12man": {
+    "_timabil": "2025-07-01 til 2026-07-14, n>=100, TRIM(sveitarfelag)",
+    "Reykjavíkurborg": {"n": 3073, "kr_m2": 789216},
+    "Kópavogsbær": {"n": 829, "kr_m2": 784314},
+    "Hafnarfjarðarkaupstaður": {"n": 725, "kr_m2": 711009},
+    "Garðabær": {"n": 391, "kr_m2": 815091},
+    "Akureyrarbær": {"n": 387, "kr_m2": 626446},
+    "Reykjanesbær": {"n": 282, "kr_m2": 582835},
+    "Mosfellsbær": {"n": 257, "kr_m2": 774336},
+    "Sveitarfélagið Árborg": {"n": 200, "kr_m2": 566644},
+    "Akraneskaupstaður": {"n": 128, "kr_m2": 533890},
+    "Vestmannaeyjabær": {"n": 107, "kr_m2": 442974},
+    "Seltjarnarnesbær": {"n": 100, "kr_m2": 863094}
+  },
+  "frambod_2026_07_15": {
+    "_fyrirvari": "ESCALATION-UPPSÖFNUN: lifecycle-hreinsun stendur til ~2026-07-20; virkar tölur OFMETNAR þar til henni lýkur. Aldursdreifing út frá first_seen_at ÓNOTHÆF (seed-dagsetningar) — aldurstölur koma frá HMS.",
+    "virkar_soluauglysingar_ibudir": 10995,
+    "virkar_leiguauglysingar_ibudir": 1631,
+    "virkar_atvinnuhusnaedi": 1588,
+    "virkar_lodir": 338
+  },
+  "asett_vs_verdmat_2026_07_15": {
+    "_skyring": "Virkar söluauglýsingar íbúða m/ fastnum og verði, deilt með real_pred_median (iter4 conformal). Hlutfall síað á [0,3;3,0]. STAÐREYND UM MARKAÐINN, engin tækifæris-orðræða.",
+    "landid_allt": {"n": 8786, "p10": 0.896, "p25": 0.948, "p50": 1.012, "p75": 1.115, "p90": 1.257},
+    "hbsv": {"n": 5427, "p10": 0.905, "p25": 0.946, "p50": 0.995, "p75": 1.075, "p90": 1.203},
+    "landsbyggd": {"n": 3359, "p10": 0.874, "p25": 0.955, "p50": 1.048, "p75": 1.173, "p90": 1.368}
+  },
+  "leigumarkadur_asett_2026_07_15": {
+    "_skyring": "Ásett leiguverð virkra leiguauglýsinga (50þ-2M kr, >10 m²). Ekki samningsverð.",
+    "n": 1598, "midgildi_leiga_kr": 337000, "midgildi_kr_m2": 4118
+  },
+  "verdbreytingar_jun_jul": {
+    "_stada": "GAT/VEIKT MERKI — aðeins 145 verðbreytingar skráðar 01.06-14.07 (125 hækkanir/20 lækkanir, miðgildi lækkunar -6,7%); hækkanirnar lykta af nýbyggingarverðlistum og þekjan er of gisin til birtingar án fyrirvara.",
+    "n_laekkanir": 20, "n_haekkanir": 125, "midgildi_laekkun": -0.0667
+  },
+  "solutimi": {
+    "_stada": "GAT í eigin gögnum (first_seen_at=seed-dags) — skýrslan notar HMS: helmingur óseldra nýrra íbúða >260 daga á sölu (183 í fyrra); ~24% alls framboðs >12 mán (16% í fyrra)."
+  },
+  "krossskodun": {
+    "kr_m2_vs_hms_visitala": "Okkar miðgildi kr/m² júní +2,5% y/y (nafnvirði) vs HMS-vísitala +2,2% y/y í maí — rímar; hvort tveggja undir 5,2% verðbólgu = raunlækkun.",
+    "velta_vs_hms": "Okkar síaða júní-velta -13,6% y/y; HMS/Landsbankinn: maí -27% y/y, 5-mán uppsafnað -15% y/y. Sama átt; talningar ríma ekki 1:1 vegna nefnaramunar (okkar sía þrengri en HMS-íbúðasamningatalning; sales_history n_alls inniheldur allar eignategundir).",
+    "asett_vs_kaupendamarkadur": "Miðgildi ásett/verðmat ~1,0 á hbsv rímar við lýsingu HMS á kaupendamarkaði (lítið sem ekkert yfirverð í ásettu verði m.v. matsvirði)."
+  }
+}
