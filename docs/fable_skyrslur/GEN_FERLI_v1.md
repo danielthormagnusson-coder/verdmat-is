@@ -72,3 +72,18 @@ Fastar fyrirspurnir (SQL-mynstur í VINNSLUGOGN_2026-06 og samtali cc5; Supabase
 ## Föst commit-mengun eftir go
 
 `docs/fable_skyrslur/*` (skýrsla, heimildaskrá, vinnslugögn, gen-ferli) + `heimildasafn/MANIFEST.json` + `heimildasafn/frettir/**` + `.gitignore`/`backup_paths.json` ef breytt. Hrá safngögn fara ALDREI í git.
+
+## Fasi 5 — UI-birting (fastur liður frá skýrslu #1, cc7 2026-07-16)
+
+Skýrslusíðan býr í **verdmat-ai repoinu** (www.verdmat.ai): `/skyrslur/[ÁÁÁÁ-MM]`, bak við innskráningu. Hver ný mánaðarskýrsla fær síðu á sama formi — þetta er transskripsjón, ekki endursmíði:
+
+- [ ] Frumritin þrjú (skýrsla, heimildaskrá, vinnslugögn) afrituð í `content/skyrslur/frumrit/` í verdmat-ai (frosin, docs-only).
+- [ ] Nýtt content-módúl `content/skyrslur/skyrsla-[ÁÁÁÁ-MM].ts` á forminu í `content/skyrslur/types.ts`: kaflarnir sem efnisblokkir (mgr/vidvorun/tafla/graf/listi), lykiltölur kafla 1 m/ heimild+fyrirvara, heimildaskráin m/ URL-um ÚT (fréttir: aðeins fyrirsögn+miðill+dags+hlekkur), grafgögn viðauka B hardkóðuð (frosin — síðan les ALDREI DB fyrir skýrsluefni).
+- [ ] Skráning FREMST í `config/skyrslur.ts` (nýjast fyrst) — /skyrslur-yfirlitið, forsíðukassinn og agent-verkfærið `manadarskyrsla` uppfærast þá SJÁLFKRAFA; ekkert annað þarf að breytast.
+- [ ] Varúðarblokkir frumritsins verða vidvorun-blokkir (sýnilegar í meginmáli); aðalvarúðin (t.d. óbirt vísitala) fer í `adalvidvorun` og birtist efst.
+- [ ] Gröf: endurnýta componentana í `components/skyrslur/SkyrslaGrof.tsx` (recharts, tokens-litir, handvirkt talnaform — ALDREI toLocaleString í client-componentum, #418-gildran); ný grafgerð = ný component í sömu skrá.
+- [ ] Sannreyna talnasamræmi transskripsjónar við frumritið (hver tala borin saman).
+- [ ] `npm run build` + sjónpróf á localhost prod-build + console hreint; rautt próf á `manadarskyrsla`-svari agentsins (lykiltölur+slóð+fyrirvarar; ráðgjafarbann heldur).
+- [ ] HALT með skjámyndum fyrir push (verdmat-ai er prod).
+
+Viðmið: audit SKYRSLA_UI_CC7 í verdmat-ai (docs/fable_prep/audits/) og commit ee927c5 sem sniðmát fyrsta mánaðar.
