@@ -1143,3 +1143,9 @@ Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref
 ## Full extraction-backfill — endurmeta við mælda notkun (logged 2026-07-13)
 
 - **On-demand extraction er live í verdmat-ai** (cc5: route `/api/eigindi/soekja`, dagsþak 200 köll/dag, keyrslu-log í `eigindi_extraction_runs`) — full-korpus backfill var HAFNAÐ á þessum tímapunkti. Endurmeta þegar rekstrargögn liggja fyrir: hvaða eigindi eru raunverulega sótt (attrs_written per attr_key úr runs/property_attributes), og haiku vs sonnet gæði úr rekstri (mæld kostnaður sonnet-5 ~2–4,3¢/kall). Heimild: `verdmat-ai/docs/fable_prep/audits/ONDEMAND_EXTRACTION_2026-07-13T2229Z.md`. — ákvörðun 2026-07-13.
+
+---
+
+## Hydration-villa (Recoverable) á /markadur/modelstada — eldri rót, lagfæring bíður (logged 2026-07-16, cc4)
+
+- Next dev-overlay sýnir "Hydration failed because the server rendered text didn't match the client" á modelstada. **A/B-sannað með git stash í cc4-lotu að villan er PRE-EXISTING** — birtist eins án cc4-skýringarlínunnar (statísk JSX getur ekki valdið misræmi). Líklegasta rót: `daysAgo(Date.now())` reiknað server-megin í PipelineHealthPanel-gögnum og/eða recharts SSR-mynstur. Recoverable (client endurteiknar tréð) — engin notendasýnileg bilun, en kostar auka-render og mengar dev-overlay. Lagfæring: færa Date.now()-afleiðslur í client-effect eða suppressHydrationWarning á viðkomandi textahnúta eftir mælingu. Heimild: CONFORMAL_RECAL_2026-07-15.md-lotan (skjámyndir í session-annál).

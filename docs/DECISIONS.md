@@ -4,6 +4,21 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-15 — Vissubila-rek mælt: retrain-hringur GO (vegvísaliður A), stakstæð endurkvörðun HAFNAÐ, mánaðarleg þekju-vakt föst (cc4)
+
+**Heimild:** `docs/fable_prep/audit/CONFORMAL_RECAL_2026-07-15.md` (+ skript/CSV í `docs/fable_prep/prototypes/conformal_recal_*` og `holdout_rows.csv`/`cell_q80_compare.csv`). Allar tölur þaðan.
+
+**Mælingin:** lifandi conformal-bil (kvörðuð á 2025-test, flippuð LIVE 02.07) undirdekka á fersku post-cutoff holdouti (þinglýst > 20.04, síað, n=1.488): **cov80 = 72,2%** (~7,5σ undir 80%-markmiði), flokkur A verstur (69,4%, n=697). Rótin er BREIDD (öldrun frosna líkansins), ekki bjagi (miðgildis-residúall −1,1%, brot samhverf). Endurkvörðunar-útgáfur mældar á sama E-setti: (a) pool áhrifalaus (72,7%, ΔA 0); (b) hreinn ~7-vikna gluggi 78,3% en A-hrun 36,1→0,8% (G5-brot); (c) blend α=0,5 75,1% / ΔA −18 pp. Engin nær bæði þekju og stöðugleika.
+
+**Ákvarðanir (Danni 2026-07-15):**
+1. **Retrain-hringur GO sem vegvísaliður A** — A-lotuprompt skrifast á grunni ákvörðunarblaðsins; 6-mán OOS conformal skv. læstum G5-staðli (04.07).
+2. **Interim-blend (c) EKKI virkjað strax** — ákvörðun tekin þegar fyrsti fasi retrain-lotunnar skilar tímamati.
+3. **Mánaðarleg ÞEKJU-VAKT samþykkt sem fastur liður retrain-forskriftarinnar:** holdout-mælingin (skriptuð, ~30 sek) keyrist eftir hverja mánaðar-predictions-endurreikningu; **cov80 < 76% tvo mánuði í röð → flýta retrain-hring.** Kvörðun fylgir retrain-taktinum — ALDREI sjálfstæð mánaðarleg artifact-skipti (mánaðarlegt flokkaflökt bryti G5).
+4. **Þröskuldar A<0,20 / B<0,36 HALDAST** — vandinn er breiddirnar, ekki mörkin; hliðrun marka til að verja A-hlutdeild væri feluleikur.
+5. **Heiðarleikapakki** (modelstada mæld þekja + FLOKKUR_SKYRING orðalag + /adferdafraedi vakt-lína) — upplýsingagjöf án líkansbreytingar; texta-HALT fyrir apply.
+
+**Stale-línur leiðréttar:** MODEL_CARD_iter4 §5+§8 og fable-audit F.3 (prod-repo 1955dcb) báru „conformal ótengt" eftir 02.07-flippið — hvor tveggja merkt LEIÐRÉTT með vísun hingað.
+
 ## 2026-07-14 — Disk-IO mótvægi: MV-refresh eftir heimildum + work_mem session-vís (cc8)
 
 **Heimild:** `D:\DISK_IO_GREINING_20260714T2131Z.md` (Supabase Disk-IO-Budget viðvörun 14.07; lestur — ekki skrif — tæmir budget á Micro).

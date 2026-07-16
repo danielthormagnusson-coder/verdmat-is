@@ -94,3 +94,6 @@ heimildasafn/**
 !heimildasafn/MANIFEST.json
 !heimildasafn/frettir/
 !heimildasafn/frettir/**
+
+# cc4: radgogn ur prod-DB - aldrei i git (public repo)
+docs/fable_prep/prototypes/holdout_rows.csv
