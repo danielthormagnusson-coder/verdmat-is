@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-07-16 — iter5-hringur #1 KEYRÐUR OG FLIPPAÐUR LIVE: iter4r_20260716 (6-mán OOS conformal, ferskt holdout, M5 skrifað) (cc6)
+
+**Heimild:** `docs/fable_prep/audit/RETRAIN_ITER4R_2026-07-16.md` (allar tölur þaðan; artifakt `D:\model_artifacts\iter4r_20260716\`). Fyrsti keyrði hringur RETRAIN_RUNBOOK; GO-A (skilgreining) og GO-B (flipp) frá Danna í lotunni, hvort með sínum skilyrðum.
+
+**Ákvarðanir/lærdómar (læst):**
+1. **Þrískiptingar-staðallinn:** calib-gluggi hringsins ber 30% lagskipta slembi-frátekt (fast seed, `calib_role` additive í predictions.pkl) sem ferskt M1-holdout — kvörðun aldrei metin á eigin röðum (G5-lærdómur). `--holdout-frac` í retrain_sales_model.py er varanlegur hluti forskriftar.
+2. **Niðurstaða:** M1 81,2% (n=848, öll top5-sellu ≥75) · M2 MAPE 7,58 vs 9,27% live · M4 ✓ · **M5: `pipeline_config.model_pred_anchor_ym='2026-08'` skrifað í flip-txn — LESIÐ gildi (100% empírísk staðfesting á pkl-akkeri + δ̂-krosspróf), lokar „ályktað ekki skráð"-gatinu (sbr. færslu 24.06).** Nýr lykill `model_version` í pipeline_config uppfærist í sömu txn framvegis.
+3. **Frávik skráð:** (i) sfh_country G2+G4 = fæðingar-offset, runbókarleið (a) — vaktað; (ii) A-hlutdeild 36,1→19,5% = leiðrétting ofseldrar vissu (fyrirséð í CONFORMAL_RECAL §5); parity G5-fastinn (10 pp vs live) ódómtækur á fyrsta hring, uppfærist í round-to-round næst.
+4. **segcal_fallback-brautin ber bil-röðunarbrot** (kvantíl-krossun native boostera; live 1.954 → kandídat 1.447): flip-hliðið er hörð röðunarkrafa á conformal-raðir + engin-afturför á fallback — EKKI 0-brota krafa á allt.
+5. **Interim-blend (c) endanlega ÓVIRKJAÐ** — hringur tók ~2 sólarhringa; 4–6 vikna hemils-skilyrðið á ekki við.
+6. **Vakt-sérliðir fyrstu mánaðarmælingar** (RETRAIN_RUNBOOK §6): APT_STANDARD|Capital_sub-sellan (75,0% á n=92), sfh_country-offsetið, framvirka rekið (júlí med resid −0,034). modelstada-textinn uppfærður í vinnutré (kandídatsmæling merkt sem slík; ný tracking-röð bíður fyrstu vaktarmælingar) — push samræmist cc4-pakkanum.
+
+Rollback: `predictions_2026_07_pre_iter4r` + FA-snapshot (RLS default-deny) + `flip_iter4r.py --phase rollback`. Staging/snapshot-hreinsun eftir 24-klst stöðugleika = sér ákvörðun. Sjá audit §6 um ócommittuð skript.
+
 ## 2026-07-15 — Vissubila-rek mælt: retrain-hringur GO (vegvísaliður A), stakstæð endurkvörðun HAFNAÐ, mánaðarleg þekju-vakt föst (cc4)
 
 **Heimild:** `docs/fable_prep/audit/CONFORMAL_RECAL_2026-07-15.md` (+ skript/CSV í `docs/fable_prep/prototypes/conformal_recal_*` og `holdout_rows.csv`/`cell_q80_compare.csv`). Allar tölur þaðan.

@@ -204,13 +204,16 @@ export default async function ModelstadaPage() {
           lineHeight: 1.5,
         }}
       >
-        Nýjasta mælingin (þinglýst 20.04–14.07 2026, mælt 15.07) er raunþekja á
-        sölum eftir þjálfunardag líkansins (n=1.488): 72,2&nbsp;% ±2,3&nbsp;pp á
-        80&nbsp;%-bilinu. Frosið líkan eldist — bilin hafa þrengst umfram
-        raundreifni nýjustu sala — og endurþjálfunarhringur með endurkvörðun
-        bilanna er í gangi. Eldri punkturinn (apríl) er mældur á held-splitti
-        við þjálfun; serían er því ekki einsleit fyrr en mánaðarlega vaktin
-        tekur við.
+        Mælingin 15.07 (þinglýst 20.04–14.07 2026, n=1.488) sýndi raunþekju
+        frosna líkansins 72,2&nbsp;% ±2,3&nbsp;pp á 80&nbsp;%-bilinu — sú
+        mæling felldi það: <strong>endurþjálfað 16.07.2026</strong>
+        (iter4r_20260716, 6&nbsp;mán OOS-endurkvörðun bilanna);
+        <strong>næsta þekju-mæling ágúst 2026</strong>. Mæling nýja líkansins
+        á fersku holdouti við skiptin var 81,2&nbsp;% ±2,7&nbsp;pp (n=848) —
+        kandídatsmæling við þjálfun, ekki vaktarmæling; röð nýja líkansins
+        hefst þegar fyrsta mánaðarlega vaktarmælingin liggur fyrir. Eldri
+        punktar eru mældir á held-splitti við þjálfun; serían er því ekki
+        einsleit fyrr en vaktin tekur við.
       </p>
       <SegmentTable segments={history} />
       <PipelineHealthPanel health={health} />

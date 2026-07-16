@@ -177,6 +177,22 @@ baka, MV-refresh. Æfð aðgerð (DECISIONS 2026-06-28 rollback).
   heildar < 0,02 — annars var drift-lokunin ekki raunveruleg.
 - Backup-nótt (03:00) þarf að ganga áður en gamla snapshot-taflan er hreinsuð.
 
+**Mánaðarleg ÞEKJU-VAKT (DECISIONS 2026-07-15, fastur liður forskriftarinnar):**
+holdout-þekju-mælingin (skriptuð, ~30 sek — aðferð `conformal_recal_holdout.py`
+/ `precompute/holdout_eval.py`) keyrist eftir HVERJA mánaðar-predictions-
+endurreikningu. Viðbragðsþröskuldur: **cov80 < 76 % tvo mánuði í röð → flýta
+retrain-hring.** Kvörðun fylgir retrain-taktinum — aldrei sjálfstæð artifact-skipti.
+
+**VAKT-SÉRLIÐIR fyrstu mælingar eftir iter4r_20260716-flippið (GO-B skilyrði 2,
+2026-07-16) — nafngreindir liðir, ekki bara heildartalan:**
+- (a) `APT_STANDARD|Capital_sub` — þynnsta M1-sellan við flipp (75,0 % á n=92,
+  ±8,3 pp); mælist hún aftur undir 75 % → skoða sellu-kvantílinn sérstaklega.
+- (b) `sfh_country` fæðingar-offsetið — G2/G4 féllu þar við flipp (bias cand
+  +0,073; markaðskólnun EFTIR gagnaenda þjálfunar, runbókarleið (a) valin);
+  spurning vaktarinnar: lokast bilið þegar eftir-kólnunar sölur koma inn í kaupskrá?
+- (c) framvirka rekið — ferskasti mánuður holdouts (júlí) sýndi med resid
+  −0,034 (ofspá ~3 %) með þekju samt 82,0 %; vex rekið eða jafnast það?
+
 ## 7. Vísitölu-skalar á módel-úttak — BANNAÐUR þögull
 
 Læst í DECISIONS 2026-07-02: enginn index-margfaldari á `real_pred_*` dálkana
