@@ -1149,3 +1149,14 @@ Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref
 ## Hydration-villa (Recoverable) á /markadur/modelstada — eldri rót, lagfæring bíður (logged 2026-07-16, cc4)
 
 - Next dev-overlay sýnir "Hydration failed because the server rendered text didn't match the client" á modelstada. **A/B-sannað með git stash í cc4-lotu að villan er PRE-EXISTING** — birtist eins án cc4-skýringarlínunnar (statísk JSX getur ekki valdið misræmi). Líklegasta rót: `daysAgo(Date.now())` reiknað server-megin í PipelineHealthPanel-gögnum og/eða recharts SSR-mynstur. Recoverable (client endurteiknar tréð) — engin notendasýnileg bilun, en kostar auka-render og mengar dev-overlay. Lagfæring: færa Date.now()-afleiðslur í client-effect eða suppressHydrationWarning á viðkomandi textahnúta eftir mælingu. Heimild: CONFORMAL_RECAL_2026-07-15.md-lotan (skjámyndir í session-annál).
+
+---
+
+## Skráar-eigindin sem features í næsta retrain-hring — samanburðarkeyrsla (logged 2026-07-17, cc12-bókun 2, skráð í cc14)
+
+**Heimild:** `docs/fable_prep/audit/EIGINDA_EFFEKT_2026-07-17.md` (samþykkt í heild 17.07, commit 3a959ca) + cc6-forskrift 1.3 (RETRAIN_ITER4R nafnaregla).
+
+- **Hvað:** í næsta retrain-hring bætast skráar-eigindin fjögur við feature-mengið sem **SAMANBURÐARKEYRSLA við grunnhring** (iter4r-arkitektúr óbreyttur sem viðmið): fjherb (herbergjaþéttleiki), bílskúr gerd+m2 (gerd-lykillinn í bilskur-JSON, ekki tegund), íbúðarhlutfall (ibudarrymi_vs_heild), geymslu-flagg.
+- **Nafnaregla:** fari featurarnir inn eftir samanburðinn heitir hringurinn **iter5-ættar** (feature-breyting), ekki iter4r_* (sbr. cc6-forskrift: iter4r = arkitektúr óbreyttur, „iter5" frátekið fyrir feature-breytingu).
+- **Rök úr blaðinu:** þekja á seldum 27–54% (herbergi/fjherb 53,5%, bilskur_staedi 39,3%, ibudarrymi_vs_heild 26,6%); mældir effektar á iter4r-holdouti 0,5–2,5% (jaðar-marktækir) — réttlæta ekki birt B-leiðréttingarlag (SEINNA, þriggja skilyrða endurvakningarhlið í blaðinu) en réttlæta feature-prófun þar sem líkanið lærir áhrifastærðina sjálft.
+- **Tengsl:** ekki sami liður og ITER5-umfangið 2026-07-04 að ofan (extraction-þétting a–d) — skráar-eigindin eru óháð extraction-backfillinu og geta farið í fyrsta hring sem býðst; ITER5-liðirnir bíða áfram Phase D.
