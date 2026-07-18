@@ -1173,3 +1173,27 @@ Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref
 - **Fyrsta mæling (sér-probe):** ~36.100 sölutextar liggja í SQLite á diski (32.376 `parsed_mbl_sale` + 3.291 `parsed_myigloo` + 418 `parsed_visir`) sem `pairs_v1` nær ekki til. Skörun þeirra við (c)-hópinn er **óvituð** — það er fyrsta talan sem þarf.
 - **Þekjan er flöt eftir canonical×svæði** (18,8–41,6%): engin eignategund eða svæði er kerfisbundið verr sett, svo markviss hlutabackfill vinnur lítið umfram flatan. Lyftistöngin er pörunin sjálf, ekki forgangsröðun innan hennar.
 - **Tengsl:** óháð skráar-eigindaliðnum (cc12) — sá liður getur farið í fyrsta hring sem býðst. Þessi liður ræður hins vegar hve mikið extraction-featurin geta lagt til í iter5-samanburðarkeyrslunni.
+
+---
+
+## SKREF 0 backfill-pilotsins — textalagið frá 18.04 verður að endurbyggjast áður en nokkuð er verðlagt (logged 2026-07-18, cc21)
+
+**Heimild:** `docs/fable_prep/audits/D_UTTEKT_20260718T095336Z.md` §2.5 + §6.
+**Tengsl:** gengur Á UNDAN liðnum „Pörunargatið í þjálfunarþýðinu" (cc20) — sama pilot, fyrra skref.
+
+- **Fundur:** `D:\listings_text_v2.pkl` (1,54 GB) og `listings_v2.pkl` (100 MB) eru dagsettar **2026-04-18**, en eru lesnar af `build_training_data_v2.py` sem keyrði **2026-07-16 07:35** og framleiddi lifandi þjálfunargögnin. Gagnagrunnarnir undir þeim (`fasteignir*.db`) og næturleiðslan hafa haldið áfram allan tímann. **iter4r_20260716 var því þjálfað á söluyfirlitstextum eins og þeir stóðu 18.04** — þriggja mánaða texti sem safnast hefur síðan er ekki í þjálfunarþýðinu. Ekki af því að extraction vanti, heldur af því að **millilagið var aldrei endurbyggt**. Óskjalfest fram að þessu.
+- **Hvers vegna þetta er SKREF 0:** ný LLM-keyrsla ofan á kyrrstætt textalag nær ekki til textans sem safnaðist eftir 18.04. Endurbygging (`parse_all_dbs.py`) kostar **diskvinnu, ekki tokena** — hún er ódýrari og áhrifameiri fyrsta aðgerð en nokkur extraction. Hún breytir líka nefnaranum sem cc20-liðurinn verðleggur: 36.100 sölutextarnir í SQLite sem `pairs_v1` nær ekki til geta að hluta verið aðgengilegir eftir endurbyggingu.
+- **Röð:** (i) endurbyggja `listings_text_v2` og **mæla hvað þekjan fer í án nokkurs LLM-kostnaðar**; (ii) þá fyrst verðleggja backfill á það sem eftir stendur (cc20-liðurinn, $81-matið endurreiknað á nýjum nefnara); (iii) meta eignastigs-leiðsluna (kerfi A) sérstaklega.
+- **Engin tímapressa.** Aprílkeyrslan var **Haiku 4.5**, ekki Sonnet — verðlokun sonnet-5 31.08 á ekki við um þessa leiðslu. Ef sú dagsetning á að reka eitthvað er það eignastigs-eigindalagið (leiðsla A, sem raunverulega notar Sonnet 5), ekki þjálfunar-extraction.
+- **Athuga við endurbyggingu:** `parse_all_dbs.py` er rót ALLS pkl-trésins (properties_v2 / listings_v2 / listings_text_v2 / sales_v2) og er **ótrackuð á D:-rót**. Endurbygging snertir því fleiri niðurstreymis-eignir en textalagið eitt — sjá D_UTTEKT §2.3 fyrir ættartréð og §5.5 fyrir repo-heimilið sem hana vantar.
+
+---
+
+## Myndamats-sannreyning: 194 GB á ályktun, ekki mælingu (logged 2026-07-18, cc21)
+
+**Heimild:** `docs/fable_prep/audits/D_UTTEKT_20260718T095336Z.md` §2.1 + §2.6 + §7.
+
+- **Staðan:** `Gagnapakki 1/3/4/5` telja **194 GB** og eru allar frosnar 12.–16.04. `Gagnapakkar\images` (352,5 GB, 1,75M skrár) virðist arftakinn. DB-skrárnar í pökkunum eru **sannanlega bætajafnar** eintökum undir `Gagnapakkar` (stærðarjöfnuð staðfest) — en **myndatrén sjálf voru ALDREI borin saman**.
+- **Hvað vantar:** raunverulegur bætasamanburður (eða a.m.k. skráarfjöldi + heildarstærð + slembiúrtak af md5) milli `Gagnapakki N` myndatrjánna og `Gagnapakkar\images`, með `image_index.db` (2.631.485 raðir, URL→path) sem þriðju heimild.
+- **Hvers vegna þetta má ekki flýta sér:** 194 GB er stærsti einstaki endurheimtanlegi blokkin á disknum, en **ekkert af því plássi má telja endurheimtanlegt fyrr en samanburðurinn er gerður**. Ályktun um bætajöfnuð dregin af DB-stærðum yfirfærist ekki sjálfkrafa á myndirnar.
+- **Read-only liður** — sannreyning fyrst, eyðing er sér-ákvörðun síðar og eigin lota.

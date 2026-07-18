@@ -97,3 +97,27 @@ heimildasafn/**
 
 # cc4: radgogn ur prod-DB - aldrei i git (public repo)
 docs/fable_prep/prototypes/holdout_rows.csv
+
+# cc21: env.local UTAN punkts er EKKI gripid af `.env*` hér að ofan. Skrain a
+# D:\ rot ber lifandi SUPABASE_SERVICE_ROLE_KEY / ANTHROPIC_API_KEY /
+# OPS_PASSWORD / R2-lykla. Verjum bad afbrigdi beinlinis (audit D_UTTEKT §5.4).
+env.local
+env.*.local
+*.env.local
+
+# cc21: fable_prep uttektarsafnid - GOGN hunsud, SKJOL trackanleg.
+# ~90 CSV + 1 parquet satu otrackud EN EKKI hunsud; eitt `git add .` hefdi
+# committad thau i opinbert repo. Reglan heldur *.md (uttektunum sjalfum)
+# trackanlegum. Heimild: D_UTTEKT_20260718T095336Z §5.3.
+docs/fable_prep/**/*.csv
+docs/fable_prep/**/*.parquet
+docs/fable_prep/**/*.pkl
+
+# Radalaga JSON undir fable_prep - EKKI gripid af reglunum ad ofan. Tvaer af
+# radalaga skronum fjorum sem uttektin nafngreindi eru .json, ekki .csv.
+docs/fable_prep/audit/comp_e2e_sample_comps.json
+docs/fable_prep/audit/comps_v2_sample_audit.json
+
+# audit.zip ber 56 CSV innani (thar a medal comp_e2e_groundtruth.csv) og fer
+# thvi FRAMHJA *.csv-reglunni. Safn, ekki skjal.
+docs/fable_prep/audit.zip
