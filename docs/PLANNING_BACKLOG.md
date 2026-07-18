@@ -1160,3 +1160,16 @@ Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref
 - **Nafnaregla:** fari featurarnir inn eftir samanburðinn heitir hringurinn **iter5-ættar** (feature-breyting), ekki iter4r_* (sbr. cc6-forskrift: iter4r = arkitektúr óbreyttur, „iter5" frátekið fyrir feature-breytingu).
 - **Rök úr blaðinu:** þekja á seldum 27–54% (herbergi/fjherb 53,5%, bilskur_staedi 39,3%, ibudarrymi_vs_heild 26,6%); mældir effektar á iter4r-holdouti 0,5–2,5% (jaðar-marktækir) — réttlæta ekki birt B-leiðréttingarlag (SEINNA, þriggja skilyrða endurvakningarhlið í blaðinu) en réttlæta feature-prófun þar sem líkanið lærir áhrifastærðina sjálft.
 - **Tengsl:** ekki sami liður og ITER5-umfangið 2026-07-04 að ofan (extraction-þétting a–d) — skráar-eigindin eru óháð extraction-backfillinu og geta farið í fyrsta hring sem býðst; ITER5-liðirnir bíða áfram Phase D.
+
+---
+
+## Pörunargatið í þjálfunarþýðinu — stærsta lyftistöngin á eigindaþekju (logged 2026-07-18, cc20)
+
+**Heimild:** `docs/fable_prep/audits/EXTRACTION_BACKFILL_FORKONNUN_CC20_2026-07-18T0948Z.md` §11.
+**Leysir af:** liðinn „Full extraction-backfill — endurmeta við mælda notkun" (2026-07-13) — endurmatið er framkvæmt, sjá dóm A1 í blaðinu (leið = kerfi A).
+
+- **Vandi:** 88.347 af 146.499 samningum þjálfunarþýðisins (**60,3%**) eiga enga pörun við auglýsingu í `pairs_v1.pkl` og þar með engan texta. Extraction getur ekki lagað þetta. Fullur extraction-backfill á (b)-hópinn lyftir eigindaþekju úr 23,8% í **39,7% og ekki hærra** — þakið er pörunin, ekki extraction-fjárhagur (sá er $81).
+- **Rekið er í nýlegum gögnum** — þekja eftir ári: 2016 45,0% · 2018 44,4% · 2020 33,0% · 2022 32,2% · **2024 27,9%** · 2025 29,5% · **2026 12,8%**. Fari eigindin inn í líkanið án þess að þetta sé lagað verður featurið kerfisbundið þynnst á nýjustu gögnunum, þ.e. veikast þar sem líkanið er mest notað.
+- **Fyrsta mæling (sér-probe):** ~36.100 sölutextar liggja í SQLite á diski (32.376 `parsed_mbl_sale` + 3.291 `parsed_myigloo` + 418 `parsed_visir`) sem `pairs_v1` nær ekki til. Skörun þeirra við (c)-hópinn er **óvituð** — það er fyrsta talan sem þarf.
+- **Þekjan er flöt eftir canonical×svæði** (18,8–41,6%): engin eignategund eða svæði er kerfisbundið verr sett, svo markviss hlutabackfill vinnur lítið umfram flatan. Lyftistöngin er pörunin sjálf, ekki forgangsröðun innan hennar.
+- **Tengsl:** óháð skráar-eigindaliðnum (cc12) — sá liður getur farið í fyrsta hring sem býðst. Þessi liður ræður hins vegar hve mikið extraction-featurin geta lagt til í iter5-samanburðarkeyrslunni.
