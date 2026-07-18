@@ -413,3 +413,91 @@ veikast þar sem líkanið er mest notað.
 
 **Þekjan er flöt eftir eignategund/svæði** (18,8–41,6%) — engin undirtegund
 er kerfisbundið verr sett, svo markviss hlutabackfill vinnur lítið umfram flatan.
+
+---
+
+## 12. A5 SANNREYNT — mæling hrekur leiðréttinguna í §9.2
+
+**Keyrt 2026-07-18, tvö raunköll í prod. Prófraðir þrifnar strax á eftir (0/0 staðfest).**
+
+| | kall #1 (2000123) | kall #2 (2000263) |
+|---|---:|---:|
+| `input_tokens` (ócachað) | 820 | 1.319 |
+| `cache_creation_input_tokens` | **3.835** | 0 |
+| `cache_read_input_tokens` | 0 | **3.835** |
+| `output_tokens` | 953 | 1.520 |
+| svartími | 15,3 s | 22,0 s |
+
+### 12.1 §9.2 var rangt — allt forskeytið cache-ast
+
+Í §9.2 var fullyrt að aðeins system-promptið (~2.184 tok) væri cache-hæft því
+`EXTRACTION_SCHEMA` fer um `output_config.format` sem tekur ekki `cache_control`.
+**Mælingin hrekur það.** Cache-aða blokkin er **3.835 tok** — sem svarar til
+alls fasta forskeytisins (system-prompt *og* skema). Skemað er greinilega
+sett saman inn í cache-hæfa forskeytið server-megin, á undan cache-brotpunktinum.
+
+Þar með stendur **upphaflega 28%-matið**, ekki 14%-leiðréttingin:
+
+| | á cache-lestri | raunhæft jafnvægi (83% hittni) |
+|---|---:|---:|
+| Sparaðir innslættir | 3.451 tok af 5.154 (67%) | ~2.702 tok |
+| **Sparnaður af heildarkostnaði kalls** | **27,0%** | **~21%** |
+
+### 12.2 Tokenlíkanið staðfest
+
+Aðhvarfið í §3.1 spáði föstu forskeyti **3.854 tok**; mælt gildi er **3.835**
+— skekkja **0,5%**. Kostnaðartölurnar í §3.2 standa því óbreyttar.
+
+### 12.3 Þröskuldsáhættan minni en óttast var
+
+§9.2 taldi borðið ~7% (2.184 vs 2.048). Raunverulega cache-aða blokkin er
+3.835 tok, þ.e. **87% borð** yfir lágmarkinu. Vörnin er samt sett upp því
+stytting á promptinu er kostnaðarbreyting sem annars sæist hvergi:
+
+- `verdmat-ai/scripts/check-cache-prefix.mjs` — build-tíma hlið
+- wired inn í `npm run build` (keyrir á hverju Vercel-deploy)
+- svartsýn deilitala 2,0 stafir/tok m.v. mælda 1,55; fellur á exit 1
+- **valið rökstutt:** runtime-assert hefði fellt lifandi extraction-leiðina
+  út af cache-fínstillingu (óhóflegt); prófskrá er dauður kóði því repoið
+  hefur enga test-runner; CI er ekki til. Build-hliðið bilar deployið hátt
+  og snertir aldrei prod-runtime.
+
+### 12.4 Þrif
+
+| | fyrir | eftir |
+|---|---:|---:|
+| `eigindi_extraction_runs` id > 45 | 2 (id 46, 47) | **0** |
+| `property_attributes` prófeigna (`source='extraction'`) | 9 | **0** |
+| heildar `property_attributes` m/ `source='extraction'` | 329 | **329** |
+
+Prófeignir valdar þannig að þær höfðu **engar** fyrirliggjandi extraction-raðir
+— þrifin urðu því hreint DELETE án þess að af-supersede-a nokkuð.
+
+---
+
+## 13. BACKFILL FRESTAÐ Á TEKJUFASA — §10.5 er SKYLDU-FORPRÓF
+
+**Staða 2026-07-18:** backfill er **frestað**. Ekki hafnað — frestað þar til
+tekjufasi réttlætir hann. Keyrsluáætlunin í §10 stendur óbreytt og tilbúin.
+
+Þegar go kemur er **§10.5 skylda, ekki valkvætt**. Ekkert af fullu 5-lotu
+keyrslunni fer af stað fyrr en eftirfarandi forpróf hefur verið keyrt og metið:
+
+### 13.1 Skyldu-forpróf: pilot 200 eignir
+
+| Liður | Krafa |
+|---|---|
+| Umfang | 200 eignir úr (b)-hópnum, slembiúrtak yfir 2024–2026 |
+| Þak | `MAX_LYSING_LEN` **hækkað** úr 3.000 — miðgildi (b) er 3.931 stafir, p90 5.845, þ.e. núverandi þak sker meirihluta hópsins |
+| Mælt: þekja | hlutfall sem skilar gildu 108-reita svari á 2024–26 textum (skema v0.2.2 er ósannreynt á þeim árgangi) |
+| Mælt: kostnaður | raun-$/kall við hækkað þak — lengri textar hækka innslátt línulega (§3.1) |
+| Mælt: gæði | handstikkprufa á ~20 svörum gegn texta |
+| Hlið | full keyrsla fer ekki af stað nema þekja og kostnaður séu innan þess sem go-talan gerði ráð fyrir |
+
+### 13.2 Hvers vegna þetta er hlið en ekki formsatriði
+
+Kostnaðarmatið $81 í §10.1 byggir á 0,71¢/kall sem var mælt á **eldra
+textasafni undir 3.000 stafa þaki**. Hækkað þak færir miðgildið úr <3.000 í
+~3.931 og p90 í 5.845 — þ.e. innslátturinn stækkar verulega og $81 er
+**neðri mörk, ekki mat**. Go-tala sem gefin er út frá $81 án forprófs væri
+gefin út frá rangri forsendu.
