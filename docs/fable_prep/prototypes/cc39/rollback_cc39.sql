@@ -1,0 +1,55 @@
+-- rollback_cc39.sql — cc39 ×1000-override: rollback-slóðir
+-- Skrifað FYRIR apply (FASI 2), Test-Path-sannreynt í HALT-skilunum.
+--
+-- LYKILSTAÐREYND ÚR PROBE (2026-07-23): cc39 gerir ENGIN handvirk DB-skrif.
+-- Lifandi sales_history ber ÞEGAR rétt gildi fyrir raðirnar þrjár
+-- (f=744059 nominal=22.000.000 / f=744084 25.990.000 / f=744085 18.000.000).
+-- Overrideið er hrein kóðabreyting í derive-kjarnanum (Python). Þess vegna:
+--
+-- == A) Rollback á overrideinu sjálfu = git, ekki SQL ==
+--   Breyttar skrár eftir GO (sjá CC39_DESIGN.md §6):
+--     scripts/rebuild_sales_history.py      (fastar + apply_x1000_override + kall í derive)
+--     scripts/daily_sales_refresh.py        (ein hávær log-lína)
+--     scripts/monthly_cpi_reanchor.py       (ein hávær log-lína)
+--   Afturköllun:  git -C D:\verdmat-is\app revert <cc39-commit>
+--   Eftir revert fer vikulega keyrslan AFTUR í exit 3 (vörðurinn ver á ný) —
+--   það er örugga bilunarstefnan, engin gögn í hættu.
+--
+-- == B) Ef vikulega keyrslan su. 26.07 04:00 committar og þarf að afturkalla ==
+-- Keyrslan býr sjálf til rollback-netið FYRIR skrifin (committað sér-txn):
+--   public.sales_history_real_backup_<YYYYMMDD_HHMM>   (faerslunumer, fastnum, kaupverd_real)
+-- Finna nafnið:  SELECT tablename FROM pg_tables
+--                WHERE tablename LIKE 'sales_history_real_backup_%' ORDER BY 1 DESC;
+-- Afturkalla (pooler 6543: SET TRANSACTION READ WRITE er ALLRA-FYRSTA statement):
+--
+-- BEGIN;
+-- SET TRANSACTION READ WRITE;
+-- SET LOCAL statement_timeout = '10min';
+-- UPDATE public.sales_history s
+--    SET kaupverd_real = b.kaupverd_real
+--   FROM public.sales_history_real_backup_<TS> b
+--  WHERE s.faerslunumer = b.faerslunumer AND s.fastnum = b.fastnum;
+-- -- vænt rowcount: ~sami fjöldi og keyrslan uppfærði (bókað í monthly_cpi_reanchor.log
+-- -- [5b] updated=...); frávik => ROLLBACK + HALT
+-- UPDATE public.pipeline_config
+--    SET value = '2026-07', updated_at = now()
+--  WHERE key = 'sales_history_anchor_ym';
+-- -- cpi_index-upsertið (2026-08 o.fl.) er gild VNV-tala og stendur — EKKI eytt.
+-- COMMIT;
+--
+-- Svo MV-refresh (autocommit-tenging, READ WRITE fyrst, work_mem session-vís):
+-- SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE;
+-- SET work_mem = '64MB';
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_street_directory;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_matsvaedi_prices_yearly;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_street_prices;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_postnr_prices_yearly;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_street_activity;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_sveitarfelag_market;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_matsvaedi_trend_quarterly;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_hood_heat;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_newbuild_share;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_model_vs_sold_by_hood;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_summerhouse_market;
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY semantic.v_price_distribution_by_hood;
+-- (v_sveitarfelag_lookup les aðeins properties — óþarft hér.)

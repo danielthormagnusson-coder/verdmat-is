@@ -175,6 +175,10 @@ def main() -> int:
         derived, stats = derive_sales_rows(kp, valid_fastnums, cpi)
         log(f"[3] re-derived at anchor={new_anchor}: final_rows={stats['final_rows']:,}, "
             f"fk_dropped={stats['fk_dropped_rows']:,}, rows_without_cpi={stats['rows_without_cpi']:,}")
+        if stats.get("x1000_overrides"):
+            log(f"[3] ×1000-OVERRIDE (cc39): {stats['x1000_overrides']} raðir leiðréttar ÷1000 "
+                f"(f={[e['faerslunumer'] for e in stats['x1000_entries']]}; "
+                f"audit: D:\\x1000_override_audit.jsonl)")
 
         # ---- Step 4: measure change vs live (read) ----
         with conn_ro.cursor() as cur:

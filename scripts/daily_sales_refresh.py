@@ -205,6 +205,10 @@ def main() -> int:
         if stats["rows_without_cpi"] > 0:
             log(f"[2] WARN: {stats['rows_without_cpi']:,} rows without cpi_factor "
                 f"(kaupverd_real NULL for those)")
+        if stats.get("x1000_overrides"):
+            log(f"[2] ×1000-OVERRIDE (cc39): {stats['x1000_overrides']} raðir leiðréttar ÷1000 "
+                f"(f={[e['faerslunumer'] for e in stats['x1000_entries']]}; "
+                f"audit: D:\\x1000_override_audit.jsonl)")
 
         # ---- Step 3: diff vs live ----
         with conn_ro.cursor() as cur:
