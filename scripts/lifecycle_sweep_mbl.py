@@ -90,6 +90,7 @@ SWEEP_DAILY_BUDGET = 700     # sweep's own trailing-24h request cap (leaves ~300
 COMBINED_CAP = 950           # sweep + delta trailing-24h hard margin under the §0.5 <1000/24h rule
 RENT_CADENCE_DAYS = 7        # rent = one full lota per week
 SALE_CADENCE_DAYS = 7        # sale = one full round per week, resumed nightly over ~2 days
+WRITE_BACKOFF_S = (2, 8, 30) # cc43: reconnect delays for write_events; 3 retries then raise
 
 # slice config mirrors fetch_mbl.MODECFG (roots/pks/price fields), minimal selection.
 SLICES = {
@@ -107,6 +108,52 @@ def now_utc() -> datetime:
 def read_db_url() -> str:
     # .dbconfig is UTF-8 with BOM (CLAUDE.md); utf-8-sig strips it. Pooler URI, port 6543.
     return DBCONFIG.read_text(encoding="utf-8-sig").strip()
+
+
+class ReconnectingConn:
+    """psycopg2 connection holder that can re-open itself after the socket dies.
+
+    The sweep holds ONE connection across the whole run while idling DEFAULT_SPACING
+    (120 s) between requests, and a sale round is resumed across hours. The 6543
+    transaction pooler will eventually drop a connection that idle. On 2026-07-20 one
+    such drop raised OperationalError on the FIRST statement of write_events and killed
+    the entire run (lifecycle_sweep_error.log) — and because the sweep is weekly, one
+    aborted run costs a full week of listing freshness.
+
+    Delegates only the psycopg2 surface the sweep uses, so every existing
+    `conn.cursor()` / `conn.commit()` call site is unchanged.
+    """
+
+    def __init__(self, url):
+        self._url = url
+        self.conn = None
+        self._open()
+
+    def _open(self):
+        self.conn = psycopg2.connect(self._url)
+        self.conn.autocommit = False
+
+    def reconnect(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass          # already dead; closing is best-effort by definition
+        self._open()
+
+    def cursor(self, *a, **kw):
+        return self.conn.cursor(*a, **kw)
+
+    def commit(self):
+        self.conn.commit()
+
+    def rollback(self):
+        self.conn.rollback()
+
+    def close(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass
 
 
 # ── DB reads (denominator + prior-absent set) ────────────────────────────────
@@ -297,11 +344,34 @@ def write_events(conn, events, log=print):
     The demotion is guarded by `l.status='active'`, which makes it idempotent: a batch
     re-processed after a resume (see _process_sale_chunk) writes duplicate events by
     design, but demotes zero rows the second time.
+
+    Retries on a dropped connection (cc43) — see WRITE_BACKOFF_S.
     """
     rows = [(e["source"], e["id"], e["fastnum"], e["event_type"],
              e["event_at"], Json(e["evidence"])) for e in events]
     terminal = [(e["source"], e["id"], e["event_at"]) for e in events
                 if e["event_type"] == "withdrawn_confirmed"]
+    for attempt in range(1, len(WRITE_BACKOFF_S) + 2):
+        try:
+            return _write_events_once(conn, rows, terminal, log)
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
+            # The transaction is gone with the socket, so nothing was committed and a
+            # full retry is safe. The one ambiguous case — connection lost after the
+            # server committed but before we saw the ack — replays the INSERT, and
+            # duplicate events are already tolerated by the append-only design
+            # (_process_sale_chunk relies on the same property); the demotion UPDATE is
+            # idempotent on l.status='active'.
+            if attempt > len(WRITE_BACKOFF_S):
+                log("write_events: giving up after %d attempts — %s" % (attempt, exc))
+                raise
+            delay = WRITE_BACKOFF_S[attempt - 1]
+            log("write_events: connection lost (%s); reconnecting in %ds (attempt %d/%d)"
+                % (type(exc).__name__, delay, attempt, len(WRITE_BACKOFF_S) + 1))
+            time.sleep(delay)
+            conn.reconnect()
+
+
+def _write_events_once(conn, rows, terminal, log):
     n_demoted = 0
     with conn.cursor() as cur:
         cur.execute("SET TRANSACTION READ WRITE")
@@ -582,8 +652,7 @@ def main():
         return enable_sale()
 
     if args.scheduled:
-        conn = psycopg2.connect(read_db_url())
-        conn.autocommit = False
+        conn = ReconnectingConn(read_db_url())
         try:
             return run_scheduled(conn, args.dry_run)
         finally:
@@ -603,8 +672,7 @@ def main():
     print("=== lifecycle sweep mbl — %s ===" % mode)
     print("sweep_id=%s  spacing=%.0fs  tenures=%s" % (sweep_id, max(MIN_SPACING_FLOOR, args.spacing), tenures))
 
-    conn = psycopg2.connect(read_db_url())
-    conn.autocommit = False
+    conn = ReconnectingConn(read_db_url())
     transport = Transport(args.spacing)
     all_results = []
     summaries = []
