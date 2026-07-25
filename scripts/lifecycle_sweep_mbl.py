@@ -13,9 +13,17 @@ Known-active id set (the denominator) =
     scraper.listings WHERE source='mbl' AND tenure=? AND status='active'
     AND NOT EXISTS a terminal 'withdrawn_confirmed' event for that listing.
 The withdrawn exclusion keeps the sweep from re-hitting listings already confirmed
-gone (so the denominator shrinks honestly instead of growing forever). No write to
-scraper.listings.status is made here — the event log is the lifecycle source of truth
-(status-sync is a deliberate later step, out of Phase A scope).
+gone (so the denominator shrinks honestly instead of growing forever).
+
+STATUS SYNC (cc43, 2026-07-25): write_events now ALSO demotes scraper.listings.status
+to 'withdrawn' in the same transaction as a terminal 'withdrawn_confirmed' event. The
+event log stays the lifecycle source of truth; status is simply no longer allowed to
+contradict it. Deferring this ("out of Phase A scope") left 12,223 rows sitting at
+status='active' with a terminal event, which every consumer then had to anti-join away
+— including every single /leit query. The anti-join above is now redundant for rows the
+sweep itself demoted, and is kept only as a belt-and-braces guard for rows demoted by
+another path. Demotion does not change what gets swept: those ids were already excluded
+from the denominator by the anti-join, so a re-listing was never picked up here either.
 
 Per id, per sweep:
   * found (returned AND, for sale, syna=true):
@@ -280,17 +288,42 @@ def sweep_slice(conn, transport, tenure, sweep_id, event_at, ids, prior_absent, 
 
 # ── event write (real run only) ──────────────────────────────────────────────
 def write_events(conn, events, log=print):
-    """INSERT lifecycle events. First statement SET TRANSACTION READ WRITE (pooler rule)."""
+    """INSERT lifecycle events + demote listings that just went terminal.
+
+    First statement SET TRANSACTION READ WRITE (pooler rule). The status demotion rides
+    in the SAME transaction as the insert, so listings.status can never drift away from
+    the event log (see module docstring, STATUS SYNC).
+
+    The demotion is guarded by `l.status='active'`, which makes it idempotent: a batch
+    re-processed after a resume (see _process_sale_chunk) writes duplicate events by
+    design, but demotes zero rows the second time.
+    """
     rows = [(e["source"], e["id"], e["fastnum"], e["event_type"],
              e["event_at"], Json(e["evidence"])) for e in events]
+    terminal = [(e["source"], e["id"], e["event_at"]) for e in events
+                if e["event_type"] == "withdrawn_confirmed"]
+    n_demoted = 0
     with conn.cursor() as cur:
         cur.execute("SET TRANSACTION READ WRITE")
         execute_values(cur,
             "INSERT INTO scraper.listing_lifecycle_events "
             "(source, source_listing_id, fastnum, event_type, event_at, evidence) VALUES %s",
             rows, page_size=1000)
+        if terminal:
+            execute_values(cur,
+                "UPDATE scraper.listings l "
+                "   SET status       = 'withdrawn', "
+                "       withdrawn_at = COALESCE(l.withdrawn_at, v.event_at), "
+                "       updated_at   = now() "
+                "  FROM (VALUES %s) AS v(source, source_listing_id, event_at) "
+                " WHERE l.source = v.source "
+                "   AND l.source_listing_id = v.source_listing_id "
+                "   AND l.status = 'active'",
+                terminal, template="(%s, %s, %s::timestamptz)", page_size=1000)
+            n_demoted = cur.rowcount
     conn.commit()
-    log("wrote %d events" % len(rows))
+    log("wrote %d events (%d terminal -> %d listings demoted to withdrawn)"
+        % (len(rows), len(terminal), n_demoted))
 
 
 # ── dry-run CSV ──────────────────────────────────────────────────────────────
