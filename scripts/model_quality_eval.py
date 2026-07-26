@@ -1,6 +1,6 @@
 """model_quality_eval.py — VÉL 1: out-of-sample model quality (two OOS scores).
 
-Weekly engine producing model_metrics rows from frozen iter4 predictions vs realized
+Weekly engine producing model_metrics rows from the LIVE frozen predictions vs realized
 thinglyst sale prices. Two scores on the SAME fresh out-of-sample sales:
 
   EINKUNN 1 (baseline)  — iter4 prediction with extraction features NULLED (structured
@@ -29,18 +29,50 @@ Two distinct CPI layers, do not conflate them:
   - METRICS de-anchor (here): cpi[saleM] / cpi[model_pred_anchor_ym] (live), identical
     in both scopes (ÁKVÖRÐUN 2).
 
-OOS_CUTOFF = 2026-04-20: the iter4 model (.lgb) was trained 2026-04-21 on kaupskra
-through ~2026-04-20, so sales after that date are genuinely out-of-sample. (predicted_at
-2026-04-01 is a nominal stamp, NOT the train cutoff — do not use it.)
+OOS-SKILGREININGIN ER TVÖFÖLD (cc47, arkitektsákvörðun 2026-07-26). A single date
+cutoff cannot serve both purposes at once, so the engine measures BOTH and labels them
+apart. They are DISJOINT row sets and must NEVER be summed or averaged together:
+
+  (a) AÐALTALA   sample_scope='holdout30' — the 30% stratified holdout (seed 20260716)
+                 held out of train AND of conformal calibration. This is the
+                 KVÖRÐUNARHEILINDI number: rows the deployed artifact provably never
+                 saw. Membership is read off disk from the artifact folder
+                 (<version>_holdout_rows.csv, FAERSLUNUMER key); seed/frac/train_end are
+                 validated against <version>_manifest.json. oos_cutoff = manifest
+                 train_end. DÓMSREGLA: cov80 < 80% => exit 2 + HALT to the architect.
+  (b) HLIÐARTALA sample_scope='fresh_edge' — sales with THINGLYSTDAGS > manifest
+                 data_end, i.e. the market strictly after the training data ended.
+                 Small n by construction; a drift tripwire, not the headline.
+                 oos_cutoff = manifest data_end.
+
+Both are measured through the SAME deployed path (public.predictions de-anchored to the
+sale month), so they answer "what does the artifact in production actually deliver",
+NOT "what did the candidate score at training time". Those two differ: the training-time
+holdout report scores each sale in its own time context, while the deployed path scores
+each property once at the valuation month and CPI-rewinds. Do not quote one as the other.
+
+MODEL VERSION IS NEVER HARD-CODED (cc47 rótarfix). It is read from
+pipeline_config.model_version — the key flip_iter4r.py writes inside the flip txn
+alongside model_pred_anchor_ym. A hard-coded version silently survives a model flip and
+measures a cohort that no longer exists: run 76 (2026-07-20) wrote 0 rows with
+exit_status='success' for exactly that reason and nobody noticed for six days.
+
+ZERO ROWS IS A FAILURE, NOT A RESULT (cc47 rótarfix). Any scope that finds no pairs, and
+any write that lands 0 rows, is a loud log line + exit 1. Silence is not evidence of calm.
 
 Metric core mirrors validate_metrics.py:compute_metrics (MAPE real-space, coverage of
 realized price within [lo,hi], bias). Point estimate = real_pred_mean.
 
 Logged to pipeline_runs/steps via migration_helpers; writes public.model_metrics.
 
+Exit codes: 0 = measured, cov80 >= 80%. 1 = measurement failed / zero rows / zero
+written. 2 = measured AND written, but the DÓMSREGLA tripped (cov80 < 80%) — the run is
+NOT a success, the architect owns the next move.
+
 CLI:
   python scripts/model_quality_eval.py --dryrun   # compute + print, no writes
-  python scripts/model_quality_eval.py            # compute + write model_metrics (baseline/all_oos)
+  python scripts/model_quality_eval.py            # compute + write model_metrics
+  python scripts/model_quality_eval.py --force-model-version <x>   # rauðsönnun only
 """
 from __future__ import annotations
 
@@ -61,20 +93,42 @@ from migration_helpers import (  # noqa: E402
 sys.stdout.reconfigure(encoding="utf-8", errors="replace") if hasattr(
     sys.stdout, "reconfigure") else None
 
-OOS_CUTOFF = "2026-04-20"            # iter4 .lgb trained 2026-04-21 → sales after = OOS
-MODEL_VERSION = "iter4_final_v1"
-ANCHOR_KEY = "model_pred_anchor_ym"  # model real-scale anchor (frozen until iter5)
+# ---- FASTI 1: model version. NOT a constant any more (cc47 rótarfix) --------------
+# Read from pipeline_config at runtime; flip_iter4r.py writes it in the flip txn next to
+# model_pred_anchor_ym, so the engine follows every future flip with no code edit.
+MODEL_VERSION_KEY = "model_version"
+ANCHOR_KEY = "model_pred_anchor_ym"  # model real-scale anchor (moves only on a flip)
 
-# ÁKVÖRÐUN 1 (2026-06-27) — adapter freeze anchor. public.predictions were frozen by
-# phase_d3_score_extract when model_pred_anchor_ym was 2026-05; the weekly CPI engine has
-# since moved the live anchor to 2026-07 AND re-anchored training_data_v2.pkl, whose
-# cpi_factor the adapter reads. Re-scoring through the live pkl rescales every adapter
-# prediction by cpi[2026-05]/cpi[2026-07] = -0.8768% uniform (empirically confirmed to 6dp,
-# std 0 → pure scale, not model error). The fix pins the adapter's real→nominal conversion
-# to the FREEZE anchor below, NOT the live pipeline_config value. This constant records the
-# anchor the predictions were written with (not queryable — the live config was overwritten).
-FREEZE_ANCHOR_YM = "2026-05"
-PRED_VALUATION_YM = "2026-04"        # phase_d3 VALUATION_YEAR/MONTH — stored preds nominal @ this
+# ---- FASTI 2: OOS-skilgreiningin, tvöföld (cc47) -----------------------------------
+# Neither bound is written here. Both come off the artifact manifest on disk
+# (D:\model_artifacts\<model_version>\<model_version>_manifest.json):
+#   train_end -> oos_cutoff for scope (a) holdout30
+#   data_end  -> oos_cutoff for scope (b) fresh_edge, AND the > bound of that scope
+# Reading them means a retrain cannot leave the engine measuring a stale window.
+ARTIFACT_ROOT = Path(r"D:\model_artifacts")
+SCOPE_HOLDOUT = "holdout30"
+SCOPE_FRESH = "fresh_edge"
+HOLDOUT_MIN_ROWS = 200   # sanity floor: 30% of a real calib window is never this small
+FRESH_MIN_ROWS = 1       # by construction tiny right after a retrain; 0 is still a failure
+
+# ---- FASTAR 3+4: adapter freeze anchor / valuation month (E2 Haiku path only) -------
+# ÁKVÖRÐUN 1 (2026-06-27), repointed to iter4r_20260716 (cc47). Source of truth is
+# docs/fable_prep/audit/RETRAIN_ITER4R_2026-07-16.md, read off disk — not inferred:
+#   §2 M5   -> model_pred_anchor_ym = '2026-08', written inside the flip txn 16.07 21:06Z
+#   §4      -> predicted_at stays 2026-07-01 (verðmats-mánuður, not flip day)
+# The adapter divides its real output by cpi[FREEZE]/cpi[PRED_VALUATION] to reproduce the
+# stored nominal scale. Pinning to the FREEZE anchor (not the live pipeline_config value)
+# keeps the adapter reproducing the frozen rows even after a weekly CPI re-anchor moves
+# sales_history_anchor_ym past it.
+FREEZE_ANCHOR_YM = "2026-08"
+PRED_VALUATION_YM = "2026-07"
+
+# The E2/parity adapter (phase_d3_score_extract) still loads D:\iter4a_*.lgb and stamps
+# 'iter4_final_v1'. After the iter4r flip that is a DIFFERENT model from the one in
+# public.predictions, so rescoring through it would compare two models and call the
+# difference "extraction gap". The paired block therefore refuses to run unless the
+# adapter's stamp matches the live model_version — loudly, and booked, never silently.
+ADAPTER_MODEL_VERSION = "iter4_final_v1"
 
 # Resumable raw-extraction cache (outside repo). Keyed by fastnum + listing-hash so a
 # killed/repeated run resumes without re-paying Haiku, and a changed listing re-extracts.
@@ -151,32 +205,132 @@ def metrics_from_arrays(actual, pred, lo80, hi80, lo95, hi95) -> dict | None:
     }
 
 
-def fetch_oos(conn) -> pd.DataFrame:
-    """Pull OOS (prediction, sale) pairs with de-anchor inputs + segment dims."""
-    sql = f"""
-    WITH anchor AS (
-      SELECT cpi AS anchor_cpi FROM public.cpi_index
-      WHERE year_month = (SELECT value FROM public.pipeline_config WHERE key='{ANCHOR_KEY}')
-    )
-    SELECT s.fastnum, s.thinglystdags, s.kaupverd_nominal,
+class MeasurementFailure(RuntimeError):
+    """A measurement that produced nothing. Distinguished from a crash so main() can book
+    it as a FAILED run and exit 1 instead of writing an empty 'success' (cc47)."""
+
+
+def loud(msg: str) -> None:
+    """A line that must survive skimming a 40 KB log. Used only for failures/HALTs."""
+    bar = "!" * 78
+    print(f"\n{bar}\n!! {msg}\n{bar}\n")
+
+
+def read_model_version(conn, override: str | None = None) -> str:
+    """Live model version from pipeline_config (cc47 rótarfix — never hard-coded).
+
+    `override` exists ONLY for the rauðsönnun (--force-model-version): pointing the engine
+    at a name that does not exist must make it fail loudly, not return a quiet zero.
+    """
+    if override:
+        print(f"  model_version: '{override}' (--force-model-version — RAUÐSÖNNUN, "
+              f"pipeline_config bypassed)")
+        return override
+    with conn.cursor() as cur:
+        cur.execute("SELECT value FROM public.pipeline_config WHERE key=%s",
+                    (MODEL_VERSION_KEY,))
+        row = cur.fetchone()
+    if row is None or not row[0]:
+        raise MeasurementFailure(
+            f"pipeline_config missing '{MODEL_VERSION_KEY}' — refusing to guess a model "
+            f"version. The flip writes this key; if it is absent the flip is incomplete.")
+    print(f"  model_version: '{row[0]}' (pipeline_config.{MODEL_VERSION_KEY})")
+    return row[0]
+
+
+def read_manifest(model_version: str) -> dict:
+    """Training manifest off disk — the source for train_end / data_end / holdout seed.
+
+    Not inferred and not duplicated as a constant: a retrain rewrites this file, so the
+    OOS window follows the artifact automatically. Missing manifest = measurement failure,
+    because guessing the window would silently mislabel every row written.
+    """
+    import json
+    p = ARTIFACT_ROOT / model_version / f"{model_version}_manifest.json"
+    if not p.exists():
+        raise MeasurementFailure(f"manifest not found: {p} — cannot resolve the OOS window "
+                                 f"for model_version='{model_version}'")
+    mf = json.loads(p.read_text(encoding="utf-8"))
+    for k in ("train_end", "data_end", "holdout_seed", "holdout_frac"):
+        if k not in mf:
+            raise MeasurementFailure(f"{p.name} missing '{k}'")
+    print(f"  manifest: train_end={mf['train_end']} data_end={mf['data_end']} "
+          f"holdout={mf['holdout_frac']:.0%} seed={mf['holdout_seed']} "
+          f"n_features={mf.get('n_features')}")
+    return mf
+
+
+def read_holdout_faerslunumer(model_version: str, manifest: dict) -> list[int]:
+    """FAERSLUNUMER of the 30% holdout, read off the artifact folder (cc47 scope (a)).
+
+    holdout_rows.csv is written by precompute/holdout_eval.py from predictions.pkl
+    calib_role=='holdout' AFTER the same filters the training report used (onothaefur=0,
+    not is_suspect_comparable). Keyed on FAERSLUNUMER (the sale PK) rather than FASTNUM: a
+    property with two sales in the window would otherwise pull in a sale that WAS in
+    calibration and quietly contaminate the held-out set.
+    """
+    p = ARTIFACT_ROOT / model_version / f"{model_version}_holdout_rows.csv"
+    if not p.exists():
+        raise MeasurementFailure(
+            f"holdout rows not found: {p} — scope '{SCOPE_HOLDOUT}' is undefined without "
+            f"the membership list. Re-run precompute/holdout_eval.py for this artifact.")
+    h = pd.read_csv(p)
+    for c in ("FAERSLUNUMER", "calib_role"):
+        if c not in h.columns:
+            raise MeasurementFailure(f"{p.name} missing column '{c}'")
+    bad = set(h["calib_role"].unique()) - {"holdout"}
+    if bad:
+        raise MeasurementFailure(f"{p.name} contains non-holdout calib_role: {sorted(bad)}")
+    fnr = sorted({int(x) for x in h["FAERSLUNUMER"]})
+    print(f"  holdout membership: {len(fnr)} FAERSLUNUMER from {p.name} "
+          f"(seed {manifest['holdout_seed']}, {manifest['holdout_frac']:.0%} stratified)")
+    return fnr
+
+
+# Shared SELECT for both scopes. anchor_cpi is passed IN as a parameter, deliberately NOT
+# joined as `CROSS JOIN (SELECT cpi ... WHERE year_month = (SELECT value ...))`: if the
+# anchor month were absent from cpi_index that CROSS JOIN silently annihilates every row
+# and the engine reports a clean zero. That is exactly how run 76 died. read_model_anchor_cpi
+# resolves the anchor first and raises on a miss, so the failure is loud and located.
+_OOS_SELECT = """
+    SELECT s.fastnum, s.faerslunumer, s.thinglystdags, s.kaupverd_nominal,
            p.real_pred_mean, p.real_pred_lo80, p.real_pred_hi80,
            p.real_pred_lo95, p.real_pred_hi95,
-           cs.cpi AS cpi_sale, a.anchor_cpi,
+           cs.cpi AS cpi_sale, %(anchor_cpi)s::numeric AS anchor_cpi,
            pr.matsvaedi_numer, pr.canonical_code, pr.is_new_build, pr.region_tier
     FROM public.predictions p
     JOIN public.sales_history s ON s.fastnum = p.fastnum
     JOIN public.properties pr ON pr.fastnum = p.fastnum
-    CROSS JOIN anchor a
     LEFT JOIN public.cpi_index cs ON cs.year_month = to_char(s.thinglystdags, 'YYYY-MM')
-    WHERE p.model_version = '{MODEL_VERSION}'
-      AND s.thinglystdags > DATE '{OOS_CUTOFF}'
+    WHERE p.model_version = %(mv)s
       AND s.onothaefur = 0          -- arm's-length only; onothaefur=1 are non-market
                                     -- (gifts/partial transfers) and would wreck MAPE/bias
       AND s.kaupverd_nominal IS NOT NULL AND s.kaupverd_nominal > 0
       AND p.real_pred_mean IS NOT NULL
+"""
+
+
+def fetch_oos(conn, model_version: str, anchor_cpi: float, scope: str,
+              manifest: dict, holdout_fnr: list[int] | None) -> pd.DataFrame:
+    """Pull (prediction, sale) pairs for ONE scope, with de-anchor inputs + segment dims.
+
+    scope='holdout30'  -> rows whose FAERSLUNUMER is in the artifact holdout list (a)
+    scope='fresh_edge' -> rows thinglyst strictly after manifest data_end (b)
+
+    The two are disjoint: data_end is the last day in the training frame, so no holdout
+    row can be on the fresh edge. main() asserts that rather than trusting it.
     """
+    params: dict = {"anchor_cpi": anchor_cpi, "mv": model_version}
+    if scope == SCOPE_HOLDOUT:
+        params["fnr"] = holdout_fnr
+        sql = _OOS_SELECT + "      AND s.faerslunumer = ANY(%(fnr)s)\n"
+    elif scope == SCOPE_FRESH:
+        params["edge"] = manifest["data_end"]
+        sql = _OOS_SELECT + "      AND s.thinglystdags > DATE %(edge)s\n"
+    else:
+        raise ValueError(f"unknown scope {scope!r}")
     with conn.cursor() as cur:
-        cur.execute(sql)
+        cur.execute(sql, params)
         cols = [d[0] for d in cur.description]
         df = pd.DataFrame(cur.fetchall(), columns=cols)
     return df
@@ -276,12 +430,14 @@ def segments(df: pd.DataFrame):
 # ======================================================================
 # EINKUNN 2 (full) — paired OOS, Haiku extraction (SKREF D)
 # ======================================================================
-def fetch_paired_oos(conn) -> pd.DataFrame:
+def fetch_paired_oos(conn, model_version: str, oos_cutoff: str) -> pd.DataFrame:
     """OOS sales (onothaefur=0, after cutoff) that have a listing description.
 
     One row per (fastnum, sale); lysing = most-recent listing for that fastnum.
+    Paired/E2 keeps the single-cutoff window (manifest train_end): it measures the
+    extraction CONTRIBUTION, a within-subset delta, not the headline calibration number.
     """
-    sql = f"""
+    sql = """
     WITH listing AS (
       SELECT DISTINCT ON (fastnum) fastnum, lysing
       FROM scraper.listings_canonical
@@ -303,21 +459,21 @@ def fetch_paired_oos(conn) -> pd.DataFrame:
     JOIN public.sales_history s ON s.fastnum = p.fastnum
     JOIN public.properties pr ON pr.fastnum = p.fastnum
     JOIN listing l ON l.fastnum = p.fastnum
-    WHERE p.model_version = '{MODEL_VERSION}'
-      AND s.thinglystdags > DATE '{OOS_CUTOFF}'
+    WHERE p.model_version = %(mv)s
+      AND s.thinglystdags > DATE %(cutoff)s
       AND s.onothaefur = 0
       AND s.kaupverd_nominal IS NOT NULL AND s.kaupverd_nominal > 0
     ORDER BY s.fastnum, s.thinglystdags DESC
     """
     with conn.cursor() as cur:
-        cur.execute(sql)
+        cur.execute(sql, {"mv": model_version, "cutoff": oos_cutoff})
         cols = [d[0] for d in cur.description]
         return _coerce_numeric(pd.DataFrame(cur.fetchall(), columns=cols))
 
 
-def fetch_parity_sample(conn, n: int) -> pd.DataFrame:
+def fetch_parity_sample(conn, n: int, model_version: str, oos_cutoff: str) -> pd.DataFrame:
     """Sample OOS fastnums with structured cols + FROZEN real_pred_median (D2 gate)."""
-    sql = f"""
+    sql = """
     SELECT DISTINCT ON (s.fastnum)
            s.fastnum, p.real_pred_median AS frozen_median,
            pr.einflm, pr.lod_flm, pr.byggar, pr.matsvaedi_numer, pr.matsvaedi_bucket,
@@ -326,14 +482,14 @@ def fetch_parity_sample(conn, n: int) -> pd.DataFrame:
     FROM public.predictions p
     JOIN public.sales_history s ON s.fastnum = p.fastnum
     JOIN public.properties pr ON pr.fastnum = p.fastnum
-    WHERE p.model_version = '{MODEL_VERSION}'
-      AND s.thinglystdags > DATE '{OOS_CUTOFF}' AND s.onothaefur = 0
+    WHERE p.model_version = %(mv)s
+      AND s.thinglystdags > DATE %(cutoff)s AND s.onothaefur = 0
       AND p.real_pred_median IS NOT NULL
     ORDER BY s.fastnum
-    LIMIT {int(n)}
+    LIMIT %(lim)s
     """
     with conn.cursor() as cur:
-        cur.execute(sql)
+        cur.execute(sql, {"mv": model_version, "cutoff": oos_cutoff, "lim": int(n)})
         cols = [d[0] for d in cur.description]
         return _coerce_numeric(pd.DataFrame(cur.fetchall(), columns=cols))
 
@@ -627,6 +783,9 @@ def main() -> int:
     ap.add_argument("--parity", action="store_true",
                     help="D2 gate: adapter baseline vs frozen predictions, then exit")
     ap.add_argument("--parity-n", type=int, default=100, help="parity sample size")
+    ap.add_argument("--force-model-version", default=None,
+                    help="RAUÐSÖNNUN ONLY: bypass pipeline_config and measure this version. "
+                         "Pointing it at a name that does not exist MUST exit non-zero.")
     args = ap.parse_args()
 
     # Self-log: tee stdout to LOGFILE (append) so the scheduled run leaves a durable trace.
@@ -640,7 +799,7 @@ def main() -> int:
         _logf = None
 
     print(f"=== model_quality_eval ({'DRYRUN' if args.dryrun else 'LIVE'}) — "
-          f"EINKUNN 1 baseline/all_oos, cutoff {OOS_CUTOFF} ===")
+          f"tvöföld OOS: '{SCOPE_HOLDOUT}' (aðaltala) + '{SCOPE_FRESH}' (hliðartala) ===")
 
     conn_log = open_connection()
     run_id = start_run(conn_log, "model_quality_eval")
@@ -649,11 +808,20 @@ def main() -> int:
     try:
         conn_ro = open_ro_conn()
 
+        # Resolve the live model + its window BEFORE any query. Every one of these raises
+        # MeasurementFailure on a miss — the engine must never fall through to a default
+        # and produce a confident number about the wrong cohort (cc47 rótarfix).
+        model_version = read_model_version(conn_ro, args.force_model_version)
+        manifest = read_manifest(model_version)
+        anchor_ym, anchor_cpi = read_model_anchor_cpi(conn_ro)
+        print(f"  metrics de-anchor base: cpi[{anchor_ym}]={anchor_cpi:.3f} (ÁKVÖRÐUN 2)")
+
         # ---- D2 PARITY GATE: adapter baseline vs frozen predictions, then exit ----
         if args.parity:
             sid = start_step(conn_log, run_id, "parity_gate", 1)
             models = load_models_freeze_anchored(conn_ro)
-            pdf = fetch_parity_sample(conn_ro, args.parity_n)
+            pdf = fetch_parity_sample(conn_ro, args.parity_n, model_version,
+                                      manifest["train_end"])
             frozen = dict(zip(pdf["fastnum"].astype("int64"), pdf["frozen_median"].astype(float)))
             ptab = run_parity(pdf, frozen, models)
             tot = len(ptab); ok = int((ptab["pct_diff"] < 0.1).sum())
@@ -674,13 +842,24 @@ def main() -> int:
                         "max_pct_diff": round(mx, 6), "verdict": verdict})
             return 0
 
-        sid = start_step(conn_log, run_id, "compute_baseline_all_oos", 1)
-        df = fetch_oos(conn_ro)
+        # ================= SKREF A: aðaltala — 30% holdout (kvörðunarheilindi) =========
+        sid = start_step(conn_log, run_id, "compute_holdout30", 1)
+        holdout_fnr = read_holdout_faerslunumer(model_version, manifest)
+        df = fetch_oos(conn_ro, model_version, anchor_cpi, SCOPE_HOLDOUT,
+                       manifest, holdout_fnr)
         n_missing_cpi = int(df["cpi_sale"].isna().sum())
         df = df[df["cpi_sale"].notna()].copy()
-        print(f"  OOS pairs={len(df):,} (missing-cpi dropped={n_missing_cpi})")
+        print(f"\n  [{SCOPE_HOLDOUT}] pairs={len(df):,} of {len(holdout_fnr)} holdout sales "
+              f"(missing-cpi dropped={n_missing_cpi})")
+        # cc47 rótarfix: an empty measurement is a FAILURE. Previously this fell straight
+        # through to a 0-row write booked as 'success'.
+        if len(df) < HOLDOUT_MIN_ROWS:
+            raise MeasurementFailure(
+                f"scope '{SCOPE_HOLDOUT}' returned {len(df)} pairs (floor {HOLDOUT_MIN_ROWS}) "
+                f"for model_version='{model_version}'. Either the version is not in "
+                f"public.predictions, or the holdout list belongs to a different artifact.")
 
-        rows = []  # model_metrics rows
+        rows = []  # (sample_scope, oos_cutoff, segment_dim, segment_value, metrics)
         overall = None
         for dim, val, sub in segments(df):
             m = compute_metrics(sub)
@@ -688,46 +867,117 @@ def main() -> int:
                 continue
             if dim == "overall":
                 overall = m
-            rows.append((dim, val, m))
+            rows.append((SCOPE_HOLDOUT, manifest["train_end"], dim, val, m))
+        if overall is None:
+            raise MeasurementFailure(
+                f"scope '{SCOPE_HOLDOUT}': {len(df)} pairs but NO residential dwellings — "
+                f"the headline 'overall' segment is empty, so there is no aðaltala to judge.")
 
-        # console report
-        print(f"\n  {'dim':<13} {'value':<16} {'n':>5} {'mape':>7} {'medape':>7} "
+        # ================= SKREF B: hliðartala — ferskur jaðar =========================
+        # Overall only, deliberately: at this n a segment breakdown would read as detail it
+        # cannot support. Written with its own sample_scope + its own oos_cutoff so nothing
+        # downstream can sum it into (a).
+        edge_df = fetch_oos(conn_ro, model_version, anchor_cpi, SCOPE_FRESH, manifest, None)
+        n_edge_missing_cpi = int(edge_df["cpi_sale"].isna().sum())
+        edge_df = edge_df[edge_df["cpi_sale"].notna()].copy()
+        print(f"  [{SCOPE_FRESH}] pairs={len(edge_df):,} (thinglyst > {manifest['data_end']}, "
+              f"missing-cpi dropped={n_edge_missing_cpi})")
+        if len(edge_df) < FRESH_MIN_ROWS:
+            raise MeasurementFailure(
+                f"scope '{SCOPE_FRESH}' returned {len(edge_df)} pairs after "
+                f"{manifest['data_end']}. Zero fresh sales means the sales pipeline has "
+                f"stalled — that is a finding, not an empty measurement.")
+
+        # DISJOINTNESS: asserted, not assumed. data_end is the last day in the training
+        # frame, so a holdout sale cannot also be on the fresh edge; if it can, one of the
+        # two windows is mislabelled and both numbers are suspect.
+        ov = set(df["faerslunumer"].dropna()) & set(edge_df["faerslunumer"].dropna())
+        if ov:
+            raise MeasurementFailure(
+                f"scopes overlap on {len(ov)} faerslunumer (e.g. {sorted(ov)[:5]}) — "
+                f"'{SCOPE_HOLDOUT}' and '{SCOPE_FRESH}' must be disjoint.")
+
+        edge_overall = compute_metrics(edge_df[edge_df["canonical_code"].apply(_is_residential)])
+        if edge_overall is None:
+            raise MeasurementFailure(
+                f"scope '{SCOPE_FRESH}': {len(edge_df)} pairs but no residential dwellings.")
+        rows.append((SCOPE_FRESH, manifest["data_end"], "overall", "", edge_overall))
+
+        # ---- console report ----
+        print(f"\n  {'scope':<11} {'dim':<13} {'value':<16} {'n':>5} {'mape':>7} {'medape':>7} "
               f"{'bias':>7} {'cov80':>6} {'cov95':>6}")
-        for dim, val, m in rows:
-            print(f"  {dim:<13} {val:<16} {m['n']:>5} {m['mape']:>7.2f} {m['med_ape']:>7.2f} "
-                  f"{m['bias']:>7.2f} {m['cov80']:>6.1f} {m['cov95']:>6.1f}")
+        for scope, _cut, dim, val, m in rows:
+            print(f"  {scope:<11} {dim:<13} {val:<16} {m['n']:>5} {m['mape']:>7.2f} "
+                  f"{m['med_ape']:>7.2f} {m['bias']:>7.2f} {m['cov80']:>6.1f} {m['cov95']:>6.1f}")
+        print(f"\n  AÐALTALA   [{SCOPE_HOLDOUT}] n={overall['n']}: MAPE {overall['mape']:.2f}% · "
+              f"medAPE {overall['med_ape']:.2f}% · bias {overall['bias']:+.2f}% · "
+              f"cov80 {overall['cov80']:.1f}% · cov95 {overall['cov95']:.1f}%")
+        print(f"  HLIÐARTALA [{SCOPE_FRESH}] n={edge_overall['n']}: MAPE "
+              f"{edge_overall['mape']:.2f}% · medAPE {edge_overall['med_ape']:.2f}% · bias "
+              f"{edge_overall['bias']:+.2f}% · cov80 {edge_overall['cov80']:.1f}% · cov95 "
+              f"{edge_overall['cov95']:.1f}%   (EKKI lagt við aðaltöluna)")
 
         # flags vs validate_metrics held baseline (context only)
-        flags = {}
-        if overall:
-            flags = {
-                "mape_vs_baseline_pp": round(overall["mape"] - BASELINE["mape"], 2),
-                "cov80_vs_baseline_pp": round(overall["cov80"] - BASELINE["cov80"], 2),
-                "cov95_vs_baseline_pp": round(overall["cov95"] - BASELINE["cov95"], 2),
-                "mape_flag": abs(overall["mape"] - BASELINE["mape"]) > MAPE_FLAG_PP,
-                "cov80_flag": abs(overall["cov80"] - BASELINE["cov80"]) > COV_FLAG_PP,
-                "cov95_flag": abs(overall["cov95"] - BASELINE["cov95"]) > COV_FLAG_PP,
-            }
+        flags = {
+            "mape_vs_baseline_pp": round(overall["mape"] - BASELINE["mape"], 2),
+            "cov80_vs_baseline_pp": round(overall["cov80"] - BASELINE["cov80"], 2),
+            "cov95_vs_baseline_pp": round(overall["cov95"] - BASELINE["cov95"], 2),
+            "mape_flag": abs(overall["mape"] - BASELINE["mape"]) > MAPE_FLAG_PP,
+            "cov80_flag": abs(overall["cov80"] - BASELINE["cov80"]) > COV_FLAG_PP,
+            "cov95_flag": abs(overall["cov95"] - BASELINE["cov95"]) > COV_FLAG_PP,
+        }
         print(f"\n  overall flags vs held baseline: {flags}")
+
+        # ---- DÓMSREGLA (cc47): cov80 of the AÐALTALA below 80% is an architect HALT ----
+        # Evaluated here so the verdict rides along in every write below, but acted on
+        # (exit 2) only after the metrics are safely persisted — the measurement must
+        # survive the halt, otherwise the halt destroys its own evidence.
+        halt_cov80 = overall["cov80"] < 80.0
+        verdict = {
+            "rule": "cov80(aðaltala) >= 80%",
+            "scope": SCOPE_HOLDOUT, "n": overall["n"], "cov80": overall["cov80"],
+            "verdict": "HALT" if halt_cov80 else "PASS",
+        }
+        if halt_cov80:
+            loud(f"DÓMSREGLA TRIPPED: cov80({SCOPE_HOLDOUT}) = {overall['cov80']:.1f}% "
+                 f"< 80% á n={overall['n']}. HALT til arkitekts.")
+            print("  Afleiðingar sem arkitekt á (EKKI gerðar sjálfkrafa):\n"
+                  "    - /adferdafraedi þarf stöðumerkingu (grunnregla 13)\n"
+                  "    - flýtt endurþjálfun skv. yfirlýstri reglu síðunnar\n"
+                  "  Mælingin sjálf er skrifuð í model_metrics; keyrslan endar á exit 2.")
         finish_step(conn_log, sid, 0, rowcount_after=len(df),
-                    notes=f"baseline/all_oos: {len(rows)} seg rows, oos={len(df)}")
+                    notes=f"{SCOPE_HOLDOUT} n={overall['n']} cov80={overall['cov80']} "
+                          f"| {SCOPE_FRESH} n={edge_overall['n']} cov80={edge_overall['cov80']} "
+                          f"| dómsregla={verdict['verdict']}")
 
         # ---- SKREF D: paired OOS — E1 rescored + E2 full + gap (Haiku) ----
         paired_rows = []          # (score_type, metrics) overall, sample_scope='paired_oos'
         paired_summary = {}
         selection = {}
-        if not args.skip_paired:
+        # cc47: the adapter still loads iter4a + stamps ADAPTER_MODEL_VERSION. Once the live
+        # model differs, an E2 "gap" would be the distance between two MODELS wearing an
+        # extraction label. Refuse loudly and book it rather than publish that number.
+        if not args.skip_paired and ADAPTER_MODEL_VERSION != model_version:
             sid2 = start_step(conn_log, run_id, "compute_paired", 2)
-            # E1-VÖRN: the proven Einkunn 1 (baseline/all_oos) is already computed in `rows`.
-            # A paired/Haiku failure (import, auth, all-fail, etc.) must NEVER abort the run
-            # before the E1 write. Wrap the whole paired block so any error logs loudly,
-            # marks the step failed, and falls through to the E1 write below.
+            loud(f"PAIRED/E2 SKIPPED: adapter (phase_d3_score_extract) scores "
+                 f"'{ADAPTER_MODEL_VERSION}' but live model_version is '{model_version}'. "
+                 f"A gap measured across two models is not an extraction gap.")
+            paired_summary = {"paired_skipped": "adapter_model_mismatch",
+                              "adapter_model_version": ADAPTER_MODEL_VERSION,
+                              "live_model_version": model_version}
+            finish_step(conn_log, sid2, 1,
+                        notes=f"paired SKIPPED: adapter={ADAPTER_MODEL_VERSION} != "
+                              f"live={model_version} (E1 unaffected)")
+        elif not args.skip_paired:
+            sid2 = start_step(conn_log, run_id, "compute_paired", 2)
+            # E1-VÖRN: the proven aðaltala is already computed in `rows`. A paired/Haiku
+            # failure (import, auth, all-fail, etc.) must NEVER abort the run before the E1
+            # write. Wrap the whole paired block so any error logs loudly, marks the step
+            # failed, and falls through to the E1 write below.
             try:
                 models = load_models_freeze_anchored(conn_ro)
                 cpi_lookup = fetch_cpi_lookup(conn_ro)
-                anchor_ym, anchor_cpi = read_model_anchor_cpi(conn_ro)
-                print(f"  metrics de-anchor base: cpi[{anchor_ym}]={anchor_cpi:.3f} (ÁKVÖRÐUN 2)")
-                pdf = fetch_paired_oos(conn_ro)
+                pdf = fetch_paired_oos(conn_ro, model_version, manifest["train_end"])
                 pdf = pdf[pdf["canonical_code"].notna()].copy()
                 if args.max_paired is not None:
                     pdf = pdf.head(args.max_paired)
@@ -744,27 +994,31 @@ def main() -> int:
                     print(f"  {st:<9} {m['n']:>4} {m['mape']:>7.2f} {m['med_ape']:>7.2f} "
                           f"{m['bias']:>7.2f} {m['cov80']:>6.1f} {m['cov95']:>6.1f}")
                 print(f"  paired summary: {paired_summary}")
-                # SELECTION: baseline/all_oos (frozen, overall) vs baseline/paired_oos (rescored).
-                # Both now use cpi[model_pred_anchor_ym] de-anchor (ÁKVÖRÐUN 2) → comparable.
+                # SELECTION: aðaltala (frozen holdout, overall) vs baseline/paired_oos
+                # (rescored). Both use the cpi[model_pred_anchor_ym] de-anchor (ÁKVÖRÐUN 2)
+                # → comparable. `sel_verdict`, NOT `verdict`: the latter holds the dómsregla
+                # and must reach the write untouched.
                 bp = scores.get("baseline")
                 if overall and bp:
                     d_med = round(bp["med_ape"] - overall["med_ape"], 2)
-                    verdict = "REPRESENTATIVE" if abs(d_med) <= 2.0 else "SELECTION-SKEWED"
+                    sel_verdict = "REPRESENTATIVE" if abs(d_med) <= 2.0 else "SELECTION-SKEWED"
                     selection = {
-                        "all_oos_n": overall["n"], "paired_n": bp["n"],
-                        "medape_all": overall["med_ape"], "medape_paired": bp["med_ape"],
-                        "mape_all": overall["mape"], "mape_paired": bp["mape"],
-                        "bias_all": overall["bias"], "bias_paired": bp["bias"],
-                        "medape_delta": d_med, "verdict": verdict,
-                        "note": ("baseline/all_oos is frozen predictions; baseline/paired_oos is "
-                                 "re-scored structured-only; both de-anchored at "
+                        "reference_scope": SCOPE_HOLDOUT,
+                        "reference_n": overall["n"], "paired_n": bp["n"],
+                        "medape_reference": overall["med_ape"], "medape_paired": bp["med_ape"],
+                        "mape_reference": overall["mape"], "mape_paired": bp["mape"],
+                        "bias_reference": overall["bias"], "bias_paired": bp["bias"],
+                        "medape_delta": d_med, "verdict": sel_verdict,
+                        "note": (f"reference is the {SCOPE_HOLDOUT} aðaltala from frozen "
+                                 "predictions; baseline/paired_oos is re-scored "
+                                 "structured-only; both de-anchored at "
                                  "cpi[model_pred_anchor_ym] (ÁKVÖRÐUN 2) → comparable. "
                                  "REPRESENTATIVE: gap is pure extraction contribution; "
-                                 "SELECTION-SKEWED: paired subset differs from the OOS universe."),
+                                 "SELECTION-SKEWED: paired subset differs from the universe."),
                     }
-                    print(f"\n  SELECTION ({verdict}): medAPE all_oos {overall['med_ape']:.2f} vs "
-                          f"paired {bp['med_ape']:.2f} (Δ{d_med:+.2f}); "
-                          f"MAPE {overall['mape']:.2f} vs {bp['mape']:.2f}  "
+                    print(f"\n  SELECTION ({sel_verdict}): medAPE {SCOPE_HOLDOUT} "
+                          f"{overall['med_ape']:.2f} vs paired {bp['med_ape']:.2f} "
+                          f"(Δ{d_med:+.2f}); MAPE {overall['mape']:.2f} vs {bp['mape']:.2f}  "
                           f"[n {overall['n']} vs {bp['n']}]")
                 finish_step(conn_log, sid2, 0, rowcount_after=paired_summary.get("scored"),
                             notes=f"paired: {paired_summary}")
@@ -779,28 +1033,49 @@ def main() -> int:
                 finish_step(conn_log, sid2, 1,
                             notes=f"paired FAILED (E1 preserved): {type(e).__name__}: {str(e)[:200]}")
 
-        if args.dryrun:
-            finish_run(conn_log, run_id, "success",
-                       {"dryrun": True, "oos_pairs": len(df), "overall": overall,
-                        "flags": flags, "paired_summary": paired_summary,
-                        "paired": {st: m for st, m in paired_rows}, "selection": selection})
-            print("\n  DRYRUN complete — no model_metrics writes.")
-            return 0
+        run_summary = {
+            "model_version": model_version,
+            "manifest": {k: manifest[k] for k in ("train_end", "data_end",
+                                                  "holdout_seed", "holdout_frac")},
+            "anchor": {"key": ANCHOR_KEY, "ym": anchor_ym, "cpi": anchor_cpi},
+            SCOPE_HOLDOUT: {"pairs": len(df), "overall": overall,
+                            "oos_cutoff": manifest["train_end"], "flags": flags},
+            SCOPE_FRESH: {"pairs": len(edge_df), "overall": edge_overall,
+                          "oos_cutoff": manifest["data_end"]},
+            "domsregla": verdict,
+            "paired_summary": paired_summary, "selection": selection,
+        }
 
-        # ---- write model_metrics (baseline/all_oos + paired baseline/full/gap) ----
+        if args.dryrun:
+            finish_run(conn_log, run_id, "success", {"dryrun": True, **run_summary,
+                                                     "paired": dict(paired_rows)})
+            print("\n  DRYRUN complete — no model_metrics writes.")
+            return 2 if halt_cov80 else 0
+
+        # ---- write model_metrics (holdout30 + fresh_edge + paired baseline/full/gap) ----
         import psycopg2
         from psycopg2.extras import execute_values
         import json
         payload = []
-        for dim, val, m in rows:
-            extra = flags if dim == "overall" else None
-            payload.append((run_id, MODEL_VERSION, OOS_CUTOFF, "baseline", dim, val,
-                            "all_oos", m["n"], m["mape"], m["med_ape"], m["bias"],
+        for scope, cutoff, dim, val, m in rows:
+            # `extra` carries the dómsregla verdict on BOTH overall rows so a reader of a
+            # single model_metrics row can tell whether that number was accepted, without
+            # having to join back to pipeline_runs.
+            extra = None
+            if dim == "overall":
+                extra = {"domsregla": verdict, "scope_role":
+                         "AÐALTALA" if scope == SCOPE_HOLDOUT else "HLIÐARTALA",
+                         "never_sum_with": SCOPE_FRESH if scope == SCOPE_HOLDOUT
+                         else SCOPE_HOLDOUT}
+                if scope == SCOPE_HOLDOUT:
+                    extra.update(flags)
+            payload.append((run_id, model_version, cutoff, "baseline", dim, val,
+                            scope, m["n"], m["mape"], m["med_ape"], m["bias"],
                             m["cov80"], m["cov95"], json.dumps(extra) if extra else None))
         for st, m in paired_rows:
             extra = ({"selection": selection, **paired_summary} if st == "baseline"
                      else (paired_summary if st == "gap" else None))
-            payload.append((run_id, MODEL_VERSION, OOS_CUTOFF, st, "overall", "",
+            payload.append((run_id, model_version, manifest["train_end"], st, "overall", "",
                             "paired_oos", m["n"], m["mape"], m["med_ape"], m["bias"],
                             m["cov80"], m["cov95"], json.dumps(extra) if extra else None))
         url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
@@ -819,19 +1094,36 @@ def main() -> int:
                     "  cov95=EXCLUDED.cov95, extra=EXCLUDED.extra, computed_at=now()",
                     payload)
                 written = cur.rowcount
+            # cc47 rótarfix #2b: a write that lands nothing is a failure, not a quiet
+            # success. Rolled back so the run leaves no half-state behind.
+            if written == 0:
+                conn_w.rollback(); conn_w.close()
+                raise MeasurementFailure(
+                    f"model_metrics write affected 0 rows from a {len(payload)}-row payload")
             conn_w.commit()
+            n_hold = sum(1 for r in rows if r[0] == SCOPE_HOLDOUT)
+            n_edge = sum(1 for r in rows if r[0] == SCOPE_FRESH)
             print(f"\n  wrote {written} model_metrics rows "
-                  f"({len(rows)} all_oos + {len(paired_rows)} paired)")
+                  f"({n_hold} {SCOPE_HOLDOUT} + {n_edge} {SCOPE_FRESH} + "
+                  f"{len(paired_rows)} paired)")
+        except MeasurementFailure:
+            raise
         except Exception as e:
             conn_w.rollback(); conn_w.close()
             finish_run(conn_log, run_id, "failed", {"step": "write", "error": str(e)[:500]})
             return 1
         conn_w.close()
-        finish_run(conn_log, run_id, "success",
-                   {"dryrun": False, "oos_pairs": len(df), "overall": overall, "flags": flags,
-                    "paired_summary": paired_summary, "selection": selection,
-                    "rows_written": len(payload)})
-        return 0
+        finish_run(conn_log, run_id, "halt_cov80" if halt_cov80 else "success",
+                   {"dryrun": False, **run_summary, "rows_written": len(payload)})
+        return 2 if halt_cov80 else 0
+    except MeasurementFailure as e:
+        # An empty or undefined measurement. Loud, booked, exit 1 — the state this engine
+        # used to report as a clean 'success' with 0 rows (run 76, 2026-07-20).
+        loud(f"MÆLING SKILAÐI ENGU: {e}")
+        finish_run(conn_log, run_id, "failed",
+                   {"measurement_failure": str(e)[:500],
+                    "model_version": args.force_model_version or "<pipeline_config>"})
+        return 1
     except Exception as e:
         print(f"*** CRASH: {type(e).__name__}: {e}")
         finish_run(conn_log, run_id, "crashed", {"error": str(e)[:500]})

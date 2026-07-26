@@ -9,9 +9,18 @@ Cadence-separated from the daily fresh-data path (daily_sales_refresh.py) and th
 monthly model pipeline (run_monthly.py). It touches ONLY kaupverd_real (a pure
 re-expression on a new anchor — nominal/thinglystdags/onothaefur/einflm/byggar
 untouched), public.pipeline_config.sales_history_anchor_ym, and public.cpi_index.
-It NEVER moves model_pred_anchor_ym (iter5 deploy only) and NEVER touches
+It NEVER moves model_pred_anchor_ym (model flip only) and NEVER touches
 predictions / any model output. v_model_vs_sold is anchor-independent (nominal/
 nominal) so this re-anchor cannot desync it.
+
+AKKERIS-VÖRÐUR (cc47, step 2b): because this engine moves one anchor and not the
+other, the sales anchor can overtake model_pred_anchor_ym. That is legitimate — a
+new CPI month is real data — but it silently splits the REAL scale: from that point
+kaupverd_real is expressed at cpi[sales_anchor] while predictions.real_pred_* stays
+at cpi[model_anchor], so any caller comparing the two directly inherits an offset of
+cpi[sales_anchor]/cpi[model_anchor]. The guard WARNs loudly and books the verdict in
+pipeline_runs.summary.anchor_guard; it does not abort. Callers that must be immune
+compare nominal/nominal (see DATA_SCHEMA, "Akkeris-invariantinn").
 
 Reuses the derive core from rebuild_sales_history.py by import — re-anchor is the
 SAME Python float64 derive path with a different anchor's cpi_lookup, guaranteeing
@@ -54,7 +63,7 @@ from rebuild_sales_history import (  # noqa: E402  reuse derive core, no re-impl
     REFRESH_KAUPSKRA,  # noqa: F401  (kept for symmetry; not used here)
     DBCONFIG,
 )
-from anchor_config import read_anchor  # noqa: E402  reads sales_history_anchor_ym
+from anchor_config import read_anchor, read_model_anchor  # noqa: E402  pipeline_config anchors
 from daily_sales_refresh import MV_LIST, mvs_touching  # noqa: E402  single source of truth for the 13 MV + MV_SOURCES vörpunin
 from migration_helpers import (  # noqa: E402  shared Group C audit logging
     start_run, start_step, finish_step, finish_run, open_connection,
@@ -158,13 +167,46 @@ def main() -> int:
         new_anchor = args.test_anchor or csv_max_month()
         log(f"[2] cur_anchor(live)={cur_anchor}  new_anchor={new_anchor}  "
             f"(source={'--test-anchor' if args.test_anchor else 'max(csv)'})")
-        finish_step(conn_log, sid, 0, notes=f"cur={cur_anchor} new={new_anchor}")
+
+        # ---- Step 2b: AKKERIS-VÖRÐUR (cc47) — sales anchor vs model anchor -----------
+        # This engine moves ONLY sales_history_anchor_ym; model_pred_anchor_ym moves on a
+        # model flip. Nothing stops the sales anchor from overtaking it, and nothing about
+        # that is illegitimate — a forward CPI month is real data. What is NOT legitimate
+        # is doing it silently: from that moment kaupverd_real and predictions.real_pred_*
+        # sit on different bases, so every REAL-vs-REAL comparison carries a hidden offset
+        # of cpi[sales_anchor]/cpi[model_anchor]. Nominal/nominal comparisons (the
+        # v_model_vs_sold family, model_quality_eval) are unaffected. Loud WARN + booked in
+        # pipeline_runs. Deliberately NOT an abort: the offset is the readers' problem to
+        # pin, and blocking a legitimate CPI month to protect an unpinned reader would be
+        # the wrong lever.
+        model_anchor = read_model_anchor(conn_ro)
+        anchor_guard = {"sales_anchor_new": new_anchor, "model_anchor": model_anchor}
+        if model_anchor is None:
+            log(f"[2b] WARN akkeris-vörður: pipeline_config['model_pred_anchor_ym'] vantar "
+                f"— get ekki borið saman akkerin.")
+            anchor_guard["verdict"] = "MODEL_ANCHOR_MISSING"
+        elif new_anchor > model_anchor:
+            log("[2b] " + "!" * 70)
+            log(f"[2b] !! WARN AKKERIS-FRÁVIK: sales_history_anchor_ym {new_anchor} > "
+                f"model_pred_anchor_ym {model_anchor}.")
+            log(f"[2b] !! kaupverd_real fer á {new_anchor}-grunn, real_pred_* situr eftir á "
+                f"{model_anchor}. Real-vs-real samanburður ber þaðan í frá falinn skekk; "
+                f"nominal/nominal er ósnortið. Ekki abort — framtíðarvísitala er lögmæt.")
+            log("[2b] " + "!" * 70)
+            anchor_guard["verdict"] = "SALES_ANCHOR_AHEAD"
+        else:
+            log(f"[2b] akkeris-vörður OK: sales {new_anchor} <= model {model_anchor}")
+            anchor_guard["verdict"] = "OK"
+        finish_step(conn_log, sid, 0,
+                    notes=f"cur={cur_anchor} new={new_anchor} "
+                          f"model_anchor={model_anchor} guard={anchor_guard['verdict']}")
 
         if not args.test_anchor and new_anchor <= cur_anchor:
             log(f"[2] anchor unchanged (new={new_anchor} <= cur={cur_anchor}) — no-op. Exiting.")
             finish_run(conn_log, run_id, "success",
                        {"noop": True, "reason": "anchor unchanged",
-                        "anchor": cur_anchor, "dryrun": args.dryrun})
+                        "anchor": cur_anchor, "dryrun": args.dryrun,
+                        "anchor_guard": anchor_guard})
             return 0
 
         # ---- Step 3: re-derive at the new anchor (Python parity) ----
@@ -296,7 +338,8 @@ def main() -> int:
                        {"dryrun": True, "noop": False, "old_anchor": cur_anchor,
                         "new_anchor": new_anchor, "rows_would_update": updated,
                         "measured_seconds": round(elapsed, 1),
-                        "would_backup_table": backup_table})
+                        "would_backup_table": backup_table,
+                        "anchor_guard": anchor_guard})
             return 0
 
         # ---- Step 4: pre-flight backup (LIVE) — own committed txn BEFORE re-anchor ----
@@ -407,7 +450,7 @@ def main() -> int:
         finish_run(conn_log, run_id, "success",
                    {"noop": False, "old_anchor": cur_anchor, "new_anchor": new_anchor,
                     "rows_updated": updated, "rows_changed": n_changed,
-                    "backup_table": backup_table})
+                    "backup_table": backup_table, "anchor_guard": anchor_guard})
         return 0
     except Exception as e:
         log(f"*** CRASH: {type(e).__name__}: {e}")

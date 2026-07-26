@@ -13,6 +13,23 @@ The daily fresh-data path keeps this PINNED; only the monthly path moves it
 from __future__ import annotations
 
 ANCHOR_KEY = "sales_history_anchor_ym"
+MODEL_ANCHOR_KEY = "model_pred_anchor_ym"
+
+
+def read_model_anchor(conn) -> str | None:
+    """Return model_pred_anchor_ym, or None if the key is absent.
+
+    Deliberately NOT fatal, unlike read_anchor: the sales-history path is correct with or
+    without it. It exists so callers can DETECT the sales anchor overtaking the model
+    anchor — the state in which kaupverd_real and predictions.real_pred_* stop living on
+    the same scale, and every real-vs-real comparison acquires a silent offset of
+    cpi[sales_anchor]/cpi[model_anchor]. Nominal/nominal comparisons are immune.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT value FROM public.pipeline_config WHERE key = %s",
+                    (MODEL_ANCHOR_KEY,))
+        row = cur.fetchone()
+    return str(row[0]) if row and row[0] is not None else None
 
 
 def read_anchor(conn) -> str:
