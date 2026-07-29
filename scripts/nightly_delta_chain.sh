@@ -188,11 +188,14 @@ PY
 # ── v2/v3: parse + promote BOTH layers (BLOKK 6); only after four clean fetch modes ──
 run_promote() {
   if [ $DRY -eq 1 ]; then
-    say "[dry-run] would run: parse_mbl --confirm; promote_mbl --slice priced --table {sale,rent}; promote_listings_append --confirm"
+    say "[dry-run] would run: canary_spatial_ref_sys; parse_mbl --confirm; promote_mbl --slice priced --table {sale,rent}; promote_listings_append --confirm"
     return 0
   fi
   local plog=$MODELOGS/promote_${TS}.log
   ( cd "$APP" || exit 90
+    # cc55 canary: refuse before any geog-computing write if the SRID registry deviates
+    # (anon write grants on spatial_ref_sys still open — RLS_FIX_20260729T075021Z.md §3)
+    echo "=== canary spatial_ref_sys ===";  python -m scripts.canary_spatial_ref_sys                            || exit 10
     echo "=== parse ===";                  python -m scripts.parse_mbl --confirm                                || exit 11
     echo "=== promote canonical sale ===";  python -m scripts.promote_mbl --confirm --slice priced --table sale  || exit 12
     echo "=== promote canonical rent ===";  python -m scripts.promote_mbl --confirm --slice priced --table rent  || exit 13

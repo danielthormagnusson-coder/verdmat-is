@@ -11,6 +11,8 @@
 #   1. fetch_myigloo                       full sweep -> raw_myigloo.db (content-hash idempotent,
 #                                          run_id-stamped; worst unattended failure = wasted requests)
 #   2. parse_myigloo                       pending detail blobs -> parsed_myigloo
+#   2b. canary_spatial_ref_sys (cc55)      refuse (exit!=0) if the SRID registry deviates from
+#                                          shipped state, BEFORE any geog-computing write
 #   3. promote_myigloo (canonical)         parsed -> scraper.listings_canonical (old fold path, kept
 #                                          in sync during the dual-layer transition)
 #   4. promote_myigloo_listings_append     parsed + active-set diff -> scraper.listings (Layer 1) +
@@ -97,6 +99,9 @@ run_step() {                  # $1 label, $2.. command (run from $APP)
 
 run_step fetch     python scripts/fetch_myigloo.py                               || exit 1
 run_step parse     python scripts/parse_myigloo.py                               || exit 1
+# cc55 canary: refuse before any geog-computing write if the SRID registry deviates
+# (anon write grants on spatial_ref_sys still open — RLS_FIX_20260729T075021Z.md §3)
+run_step canary    python -m scripts.canary_spatial_ref_sys                      || exit 1
 run_step canonical python -m scripts.promote_myigloo                             || exit 1
 run_step lag1      python -m scripts.promote_myigloo_listings_append --confirm   || exit 1
 
