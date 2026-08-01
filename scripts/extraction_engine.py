@@ -29,8 +29,12 @@ from psycopg2.extras import execute_values, Json
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # scripts/
 sys.path.insert(0, r"D:\\")                                  # build_training_data_v2
 
+# cc47 replaced the hardcoded MODEL_VERSION with pipeline_config.model_version + the adapter's
+# own stamp; these valuations are computed BY the freeze-anchored adapter, so its stamp is the
+# honest model_version here (same value the historical listing_valuations rows carry).
 from model_quality_eval import (  # noqa: E402
-    load_models_freeze_anchored, _score_iter4, _coerce_numeric, MODEL_VERSION)
+    load_models_freeze_anchored, _score_iter4, _coerce_numeric,
+    ADAPTER_MODEL_VERSION as MODEL_VERSION)
 from build_training_data_v2 import build_extraction_features  # noqa: E402
 
 VALUATION_YEAR = 2026
