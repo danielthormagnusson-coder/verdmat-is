@@ -42,6 +42,13 @@ Heimildalisti (fastir liðir):
 | Löng PDF hafa token-þak í fetch-i | Taka töflur/lykiltölur, ekki heildarskjöl; flagga það sem næst ekki |
 | Start-Process + python = cp1252 kóðunarhrun | `$env:PYTHONIOENCODING="utf-8"` fyrir ræsingu |
 
+### Framsetning: nafn og eigin-heimildir (skerping cc17, 2026-07-17)
+
+Gildir í BÁÐUM afurðum — frumritunum (Fasi 4) og `.ts`-transskripsjóninni (Fasi 5):
+
+- **Nafnið er alltaf `verdmat.ai`** — aldrei `verdmat.is`. (Júní-skýrslan bar ranga rithátt í eigin nafni, leiðrétt cc17. Athuga: `verdmat-is` með bandstriki er repo-/Vercel-heiti og á ekki heima í skýrslutexta.)
+- **Eigin-gagna heimildalínurnar eru í notenda-formi**, t.d. „verdmat.ai — söluskrá, þinglýst t.o.m. [dags]“ og „verdmat.ai — vöktun söluauglýsinga og verðmatslíkan“. Tæknilegi rekjanleikinn (JSON-committ, `VINNSLUGOGN`-skráarheiti, töfluheiti á borð við `sales_history`/`iter4`) á heima í audit/vinnslugögnum — **EKKI** í notendaskjalinu (heimildaskrá skýrslunnar). Frumritin/`HEIMILDASKRA_*.md` mega bera tæknilegu slóðina áfram (þau ERU heimildin); notenda-`.ts`-línan er einfölduð.
+
 ## Fasi 2 — eigin gagnabanki (read-only)
 
 Fastar fyrirspurnir (SQL-mynstur í VINNSLUGOGN_2026-06 og samtali cc5; Supabase MCP execute_sql):

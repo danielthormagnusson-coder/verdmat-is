@@ -302,3 +302,26 @@ eina rekstrarlega tilfellið og viðgerð þar er sér-ákvörðun (hún breytir
 `python -m py_compile` grænt á öllum þremur.
 
 — cc47, 2026-07-26T08:11Z
+
+---
+
+## VIÐAUKI A (bætt við 2026-07-28) — exit≠0 kviknar engri tilkynningu
+
+`verdmat-weekly-model-quality` keyrir `C:\Python314\python.exe` beint; **enginn wrapper,
+enginn `OnFailure`-trigger, engin tilkynningarrás.** Nýju exit-kóðarnir (1 = mæling
+skilaði engu, 2 = dómsreglan féll) skila sér því aðeins í `LastTaskResult` í Task
+Scheduler og í `pipeline_runs.exit_status` — **ekkert lætur vita af sjálfu sér.**
+
+Þetta er raunveruleg takmörkun á lækningunni, ekki formsatriði: cc47 lagaði það að vélin
+*mæli* og að hún *segi frá í logg og DB*, en ekki að **einhver frétti af því án þess að
+fletta upp**. Fyrir mælingu sem á að vaka yfir líkaninu milli lota er það eftirstandandi
+gat.
+
+Til samanburðar: `LastTaskResult` var `0` þann 20.07 þegar ekkert var mælt. Héðan í frá
+verður hann `2` eða `1` — sem er framför, en aðeins fyrir þann sem lítur.
+
+**Staða: sér-liður á BACKLOG, EKKI útfærður nú.** Ákvörðun um rás (t.d. Resend-póstur
+gegnum sömu leið og ábendingakerfið, `OnFailure`-trigger, eða morgunúttektin les
+`pipeline_runs.exit_status`) er sér-go.
+
+— cc47 viðauki, 2026-07-28
