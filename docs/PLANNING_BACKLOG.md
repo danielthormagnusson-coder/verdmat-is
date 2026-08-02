@@ -1197,3 +1197,17 @@ Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref
 - **Hvað vantar:** raunverulegur bætasamanburður (eða a.m.k. skráarfjöldi + heildarstærð + slembiúrtak af md5) milli `Gagnapakki N` myndatrjánna og `Gagnapakkar\images`, með `image_index.db` (2.631.485 raðir, URL→path) sem þriðju heimild.
 - **Hvers vegna þetta má ekki flýta sér:** 194 GB er stærsti einstaki endurheimtanlegi blokkin á disknum, en **ekkert af því plássi má telja endurheimtanlegt fyrr en samanburðurinn er gerður**. Ályktun um bætajöfnuð dregin af DB-stærðum yfirfærist ekki sjálfkrafa á myndirnar.
 - **Read-only liður** — sannreyning fyrst, eyðing er sér-ákvörðun síðar og eigin lota.
+
+---
+
+## Bókunarlota cc70 §5A — sjö backlog-liðir (logged 2026-08-02)
+
+**Heimildarregla lotunnar:** allar tölur úr audit-skjölum á diski, git eða DB; „[heimild óstaðfest]" þar sem ekkert fannst. Sjá DECISIONS §5A-1–32 sama dag.
+
+- **saekjaAsettVerdEignar → `scraper.v_eign_virk_auglysing`.** Agent-verkfærið ber sömu window-rót og /eign-gatið (62–255 ms per uppfletting vs 0,4 ms um þrönga viewið); viðgerðin er bókuð sem sér-go í cc69 og bíður hans. Heimild: `ASOLU_EIGN_CC69` §1/§5.3, DECISIONS §5A-26.
+- **Apríl-snapshotsins dauði (precompute-ákvörðun).** `list_price_latest`/`augl_id_latest` (max scraped_at 2026-04-16) eru nú aldrei fallback á /eign; fullur dauði þeirra er precompute-hlið sérákvörðunar — hvað les þá enn af þeim og hvað kemur í staðinn. Heimild: `ASOLU_EIGN_CC69` §5.2, DECISIONS §5A-27.
+- **Tveggja-talna leiguflöturinn — útfærsla.** Ákvörðunin (A „áætluð auglýst leiga" = samningsmat × 1,19 m/heimild; B „áætluð samningsleiga" = módelið) er bókuð í DECISIONS §5A-31; útfærslan er óhafin. Rætur mældar: +19% (762/21) og elding 1,038 (n=1.189). [Ákvörðunar-spjallið sjálft ekki á diski.]
+- **„Kafa dýpra"-yield-reiknivélin.** Notandainntak leggst OFAN á grunnmatið, aldrei INN í það (§5A-1: SPJALL breytir aldrei matinu; §5A-14: röðun bönnuð, tala birtist). [Vísun verkbeiðni á „PRODUCT_SPEC v1" — skjalið finnst hvergi í repoum né á D:-rót: heimild óstaðfest; liðurinn stendur á DECISIONS-reglunum tveimur þar til spec-ið kemur á disk.]
+- **Mapping vs matseiningar-gerð (ágúst-endurþjálfun).** Á mapping að lesa matseiningar-gerð þegar hún stangast á við notkunar-flötinn? 2013952-tilvikið sannreynt gegn HMS-safni + DB (Íbúð/501 vs Raðhús/gerd=2, mapping fylgir notkun); verðáhrifamælingin sem ákvörðunin á að hvíla á er [heimild óstaðfest] og þarf endurmælingu í ágúst-lotunni. Heimild: DECISIONS §5A-28.
+- **WARN-þröskuldur ferska jaðarsins (ágúst).** fresh_edge cov80 mældist 77,1% (n=323) undir 80%-markinu og var bókað ófullnægjandi (cc51 §F3; vöktunarkassinn ber 81,1/77,1 m/nefnurum síðan cc53). Ágúst-vaktin þarf formlegan WARN-þröskuld á jaðarinn. [Talan „75%" úr verkbeiðni finnst ekki í heimildum — þröskuldsgildið sjálft er opin ákvörðun ágúst-lotunnar.]
+- **R2-myndaspegillinn.** Bylgju-2-liður 2.2 í heildarúttektinni; 402-atvikið (cc58/cc62-f0) sýndi að öll myndbirting hangir á einum ytri rofa (CloudFront-hotlink + Vercel-optimizer-kvóti) þótt afrit sé til á D:. Optimizer mælist grænn í dag (HTTP 200, mælt 02.08) — spegillinn er áhættuliður, ekki bruna. Heimild: `HEILDARUTTEKT` HLUTI 3 (2.2), `MYNDIR_402_STODUTEKK_CC62F0`.
