@@ -12,7 +12,11 @@ HÖNNUNARVAL (bókað fyrir arkitekt): applýjaði stuðullinn er VÍSITÖLU-skr
 (landsvísitala, slétt, samsetningarfrí) — leiguverðsjáin er DRIFT-MÆLIRINN:
 vegið sellustig spá÷MEDAL_LEIGUVERD yfir frosið leigu-birgða-proxý (cc56
 s15-aðferðin, 1,037 við maí-2026) mælist og bókast í hverri keyrslu, með
-hávaða-braut (WARN yfir ±6 %, ekki abort). Endurtekin WARN = endur-akkerun er
+hávaða-braut (WARN yfir ±6 % frá DRIFT_BASELINE, ekki abort). Hlutlausi
+punkturinn er EKKI 1,00: verðsjáin er birgðamæling og liggur mælt ~3,8 %
+undir FERSKUM markaði (elding — frystir/CPI-samningar í stokknum), svo
+ferskt-akkeruð spá Á að standa ~1,038 yfir henni (cc58 KROSSVIDMID §3,
+B-mæling vegið 1,0384 á n=1.189). Endurtekin WARN = endur-akkerun er
 arkitektsákvörðun, ekki sjálfvirkni. Sama hefð og monthly_cpi_reanchor:
 gate DB-megin, verðir, logg, pipeline_runs-bókun, exit-kóðar 0/1/3.
 
@@ -59,7 +63,14 @@ PROXY_CSV = Path(r"D:\verdmat-is\data\ops\rent_stock_proxy_fastnums.csv")
 
 MODEL_VERSION = "rent_v1_nan"
 F_MIN, F_MAX = 0.94, 1.06          # stuðuls-vörður (margra mánaða skref rúmast)
-DRIFT_WARN = 0.06                  # |sellustig − 1| yfir þessu → hávær WARN (ekki abort)
+# Hlutlausi punktur drift-mælisins: verðsjáin (birgðamæling) liggur mælt ~3,8 %
+# undir fersku markaðsstigi — eldingin, cc58 KROSSVIDMID §3 (vegið 1,0384,
+# n=1.189 ferskir hreinir samningar vs verðsjá maí-26). Stig á baselineinum
+# = módel á fersku markaðsstigi; að „leiðrétta" niður að 1,00 drægi matið ~4 %
+# niður fyrir markað. Eldingin hreyfist með verðbólgu/veltuhraða — ENDURMÆLA
+# ÁRLEGA (s09-aðferð cc58) og uppfæra töluna hér.
+DRIFT_BASELINE = 1.038
+DRIFT_WARN = 0.06                  # |sellustig/DRIFT_BASELINE − 1| yfir þessu → hávær WARN (ekki abort)
 FETCH_TARGETS = ("leiguvisitala", "leiguverdsja")
 
 # sveitarfélag → leiguverðsjár-flokkur (cc56 s15, orðrétt)
@@ -156,8 +167,8 @@ def drift_metric(conn, factor: float):
         return None, "engar gjaldgengar sellur (n>=30 + ein verðsjár-röð)"
     w = sum(s["w"] for s in sellur)
     stig = sum(s["hlutf"] * s["w"] for s in sellur) / w
-    return {"verdsja_man": lv_man, "n_sellur": len(sellur),
-            "n_samninga": int(w), "stig_vegid": round(stig, 4)}, "ok"
+    return {"verdsja_man": lv_man, "n_sellur": len(sellur), "n_samninga": int(w),
+            "stig_vegid": round(stig, 4), "baseline": DRIFT_BASELINE}, "ok"
 
 
 def main() -> int:
@@ -246,16 +257,20 @@ def main() -> int:
             log(f"[4] WARN drift-mælir: {skyr}")
             finish_step(conn_log, sid, 0, notes=f"skipped: {skyr}")
         else:
-            dev = met["stig_vegid"] - 1
+            dev = met["stig_vegid"] / DRIFT_BASELINE - 1
             log(f"[4] sellustig EFTIR stigfærslu vs leiguverðsjá {met['verdsja_man']}: "
-                f"{met['stig_vegid']:.4f} ({100 * dev:+.1f} %; {met['n_sellur']} sellur, "
-                f"{met['n_samninga']:,} samningar að baki) [cc56-viðmið maí-26: 1,037]")
+                f"{met['stig_vegid']:.4f} ({100 * dev:+.1f} % frá baseline {DRIFT_BASELINE} "
+                f"= mældri eldingu verðsjárinnar, cc58 §3; {met['n_sellur']} sellur, "
+                f"{met['n_samninga']:,} samningar að baki)")
             if abs(dev) > DRIFT_WARN:
                 log("[4] " + "!" * 70)
-                log(f"[4] !! WARN DRIFT: |{met['stig_vegid']:.4f} − 1| > {DRIFT_WARN} — stigið "
-                    f"rekur frá verðsjánni. Endur-akkerun er ARKITEKTSÁKVÖRÐUN, ekki sjálfvirk.")
+                log(f"[4] !! WARN DRIFT: |{met['stig_vegid']:.4f}/{DRIFT_BASELINE} − 1| > "
+                    f"{DRIFT_WARN} — stigið rekur frá eldingar-baselineinum. Endur-akkerun "
+                    f"er ARKITEKTSÁKVÖRÐUN, ekki sjálfvirk.")
                 log("[4] " + "!" * 70)
-            finish_step(conn_log, sid, 0, notes=f"stig={met['stig_vegid']} {met['verdsja_man']}")
+            finish_step(conn_log, sid, 0,
+                        notes=f"stig={met['stig_vegid']} vs baseline {DRIFT_BASELINE} "
+                              f"({100 * dev:+.1f}%) {met['verdsja_man']}")
 
         new_date = f"{new_ym}-01"
 
