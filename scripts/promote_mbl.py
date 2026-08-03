@@ -334,6 +334,59 @@ def derive_lease(tenure):
     return "unspecified" if tenure == "rent" else None
 
 
+# ───────────────────────────────────── söluaðili (cc82)
+# mbl-svarið ber söluaðilann og parse_mbl.py hefur alltaf geymt hann sem
+# `agency_json`; promote-lagið tók hann bara aldrei með (37.517/38.706 sale =
+# 96,9% lágu ósótt á diski — FASTINN_SAMANBURDUR_CC82 §2.12). Kortlagningin
+# býr HÉR svo hún eigi eitt heimili: promote_listings_append.py og
+# backfill_listing_agency.py lesa BÆÐI þessa sömu töflu (cc71-doktrínan um
+# einn sannleika í stað tveggja hreinsana sem geta rekið í sundur).
+#
+# Lyklarnir eru mbl-megin og eru afritaðir ÓBREYTTIR — engin túlkun, engin
+# samræming: söluaðili er fullyrðing auglýsanda, nákvæmlega eins og verð og
+# lýsing, og birtist alltaf með lindarmerkingu.
+AGENCY_MAP = [
+    ("nafn", "agency_name"),
+    ("simi", "agency_phone"),
+    ("email_tl", "agency_email"),
+    ("heimilisfang", "agency_addr"),
+    ("postnumer", "agency_postcode"),
+    ("vefslod", "agency_url"),
+]
+AGENCY_COLS = [c for _, c in AGENCY_MAP] + ["agency_source_id"]
+
+
+def parse_agency(agency_json):
+    """agency_json (str/dict/None) -> {dálkur: gildi}. Allt NULL þegar ekkert nýtilegt.
+
+    Tómur strengur verður NULL: '' og NULL mega ekki verða tvö ólík gildi fyrir
+    „vantar" — það myndi falsa hverja þekjumælingu sem telur NOT NULL.
+    """
+    tomt = {c: None for c in AGENCY_COLS}
+    if not agency_json:
+        return tomt
+    d = agency_json
+    if isinstance(d, (str, bytes)):
+        try:
+            d = json.loads(d)
+        except (TypeError, ValueError):
+            return tomt
+    if not isinstance(d, dict):
+        return tomt
+    ut = dict(tomt)
+    for lykill, dalkur in AGENCY_MAP:
+        v = d.get(lykill)
+        if v is not None:
+            s = str(v).strip()
+            ut[dalkur] = s or None
+    sid = d.get("sala_id")
+    try:
+        ut["agency_source_id"] = int(sid) if sid is not None else None
+    except (TypeError, ValueError):
+        ut["agency_source_id"] = None
+    return ut
+
+
 # ───────────────────────────────────── parsed-row normalisation (table-agnostic)
 def extract_common(p, table):
     """Map a table-specific parsed_mbl_* row into the common keys the pipeline uses."""
@@ -354,6 +407,7 @@ def extract_common(p, table):
             "municipality": None, "available_from": None,
             "tegund_raw": p.get("teg_eign") or "unknown",
             "photos_json": p.get("images_json") or "[]",
+            "agency_json": p.get("agency_json"),  # cc82
             "first_seen": first, "last_seen": last, "parse_id": p.get("parse_id"),
         }
     # rent: residential íbúðaleiga, no fastano, no coords; type_id is an opaque signal.
@@ -372,6 +426,7 @@ def extract_common(p, table):
         "available_from": p.get("available_from"),
         "tegund_raw": "leiga_type_%s" % (p.get("type_id") if p.get("type_id") is not None else "na"),
         "photos_json": p.get("images_json") or "[]",
+        "agency_json": p.get("agency_json"),  # cc82 — leigan ber hann líka (3.150/3.165 = 99,5%)
         "first_seen": first, "last_seen": last, "parse_id": p.get("parse_id"),
     }
 

@@ -67,6 +67,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from promote_mbl import (  # noqa: E402  reuse identical resolution logic
     foreign_filter, tenure_cascade, resolve_price, decompose_category,
     decompose_fastano, resolve_fastnum, preload_props, extract_common, parsed_db_path,
+    parse_agency, AGENCY_COLS,
 )
 from scraper_paths import get_scraper_data_dir  # noqa: E402
 
@@ -139,7 +140,11 @@ def build_record(p, common, table, props):
     fastnum, conf, method = resolve_fastnum(common, derived, props)
     size = _f(common.get("area"))
     ibnr = extract_ibnr(common.get("addr_text"))
+    # cc82: söluaðili fylgir auglýsingunni alla leið. Kortlagningin býr í
+    # promote_mbl.parse_agency (eitt heimili — backfill-skriftin les hana líka).
+    agency = parse_agency(common.get("agency_json"))
     return {
+        **agency,
         "source": "mbl",
         "source_listing_id": common["source_listing_id"],
         "fastnum": fastnum,
@@ -199,7 +204,7 @@ _LISTING_COLS = [
     "lat", "lng", "lysing", "photos_json", "listed_at", "first_seen_at", "last_seen_at",
     "discovered_at",
     "status", "surviving_parse_id", "br_dags", "promoter_version",
-]
+] + AGENCY_COLS  # cc82 — aftast svo röð eldri dálka haldist óbreytt
 # volatile columns refreshed on re-promote (Vandi-1 fix); immutable ones preserved.
 # first_seen_at + discovered_at are write-once: excluded from the update set so a
 # re-promote never overwrites them (and pre-existing NULL discovered_at rows stay NULL).
