@@ -172,3 +172,30 @@ def extract_and_store(pg, client, rows, source_trigger, log=print):
         pg.commit()
     return {"haiku_calls": n_call, "stored": len(out), "failed": n_fail,
             "cost_est_usd": round(n_call * 0.0071, 4)}
+
+
+# ───────────────────────────── brúin í eigindalagið ─────────────────────────────
+def bridge_attributes(pg, fastnum=None, log=print):
+    """cc75 — flytur útdrættina í public.property_attributes (source='auglysing').
+
+    Öll vörpunin og öll idempotens-logíkin er í DB-fallinu
+    public.bru_extraction_i_eigindi (migration 20260803_cc75_bru_extraction_eigindi):
+    deterministísk kortlagning v0.2.2 → 28-lykla vokabúlar, ENGIN Haiku-kall,
+    enginn kostnaður. Þessi hjúpur er aðeins kallið + logglínan.
+
+    Fyrir cc75 lá ENGIN leið héðan í eigindalagið: 3.133 eignir með virka
+    auglýsingu báru útdrátt sem app-pípan sá aldrei (hún les eingöngu
+    public.last_listing_text = pöruð SÖLU-söluyfirlit), svo hvert einasta
+    eigindi stóð „Óþekkt" á eign í virkri sölu.
+
+    Idempotent: mengjasamanburður í DB-fallinu, óbreytt mengi = 0 skrif.
+    Óhætt að keyra hvenær sem er og hversu oft sem er.
+    """
+    cur = pg.cursor()
+    cur.execute("SET TRANSACTION READ WRITE")
+    cur.execute("SELECT * FROM public.bru_extraction_i_eigindi(%s)", (fastnum,))
+    eignir, nyjar, vikjandi = cur.fetchone()
+    pg.commit()
+    log(f"  bridge: {eignir} eignir kortlagðar -> {nyjar} nyjar radir, "
+        f"{vikjandi} vikjandi (source='auglysing')")
+    return {"eignir": eignir, "nyjar": nyjar, "vikjandi": vikjandi}

@@ -78,10 +78,20 @@ def main():
     ap.add_argument("--daily-cap-usd", type=float, default=10.0)
     ap.add_argument("--trigger", default="nightly", choices=["nightly", "ondemand"])
     ap.add_argument("--confirm", action="store_true")
+    # cc75: keyra AÐEINS brúna (engin Haiku, engin verðmatsfrysting) — til
+    # að éta uppsafnaða útdrætti inn í eigindalagið án þess að snerta kostnað.
+    ap.add_argument("--bridge-only", action="store_true")
     args = ap.parse_args()
 
     ro, rw = _connect()
-    models = load_models_freeze_anchored(ro)
+    # Líkönin þarf aðeins verðmatsfrystingin; brúin er hrein SQL-aðgerð.
+    models = None if (args.bridge_only and not (args.forward or args.value_seeded)) \
+        else load_models_freeze_anchored(ro)
+
+    # cc75: kostnaðarþak og dry-run STÖÐVA Haiku-hlutann — en máttu ekki
+    # lengur stöðva keyrsluna alla, því brúin (ókeypis SQL) á að fá að
+    # ganga þótt engir nýir útdrættir séu keyptir. Áður var þetta `return 0`.
+    haiku_stodvud = False
 
     if args.forward:
         spent = _load_today_spend()
@@ -92,26 +102,48 @@ def main():
               f"budget_calls={budget_calls} -> effective_n={effective_n}")
         if effective_n <= 0:
             print("EXTRACTION SKIPPED: daily cost cap reached (or zero budget).")
-            return 0
-        need = E.fetch_listings_needing_extraction(ro, effective_n)
-        print(f"forward: {len(need)} fresh distinct lysingar to extract (fresh-first)")
-        if not args.confirm:
-            print("[dry] re-run with --confirm to call Haiku.")
-            return 0
-        import anthropic
-        # Haiku key ONLY from D:\env.local (anthropic_key -> dotenv_values); CC env stays keyless.
-        client = anthropic.Anthropic(api_key=anthropic_key(), timeout=60.0, max_retries=0)
-        res = E.extract_and_store(rw, client, need, args.trigger)
-        _record_spend(res["cost_est_usd"])
-        print(f"extract: {res} | day_total=${_load_today_spend():.4f}")
+            haiku_stodvud = True
+        else:
+            need = E.fetch_listings_needing_extraction(ro, effective_n)
+            print(f"forward: {len(need)} fresh distinct lysingar to extract (fresh-first)")
+            if not args.confirm:
+                print("[dry] re-run with --confirm to call Haiku.")
+                haiku_stodvud = True
+            else:
+                import anthropic
+                # Haiku key ONLY from D:\env.local (anthropic_key -> dotenv_values);
+                # CC env stays keyless.
+                client = anthropic.Anthropic(api_key=anthropic_key(), timeout=60.0,
+                                             max_retries=0)
+                res = E.extract_and_store(rw, client, need, args.trigger)
+                _record_spend(res["cost_est_usd"])
+                print(f"extract: {res} | day_total=${_load_today_spend():.4f}")
 
-    if args.value_seeded or args.forward:
+    if not haiku_stodvud and (args.value_seeded or args.forward):
         rows = E.fetch_extracted_listings_to_value(ro)
         print(f"value: {len(rows)} extracted listings without a valuation")
         if args.confirm or args.value_seeded:
             E.value_listings(rw, models, rows)
         else:
             print("[dry] re-run with --confirm to write valuations.")
+
+    # cc75 — BRÚIN í eigindalagið. Keyrir ALLTAF (líka á --bridge-only) því
+    # hún er ódýr: eitt SQL-kall, engin Haiku, engin kostnaðarfærsla. Hún
+    # gengur yfir ALLT virka framboðið, ekki bara útdrættina úr þessari
+    # keyrslu — baklistinn étst um nætur og eldri útdrættir sem aldrei
+    # komust í eigindalagið eiga að skila sér líka.
+    #
+    # HÖRÐ REGLA: brúin fellir ALDREI nóttina. Hún er viðbót ofan á
+    # extraction+valuation og villa hér má ekki eyðileggja það sem tókst
+    # (sama abort-not-retry-hugsun og keðjan sjálf byggir á).
+    if args.confirm or args.value_seeded or args.bridge_only:
+        try:
+            E.bridge_attributes(rw, log=print)
+        except Exception as e:                                    # noqa: BLE001
+            rw.rollback()
+            print(f"BRIDGE FAILED (non-fatal): {type(e).__name__}: {e}")
+    else:
+        print("[dry] re-run with --confirm to run the attribute bridge.")
     return 0
 
 
