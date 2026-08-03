@@ -1232,3 +1232,23 @@ Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref
 - **Liður 1: `[heimild óstaðfest]` FELLD — cc76-mælingin er til.** Mælingin er read-only lota 03.08 sem fullmældi cc68-mótsögnina (HMS `notkun` vs `gerd`): mótsögnin nær til 28.962 íbúðareigna, þar af eru 28.065 **stök eining á heimilisfangi með 100% flatarmáls** — heil hús sem HMS skráir sem notkun 501 „Íbúð á hæð". Lindarprófið (hedónískt viðmið, cellu-FE matssvæði×ár) fellur GERÐ í vil á þeim hópi (MAE −37% / −33%) en NOTKUN í vil á 2–3 eininga hópnum og á öfugu mótsögninni — reglan er því **skilyrt (Regla R)**, ekki „gerð alltaf". **Heimild:** `docs/HMS_MOTSOGN_CC76_20260803T104446Z.md` (480 línur, lenti 03.08 kl. 10:44Z; **tracked** eintak — `.dbconfig`-slóðin stytt í línu 475, að öðru leyti línujafnt frumritinu í `docs/fable_prep/audits/` sem stendur óhreyft); skriftir átta liggja staðbundið í `docs/fable_prep/prototypes/cc76/` (631 lína, utan git skv. cc69). Tölur liðarins og viðaukans krossathugaðar gegn skjalinu: §4 ber 58.561/36,29% og 8.837 af 62.062 (14,24%), §2 ber 28.962 mótsagnir og 28.065 stakar einingar.
 - **ÁGÚST-ENDURÞJÁLFUNIN ER FORMLEGA OPNUÐ (arkitektsdómur 03.08).** Fjögur **sjálfstæð** merki knýja hana, og það er fjöldinn og óhæðið sem opnar hana — ekki eitt merki: (i) **bias-fyrning** — MAPE ferska jaðarsins 12,92% (n=323, 31.07) → 14,59% (n=339, 03.08), bias −6,50%; (ii) **fresh_edge cov80 76,70% (n=339 af 352 pörum)** undir 80%-markinu; (iii) **endurgjöf fasteignasala 03.08** um heilar hæðir og rað-/parhús [munnleg, ekki skjalfest — en cc76 mældi að kvartanirnar tvær eru af gjörólíkri stærðargráðu: stök sérbýlis-eining +7,5%/+9,1% leif meðan ekta heilar hæðir bera aðeins +1,5% bjaga]; (iv) **cc76-mælingin**: Regla R færir **58.561 eignir (36,29%)** milli segmenta miðað við `canonical_code` í DB í dag og **8.837 af 62.062 þjálfunarsölum (14,24%)**. Fjórða merkið er afgerandi: conformal-kvörðunin er **lykluð á segment (×region)** (`by_segment_region`/`by_segment`), svo öll vissubil breytast og 81,1%-dómsreglan verður ósamanburðarhæf → **endurþjálfun er SKYLDA, ekki endurmæling**. Dómurinn **leysir af** afstöðu morgunvaktarinnar sama dag („EKKI opnuð núna — ein mæling er ekki þróun", `verdmat-ai/docs/fable_prep/audits/MORGUNVAKT_CC74_2026-08-03T0925Z.md` §L3): sú afstaða hvíldi á einu merki, þessi á fjórum.
 - **Liður 4: `[heimild óstaðfest]` FELLD — PRODUCT_SPEC v1 er komið á disk.** Lagskiptingin er nú skjalfest: `docs/PRODUCT_SPEC_v1.md` §2 skilgreinir aðgangsstigin þrjú og setur söluyfirlits-smiðjuna í **lag 3** (fasteignasalar einir), §8 ber útfærslu liðarins óbreytta (tvennt aðskilið: heilt söluyfirlit skv. stöðluðu formi vs lýsing ein og sér, og sendingarferlið utan umfangs). **Heimild:** `docs/PRODUCT_SPEC_v1.md` (151 lína, commit `96a45d1`, pushað 03.08; rýnt og samþykkt af eiganda sama dag) — skjalið er HÖNNUN, ekki staðreyndaskrá, svo tölur úr því standa áfram undir sinni eigin heimildarskoðun. Blokkerinn sem eftir stendur er óbreyttur: staðlaða formið er ekki komið (PRODUCT_SPEC §15, opin ákvörðun 3).
+
+---
+
+## Cache-fundur cc82 (logged 2026-08-03, ákvörðun eiganda: hönnunarákvörðun, ekki flýtilagfæring)
+
+- **Útgáfa ógildir ekki gagna-cache eignasíðunnar.** `lib/eign-queries.js:85` (verdmat-ai) vefur
+  `saekjaEign` í `unstable_cache` með TTL 3.600 s og merkjum `eign` + `eign-<fastnum>` (cc73).
+  Gagna-cache Vercel **lifir af útgáfu**, svo ný útgáfa sem breytir því HVAÐA dálka `saekjaEign`
+  sækir fær gamla farminn þar til TTL rennur út. **MÆLT í cc82-útgáfunni:** söluaðila-línan
+  birtist á söluyfirlitinu STRAX (sú síða notar `cache(...)` — React-minnun innan einnar beiðni,
+  enginn þrálátur cache) en á `/eign/2013952` fyrst eftir **~47 mínútur**, staðfest með
+  sókn-á-mínútu vöktun. Ekkert var að kóðanum; cache-færslan var einfaldlega skrifuð fyrir
+  útgáfuna. cc75 tengdi `revalidateTag` við AI-fyllingarleiðina EINA, svo útgáfa hefur enga
+  ógildingarleið.
+  **Afleiðingin nær lengra en cc82:** hver framtíðar-breyting á því sem `/eign` les lendir allt að
+  klukkustund seint á prod, og sá sem prófar strax eftir push les það sem BILUN — nákvæmlega sú
+  ranggreining sem `feedback_ein_sokn_i_dev_asset_sannar_ekki_fjarveru` varar við, nema hér er
+  gildran útgáfu-megin. **Tveir valkostir, hvorugur valinn:** (a) binda útgáfuauðkenni inn í
+  cache-lykil `saekjaEign`, eða (b) bæta ógildingu við útgáfuferlið. Enginn go.
+  Heimild: `docs/SOLUADILI_MATSARGERD_CC82_20260803T133000Z.md` §V3/§V3b.

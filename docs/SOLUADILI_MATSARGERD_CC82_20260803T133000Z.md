@@ -352,11 +352,74 @@ okkar* nema árgerðin sjáist á fletinum. Það er næsta ákvörðun, ekki þ
 
 ---
 
+## VIÐAUKI 2 — PROD-RAUNPRÓFUN 03.08 (append-only, eftir push `0f53cd4` / `b03d1cb`)
+
+Bæði push send: verdmat-ai `0f53cd4` (Vercel `dpl_FDAwCMn9iegWPJwcUKR9119jcW57`, state READY,
+target production) og verdmat-is `b03d1cb`.
+
+| Próf | Slóð | Niðurstaða |
+|---|---|---|
+| Söluaðili á söluyfirliti | `/eign/2013952/soluyfirlit` | **PASS** — „Fasteignasala: Híbýli · 585-8800 · hibyli@hibyli.is · úr auglýsingu (mbl.is)" |
+| Hljóðlaust hvarf | `/eign/2369174/soluyfirlit` | **PASS** — 0 tilvik af „Fasteignasala", síðan að öðru leyti heil (verðblokk stendur) |
+| Söluaðili á eignasíðu | `/eign/2013952` | **BÍÐUR — ekki fall.** Sjá §V3 |
+| TTFB ×9 `/eign/2013952` | | miðgildi **0,477 s** (0,434–0,594) |
+| TTFB ×9 söluyfirlit | | miðgildi **0,440 s** (0,390–0,715) |
+
+### V3 — ⚠ NÝTT: ÚTGÁFA ÓGILDIR EKKI GAGNA-CACHE EIGNASÍÐUNNAR
+
+`/eign/2013952` bar EKKI söluaðilann eftir að útgáfan var READY — 10 sóknir yfir 5 mínútur,
+allar án hans. Söluyfirlitið bar hann strax. **Munurinn er ekki tilviljun heldur bygging:**
+
+- `lib/eign-queries.js:85` vefur `saekjaEign` í `unstable_cache` með TTL **3.600 s** og merkjum
+  `eign` + `eign-<fastnum>` (cc73).
+- Söluyfirlitssíðan notar `cache(saekjaSoluyfirlit)` — React-minnun **innan einnar beiðni**,
+  enginn þrálátur cache.
+
+Gagna-cache Vercel **lifir af útgáfu**. Ný útgáfa sem breytir því HVAÐA dálka `saekjaEign` sækir
+fær því gamla farminn þar til TTL rennur út — allt að klukkustund. Þetta er ekki galli í cc82
+heldur **eiginleiki cc73-cachins sem enginn hafði mælt**: cc75 tengdi `revalidateTag` við
+AI-fyllingarleiðina EINA, svo útgáfa hefur enga ógildingarleið.
+
+**Afleiðing sem stendur eftir þessa lotu:** hver framtíðar-breyting á því sem `/eign` les lendir
+allt að klukkustund seint á prod, og sá sem prófar strax eftir push les það sem BILUN.
+`/eign/2013952` er í vöktun (bakgrunns-sókn þar til söluaðilinn birtist); ekkert var þvingað —
+eina ógildingarleiðin sem til er (AI-fyllingarrútan) hefur hliðaráhrif og var ekki notuð.
+
+**BACKLOG-liður (ekki gerður hér):** binda útgáfuauðkenni inn í cache-lykil `saekjaEign`, eða
+bæta ógildingu við útgáfuferlið. Hvort tveggja er hönnunarákvörðun, ekki lagfæring í flýti.
+
+### V3b — LEYST AF SJÁLFU SÉR EFTIR ~47 MÍNÚTUR (mælt, ekki áætlað)
+
+Bakgrunns-vöktunin (sókn á mínútu) skilaði: **söluaðilinn birtist á `/eign/2013952` eftir
+~47 mínútur**. Það er innan 3.600 s TTL-gluggans og staðfestir greininguna í §V3 — ekkert var
+þvingað, ekkert var að kóðanum, cache-færslan var einfaldlega skrifuð fyrir útgáfuna.
+
+**Endanleg prod-staða, öll fjögur próf græn:**
+
+| Próf | Slóð | Niðurstaða |
+|---|---|---|
+| Söluaðili á eignasíðu | `/eign/2013952` | **PASS** — „Fasteignasala: Híbýli · 585-8800 · hibyli@hibyli.is", heimildarlínan „mbl.is · fyrst séð 23. júl. 2026" stendur óbreytt beint fyrir neðan |
+| Hljóðlaust hvarf | `/eign/2369174` | **PASS** — 0 tilvik, Á sölu-kortið að öðru leyti heilt |
+| Söluaðili á söluyfirliti | `/eign/2013952/soluyfirlit` | PASS (viðauki 2) |
+| Hljóðlaust hvarf | `/eign/2369174/soluyfirlit` | PASS (viðauki 2) |
+
+**TTFB ×9 á `/eign/2013952` með NÝJA farminum:** miðgildi **0,463 s** (0,376–0,700) á móti
+**0,477 s** (0,434–0,594) á gamla farminum, mælt í sömu lotu ~50 mín fyrr.
+Munurinn (−14 ms) er innan sveiflu — þrír dálkar til viðbótar í sömu sókn kosta ekkert mælanlegt.
+
+⚠ Mælingin er A/B í TÍMA, ekki samtímis, og hvor röð er 9 sóknir — hún útilokar afturför af
+stærðargráðunni sem skiptir máli en er ekki nákvæmnismæling.
+
+---
+
 ## ÓGERT / OPIÐ
 
-1. **Commit + push** í BÁÐUM repóum — bíður GO. Tvö aðskilin commit, explicit paths.
-2. **Prod-sannreyning** eftir deploy: `/eign/2013952`, `/eign/2013952/soluyfirlit`,
-   `/leiguverd/[fastnum]` (leigu-flæðið ósannreynt jafnvel í dev).
+1. ~~**Commit + push**~~ — **GERT** (verdmat-is `1d9a8e2`, `b03d1cb`; verdmat-ai `0f53cd4`).
+2. **Prod-sannreyning** — **GERT, fjögur af fjórum græn** (viðauki 2 + §V3b): báðir fletir bera
+   söluaðilann og báðir fela hann hljóðlaust á 2369174; TTFB ×9 óbreytt innan sveiflu.
+   ⚠ EFTIR STENDUR: `/leiguverd/[fastnum]` **ósannreynt** í dev og prod (sama `ASoluKort`,
+   sama cache-gildra — leigulind ber söluaðila á 3.150/3.165 = 99,5% parsed-raða).
+2b. **Útgáfa ógildir ekki `saekjaEign`-cache** (§V3) — nýr backlog-liður, hönnunarákvörðun.
 3. ~~**Árgerðaspurningin (skref 0)**~~ — **LEYST** 03.08, sjá viðauka V2B.1 (sönnuð innanhúss).
 4. ~~**Dálkavalið A/B/C**~~ — **ÁKVEÐIÐ**: valkostur C (nýr dálkur + árgerðarmerki), framkvæmt.
 4b. **Birting nýju talnanna** á `/eign` — ÓTEKIN ákvörðun, var ekki hluti af GO-inu (V2B.4).
