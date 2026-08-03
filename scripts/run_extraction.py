@@ -78,9 +78,22 @@ def main():
     ap.add_argument("--daily-cap-usd", type=float, default=10.0)
     ap.add_argument("--trigger", default="nightly", choices=["nightly", "ondemand"])
     ap.add_argument("--confirm", action="store_true")
-    # cc75: keyra AÐEINS brúna (engin Haiku, engin verðmatsfrysting) — til
-    # að éta uppsafnaða útdrætti inn í eigindalagið án þess að snerta kostnað.
-    ap.add_argument("--bridge-only", action="store_true")
+    # cc75 — BRÚIN Í EIGINDALAGIÐ ER OPT-IN, EKKI SJÁLFGEFIN.
+    #
+    # Hún er OPT-IN af ástæðu og hún er ekki sú venjulega („nýtt sé slökkt
+    # fyrst"): brúin skrifar í public.property_attributes, sem PROD LES
+    # SAMSTUNDIS. Fari hún af stað áður en verdmat-ai er pushað birtast
+    # eigindin á prod með TÓMRI uppruna-pillu — `upprunaHeiti` í lifandi
+    # útgáfu er switch án `default` og þekkir ekki lindina 'auglysing'.
+    # Eigindi án uppruna er einmitt það sem uppruna-agi lagsins bannar.
+    #
+    # Réttri röð er því haldið af rofanum sjálfum: push → --bridge → prófun.
+    # Að tengja hana inn í nightly_delta_chain.sh er SÉR ÁKVÖRÐUN (sjá §8 í
+    # audit-skjalinu: 47,4% lenda á margföldunarþaki leiðréttingarlagsins).
+    ap.add_argument("--bridge", action="store_true",
+                    help="keyra brúna í eigindalagið að lokinni extraction/valuation")
+    ap.add_argument("--bridge-only", action="store_true",
+                    help="keyra EINGÖNGU brúna (engin Haiku, engin verðmatsfrysting)")
     args = ap.parse_args()
 
     ro, rw = _connect()
@@ -127,23 +140,23 @@ def main():
         else:
             print("[dry] re-run with --confirm to write valuations.")
 
-    # cc75 — BRÚIN í eigindalagið. Keyrir ALLTAF (líka á --bridge-only) því
-    # hún er ódýr: eitt SQL-kall, engin Haiku, engin kostnaðarfærsla. Hún
-    # gengur yfir ALLT virka framboðið, ekki bara útdrættina úr þessari
-    # keyrslu — baklistinn étst um nætur og eldri útdrættir sem aldrei
-    # komust í eigindalagið eiga að skila sér líka.
+    # cc75 — BRÚIN í eigindalagið. OPT-IN (--bridge / --bridge-only, sjá
+    # rökin við rofann). Ódýr: eitt SQL-kall, engin Haiku, engin
+    # kostnaðarfærsla. Hún gengur yfir ALLT virka framboðið, ekki bara
+    # útdrættina úr þessari keyrslu — baklistinn étst um nætur og eldri
+    # útdrættir sem aldrei komust í eigindalagið eiga að skila sér líka.
     #
     # HÖRÐ REGLA: brúin fellir ALDREI nóttina. Hún er viðbót ofan á
     # extraction+valuation og villa hér má ekki eyðileggja það sem tókst
     # (sama abort-not-retry-hugsun og keðjan sjálf byggir á).
-    if args.confirm or args.value_seeded or args.bridge_only:
+    if args.bridge or args.bridge_only:
         try:
             E.bridge_attributes(rw, log=print)
         except Exception as e:                                    # noqa: BLE001
             rw.rollback()
             print(f"BRIDGE FAILED (non-fatal): {type(e).__name__}: {e}")
     else:
-        print("[dry] re-run with --confirm to run the attribute bridge.")
+        print("bridge: SLEPPT (opt-in — bættu við --bridge eða --bridge-only).")
     return 0
 
 
