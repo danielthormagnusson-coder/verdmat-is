@@ -265,13 +265,101 @@ raðir bakfylltar) en prod-appið les hann ekki fyrr en verdmat-ai er deployað.
 
 ---
 
+## VIÐAUKI 03.08 — SKREF 0 LEYST OG VERK 2 FRAMKVÆMT (append-only, bókað eftir push `1d9a8e2`)
+
+Kaflarnir að ofan standa óbreyttir. Þetta er framhaldið eftir GO eiganda:
+**dálkavalið = NÝR DÁLKUR + ÁRGERÐARMERKI**, og skilyrðið *„má staðfesta árgerðina úr
+safninu sjálfu frekar en að álykta hana af þriðja aðila? Ef já: framkvæma."*
+
+### V2B.1 SKREF 0 — JÁ, árgerðin er sönnuð innanhúss
+
+`scripts/hms_mat_argerd_skref0.py` (READ-ONLY). Fyrst var athugað hvort HMS-svarið sjálft beri
+árgerðarmerki: **það gerir það ekki** — geymda JSON-ið er hrátt svar
+`hms.is/api/fasteignaskra/fasteign/<nr>` (`hms_full_scrape.py` línur 45/180/233, engin
+staðbundin sameining) og enginn reitur ber ártal matsins. Skjölun dugði því ekki.
+
+**Tímaprófið á kaupskrá dugði.** `D:\kaupskra.csv` ber `FASTEIGNAMAT` = sögulegt mat **á
+söludegi**. Fasteignamat tekur gildi 31.12 og gildir almanaksárið á eftir, svo sala ársins ber
+það mat sem þá gildir. Nefnari: **177.036 nothæfar sölur** sem eiga HMS-röð.
+
+| söluár | n | = `hms_mat` | = `hms_nuv` | miðgildi `hms_mat`/sögulegt | miðgildi `hms_nuv`/sögulegt |
+|---|---|---|---|---|---|
+| 2023 | 9.563 | 0 — 0,0% | 0 — 0,0% | 1,3088 | 1,1918 |
+| 2024 | 12.587 | 0 — 0,0% | 97 — 0,8% | 1,1378 | 1,0393 |
+| 2025 | 11.612 | 9 — 0,1% | **10.615 — 91,4%** | 1,0998 | **1,0000** |
+| 2026 | 5.852 | **5.493 — 93,9%** | 1 — 0,0% | **1,0000** | 0,9089 |
+
+**Niðurstaða: `fasteignamat` = árgerð 2026, `fasteignamat_nuverandi` = 2025.** Miðgildin
+tvö sem lenda á nákvæmlega 1,0000 eru sterkari en hittnitölurnar: allur árgangurinn liggur ofan
+á reitnum, ekki bara meirihlutinn. Framsetning fastinn.is er nú **samhljóða vitni, ekki
+forsenda** — grunnregla 13 er uppfyllt, við birtum ekki árgerð sem við getum ekki staðfest.
+
+⚠ Prófið greinir ekki eign sem BREYTTIST (nýbygging, stækkun, endurmat) frá árgerðamun — þess
+vegna er hlutfallið lesið en ekki einstök tilvik, og báðir reitir mældir á sama úrtaki.
+Afgangurinn (2025: 990 „hvorugt", 2026: 359) er af þeirri stærð sem slíkar breytingar skýra.
+
+### V2B.2 Framkvæmdin
+
+**Migration** `20260803140500_cc82_fasteignamat_hms_argerd.sql` — APPLIED. Þrír dálkar á
+`public.properties`:
+
+| Dálkur | Merking |
+|---|---|
+| `fasteignamat_hms` | talan úr HMS, **ÞÚSUND KRÓNUR** (sama eining og `fasteignamat` og kaupskrá) |
+| `fasteignamat_hms_argerd` | árgerðin (2026) — talan er merkingarlaus án hennar |
+| `fasteignamat_hms_sott` | hvenær röðin var sótt úr HMS (uppruni, ekki gildistökudagur) |
+
+**`properties.fasteignamat` var ALDREI snert.** Sagan stendur, og munurinn er mælanlegur um
+alla framtíð með einni samanburðarfyrirspurn — sem var einmitt rökstuðningur eigandans.
+
+**Skriftin** `scripts/refresh_fasteignamat_from_hms.py` fylgir þrískiptingunni
+(extract → dryrun m/HALT → apply) og skrifar rollback-SQL á disk
+(`D:\cc82_fasteignamat_hms_rollback.sql` — einn `UPDATE ... SET NULL`, því dálkarnir voru allir
+NULL fyrir keyrslu og ekkert eldra gildi er til að endurheimta).
+
+**Árgerðin er LEIDD, ekki harðkóðuð.** Hún er reiknuð úr `fetched_at` hverrar raðar
+(almanaksár sóknar = árgerð þess mats sem þá gildir). Harðkóðaður fastinn `2026` hefði lifað af
+næstu endursókn og logið þá — `feedback_hardkodadur_argangur_lifir_flipp`. Skriftin **stöðvast**
+ef sóknardagar spanna fleiri en eitt ár (31.12-jaðarinn krefst mannlegrar ákvörðunar); í þessu
+safni gera þeir það ekki: allar 231.153 raðirnar eru sóttar 03.–05.06.2026.
+
+### V2B.3 Mælingar
+
+| Mæling | Tala |
+|---|---|
+| HMS-raðir m/fasteignamati | 231.153 (1.664 án mats, slepptar) |
+| Raðir sem fengu gildi | **231.103 / 232.887 = 99,2%** (nefnari = allar raðir í `properties`) |
+| HMS-raðir án `properties`-raðar | 50 (slepptar) |
+| Víkja frá núverandi `fasteignamat` | **43.169 = 18,7%** |
+| Árgerðir í safninu | ein: 2026 |
+| Sóknarspann | 2026-06-03 .. 2026-06-05 |
+| Viðmiðunareign 2013952 | `fasteignamat` 121.450 (óbreytt) · `fasteignamat_hms` **138.100** · árgerð **2026** · sótt 2026-06-03 |
+
+Talan 138.100 er nákvæmlega sú sem fastinn birtir sem „Fasteignamat 2026" — nú fengin úr HMS og
+árgerðarmerkt af okkar eigin mælingu.
+
+### V2B.4 Ekkert notendayfirborð breyttist — sannreynt, ekki gefið
+
+| Vörn | Mæling |
+|---|---|
+| Dálkaheimildir `anon`/`authenticated` | 44 dálkar hvor — **nýju þrír EKKI með** (column-grant lockout heldur sjálfkrafa) |
+| `public.v_properties` | ber nýju dálkana **EKKI** (skýr dálkalisti, ekki `select *`) |
+| Birtingarkóði | ósnertur í báðum repóum |
+
+Nýju dálkarnir eru þögul viðbót. **Birtingarákvörðunin er ÓTEKIN og var ekki hluti af GO-inu:**
+hækki birt fasteignamat um ~9,8% á 43.169 eignum les notandinn það sem breytingu á *matinu
+okkar* nema árgerðin sjáist á fletinum. Það er næsta ákvörðun, ekki þessi lota.
+
+---
+
 ## ÓGERT / OPIÐ
 
 1. **Commit + push** í BÁÐUM repóum — bíður GO. Tvö aðskilin commit, explicit paths.
 2. **Prod-sannreyning** eftir deploy: `/eign/2013952`, `/eign/2013952/soluyfirlit`,
    `/leiguverd/[fastnum]` (leigu-flæðið ósannreynt jafnvel í dev).
-3. **Árgerðaspurningin (skref 0)** — blokkerar alla fasteignamats-uppfærslu.
-4. **Dálkavalið A/B/C** — ákvörðun eiganda.
+3. ~~**Árgerðaspurningin (skref 0)**~~ — **LEYST** 03.08, sjá viðauka V2B.1 (sönnuð innanhúss).
+4. ~~**Dálkavalið A/B/C**~~ — **ÁKVEÐIÐ**: valkostur C (nýr dálkur + árgerðarmerki), framkvæmt.
+4b. **Birting nýju talnanna** á `/eign` — ÓTEKIN ákvörðun, var ekki hluti af GO-inu (V2B.4).
 5. **Nafn á lóðarmats-dálk** áður en nokkur HMS-sameining er keyrð.
 6. **`tel:`/`mailto:`** á söluaðila-línunni — valið var berur texti.
 7. **Bókun í `DECISIONS.md`/`STATE.md`** — engin journal-færsla skrifuð í þessari lotu.
