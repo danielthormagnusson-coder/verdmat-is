@@ -5017,3 +5017,84 @@ Ein keyrsla: frosni listinn 1–17 + viðaukar cc61–cc69 (18–32). Allar töl
 **Heimild**: `docs/SOLUADILI_MATSARGERD_CC82_20260803T133000Z.md` §V3/§V3b; `lib/eign-queries.js:85` (verdmat-ai). Sami fundur er þegar bókaður í `PLANNING_BACKLOG.md` (Cache-fundur cc82).
 
 *— Lok bókunarlotu cc88 §5B (DECISIONS-hluti).*
+
+## 2026-08-04 — §5B-7 · LEIÐRÉTTING cc83: varanleikadómurinn „eytt ≠ lokað" er FELLDUR
+
+**Hvað**: DNS-hvarf CloudFront-dreifingarinnar `d1u57vh96em4i1` 03.08 var **tímabundið útfall, ekki eyðing**. cc92 mældi 04.08 (read-only, 349,6 s): **200 af 200 geymdum slóðum úr `property_images` svara HTTP 200 — 100,0% í öllum fjórum lögum**, 0 × 403, 0 × 404, 0 villur, kill-switch virkjaðist aldrei. Sterkara en það: **allar 200 báru `X-Cache: Miss from cloudfront`** — ekkert svar kom úr jaðar-skyndiminni, **upprunninn sjálfur heldur enn gömlu hlutunum** (200/200 `image/jpeg`, 66.921–759.205 B, meðaltal 336.198). Þar með fellur §5B-1-ályktunin „horfið nafn ⇒ dreifingin var EYDD": **fjarvera úr DNS sannar ekki eyðingu.** **Restin af cc83 stendur óhögguð** — D:-staðan þá, spegiltölurnar, 402-úreldingin (§5B-2) og GPTBot-staðfestingin (§5B-3) snerta þetta ekki.
+
+**Útfallsbilið er BIL, ekki punktur** — og verkbeiðnar-orðalagið „~2 sólarhringar" er **efri mörk þess, ekki mæling**: síðasta LIFANDI mæling er `2026-08-03T00:40Z` (cc72), fyrsta DAUÐA `2026-08-03T22:30Z` (cc83), endurkoma í DNS `2026-08-04 ~22:04Z`. Mælt útfall er því **≥ 23 klst 34 mín og ≤ 45 klst 24 mín**; cc92 orðar sjálft „féll úr DNS fyrir sólarhring". Endurkomu-tímastimpillinn er **arkitektsmæling og liggur ekki á diski**.
+
+**Af hverju**: Aðgreiningin sem cc83 byggði á (eytt vs lokað) var rétt sett fram en dómurinn var dreginn af EINNI mælingu á einum tímapunkti. cc92 §7 bókar sjálft hvað prófið sannar EKKI, og sá varnagli á að fylgja liðnum: ekkert hotlink-próf (enginn `Referer`), engin aldursvörn (lögin eru fastnum-röð, sjá §5B-12), enginn varanleiki (ytri rofinn er enn ytri), og n=200 af 2.583.775 — efri 95%-mörk á bilunartíðni við 0/200 eru **~1,5%**, svo safn með 1% dauðum slóðum hefði vel getað skilað 200/200. HEAD ≠ GET: bætin voru ekki sótt.
+
+**Heimild**: `D:\_audit\HYSILL_LIFNADI_CC92_20260804T2215Z.md` §1/§2/§5/§7; `MYNDAHYSING_DAUD_CC83_20260803T2256Z.md` línur 12/158/161 (00:40Z lifandi, 22:30Z dauð); endurkoman í DNS 04.08 ~22:04Z **[arkitektsmæling, ekki á diski]**.
+
+## 2026-08-04 — §5B-8 · LEIÐRÉTTING cc84 §2.3/§6: 2344094-greiningin var ÖFUG — röðunin valdi RÉTT
+
+**Hvað**: cc84 bókaði atviksábendingu — „röðunin velur ranga töluna og felur þá réttu" á fastnum **2344094**. **Þetta stenst ekki.** Óháði dómarinn (HMS) segir: byggingarstig **B1**, matsstig 1, fasteignamat **3.350 þús. kr.**, einflm 102, lóð 5.560 m² — **óbyggð sumarhúsalóð**. Birta talan (**14.900.000**, auðkenni 1712131, Fasteignaland, `rn=1`) selur nákvæmlega það: „Sumarhúsalóð með púða og teikningum … Teikningar fyrir 102 fm hús … fylgja með í kaupum." Falda talan (**94.900.000**, auðkenni 1674955, Betri Stofan, `rn=2`) selur „glæsilegt heilsárshús … fullklárað að innan og utan" — **hús sem er ekki til í fasteignaskrá**. Hlutföll: 14,9 M = **4,45×** fasteignamat (innan p95 = 5,08×), 94,9 M = **28,33×** (yfir p99 = 19,39×); miðgildi alls virks framboðs er 1,18×. B1-hópurinn allur: n=**595**, miðgildi mats **3.010 þús.** — 2344094 situr á miðgildi hópsins. **Röðunin valdi töluna sem samræmist skráðu ástandi eignarinnar.**
+
+**102 m² í báðum auglýsingum er sama talan af ólíkum uppruna** — flatarmál TEIKNINGAR hjá Fasteignalandi, flatarmál HÚSS hjá Betri Stofunni. Stærðarjafnræðið sem lét þetta líta út eins og mótsögn er tilviljun. **Báðar auglýsingar LIFA** (mbl.is, mælt 04.08: `og:title` „Grensás 26, Selfossi" á báðum, HTTP 200); þriðja röðin (1709601, 14,9 M) sem `confirmed_absent_1` felldi 31.07 er líka sú eina sem mbl svarar tómri skel fyrir — sjálfstæð sannprófun á aðferðinni. Á öfgamenginu öllu: **38 af 40 tilvikum bera TVÆR LIFANDI auglýsingar**. Þetta er því **samtímis ágreiningur milli tveggja söluaðila, ekki röðunarvilla** — hönnunarspurning sem fæst ekki leyst með röðun.
+
+**Af hverju**: Rótin sem cc84 leitaði að er raunveruleg en önnur: **FASTNÚMER ER EKKI SÖLUEINING.** Sama fastnúmer getur borið lóð og húsið sem á að rísa á henni, matshluta 0101 og 0102, jörð og hlut í henni, fasteign og reksturinn í henni. Sérhver framtíðar-„villuleit" sem raðar tveimur verðum á eitt fastnúmer og kallar lægri töluna villu endurtekur nákvæmlega þessa ranggreiningu.
+
+**Heimild**: `D:\_audit\RANGT_ASETT_VERD_AUDIT_CC90_20260804T1600Z.md` §4.1–§4.5 (raðirnar þrjár, lýsingarnar, HMS-taflan, lifunarprófið) + §3 (38 af 40); `_audit/AUGLYSINGASAGAN_AUDIT_CC84_20260803T1500Z.md` §2.3/§6 (liðurinn sem er leiðréttur).
+
+## 2026-08-04 — §5B-9 · cc86-forskriftarvillan var ARKITEKTSINS: „174/174" stangaðist á við c3-regluna sjálfa
+
+**Hvað**: Kröfuna „teljarinn á að fara í **174/174** á fastnum 2123239" var ekki hægt að uppfylla samtímis c3-reglunni sem sama verkbeiðni setti. **174 er fjöldi ólíkra slóða yfir ALLAR sex virku auglýsingar fastnúmersins** (574 raðir → 174 eftir dedupe); **c3-reglan velur EINA auglýsingu per fastnum** eftir ferskleika og deduperar innan hennar — og sú auglýsing ber **100** myndir. Lotan fylgdi reglunni og skilaði **100/100**, og **það var rétt**. **INVARIANTIÐ er reglan sjálf: teljarinn skal jafngilda raunfjölda BIRTANLEGRA mynda** — hvaða tala það er ræðst af því hvaða mengi er birt, og hún má aldrei vera fest fyrirfram á tölu úr öðru mengi.
+
+**Af hverju**: Gamla greinin sagði „+570 myndir" þegar 174 voru til — **3,3× ofmat** sem fellur á nefnara-skoðun (grunnregla 13) — og sex raðir báru allar `img_order = 1`, svo fyrstu reitir myndarandarinnar urðu sama myndin úr sitt hvorri auglýsingunni (og `key={m.img_order}` varð tvítekinn React-lykill). Röðunin sem c3 valdi er **mæld, ekki valin af smekk**: `listed_at desc nulls last, first_seen_at desc nulls last, listing_id desc` velur sömu auglýsingu og röðun Á sölu-kortsins á **öllum 8.886 eignum greinarinnar — 0 ósammála**. `listing_id desc` er hreinn jafnteflis-brjótur; án hans er röðunin ekki heildarröðun og röndin gæti flökt milli fyrirspurna. [Bókhaldsathugasemd: migration-athugasemdin segir c2 fjölga eignum greinarinnar um **3.509** en commit-skilaboðin bóka **5.377 → 8.881 = 3.504**, og cc93-migrationin endurtekur **3.504**. Talan 3.504 stendur; 3.509 er stök og óstudd.]
+
+**Heimild**: `verdmat-ai` commit `7024c08` (skilaboð), `verdmat-ai/supabase/migrations/20260804_cc86_daudir_myndahyslar.sql` línur 28–57.
+
+## 2026-08-04 — §5B-10 · cc91-sannprófunin: cc87 stenst bæti fyrir bæti — og heild úr þekktum undirliðum er EKKI heild
+
+**Hvað**: Sjálfstæð endurmæling á R2-fötunni (`rclone size --fast-list`, tæpum sólarhring eftir cc87) skilar **núll fráviki á öllum sex tölum** cc87 §19: `myndir/` **2.631.932 hlutir / 586.385.814.963 bæti**, `myndir-leiga/` **12.976 / 1.778.600.751**, samtals **2.644.908 / 588.164.415.714**. Reikningurinn lokast í báðar áttir gegn flatri rótartalningu: hlutir **2.631.932 + 12.976 + 4.125 = 2.649.033**, bæti **586.385.814.963 + 1.778.600.751 + 26.949.069.967 = 615.113.485.681** — hvort tveggja nákvæmlega mæling C. **Bókhaldsvillan í cc87 §17 er leiðrétt**: „56.771 fastnúmer" var **PRE-SPLIT** talan; rétt er **55.637** undir `myndir/` og **1.134** leiguauðkenni undir `myndir-leiga/` (56.771 − 55.637 = 1.134, nákvæmlega aðskilnaðurinn sem cc87 §12 ákvað). Hlutatalan var rétt í báðum skjölum — aðeins nefnarinn var stale. Sjálfstæð staðfesting: **55.637** er sama tala og `image_index.db` ber (mælt í þessari lotu: 2.631.485 raðir / **55.637** fastnúmer).
+
+**Af hverju**: Morgunvaktin 04.08 bókaði „`myndir/` ekki til, 0 hlutir; fötu-heild **4.125**" og felldi þar með fasa 1. Talan var **rétt mæling á röngu mengi** — 4.125 = 925 backups (`current/` 625 + `archive/` 106 + `2026-05-20T12-35/` 194) + 3.200 probes, þ.e. summa ekki-mynda-forskeytanna einna. **Reglan sem þetta setur: heild fötu sem er sett saman úr þekktum undirliðum er ekki heild fötu — hún getur ekki afsannað forskeyti sem mælandinn þekkir ekki. Flöt rótartalning er eina talan sem má bera það nafn.** Keyrslutíminn lekur svarinu sem aukavörn: mælingar A og C tóku 29,3 og 29,6 mín, B tók 10 s — **tómt forskeyti skilar samstundis**, svo hálftímalöng talning er sjálf sönnun um að forskeytið sé ekki tómt.
+
+**Heimild**: `D:\_audit\R2_SANNPROFUN_CC91_20260804T2220Z.md` §1–§3, §5.1, §7; `docs/fable_prep/audits/R2_SPEGILL_FASI0_CC87_20260803T2325Z.md` §17/§19; `D:\Gagnapakkar\image_index.db` (mælt 04.08).
+
+## 2026-08-04 — §5B-11 · ÁKVÖRÐUNIN: birta af LIFANDI hýslinum strax (cc93); R2-birtingarleiðin er varanlega formið, á backlog
+
+**Hvað**: Ákvörðun arkitekts+eiganda: **taka hýsilinn af dauðalistanum og birta safnið aftur STRAX** — R2-birtingarleiðin (cc87 fasi 2) fer á backlog **sem varanlegt form**, ekki sem viðbragð. cc93 er **ein `delete`** úr `public.daudir_myndahyslar`, **engin view-breyting**: cc86 hannaði endurheimtina inn í `v_eign_myndir` þannig að tæmist listinn verður innra `NOT EXISTS` ósatt og cc23-forgangurinn (safn vinnur) tekur við af sjálfu sér. c2/c3-reglurnar standa óhreyfðar og gilda áfram um þau 5.377 fastnúmer sem eiga enga safn-röð. Taflan er **ekki dropuð** — tóm tafla er RÉTT ástand hennar, hún er vélbúnaðurinn fyrir næsta útfall.
+
+**Staða cc93, mæld í þessari lotu (read-only)**: **APPLÝJAÐ Á PROD** — `public.daudir_myndahyslar` skilar **0 röðum**; safngreinin er virk (`v_eign_myndir` skilar **36** röðum á fastnum 2207452 og **100** á 2123239, allar á CloudFront-slóðum). **ÓCOMMITTAÐ**: `20260804_cc93_hysill_af_daudalista.sql` (71 lína) + rollback standa **untracked** í `verdmat-ai`. **Enginn cc93-skiladómur liggur á diski.**
+
+**Tölur cc93, mældar FYRIR apply 04.08** — nefnarar: 55.636 fastnúmer eiga safn-röð (2.583.775 raðir, 100% á þessum eina hýsli), 8.881 bera auglýsingagrein, 17.033 virkar auglýsingar með fastnúmeri, 232.887 eignir alls.
+
+| grein sem birtist | FYRIR (mælt) | EFTIR (**SPÁÐ**) |
+|---|---:|---:|
+| safngrein | 0 eignir | 55.636 eignir |
+| auglýsingagrein | 8.881 eignir | 5.377 eignir |
+| stöðumerki | 52.132 eignir | 0 eignir |
+| birtar myndir | 217.193 | 2.583.775 |
+
+**EFTIR-dálkurinn er SPÁ, ekki eftirá-mæling** — hún liggur ekki á diski og er **óbókuð hér**. **Tap = 0** (mælt beint: `birtir_fyrir > 0 and birtir_eftir = 0` skilar 0 röðum) en **3.504 eignir SKIPTA UM GREIN**, og kostnaðurinn þar er bókaður: **559 eignir sýna FÆRRI myndir** (18.146 → 11.449, **−6.697**) því safnið þeirra er styttra en auglýsingin sem þær báru; 2.339 sýna FLEIRI (58.690 → 175.161) og 606 jafnmargar. Lágmark eftir er 1 — engin dettur í núll.
+
+**Af hverju**: **Útfallið sannaði ÞÖRF spegilsins, ekki fall hýsilsins.** Sá sem les §5B-7 sem „við þurftum aldrei R2" les rangt: hýsillinn er enn ytri rofi hjá þriðja aðila (`project_myndir_hotlink_cloudfront`), hann fór einu sinni og getur farið aftur, og spegillinn er fullgerður og bætta-vottaður (§5B-10) en er **afrit, ekki birtingarleið**. Birtingin liggur á upprunahýslinum þangað til fasi 2 er hannaður — nákvæmlega staðan sem var í gildi fram að 03.08.
+
+**Heimild**: `verdmat-ai/supabase/migrations/20260804_cc93_hysill_af_daudalista.sql` (allar tölur, línur 36–57); DB-mæling 04.08 gegnum PostgREST með `service_role` (0 raðir í `daudir_myndahyslar`; 36/100 raðir í `v_eign_myndir`); `git status` í `verdmat-ai` 04.08 (untracked).
+
+## 2026-08-04 — §5B-12 · SKEMAMÁL: `property_images` ber ENGAN tímastimpil — fastnum-lög eru röðunarlög, ekki aldurslög
+
+**Hvað**: `public.property_images` hefur **þrjá dálka og engan tímastimpil**: `fastnum bigint not null`, `url text not null`, `img_order integer not null`, `primary key (fastnum, img_order)`. Það þýðir að **enginn flötur í DB getur svarað „hvenær var þessi mynd sótt?"**. Nálgunin sem næst er `properties.scraped_at_latest`, og hún er þjöppuð í **2026-04-10 .. 2026-04-16** (sex dagar) fyrir allar eignir — það er fjöldaskröpunin, ekki aldur myndarinnar. **D:-hliðin bætir þetta EKKI upp**: `image_index.db` ber vissulega `first_seen_at` (0 NULL af 2.631.485 röðum) og `last_verified_at` (2.631.427 gildi), **en spönnin er `2026-05-08T12:35:22Z` .. `2026-05-13T22:34:16Z`** — sex dagar, samsöfnunarkeyrslan sjálf. **Hvorugur flöturinn ber raunaldur myndar.**
+
+**Af hverju**: Þetta er varnagli cc92 og hann bindur hverja framtíðarmælingu. Lögin fjögur í cc92 (elstu/miðja/nýjustu/slemba) eru **fastnum-RÖÐUNARLÖG, ekki upptökudagsetningarlög** — prófið mældi hvort slóðir yfir allt fastnum-bilið lifi (33 .. 206.138.810, þakið jafnt) og gat **ekki** mælt hvort myndir sóttar á tilteknum tíma hafi dáið. Vörnin gegn aldursbundinni eyðingu er því **rökstudd en ekki bein**, og sérhver spurning af gerðinni „dóu gömlu myndirnar?" strandar á skemanu þar til tímastimpill bætist við. [Nákvæmni: cc87 §18 liður 2 nefnir `property_images.original_url` — **sá dálkur er í `image_index.db` á D:, ekki í `public.property_images`**, þar sem hann heitir `url`. Efnisatriðið stendur óhaggað: 100% slóða vísa á þennan eina hýsil (cc92 §2).]
+
+**Heimild**: `verdmat-ai/supabase/migrations/20260705_property_images.sql` línur 16–21 (DDL); `D:\_audit\HYSILL_LIFNADI_CC92_20260804T2215Z.md` §3/§7.2; `D:\Gagnapakkar\image_index.db` skema + tímastimpilmæling 04.08.
+
+## 2026-08-04 — §5B-13 · cc85 verk D — ákvarðanir arkitekts D1–D5
+
+**Hvað**: Fimm ákvarðanir teknar á hönnunarskjali cc85 (verk D, lotu-samsöfnun); framkvæmdin sjálf bíður tímasetningar eiganda (PLANNING_BACKLOG).
+
+- **D1 — orðalag**: „**engin þinglýst sala er skráð**", ALDREI „seldist ekki". Briefið setur sjálft ályktunarbannið: við vitum að sala er óskráð, ekki hvers vegna.
+- **D2 — fjöleiningarsían: FELLA ÚT**. **1.284 örugg fastanúmer > 1.565 með 18% hávaða** á eignasíðu. Mælt: 10,96% fastanúmera í sögulega safninu bera >1 ólíka `einflm`; innan flöggaða mengisins **17,96% (281 af 1.565)**. Flaggið fellur út þegar `n_olikar_staerdir > 1`.
+- **D3 — `gap_dagar = 90` LÆST**, en sem **gildi í `scraper.session_config`, ekki fasti í kóða** (±10 pp á þýðið).
+- **D4 — leiðrétting 1 SAMÞYKKT**: forsenda briefsins („time-on-market röng á 19% virkra") **féll fyrir mælingu**. Á 8.365 einingum **VANmetur** `v_units.days_on_market` að meðaltali **−3,3 daga** (96,1 vs 99,5) og **OFmetur á 8 af 8.365 = 0,10%**. **Spillti dálkurinn er annar: `n_relistings`**, sem telur 3,37 auðkenni að meðaltali (hámark 141) sem „endurbirtingar" þegar um eina samfellda keyrslu er að ræða. Enginn TOM-dálkur er notendasýnilegur (`days_on_market` finnst hvergi í app-kóða; `ASoluKort.tsx` ber bindandi bann við „X daga á sölu"). Verkið er því **(a) `n_relistings`-viðgerð + (b) opnun á RÉTTA TOM-tölu**, ekki viðgerð á rangri birtri tölu.
+- **D5 — tvö apply-þrep með HALT á milli**: tafla + backfill fyrst og mælt, svo view + UI í sérlotu (sama og phase_d).
+
+**Af hverju**: D4 er kjarninn og hann er fordæmi: **forsenda arkitektsins var felld af mælingu áður en hannað var**, og umfang verksins breyttist við það. Að hafa byggt „viðgerðina" á briefinu hefði lagað dálk sem enginn notandi sér og skilið eftir þann sem er raunverulega spilltur. D2 er sama ætt: þrengra mengi með sannreyndri kornastærð vinnur stærra mengi með hávaða (sbr. `feedback_kaskadinn_felur_thynnkuna`).
+
+**Heimild**: `D:\VIDHALDSSAGA_D_HONNUN_CC85_20260804T0030Z.md` §0.1 (TOM-taflan, `n_relistings`), §0.2, §3 (fjöleiningarsían, 1.565 → 1.284), §6 (D1–D5-taflan).
+
+*— Lok bókunarlotu cc95 §5B (DECISIONS-hluti).*
