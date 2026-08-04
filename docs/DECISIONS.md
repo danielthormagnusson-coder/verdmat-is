@@ -4965,3 +4965,55 @@ Ein keyrsla: frosni listinn 1–17 + viðaukar cc61–cc69 (18–32). Allar töl
 **Heimild**: `LAEKNUN_B_AKKERISVORDUR` §5–§7, `ENDURKVORDUN_APPLY_CC51` §0.
 
 *— Lok bókunarlotu cc70 §5A (DECISIONS-hluti).*
+
+---
+
+## 2026-08-04 — §5B-1 · Myndahýsingin HORFIN ÚR DNS: hotlink-áhættan frá cc58 rættist
+
+**Hvað**: CloudFront-dreifingin `d1u57vh96em4i1.cloudfront.net` á **enga DNS-færslu** á fjórum resolverum — hún er horfin, ekki niðri (~00:40Z lifandi → 22:30Z dauð 03.08). Aðgreiningin skiptir máli: **eytt ≠ lokað** — slökkt (disabled) dreifing heldur DNS-nafninu og svarar 403; horfið nafn þýðir að dreifingin var EYDD. **95,46% eigna standa myndalausar** (222.306 af 232.887; þar af **48.821 sem misstu allt** því þær áttu enga aðra lind). `public.property_images` ber 2.583.775 raðir, 100% á þessu eina hýsili — ekkert varaslóðamynstur er til. cc80-talan 91,19% **endurgerðist ekki** á neinum eðlilegum nefnara (232.887 / 55.636 / 48.595 / 27.894 / `v_leit_listings`); hún stendur óendurgerð og **cc83-mælingin er heimildin**.
+
+**Af hverju**: Áhættan var bókuð frá cc58 og aftur í heildarúttektinni (bylgja 2, liður 2.2): öll myndbirting hékk á EINUM ytri rofa hjá þriðja aðila þótt fullt afrit væri til á D:. Þriðji aðili sló rofann af án fyrirvara. Þetta er ekki bilun sem lagast — þetta er niðurrif, og eina svarið er eigin hýsing (sjá R2-spegilinn, PLANNING_BACKLOG).
+
+**Heimild**: `docs/fable_prep/audits/MYNDAHYSING_DAUD_CC83_20260803T2256Z.md` §1.1/§1.2 (nefnaratafla), `HEILDARUTTEKT` HLUTI 3 (2.2), minni `project_myndir_hotlink_cloudfront`.
+
+## 2026-08-04 — §5B-2 · Vercel 402-kvótinn er ÚRELTUR — cc58/cc62-f0-greiningin og valkostur A lokast
+
+**Hvað**: `/_next/image` á lifandi upprunaslóð skilar **HTTP 200** — 402-kvótinn sem cc58 og cc62-f0 bókuðu er farinn. Myndaleysið í dag á því EKKERT skylt við Vercel-optimizerinn. **Valkostur A (uppfærsla á Vercel-plani) lokast** sem viðbragð, og hver greining sem hvílir á 402-forsendunni fellur með henni.
+
+**Af hverju**: Tvær ólíkar bilanir hafa nú birst á sama yfirborði (myndir birtast ekki) með níu daga millibili — kvóti (cc58/cc62-f0) og hýsingardauði (§5B-1). Að bera gamla greiningu yfir á nýtt einkenni hefði valið rangan valkost; forsendan var endurmæld í stað þess að vera ályktuð.
+
+**Heimild**: `MYNDAHYSING_DAUD_CC83_20260803T2256Z.md` §1.3 (402-mælingin) + §4 liður 3.
+
+## 2026-08-04 — §5B-3 · GPTBot 74.7.227.14 STAÐFESTUR OpenAI — robots.txt bítur á raunverulegan aðila
+
+**Hvað**: Talan **74.7.227.14 er innan `74.7.227.0/25`**, sem er eitt af 21 forskeyti í birtri IP-skrá OpenAI (`openai.com/gptbot.json`, HTTP 200, `creationTime 2025-10-30`). RDAP vísar á Azure (MICROSOFT-MAINT), sem samræmist. **PTR er NXDOMAIN** — en forward-confirmed rDNS **á ekki við hér**: OpenAI gefur ekki út PTR-færslur og vísar sjálft á json-skrána sem sannvottunarleið. **Afleiðing**: `robots.txt` bítur á raunverulegan aðila sem virðir hana — hún er **virk vörn, ekki kurteisi**; WAF er viðbót en ekki eina leiðin. **Bot-hlutfall umferðarinnar almennt er enn ÓMÆLT.**
+
+**Af hverju**: Fyrsta prófið (PTR) skilaði engu og hefði — lesið sem sönnun — leitt til rangrar niðurstöðu („óstaðfestur hermir"). Sannvottunaraðferðin verður að fylgja þeirri sem útgefandinn birtir, ekki þeirri sem er hefðbundin.
+
+**Heimild**: `MYNDAHYSING_DAUD_CC83_20260803T2256Z.md` §5 (a)/(b), minni `project_gptbot_stadfest_cc83`.
+
+## 2026-08-04 — §5B-4 · AI Bots → Deny LIVE í Vercel (meðvituð ákvörðun eiganda)
+
+**Hvað**: „AI Bots → Deny" er virkjað í Vercel-eldveggnum og **mælt**: GPTBot / ClaudeBot / PerplexityBot fá **403**, Googlebot fær **200 óbreytt** (leitarvélaskrið raskast ekki). **Viðvörun Vercel bókast með**: þetta gerir AI-leitar- og tilvitnunartólum erfiðara að lesa síðuna eða vísa í hana. Eigandi tók ákvörðunina með þeirri afleiðingu uppi á borðinu.
+
+**Af hverju**: Bókun á viðvöruninni sjálfri er kjarni liðarins — ef sýnileiki í AI-svörum minnkar síðar á það ekki að lesast sem óútskýrt frávik, heldur sem mæld afleiðing valinnar stillingar sem má snúa við.
+
+**Heimild**: Vercel-eldveggur (mælt 03.08, UA-próf 3× deny / 1× allow), `MYNDAHYSING_DAUD_CC83_20260803T2256Z.md` §5.
+
+## 2026-08-04 — §5B-5 · NULL Á RÖÐ ER EKKI NULL Á EIGN — regression-viðmið veljast á EIGN
+
+**Hvað**: Þegar eign ber margar raðir og birtingin velur EINA þeirra, þá prófar viðmið sem valið er á RÖÐ ekki það sem yfirborðið sýnir: röð með `NULL` getur verið til á eign sem birtir gildi úr annarri röð — viðmiðið „sannar" þá galla sem er ekki til, eða öfugt. **Regla**: regression-viðmið skulu valin á EIGN — `GROUP BY fastnum HAVING count(<reitur>) = 0` — **að undangenginni sömu síun og gagnalagið beitir** (sami ferskleiki, sama lind, sama virkni-skilyrði). Aðferðarvillan var gerð og leiðrétt innan cc82.
+
+**Af hverju**: Kornastærð viðmiðsins verður að vera sú sama og kornastærð birtingarinnar. Þetta er sama bilunarmátið og `feedback_kaskadinn_felur_thynnkuna` bókar (mæla á kornastærð notandans) og systurregla `feedback_cov_maeling_nan_sem_miss` (nefnarinn bókast sér).
+
+**Heimild**: `docs/SOLUADILI_MATSARGERD_CC82_20260803T133000Z.md` §V4.2.
+
+## 2026-08-04 — §5B-6 · ÚTGÁFA ÓGILDIR EKKI `saekjaEign`-CACHE — allt að klukkustundar töf á /eign
+
+**Hvað**: `saekjaEign` er vafið í `unstable_cache` með TTL 3.600 s og merkjum `eign` / `eign-<fastnum>` (cc73). Gagna-cache Vercel **lifir af útgáfu**, svo ný útgáfa sem breytir því HVAÐA dálka fallið sækir fær gamla farminn þar til TTL rennur út. **Mælt í cc82: ~47 mínútna töf** eftir deploy (söluyfirlitið birti sömu línu STRAX því sú síða notar `cache(...)`, sem er React-minnun innan einnar beiðni). cc75 tengdi `revalidateTag` við AI-fyllingarleiðina EINA — útgáfa hefur enga ógildingarleið. **Afleiðing sem nær lengra en cc82**: hver framtíðarbreyting á því sem `/eign` les lendir allt að klukkustund seint, og sá sem prófar strax eftir push les það sem BILUN. **Stendur á backlog sem HÖNNUNARÁKVÖRÐUN, ekki flýtilagfæring**: (a) útgáfuauðkenni inn í cache-lykilinn eða (b) ógilding inn í útgáfuferlið. Enginn go.
+
+**Af hverju**: Þetta er ranggreiningargildra af sömu ætt og `feedback_ein_sokn_i_dev_asset_sannar_ekki_fjarveru`, nema útgáfu-megin: prófunin er rétt, kóðinn er réttur, og samt sýnir yfirborðið gamalt efni. Að bóka töfina sem þekkta hegðun er ódýrara en að endurgreina hana í hverri lotu.
+
+**Heimild**: `docs/SOLUADILI_MATSARGERD_CC82_20260803T133000Z.md` §V3/§V3b; `lib/eign-queries.js:85` (verdmat-ai). Sami fundur er þegar bókaður í `PLANNING_BACKLOG.md` (Cache-fundur cc82).
+
+*— Lok bókunarlotu cc88 §5B (DECISIONS-hluti).*

@@ -1252,3 +1252,39 @@ Bíður Phase D (HMS-gögn í Supabase + `rebuild_training_data.py` export-skref
   gildran útgáfu-megin. **Tveir valkostir, hvorugur valinn:** (a) binda útgáfuauðkenni inn í
   cache-lykil `saekjaEign`, eða (b) bæta ógildingu við útgáfuferlið. Enginn go.
   Heimild: `docs/SOLUADILI_MATSARGERD_CC82_20260803T133000Z.md` §V3/§V3b.
+
+---
+
+## Bókun cc88 (logged 2026-08-04) — myndahýsingin, umkóðun, lindar-þak og WAF-nafnið
+
+**Bókunarregla:** append-only. Liðirnir hér að neðan **leysa af** eldri orðalag ofar í skjalinu þar sem
+það er tekið fram; eldri línur standa óbreyttar sem söguleg færsla.
+
+- **R2-MYNDASPEGILLINN ER Í FRAMKVÆMD SEM cc87 (valkostur a1).** **Leysir af** liðinn
+  „R2-myndaspegillinn" hér að ofan að því er varðar stöðumatið: sá liður bókar spegilinn sem
+  **áhættulið, ekki bruna** („optimizer mælist grænn í dag") — sú forsenda er fallin. Myndahýsingin
+  er horfin úr DNS og 95,46% eigna standa myndalausar (DECISIONS §5B-1); optimizer-hliðin er
+  jafnframt óviðkomandi því 402-kvótinn er úreltur (§5B-2). Spegillinn er þar með **eina leiðin
+  til baka**, ekki varúðarráðstöfun. Umfangið er leiðrétt í minni: spegiláætlunin fer úr
+  113 GB í **263 GB** (D:-afritið dekkar 48/48 stikkprufu-eigna).
+- **UMKÓÐUN Í WEBP KEMUR SÍÐAR — OFAN Á R2-EINTAKIÐ, EKKI Í STAÐINN.** Röðin er skilyrði, ekki
+  smekkur: fyrst kemur heilt, óumkóðað eintak í eigin hýsingu (cc87), síðan umkóðun sem afleidd
+  útgáfa ofan á það. Undanfari umkóðunar er **mæling á því HVAÐA stærðir þarf í raun** — ekki
+  ágiskun um breiddir. Þau mistök eru þegar bókuð tvisvar: `feedback_fill_getur_ekki_gefid_fa_afbrigdi`
+  (`sizes` án `vw` skilar ÖLLUM breiddum) og cc72, þar sem rót kostnaðarblæðingarinnar reyndist
+  **breiddaryfirborð** (w=3840). Að umkóða áður en stærðaþörfin er mæld endurtekur nákvæmlega þá
+  blæðingu í nýju hýsingunni.
+- **LINDAR-ÞAKIÐ Á SÖLUAÐILA: myigloo BER ENGAN AGENCY-REIT.** Mælt: mbl-leiga ber söluaðila á
+  **178/178 = 100%**, myigloo á **0 af 915 = 0,0%** — reiturinn er ekki tómur hjá myigloo, hann er
+  ekki til í lindinni. Afleiðing fyrir hverja framtíðar-þekjumælingu á söluaðila: **nefnarinn er
+  mbl-leiga, ekki allt leiguframboðið**, og 100%-þak næst aldrei á samsettum fleti meðan myigloo er
+  með. Röðunin (`asett_verd_dags desc, listed_at desc`) velur eina röð þegar báðar lindir eiga
+  eignina — sjá DECISIONS §5B-5 (viðmið veljast á EIGN, ekki röð). Heimild:
+  `docs/SOLUADILI_MATSARGERD_CC82_20260803T133000Z.md` §V4 (lindartafla, línur 434–468).
+- **WAF-REGLUNAFNIÐ ER VILLANDI — ENDURNEFNA.** Reglan heitir `cc73-UA-maeling-bera-saman`, sem
+  lýsir upphaflegu umfangi hennar (UA-mæling á /bera-saman). Hún hefur síðan verið **víkkuð á allan
+  flötinn** og nafnið lýsir henni ekki lengur — sá sem les regluna í Vercel-eldveggnum les rangt
+  umfang og gæti breytt henni eða fellt hana í trausti þess að hún snerti eina síðu.
+  Endurnefning er hrein snyrting án virknibreytingar; **enginn go**. Nafnið finnst hvorki í
+  `app/docs/` né `verdmat-ai/docs/` (leitað 04.08) — það lifir eingöngu í Vercel-stillingunum,
+  sem er sjálfstæð ástæða til að bóka það hér.
