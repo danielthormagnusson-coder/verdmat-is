@@ -1,0 +1,1000 @@
+{
+ "_skyring": "Fasi B talnagrunnur fyrir FASTEIGNASKYRSLA_2026-07. Allar fyrirspurnir read-only á Supabase (szzjsvmvxfrhyexblzvq) 2026-08-05 ~09:00Z. Sía nema annað sé tekið fram: onothaefur=0, is_suspect_comparable=false, kaupverd_nominal>0 (=\"metanlegir íbúðasamningar\", þrengra mengi en HMS-talningar). Raunvirði = kaupverd_real, fast verðlag vísitölu til verðtryggingar 2026-09 (693,2 = verðlag júlí 2026).",
+ "gagnafersla": {
+  "sales_history_max_thinglystdags": "2026-08-04",
+  "sales_history_n_alls": 229153,
+  "sott_dags": "2026-08-05"
+ },
+ "velta_juli_eftir_arum_siad": {
+  "2021": {
+   "n": 975,
+   "midgildi_kr_m2": 482620
+  },
+  "2022": {
+   "n": 656,
+   "midgildi_kr_m2": 583880
+  },
+  "2023": {
+   "n": 515,
+   "midgildi_kr_m2": 608919
+  },
+  "2024": {
+   "n": 746,
+   "midgildi_kr_m2": 675452
+  },
+  "2025": {
+   "n": 902,
+   "midgildi_kr_m2": 721150
+  },
+  "2026": {
+   "n": 636,
+   "midgildi_kr_m2": 727297
+  }
+ },
+ "velta_agust_1_4_eftir_arum_siad": {
+  "2021": {
+   "n": 69
+  },
+  "2022": {
+   "n": 98
+  },
+  "2023": {
+   "n": 83
+  },
+  "2024": {
+   "n": 62
+  },
+  "2025": {
+   "n": 21
+  },
+  "2026": {
+   "n": 5
+  }
+ },
+ "velta_2026_manadarleg": {
+  "2026-01": {
+   "n_alls": 1143,
+   "n_siad": 519
+  },
+  "2026-02": {
+   "n_alls": 1005,
+   "n_siad": 415
+  },
+  "2026-03": {
+   "n_alls": 1372,
+   "n_siad": 720
+  },
+  "2026-04": {
+   "n_alls": 928,
+   "n_siad": 467
+  },
+  "2026-05": {
+   "n_alls": 1125,
+   "n_siad": 526
+  },
+  "2026-06": {
+   "n_alls": 1175,
+   "n_siad": 609
+  },
+  "2026-07": {
+   "n_alls": 1155,
+   "n_siad": 636
+  },
+  "2026-08": {
+   "n_alls": 8,
+   "n_siad": 5
+  }
+ },
+ "midgildi_kr_m2_eftir_sveitarfelagi_12man": {
+  "Garðabær": {
+   "n": 383,
+   "kr_m2": 820172
+  },
+  "Reykjavíkurborg": {
+   "n": 2804,
+   "kr_m2": 787367
+  },
+  "Kópavogsbær": {
+   "n": 772,
+   "kr_m2": 785246
+  },
+  "Mosfellsbær": {
+   "n": 231,
+   "kr_m2": 780292
+  },
+  "Hafnarfjarðarkaupstaður": {
+   "n": 666,
+   "kr_m2": 711698
+  },
+  "Akureyrarbær": {
+   "n": 369,
+   "kr_m2": 628227
+  },
+  "Reykjanesbær": {
+   "n": 280,
+   "kr_m2": 583024
+  },
+  "Sveitarfélagið Árborg": {
+   "n": 186,
+   "kr_m2": 570136
+  },
+  "Akraneskaupstaður": {
+   "n": 125,
+   "kr_m2": 531317
+  }
+ },
+ "frambod_2026_08_05": {
+  "solu_auglysingafaerslur_virkar": 15072,
+  "solu_adgreind_fastanumer": 7035,
+  "solu_adgreind_heimilisfong": 7772,
+  "onnur": {
+   "commercial|rent": {
+    "faerslur": 195,
+    "adgreind": 112
+   },
+   "commercial|sale": {
+    "faerslur": 1447,
+    "adgreind": 834
+   },
+   "other|rent": {
+    "faerslur": 1,
+    "adgreind": 1
+   },
+   "other|sale": {
+    "faerslur": 106,
+    "adgreind": 71
+   },
+   "plot|sale": {
+    "faerslur": 484,
+    "adgreind": 308
+   },
+   "residential|rent": {
+    "faerslur": 1302,
+    "adgreind": 932
+   },
+   "residential|sale": {
+    "faerslur": 15072,
+    "adgreind": 7772
+   }
+  }
+ },
+ "asett_vs_verdmat_2026_08_05": {
+  "hbsv": {
+   "n": 8887,
+   "p10": 0.898,
+   "p25": 0.946,
+   "p50": 0.997,
+   "p75": 1.066,
+   "p90": 1.181
+  },
+  "landid_allt": {
+   "n": 12130,
+   "p10": 0.897,
+   "p25": 0.951,
+   "p50": 1.009,
+   "p75": 1.107,
+   "p90": 1.243
+  },
+  "landsbyggd": {
+   "n": 3243,
+   "p10": 0.892,
+   "p25": 0.979,
+   "p50": 1.069,
+   "p75": 1.207,
+   "p90": 1.39
+  }
+ },
+ "leigumarkadur_asett_2026_08_05": {
+  "n": 1264,
+  "midgildi_leiga_kr": 343500,
+  "midgildi_kr_m2": 4079
+ },
+ "verdbreytingar_juli": {
+  "n_laekkanir": 45,
+  "n_haekkanir": 128,
+  "midgildi_laekkun": -0.0556
+ },
+ "lifsferill_jul_agu": {
+  "confirmed_absent_1": 23027,
+  "withdrawn_confirmed": 17983,
+  "price_changed": 57
+ },
+ "tom_konnun_juli": {
+  "n": 513,
+  "med_dagar": 22.0,
+  "p25": 9.0,
+  "p75": 37.0
+ },
+ "list_to_sale_juli": {
+  "n": 609,
+  "midgildi_solu_asett": 0.974
+ },
+ "kafli_100m2": {
+  "_skilgreining": "Tegund úr lifandi framleiðsluflokkun (canonical_code, byggð á tegund-skráningu HMS): íbúð=APT_STANDARD, hæð=APT_FLOOR, rað-par=ROW_HOUSE+SEMI_DETACHED, einbýli=SFH_DETACHED. Kjallara- og risíbúðir standa utan flokkanna fjögurra. Band=einflm_at_sale 85–115 m²; verd100 = miðgildi(kr/m²)×100. Aðhvarf: ln(verð)=a+b·ln(flm/100), 30–400 m², 12 mán (2025-08-01..2026-08-01); verd100=exp(a). Svæði: hbsv=RVK_core+Capital_sub, landsbyggd=Country (region_tier). Birtingarregla: hólf með n<30 fá stöðumerki, ekki tölu.",
+  "band": {
+   "ibud|hbsv": {
+    "12man": {
+     "nom": {
+      "n": 713,
+      "verd100_mkr": 74.4
+     },
+     "real": {
+      "n": 713,
+      "verd100_mkr": 77.8
+     }
+    },
+    "fyrri12": {
+     "nom": {
+      "n": 816,
+      "verd100_mkr": 72.6
+     },
+     "real": {
+      "n": 816,
+      "verd100_mkr": 78.7
+     }
+    },
+    "juli26": {
+     "nom": {
+      "n": 48,
+      "verd100_mkr": 77.5
+     },
+     "real": {
+      "n": 48,
+      "verd100_mkr": 78.5
+     }
+    }
+   },
+   "ibud|landsbyggd": {
+    "12man": {
+     "nom": {
+      "n": 85,
+      "verd100_mkr": 59.1
+     },
+     "real": {
+      "n": 85,
+      "verd100_mkr": 61.4
+     }
+    },
+    "fyrri12": {
+     "nom": {
+      "n": 109,
+      "verd100_mkr": 57.9
+     },
+     "real": {
+      "n": 109,
+      "verd100_mkr": 62.9
+     }
+    },
+    "juli26": {
+     "nom": {
+      "n": 6,
+      "verd100_mkr": 58.8
+     },
+     "real": {
+      "n": 6,
+      "verd100_mkr": 59.5
+     }
+    }
+   },
+   "haed|hbsv": {
+    "12man": {
+     "nom": {
+      "n": 780,
+      "verd100_mkr": 75.6
+     },
+     "real": {
+      "n": 780,
+      "verd100_mkr": 78.5
+     }
+    },
+    "fyrri12": {
+     "nom": {
+      "n": 789,
+      "verd100_mkr": 73.8
+     },
+     "real": {
+      "n": 789,
+      "verd100_mkr": 79.9
+     }
+    },
+    "juli26": {
+     "nom": {
+      "n": 80,
+      "verd100_mkr": 74.5
+     },
+     "real": {
+      "n": 80,
+      "verd100_mkr": 75.5
+     }
+    }
+   },
+   "haed|landsbyggd": {
+    "12man": {
+     "nom": {
+      "n": 248,
+      "verd100_mkr": 50.6
+     },
+     "real": {
+      "n": 248,
+      "verd100_mkr": 53.0
+     }
+    },
+    "fyrri12": {
+     "nom": {
+      "n": 202,
+      "verd100_mkr": 49.3
+     },
+     "real": {
+      "n": 202,
+      "verd100_mkr": 53.6
+     }
+    },
+    "juli26": {
+     "nom": {
+      "n": 26,
+      "verd100_mkr": 50.8
+     },
+     "real": {
+      "n": 26,
+      "verd100_mkr": 51.5
+     }
+    }
+   },
+   "radpar|hbsv": {
+    "12man": {
+     "nom": {
+      "n": 22,
+      "verd100_mkr": 68.3
+     },
+     "real": {
+      "n": 22,
+      "verd100_mkr": 71.9
+     }
+    },
+    "fyrri12": {
+     "nom": {
+      "n": 17,
+      "verd100_mkr": 64.4
+     },
+     "real": {
+      "n": 17,
+      "verd100_mkr": 70.4
+     }
+    },
+    "juli26": {
+     "nom": {
+      "n": 2,
+      "verd100_mkr": null
+     },
+     "real": {
+      "n": 2,
+      "verd100_mkr": null
+     }
+    }
+   },
+   "radpar|landsbyggd": {
+    "12man": {
+     "nom": {
+      "n": 35,
+      "verd100_mkr": 63.1
+     },
+     "real": {
+      "n": 35,
+      "verd100_mkr": 65.4
+     }
+    },
+    "fyrri12": {
+     "nom": {
+      "n": 49,
+      "verd100_mkr": 63.1
+     },
+     "real": {
+      "n": 49,
+      "verd100_mkr": 68.2
+     }
+    },
+    "juli26": {
+     "nom": {
+      "n": 4,
+      "verd100_mkr": null
+     },
+     "real": {
+      "n": 4,
+      "verd100_mkr": null
+     }
+    }
+   },
+   "einbyli|hbsv": {
+    "12man": {
+     "nom": {
+      "n": 8,
+      "verd100_mkr": 90.9
+     },
+     "real": {
+      "n": 8,
+      "verd100_mkr": 93.9
+     }
+    },
+    "fyrri12": {
+     "nom": {
+      "n": 6,
+      "verd100_mkr": 71.6
+     },
+     "real": {
+      "n": 6,
+      "verd100_mkr": 77.9
+     }
+    },
+    "juli26": {
+     "nom": {
+      "n": 1,
+      "verd100_mkr": null
+     },
+     "real": {
+      "n": 1,
+      "verd100_mkr": null
+     }
+    }
+   },
+   "einbyli|landsbyggd": {
+    "12man": {
+     "nom": {
+      "n": 22,
+      "verd100_mkr": 36.1
+     },
+     "real": {
+      "n": 22,
+      "verd100_mkr": 37.9
+     }
+    },
+    "fyrri12": {
+     "nom": {
+      "n": 13,
+      "verd100_mkr": 43.8
+     },
+     "real": {
+      "n": 13,
+      "verd100_mkr": 47.6
+     }
+    },
+    "juli26": {
+     "nom": {
+      "n": 0,
+      "verd100_mkr": null
+     },
+     "real": {
+      "n": 0,
+      "verd100_mkr": null
+     }
+    }
+   }
+  },
+  "manadarroð": {
+   "ibud": [
+    {
+     "man": "2025-08",
+     "n": 68,
+     "nom": 74.5,
+     "real": 78.6
+    },
+    {
+     "man": "2025-09",
+     "n": 96,
+     "nom": 73.0,
+     "real": 76.8
+    },
+    {
+     "man": "2025-10",
+     "n": 106,
+     "nom": 71.8,
+     "real": 75.7
+    },
+    {
+     "man": "2025-11",
+     "n": 69,
+     "nom": 70.4,
+     "real": 74.2
+    },
+    {
+     "man": "2025-12",
+     "n": 50,
+     "nom": 72.0,
+     "real": 75.5
+    },
+    {
+     "man": "2026-01",
+     "n": 56,
+     "nom": 68.2,
+     "real": 71.8
+    },
+    {
+     "man": "2026-02",
+     "n": 56,
+     "nom": 74.9,
+     "real": 77.9
+    },
+    {
+     "man": "2026-03",
+     "n": 89,
+     "nom": 74.4,
+     "real": 77.1
+    },
+    {
+     "man": "2026-04",
+     "n": 47,
+     "nom": 73.9,
+     "real": 75.9
+    },
+    {
+     "man": "2026-05",
+     "n": 51,
+     "nom": 76.8,
+     "real": 78.5
+    },
+    {
+     "man": "2026-06",
+     "n": 56,
+     "nom": 76.7,
+     "real": 77.8
+    },
+    {
+     "man": "2026-07",
+     "n": 54,
+     "nom": 74.3,
+     "real": 75.3
+    }
+   ],
+   "haed": [
+    {
+     "man": "2025-08",
+     "n": 89,
+     "nom": 72.0,
+     "real": 76.0
+    },
+    {
+     "man": "2025-09",
+     "n": 96,
+     "nom": 71.7,
+     "real": 75.4
+    },
+    {
+     "man": "2025-10",
+     "n": 93,
+     "nom": 70.5,
+     "real": 74.3
+    },
+    {
+     "man": "2025-11",
+     "n": 92,
+     "nom": 71.2,
+     "real": 75.0
+    },
+    {
+     "man": "2025-12",
+     "n": 69,
+     "nom": 73.3,
+     "real": 76.8
+    },
+    {
+     "man": "2026-01",
+     "n": 77,
+     "nom": 73.6,
+     "real": 77.5
+    },
+    {
+     "man": "2026-02",
+     "n": 46,
+     "nom": 74.5,
+     "real": 77.6
+    },
+    {
+     "man": "2026-03",
+     "n": 108,
+     "nom": 74.0,
+     "real": 76.7
+    },
+    {
+     "man": "2026-04",
+     "n": 74,
+     "nom": 74.4,
+     "real": 76.4
+    },
+    {
+     "man": "2026-05",
+     "n": 79,
+     "nom": 73.2,
+     "real": 74.8
+    },
+    {
+     "man": "2026-06",
+     "n": 99,
+     "nom": 72.8,
+     "real": 73.8
+    },
+    {
+     "man": "2026-07",
+     "n": 106,
+     "nom": 72.7,
+     "real": 73.6
+    }
+   ],
+   "radpar": [
+    {
+     "man": "2025-08",
+     "n": 4,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2025-09",
+     "n": 4,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2025-10",
+     "n": 7,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2025-11",
+     "n": 5,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2025-12",
+     "n": 6,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-01",
+     "n": 0,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-02",
+     "n": 4,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-03",
+     "n": 7,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-04",
+     "n": 4,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-05",
+     "n": 5,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-06",
+     "n": 5,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-07",
+     "n": 6,
+     "nom": null,
+     "real": null
+    }
+   ],
+   "einbyli": [
+    {
+     "man": "2025-08",
+     "n": 0,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2025-09",
+     "n": 3,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2025-10",
+     "n": 5,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2025-11",
+     "n": 1,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2025-12",
+     "n": 2,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-01",
+     "n": 5,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-02",
+     "n": 1,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-03",
+     "n": 5,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-04",
+     "n": 2,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-05",
+     "n": 3,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-06",
+     "n": 2,
+     "nom": null,
+     "real": null
+    },
+    {
+     "man": "2026-07",
+     "n": 1,
+     "nom": null,
+     "real": null
+    }
+   ]
+  },
+  "adhvarf": {
+   "ibud|hbsv": {
+    "nom": {
+     "n": 1876,
+     "verd100_mkr": 76.6,
+     "teygni_b": 0.728,
+     "r2": 0.702,
+     "flm_p25_p75": [
+      75,
+      114
+     ]
+    },
+    "real": {
+     "n": 1876,
+     "verd100_mkr": 79.7,
+     "teygni_b": 0.731,
+     "r2": 0.706,
+     "flm_p25_p75": [
+      75,
+      114
+     ]
+    }
+   },
+   "ibud|landsbyggd": {
+    "nom": {
+     "n": 235,
+     "verd100_mkr": 56.7,
+     "teygni_b": 0.689,
+     "r2": 0.486,
+     "flm_p25_p75": [
+      78,
+      117
+     ]
+    },
+    "real": {
+     "n": 235,
+     "verd100_mkr": 59.0,
+     "teygni_b": 0.693,
+     "r2": 0.492,
+     "flm_p25_p75": [
+      78,
+      117
+     ]
+    }
+   },
+   "haed|hbsv": {
+    "nom": {
+     "n": 2388,
+     "verd100_mkr": 76.9,
+     "teygni_b": 0.755,
+     "r2": 0.761,
+     "flm_p25_p75": [
+      79,
+      130
+     ]
+    },
+    "real": {
+     "n": 2388,
+     "verd100_mkr": 79.8,
+     "teygni_b": 0.755,
+     "r2": 0.759,
+     "flm_p25_p75": [
+      79,
+      130
+     ]
+    }
+   },
+   "haed|landsbyggd": {
+    "nom": {
+     "n": 818,
+     "verd100_mkr": 47.5,
+     "teygni_b": 0.576,
+     "r2": 0.317,
+     "flm_p25_p75": [
+      82,
+      156
+     ]
+    },
+    "real": {
+     "n": 818,
+     "verd100_mkr": 49.4,
+     "teygni_b": 0.572,
+     "r2": 0.315,
+     "flm_p25_p75": [
+      82,
+      156
+     ]
+    }
+   },
+   "radpar|hbsv": {
+    "nom": {
+     "n": 239,
+     "verd100_mkr": 74.8,
+     "teygni_b": 0.975,
+     "r2": 0.739,
+     "flm_p25_p75": [
+      142,
+      204
+     ]
+    },
+    "real": {
+     "n": 239,
+     "verd100_mkr": 77.5,
+     "teygni_b": 0.98,
+     "r2": 0.741,
+     "flm_p25_p75": [
+      142,
+      204
+     ]
+    }
+   },
+   "radpar|landsbyggd": {
+    "nom": {
+     "n": 141,
+     "verd100_mkr": 54.6,
+     "teygni_b": 0.952,
+     "r2": 0.497,
+     "flm_p25_p75": [
+      96,
+      153
+     ]
+    },
+    "real": {
+     "n": 141,
+     "verd100_mkr": 56.7,
+     "teygni_b": 0.951,
+     "r2": 0.498,
+     "flm_p25_p75": [
+      96,
+      153
+     ]
+    }
+   },
+   "einbyli|hbsv": {
+    "nom": {
+     "n": 169,
+     "verd100_mkr": 79.9,
+     "teygni_b": 0.879,
+     "r2": 0.592,
+     "flm_p25_p75": [
+      178,
+      246
+     ]
+    },
+    "real": {
+     "n": 169,
+     "verd100_mkr": 83.1,
+     "teygni_b": 0.88,
+     "r2": 0.59,
+     "flm_p25_p75": [
+      178,
+      246
+     ]
+    }
+   },
+   "einbyli|landsbyggd": {
+    "nom": {
+     "n": 174,
+     "verd100_mkr": 38.8,
+     "teygni_b": 0.986,
+     "r2": 0.349,
+     "flm_p25_p75": [
+      136,
+      199
+     ]
+    },
+    "real": {
+     "n": 174,
+     "verd100_mkr": 40.3,
+     "teygni_b": 0.981,
+     "r2": 0.347,
+     "flm_p25_p75": [
+      136,
+      199
+     ]
+    }
+   }
+  }
+ },
+ "model_tracking": {
+  "_skilgreining": "Lifandi framleiðsla eingöngu: public.model_metrics (vikuleg model_quality_eval-keyrsla), model_version=iter4r_20260716 (útgáfan sem predictions bera; birt á /markadur/modelstada). holdout30=OOS-pör m/ cutoff 2026-01-15; fresh_edge=pör þinglýst eftir 2026-07-15.",
+  "nyjasta_keyrsla_2026_08_03": {
+   "holdout30": {
+    "n": 847,
+    "med_ape": 7.66,
+    "mape": 9.96,
+    "cov80": 81.1,
+    "cov95": 95.5
+   },
+   "fresh_edge": {
+    "n": 339,
+    "med_ape": 10.33,
+    "mape": 14.59,
+    "cov80": 76.7,
+    "cov95": 96.2
+   }
+  },
+  "endurkvordun_vissubila": {
+   "_skyring": "Vissubil endurkvörðuð í lok júlí (birt 31.07); þekjuvaktin fór úr 68,0% í 81,1% á holdout30 (n=847) og úr 62,3% í 77,1% á fresh_edge (n=323 við birtingu).",
+   "fyrir": {
+    "holdout30_cov80": 68.0,
+    "fresh_edge_cov80": 62.3
+   },
+   "eftir": {
+    "holdout30_cov80": 81.1,
+    "fresh_edge_cov80": 77.1
+   }
+  }
+ },
+ "hms_visitolur_ur_csv": {
+  "kaupvisitala_juni_2026": {
+   "gildi": 113.4,
+   "m_m": 0.0009,
+   "y_y": 0.018,
+   "utg": "2026-07-21",
+   "hbsv_m_m": -0.0009,
+   "landsbyggd_m_m": 0.0043
+  },
+  "leiguvisitala_juni_2026": {
+   "gildi": 129.8,
+   "m_m": 0.0039,
+   "utg": "2026-07-29"
+  }
+ },
+ "krossskodun": {
+  "kr_m2_vs_hms": "Okkar miðgildi kr/m² í júlí +0,9% y/y (nafnvirði; 727 þ. vs 721 þ.) vs HMS-vísitala +1,8% y/y í júní — sama átt, hvort tveggja langt undir 5,3% verðbólgu = áframhaldandi raunlækkun.",
+  "frambod_vs_hms": "Okkar 7.772 aðgreind heimilisföng í virku söluframboði (05.08) vs HMS ~6.400 íbúðir til sölu í byrjun júlí (mánaðarskýrsla 23.07) — sama stærðargráða; okkar flötur ofmetur líklega (auðkennaflökt veitu + staðfestingartöf lífsferilsvélar), talning auglýsingafærslna (15.072) er skýrt ofmat.",
+  "velta_vs_hms": "Okkar síaða júlí-velta -29,5% y/y (bráðabirgða; þinglýsingartöf) ; HMS (júlí-skýrsla): kaupsamningar í maí ~27% færri en í fyrra. Sama átt.",
+  "list_to_sale": "Miðgildi sölu-/ásetts verðs 0,974 (n=609 pör í júlí) rímar við kaupendamarkaðslýsingu HMS — selt rétt undir ásettu."
+ }
+}

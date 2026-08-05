@@ -1,0 +1,34 @@
+{
+  "_skyring": "Fréttametadata eingöngu (copyright-reglan: engin endurbirting efnis). Fyrirsögn/miðill/dags/hlekkur. Sótt 2026-08-05.",
+  "timabil": "2026-07-16 til 2026-08-05",
+  "frettir": [
+    {
+      "fyrirsogn": "Áfram lækkar íbúðaverð að raunvirði",
+      "midill": "Vísir",
+      "dags": "2026-07-21",
+      "url": "https://www.visir.is/g/20262911922d/a-fram-laekkar-i-buda-verd-ad-raun-virdi",
+      "athugasemd": "Vísitala íbúðaverðs HMS júní +0,09% m/m, +1,80% á ári; raunlækkun -3,25% á ári, ellefti mánuðurinn í röð með raunlækkun á ársgrundvelli. Hbsv -0,09% m/m, landsbyggð +0,43%."
+    },
+    {
+      "fyrirsogn": "Verðbólga hækkar milli mánaða",
+      "midill": "Viðskiptablaðið (vb.is)",
+      "dags": "2026-07-23",
+      "url": "https://vb.is/frettir/verdbolga-haekkar-milli-manada/",
+      "athugasemd": "VNV júlí 5,3% (úr 5,2%); 693,2 stig; yfir spám allra bankanna fjögurra (Arion, Íslandsbanki, Landsbankinn, Kvika spáðu 5,2%)."
+    },
+    {
+      "fyrirsogn": "Yfir 6.400 íbúðir til sölu",
+      "midill": "Viðskiptablaðið (vb.is)",
+      "dags": "2026-07-23",
+      "url": "https://vb.is/frettir/yfir-6400-ibudir-til-solu/",
+      "athugasemd": "Byggt á mánaðarskýrslu HMS: rúmlega 6.400 íbúðir til sölu á landinu í byrjun júlí (þ.a. ~2.300 nýjar); hbsv ~3.800; birgðatími á hbsv ~40% lengri en í ársbyrjun."
+    },
+    {
+      "fyrirsogn": "Verðbólga eykst enn",
+      "midill": "Vísir",
+      "dags": "2026-07-23",
+      "url": "https://www.visir.is/g/20262912721d/verd-bolga-eykst-enn",
+      "athugasemd": "VNV júlí 5,3%; flugfargjöld stærsti hækkunarliður."
+    }
+  ]
+}

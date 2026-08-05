@@ -161,6 +161,96 @@
       "url": "https://sedlabanki.is/",
       "staerd_baeti": 101512,
       "md5": "61d77b0341710a8532bad94d94e36625"
+    },
+    {
+      "skra": "hms/2026/2026-08_kaupvisitala_sott2026-08-05.csv",
+      "heimild": "hms",
+      "utgafudags": "2026-07-21 (júní-færsla)",
+      "sott_dags": "2026-08-05",
+      "url": "https://frs3o1zldvgn.objectstorage.eu-frankfurt-1.oci.customer-oci.com/n/frs3o1zldvgn/b/public_data_for_download/o/kaupvisitala.csv",
+      "staerd_baeti": 4498,
+      "md5": "65c82c8bf8ca3d62fb4b30ebb2d7c09a"
+    },
+    {
+      "skra": "hms/2026/2026-08_leiguvisitala_sott2026-08-05.csv",
+      "heimild": "hms",
+      "utgafudags": "2026-07-29 (júní-færsla)",
+      "sott_dags": "2026-08-05",
+      "url": "https://frs3o1zldvgn.objectstorage.eu-frankfurt-1.oci.customer-oci.com/n/frs3o1zldvgn/b/public_data_for_download/o/leiguvisitala.csv",
+      "staerd_baeti": 1172,
+      "md5": "887a088bbf8c973ab0ffda9afcc0abf3"
+    },
+    {
+      "skra": "hms/2026/2026-07-23_manadarskyrsla-juli-2026-vefur_sott2026-08-05.html",
+      "heimild": "hms",
+      "utgafudags": "2026-07-23",
+      "sott_dags": "2026-08-05",
+      "url": "https://hms.is/skyrslur/manadarskyrsla-juli-2026",
+      "staerd_baeti": 539505,
+      "md5": "082a0b0386f18a1030500816620edfc4"
+    },
+    {
+      "skra": "hms/2026/2026-07-23_manadarskyrsla-hms-juli-2026-frett_sott2026-08-05.html",
+      "heimild": "hms",
+      "utgafudags": "2026-07-23",
+      "sott_dags": "2026-08-05",
+      "url": "https://hms.is/frettir/manadarskyrsla-hms-juli-2026",
+      "staerd_baeti": 219523,
+      "md5": "ffcdd5c77a16d021746487c24881de6a"
+    },
+    {
+      "skra": "hms/2026/2026-07-23_gogn-manadarskyrsla-juli26_sott2026-08-05.xlsx",
+      "heimild": "hms",
+      "utgafudags": "2026-07-23",
+      "sott_dags": "2026-08-05",
+      "url": "https://hms-web.cdn.prismic.io/hms-web/sP91ERPSB1U8uEyw_Gogn_manadarskyrsla_juli26HMS.xlsx",
+      "staerd_baeti": 787195,
+      "md5": "7de705085149fecf270ed8dc29feb5ce"
+    },
+    {
+      "skra": "hagstofa/2026/2026-07-23_visitala-neysluverds-juli-2026-frett_sott2026-08-05.html",
+      "heimild": "hagstofa",
+      "utgafudags": "2026-07-23",
+      "sott_dags": "2026-08-05",
+      "url": "https://hagstofa.is/utgafur/frettasafn/verdlag/visitala-neysluverds-i-juli-2026/",
+      "staerd_baeti": 329185,
+      "md5": "bdcc58a7bd89d4b438112bb3ff2d87b8"
+    },
+    {
+      "skra": "sedlabanki/2026/2026-08-05_forsida-naesta-vaxtaakvordun_sott2026-08-05.html",
+      "heimild": "sedlabanki",
+      "utgafudags": "2026-08-05 (sótt)",
+      "sott_dags": "2026-08-05",
+      "url": "https://sedlabanki.is/",
+      "staerd_baeti": 104454,
+      "md5": "11b01db069b836d53dea56de75a0039e"
+    },
+    {
+      "skra": "bankar/2026/2026-07-23_landsbankinn-verdbolga-jokst-litillega-i-juli_sott2026-08-05.html",
+      "heimild": "bankar",
+      "utgafudags": "2026-07-23",
+      "sott_dags": "2026-08-05",
+      "url": "https://www.landsbankinn.is/umraedan/efnahagsmal/verdbolga-jokst-litillega-i-juli-2026",
+      "staerd_baeti": 670684,
+      "md5": "e36f77b1486de458e339d02738ddddd8"
+    },
+    {
+      "skra": "bankar/2026/2026-07-23_islandsbanki-verdbolga-eykst-litillega-i-juli_sott2026-08-05.html",
+      "heimild": "bankar",
+      "utgafudags": "2026-07-23",
+      "sott_dags": "2026-08-05",
+      "url": "https://www.islandsbanki.is/is/frett/verdbolga-eykst-litillega-i-juli",
+      "staerd_baeti": 294404,
+      "md5": "c0e289f3a2c333cdda1699207f4a9ba0"
+    },
+    {
+      "skra": "frettir/2026/2026-08-05_frettayfirlit-jul-2026_sott2026-08-05.json",
+      "heimild": "frettir",
+      "utgafudags": "2026-08-05",
+      "sott_dags": "2026-08-05",
+      "url": null,
+      "staerd_baeti": 1689,
+      "md5": "40bb456a529f8587fdde9c3aaa9bfd52"
     }
   ],
   "_skyring": "Append-only manifest yfir heimildasafn verdmat-skyrslna. Sama skjal endursott = ny faersla adeins ef md5 breytist.",
