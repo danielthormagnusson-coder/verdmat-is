@@ -14,7 +14,10 @@
 # rent-restep guard). 267009 (0x41301 = still running) is neutral. EVERYTHING else is
 # loud — incl. 1/2 (chain abort / preflight or domsregla-HALT) and 267011 (0x41303 =
 # never ran; a registered task that never fires is a scheduler problem, not a no-op).
-# Chain logs: newest night_*.log / myigloo_night_*.log must end in "CHAIN CLEAN (exit 0)"
+# Chain logs: newest night_*.log / myigloo_night_*.log. Þrjú stig (cc94):
+#   CHAIN CLEAN (exit 0)      -> CLEAN
+#   CHAIN DEGRADED:n (exit 0) -> DEGRADED(n) — keðjan kláraði, n köll féllu. FLAGG.
+#   annað / vantar            -> ABORT
 # and be from today or yesterday — older = STALE (chain not even starting).
 #
 # Usage:  powershell -File scripts\verdmat_status_probe.ps1 [-DryRun]
@@ -48,8 +51,15 @@ function Get-ChainVerdict([string]$pattern, [string]$label) {
            Sort-Object Name | Select-Object -Last 1
     if (-not $log) { $script:offenders += "$label=MISSING"; return "$label=MISSING" }
     $day = [datetime]::ParseExact(($log.BaseName -replace '.*_(\d{8})$', '$1'), 'yyyyMMdd', $null)
-    $verdict = if (Select-String -Path $log.FullName -Pattern 'CHAIN CLEAN \(exit 0\)' -Quiet) {
-        'CLEAN' } else { 'ABORT' }
+    # cc94 — DEGRADED prófað Á UNDAN CLEAN. Ástæða: sama loggskrá getur borið
+    # báðar línurnar sé keðja endurkeyrð handvirkt sama dag (append-only
+    # næturlogg), og þá á VERRA stigið að ráða — annars felur ein hrein
+    # endurkeyrsla skerta nótt.
+    $deg = Select-String -Path $log.FullName -Pattern 'CHAIN DEGRADED:(\d+) \(exit 0\)' |
+           Select-Object -Last 1
+    $verdict = if ($deg) { 'DEGRADED({0})' -f $deg.Matches[0].Groups[1].Value }
+        elseif (Select-String -Path $log.FullName -Pattern 'CHAIN CLEAN \(exit 0\)' -Quiet) {
+            'CLEAN' } else { 'ABORT' }
     if ($day -lt (Get-Date).Date.AddDays(-1)) { $verdict = "STALE($($log.BaseName))" }
     if ($verdict -ne 'CLEAN') { $script:offenders += "$label=$verdict" }
     '{0}={1}:{2}' -f $label, $day.ToString('MMdd'), $verdict

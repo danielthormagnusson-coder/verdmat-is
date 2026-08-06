@@ -41,6 +41,92 @@ VALUATION_YEAR = 2026
 SCHEMA_VERSION = "v0.2.2"
 EXTRACT_MODEL = "claude-haiku-4-5"
 
+# ── cc94 ÞREP A — validering á skrif-leiðinni ────────────────────────────────
+# MÆLT 2026-08-04 (read-only, nefnari 5.122 útdrættir): 152 (2,97%) bera
+# `components` sem STRENG — 0 af 152 parsast, því líkanið typar strenginn sjálft
+# og misritar unicode-escape-in (`múrvið\u00gerðir`). 2 ár utan bils (10, 20) —
+# frumtextarnir segja „fyrir um 10/20 árum", þ.e. AFSTÆÐUR ALDUR skrifaður í
+# ártalsreit, EKKI stytt ártal (tilgátan 10→2010 var mæld og felld). 11 lyklar
+# og 5 status-gildi utan lokaðra mengja. Blæddi enn: 4 nýjar raðir í nótt.
+#
+# RÓTIN: `input_schema` í tólaskilgreiningunni er LEIÐBEINING til líkansins, ekki
+# server-side validator. Skemað í pilot_extract_v022.build_tool_schema er rétt
+# skrifað (`components` = object, `year` = [1900,2030], `additionalProperties`
+# false) — það er einfaldlega ekki þvingað, og ekkert lag hafnaði.
+# pilot_extract_v022.flatten_row BAR skynjara („components_malformed") en býr í
+# CSV-flötunarfalli pilotsins sem nætur-keðjan kallar ALDREI. Sú lexía er ástæðan
+# fyrir að þetta fall er kallað hér, í `extract_and_store` — eina staðnum sem
+# skrifar í scraper.listing_extractions (sannreynt með grepi 04.08: kallstaðurinn
+# er nightly_delta_chain.sh:228 -> run_extraction.py:131 -> extract_and_store;
+# model_quality_eval.py kallar sama extract_listing en skrifar í JSONL-cache,
+# ekki töfluna).
+COMPONENT_KEYS = frozenset((
+    'kitchen', 'primary_bathroom', 'secondary_bathroom', 'flooring',
+    'interior_finishes', 'paint', 'electrical_panel', 'electrical_wiring',
+    'plumbing', 'heating', 'windows_unit', 'roof', 'cladding',
+    'windows_building', 'insulation', 'elevator_mechanism',
+    'sameign_cosmetic', 'foundation_drainage'))
+STATUS_ENUM = frozenset((
+    'replaced_new', 'overhauled', 'well_maintained', 'original_functional',
+    'in_progress', 'needs_work', 'not_mentioned'))
+# Neðri mörkin eru 1900 skv. GO-inu (sama bil og cc94-mælingin notaði). BÓKAÐ
+# FRÁVIK: disksafnið ber 1882 (1×) og 1898 (3×) sem eru trúverðug byggingarár —
+# við þessi mörk væri slíkur útdráttur hafnaður. Höfnun er afturkræf (röðin er
+# vistuð ÓBREYTT), svo víkkun í 1850 + endurvalidering endurheimtir hann; það er
+# breyting á þessari einu línu. Mælt tíðni: 4 af 27.464 fylltum árum = 0,015%.
+YEAR_MIN = 1900
+# Efri mörkin eru yfirstandandi ár, ekki fast 2026 og ekki 2030 úr skemanu:
+# framkvæmdaár í framtíð er ekki framkvæmd sem er lokið.
+YEAR_MAX = VALUATION_YEAR
+
+
+def validate_extraction(raw):
+    """cc94 — dæmir hrátt tool_use.input gegn v0.2.2-skemanu. Skilar (status, reasons).
+
+    HREINT FALL: það BREYTIR ENGU. Röðin er vistuð ÓBREYTT hvort sem hún stenst
+    eða fellur — hrásvarið er sönnunargagnið sem gerði cc94-greininguna mögulega,
+    og ætti aldrei að hverfa við skrif. Öll leiðrétting (endurlestur strengja,
+    ár → NULL, brottfelling lykla) er ÞREP B og gerist afturvirkt, ekki hér.
+
+    status: 'ok' eða 'rejected:<ástæða>[+<ástæða>…]'
+    reasons: listi ástæðukóða (tómur ef 'ok') — fleiri en ein ástæða er skeytt
+             saman svo seinna brotið feli sig ekki á bak við það fyrra.
+    """
+    reasons = []
+    if not isinstance(raw, dict):
+        return "rejected:not_an_object", ["not_an_object"]
+
+    comps = raw.get("components")
+    if isinstance(comps, str):
+        reasons.append("components_string")
+    elif not isinstance(comps, dict):
+        reasons.append("components_missing")
+    else:
+        if set(comps) - COMPONENT_KEYS:
+            reasons.append("key_outside_enum")
+        bad_year = bad_status = False
+        for v in comps.values():
+            if not isinstance(v, dict):
+                bad_status = True
+                continue
+            s = v.get("status")
+            if s is not None and s not in STATUS_ENUM:
+                bad_status = True
+            y = v.get("year")
+            if y is not None:
+                # bool er undirklassi int í Python — True myndi annars sleppa í gegn
+                if isinstance(y, bool) or not isinstance(y, int) \
+                        or y < YEAR_MIN or y > YEAR_MAX:
+                    bad_year = True
+        if bad_year:
+            reasons.append("year_out_of_range")
+        if bad_status:
+            reasons.append("status_outside_enum")
+
+    if not reasons:
+        return "ok", []
+    return "rejected:" + "+".join(reasons), reasons
+
 # property feature columns the iter4 adapter consumes (same set as fetch_paired_oos)
 PROP_COLS = ("einflm", "lod_flm", "byggar", "matsvaedi_numer", "matsvaedi_bucket",
              "region_tier", "canonical_code", "unit_category", "is_main_unit",
@@ -64,6 +150,15 @@ def fetch_extracted_listings_to_value(pg, limit=None):
              ON v.source_listing_id = l.source_listing_id AND v.model_version = %s
       WHERE l.source = 'mbl' AND l.fastnum IS NOT NULL AND l.lysing IS NOT NULL
         AND v.valuation_id IS NULL
+        -- cc94 ÞREP A: hafnaður útdráttur má ALDREI verða að eiginleikavigri.
+        -- Án þessarar línu er höfnunin aðeins merking: build_extraction_features
+        -- tekur `year` beint (years_since = sale_year - year), svo year=20 gefur
+        -- years_since_heating = 2006 og fer óbreytt inn í frysta verðmatið.
+        -- NULL er MEÐTALIÐ af ásettu ráði: það eru 5.122 raðirnar sem voru
+        -- skrifaðar fyrir cc94 og aldrei valideraðar. Að útiloka þær hér væri að
+        -- stöðva verðmat á öllu safninu sem fyrir er. Tvö spillt ár lifa þar og
+        -- eru viðfangsefni ÞREPS B2, ekki þessarar síu.
+        AND (e.validation_status IS NULL OR e.validation_status NOT LIKE 'rejected:%%')
       ORDER BY l.source_listing_id, l.last_seen_at DESC NULLS LAST
       {('LIMIT %d' % int(limit)) if limit else ''}
     """
@@ -146,7 +241,8 @@ def extract_and_store(pg, client, rows, source_trigger, log=print):
     from pilot_extract_v022 import build_tool_schema, extract_listing
     schema = build_tool_schema()
     out = []
-    n_call = n_fail = 0
+    n_call = n_fail = n_rejected = n_retry_saved = 0
+    reason_tally = {}
     for i, r in enumerate(rows, 1):
         h = r["lysing_hash"]
         # content-addressed idempotency is handled by the fetch filter + ON CONFLICT DO NOTHING
@@ -156,8 +252,42 @@ def extract_and_store(pg, client, rows, source_trigger, log=print):
             n_call += 1
             if err or raw is None:
                 raise RuntimeError(err or "no extraction")
-            out.append((h, Json(raw), SCHEMA_VERSION, EXTRACT_MODEL, source_trigger, len(r["lysing"])))
-            log(f"    [{i}/{len(rows)}] {h} ok ({usage.get('duration_sec','?')}s)")
+
+            # cc94 ÞREP A — dæma svarið ÁÐUR en það fer í töfluna.
+            status, reasons = validate_extraction(raw)
+
+            # Form-rekið er slembið (2,97% að meðaltali, ekki eiginleiki tiltekinnar
+            # lýsingar), svo EITT endurkall bjargar meirihluta strengja-tilvika á
+            # ~$0,0071. Aðeins reynt á components-brotunum: ár og enum-brot eru
+            # lestrarvillur á textanum sjálfum og endurkall myndi líklega endurtaka þau.
+            if any(x in reasons for x in ("components_string", "components_missing")):
+                log(f"    [{i}/{len(rows)}] {h} {status} — endurkalla einu sinni")
+                raw2, usage2, err2 = extract_listing(client, schema, r["lysing"],
+                                                     lambda *a, **k: None)
+                n_call += 1          # kostnaðarbókhaldið verður að telja endurkallið
+                if not err2 and raw2 is not None:
+                    status2, reasons2 = validate_extraction(raw2)
+                    if status2 == "ok":
+                        n_retry_saved += 1
+                        raw, status, reasons = raw2, status2, reasons2
+                    elif not any(x in reasons2 for x in
+                                 ("components_string", "components_missing")):
+                        # seinna svarið er heilt að byggingu þótt það brjóti annað —
+                        # það er strangt betra en strengur og verður fyrir valinu
+                        raw, status, reasons = raw2, status2, reasons2
+
+            # A1: RÖÐIN ER VISTUÐ HVORT SEM ER, ÓBREYTT. Höfnun sem sleppir
+            # skrifum myndi láta fetch_listings_needing_extraction (LEFT JOIN á
+            # lysing_hash IS NULL) velja SÖMU lýsingu aftur næstu nótt, að eilífu.
+            out.append((h, Json(raw), SCHEMA_VERSION, EXTRACT_MODEL, source_trigger,
+                        len(r["lysing"]), status))
+            if status == "ok":
+                log(f"    [{i}/{len(rows)}] {h} ok ({usage.get('duration_sec','?')}s)")
+            else:
+                n_rejected += 1
+                for x in reasons:
+                    reason_tally[x] = reason_tally.get(x, 0) + 1
+                log(f"    [{i}/{len(rows)}] {h} HAFNAD {status}")
         except Exception as e:
             n_fail += 1
             log(f"    [{i}/{len(rows)}] skip {h}: {type(e).__name__}: {e}")
@@ -167,10 +297,12 @@ def extract_and_store(pg, client, rows, source_trigger, log=print):
         execute_values(cur,
             "INSERT INTO scraper.listing_extractions "
             "(lysing_hash, extraction, extraction_schema_version, extraction_model, "
-            " source_trigger, lysing_len) VALUES %s "
+            " source_trigger, lysing_len, validation_status) VALUES %s "
             "ON CONFLICT (lysing_hash) DO NOTHING", out, page_size=500)
         pg.commit()
     return {"haiku_calls": n_call, "stored": len(out), "failed": n_fail,
+            "rejected": n_rejected, "retry_saved": n_retry_saved,
+            "reasons": reason_tally,
             "cost_est_usd": round(n_call * 0.0071, 4)}
 
 

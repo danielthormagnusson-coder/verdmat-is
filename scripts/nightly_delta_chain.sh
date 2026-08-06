@@ -54,6 +54,12 @@ TS=$(date +%Y%m%d)
 REPORT=$NIGHTLOGS/night_${TS}.log
 CHAIN_START=$(python -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).isoformat())")
 
+# cc94/cc99 — stigsmunur á nóttinni. run_extraction skilar 0 þótt einstök köll
+# falli (per-kall grip, viljandi: eitt fall má ekki fella 199 heppnuð). Fjöldi
+# falla er því EINA merkið um skerta nótt og verður að komast í keðjulínuna.
+EXTRACT_FAILED=0
+EXTRACT_REJECTED=0
+
 say() {                       # stdout always; night-log only on a real run (append-only)
   local line="$(date '+%Y-%m-%d %H:%M:%S') $*"
   echo "$line"
@@ -229,12 +235,25 @@ run_extract() {
   local rc=$?
   local summary
   summary=$(grep -oE "(effective_n=[0-9]+|day_total=\\\$[0-9.]+|valued [0-9]+ listings)" "$xlog" | tr '\n' ' ')
-  say "extraction: exit=$rc ${summary}-> $xlog"
+  # cc94 — `failed`/`rejected` úr extract-samantektinni inn í keðjulínuna.
+  # Vanti línan (t.d. ef Haiku-hlutinn var stöðvaður af kostnaðarþaki) haldast núllin.
+  EXTRACT_FAILED=$(grep -oE "'failed': [0-9]+" "$xlog" | tail -1 | grep -oE "[0-9]+")
+  EXTRACT_REJECTED=$(grep -oE "'rejected': [0-9]+" "$xlog" | tail -1 | grep -oE "[0-9]+")
+  : "${EXTRACT_FAILED:=0}" "${EXTRACT_REJECTED:=0}"
+  say "extraction: exit=$rc ${summary}failed=$EXTRACT_FAILED rejected=$EXTRACT_REJECTED -> $xlog"
   if [ $rc -ne 0 ]; then
     say "ABORT extraction (exit $rc) — NO RETRY (abort-not-retry); promote/raw/layers untouched"
     return 1
   fi
   return 0
+}
+
+# cc94 — eitt útgönguorð fyrir öll fallandi útgöngin, svo CHAIN FAIL sé alltaf
+# ritað í næturloggið (áður hættu þau þögult og vaktarprófið las það sem ABORT
+# af FJARVERU CLEAN-línunnar — rétt niðurstaða, engin ástæða).
+chain_fail() {
+  say "=== CHAIN FAIL ($1, exit $2) ==="
+  exit "$2"
 }
 
 # ════════════════════════════════ main ═══════════════════════════════════════
@@ -248,22 +267,22 @@ if [ $PRERC -ne 0 ]; then
     say "[dry-run] pre-flight WOULD REFUSE (exit 2 on a real run)"
   else
     say "PRE-FLIGHT REFUSED — nothing launched"
-    exit 2
+    chain_fail "pre-flight" 2
   fi
 fi
 
 # §6-A.5 rule 1: delta always runs first / is the whole v1 night. Serial, gated.
-run_mode delta-sale            delta_sale            last_br_dags_seen  || exit 1
-run_mode delta-rent            delta_rent            last_updated_seen  || exit 1
-run_mode delta-sale-negotiable delta_sale_negotiable last_br_dags_seen  || exit 1
-run_mode delta-rent-negotiable delta_rent_negotiable last_updated_seen  || exit 1
+run_mode delta-sale            delta_sale            last_br_dags_seen  || chain_fail "delta-sale" 1
+run_mode delta-rent            delta_rent            last_updated_seen  || chain_fail "delta-rent" 1
+run_mode delta-sale-negotiable delta_sale_negotiable last_br_dags_seen  || chain_fail "delta-sale-neg" 1
+run_mode delta-rent-negotiable delta_rent_negotiable last_updated_seen  || chain_fail "delta-rent-neg" 1
 
 # v2/v3: parse + promote BOTH layers (priced sale+rent; negotiable excluded). Gated on the
 # four clean fetch modes above; abort-not-retry. Added BLOKK 6 (2026-06-27).
-run_promote || exit 1
+run_promote || chain_fail "promote" 1
 
 # forward extraction + frozen valuation (mbl), after both layers are fresh. Added EXTRACTION ÞREP 5.
-run_extract || exit 1
+run_extract || chain_fail "extraction" 1
 
 if [ $DRY -eq 1 ]; then
   say "[dry-run] would append night totals + CHAIN CLEAN to $REPORT"
@@ -272,5 +291,12 @@ fi
 
 TOT=$(night_totals)
 while IFS= read -r line; do say "  $line"; done <<< "$TOT"
-say "=== CHAIN CLEAN (exit 0) ==="
+# cc94 — ÞRJÚ STIG. Keðjan kláraði í báðum tilvikum hér (exit 0); munurinn er
+# hvort eitthvað féll á leiðinni. DEGRADED er flagg, ekki bilun: gögnin sem
+# tókust eru rétt, en nóttin er ekki heil og biðröðin ber afganginn áfram.
+if [ "$EXTRACT_FAILED" -gt 0 ]; then
+  say "=== CHAIN DEGRADED:$EXTRACT_FAILED (exit 0) ==="
+else
+  say "=== CHAIN CLEAN (exit 0) ==="
+fi
 exit 0
