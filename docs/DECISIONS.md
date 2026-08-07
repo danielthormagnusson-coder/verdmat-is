@@ -5478,3 +5478,19 @@ Lagfæringin er **þriggja stiga merki**, ekki exit-kóði: `CHAIN CLEAN` (0 fö
 **Heimild**: `app` commit `f5b45e6` (1 skrá, +51/−0) og skilaboð hans; `docs/fable_prep/audits/AGUST_ENDURTHJALFUN_FLIPP_CC104_20260806.md` þrep 8 (taflan, sundurliðunin, atvikið); logg `D:\cc101_fallnir31.log`; `feedback_set_transaction_read_write_verdur_ad_vera_fyrsta`, `feedback_samhlida_lota_pushar_undir_ther`.
 
 *— Lok viðauka cc108 §5C (DECISIONS-hluti).*
+
+## 2026-08-07 — GRANTS MÆLAST Í `pg_class.relacl` — `role_table_grants` EITT OG SÉR ER ÓFULLNÆGJANDI MÆLING (cc105)
+
+**Tilefni:** þessi lesning framleiddi eina ranga forsendu sem heil verkbeiðni var skrifuð á. cc105 FASI 1 (06.08) las `information_schema.role_table_grants` á `public.spatial_ref_sys`, valdi ekki `grantor`-dálkinn, og bókaði „grantor er postgres skv. ACL svo REVOKE er heimilt". FASI 2a (07.08) mældi `pg_class.relacl` beint og felldi setninguna: grantor er `supabase_admin` í ÖLLUM færslum, og ACL ber að auki `=r/supabase_admin` — **SELECT til PUBLIC**, aðgangsleið sem birtist alls ekki sem venjuleg röð í role_table_grants.
+
+**Reglan (læst):**
+
+1. **`pg_class.relacl` er heimildin.** Áður en réttindaaðgerð er ákveðin skal mæla `select relacl::text, pg_get_userbyid(relowner) from pg_class where oid='<tafla>'::regclass` og lesa `grantee=privs/grantor`-mynstrið beint. `role_table_grants` má nota til yfirlits en aldrei sem grunn ákvörðunar.
+2. **PUBLIC-grants verða að teljast sérstaklega:** `select count(*) from aclexplode(relacl) where grantee = 0`. Grant til PUBLIC nær til allra hlutverka og gerir REVOKE á `anon, authenticated` gagnslausa — hún sést hvergi nema í ACL-inu.
+3. **Mældu heimildina TIL aðgerðarinnar áður en hún er keyrð, ekki eftir á:** `pg_has_role(current_user,'<eigandi>','member')` fyrir ALTER, og `has_table_privilege(current_user,'<tafla>','<sögn> WITH GRANT OPTION')` fyrir REVOKE. Séu báðar `false` bítur hvorug aðgerðin: ALTER fellur með villu (sýnilegt), en **REVOKE ÞEGIR — hún gefur WARNING, ekki villu, og migrationin skilar `success` án þess að breyta neinu.**
+4. **Þar með er cc52-reglan hert:** „staðfestu með `aclexplode`, aldrei með eintómri `success`-stöðu migrationarinnar" gildir áfram EFTIR aðgerð — en þessi regla færir prófið FRAM FYRIR hana, svo þögul núll-aðgerð sé aldrei keyrð í fyrsta lagi.
+5. **Fæðingarreglan** (RLS + þröng réttindi í sömu migration og CREATE, CLAUDE.md) og **cc52-reglan** vísa báðar hingað um það hvernig „réttindi" eru mæld.
+
+**Sannreynt í reynd samdægurs:** báðar leiðir á `spatial_ref_sys` reyndust ófærar — `ENABLE ROW LEVEL SECURITY` féll á raunreyndu `42501: must be owner of table spatial_ref_sys`, og REVOKE-varaleiðin var **ekki keyrð** af ásettu ráði (kvittað af eiganda 07.08) því hún hefði framleitt falska „tókst"-línu. Flaggið stendur known-accepted; support-beiðni fer á backlog (viðauki cc105 í PLANNING_BACKLOG).
+
+**Heimild**: `docs/HALT_SKIL_RLS_GAT_CC105_FASI2A_20260807.md` §2–§3 (mældar ACL-strengir, `42501`-villan, `pg_has_role`/GRANT OPTION mælingarnar); `docs/HALT_SKIL_RLS_GAT_CC105_FASI1_20260806.md` §1 + tveir viðaukar 07.08 (upprunalega ranga lesningin stendur óbreytt með leiðréttingu undir); migration `20260807082414_cc105_2a_rls_snapshot_toflur`; CLAUDE.md (cc52/cc72-bókanirnar).

@@ -21,6 +21,17 @@ Nefnarar: (a) = RLS af OG anon-grant til staðar; (b) = RLS af en engin
 grants → PostgREST hafnar (þótt scraper-skemað SÉ útsett, sjá §3.1).
 Engin skrif-grants á neinni þeirra fyrir anon/authenticated.
 
+> ⚠️ **VIÐAUKI (FASI 2a, 07.08) — LEIÐRÉTTING Á TÖFLUNNI HÉR AÐ OFAN.**
+> Reiturinn „(grantor postgres)" á `spatial_ref_sys`-línunni er RANGUR og
+> stendur óbreyttur hér að ofan sem heimild. Hann byggði á
+> `information_schema.role_table_grants` án `grantor`-dálks. Bein mæling á
+> `pg_class.relacl` (07.08) sýnir grantor = **`supabase_admin`** í öllum
+> færslum, og auk þess `=r/supabase_admin`, þ.e. **SELECT til PUBLIC** — leið
+> sem birtist alls ekki í role_table_grants. Rétt lesning á reitnum er því:
+> anon+authenticated hafa `rxtm` veitt AF supabase_admin, og PUBLIC hefur
+> SELECT að auki. Sjá `HALT_SKIL_RLS_GAT_CC105_FASI2A_20260807.md` §3 og
+> nýja regluna í DECISIONS (07.08).
+
 **Stofndagar:**
 - `spatial_ref_sys`: fæddist með postgis-extensioninni í public
   (advisor-flaggið `extension_in_public` staðfestir staðsetninguna) —
@@ -154,6 +165,23 @@ SECURITY **INVOKER** og anon-kallanlegt PostGIS-fall — ef innri
 geography-aðgerðir þess fletta upp í spatial_ref_sys brotnar POI-lag
 /eign undir anon við REVOKE. Prófa verður poi_naesta + /eign + /leit
 + /markadur + /leiguverd EFTIR apply, og rollback-SQL tilbúið FYRIR.
+
+> ⚠️ **VIÐAUKI (FASI 2a, 07.08) — LEIÐRÉTTING Á MÁLSGREININNI HÉR AÐ OFAN.**
+> Setningin „(grantor er postgres skv. ACL svo REVOKE er heimilt)" stendur
+> óbreytt hér að ofan sem heimild, en hún er RÖNG og var aldrei framkvæmd.
+> Mælt 07.08 á `pg_class.relacl`: grantor er `supabase_admin`, ekki postgres.
+> Postgres hefur hvorki eignarhald né GRANT OPTION (bæði mæld `false`), svo
+> **hvorug leiðin er fær**: `ENABLE ROW LEVEL SECURITY` fellur á raunreyndu
+> `42501 must be owner of table spatial_ref_sys`, og REVOKE væri þögul
+> núll-aðgerð sem skilar `success` (cc52-gildran) — auk þess sem `=r` til
+> PUBLIC gerir REVOKE á anon/authenticated gagnslausa. Varaleiðin var því
+> EKKI keyrð; flaggið stendur known-accepted. Sjá
+> `HALT_SKIL_RLS_GAT_CC105_FASI2A_20260807.md` §3.
+>
+> **POI-gildran sem hér er lýst reyndist hlutlaus:** `poi_naesta` er
+> `LANGUAGE sql` með hreinni haversine-formúlu — engin PostGIS-týpa, ekkert
+> `ST_`-kall. Mælt til viðbótar: ekkert útsett view/MV kallar `ST_`-fall.
+> Raunprófuð samt fyrir og eftir (200, 1.117 b, óbreytt).
 
 **(b) Linter-frávikin — pre_cc94b-töflurnar þrjár: HREINLÆTI.**
 169 raðir samtals, engin grants, ekki aðgengilegar um API. Núll
