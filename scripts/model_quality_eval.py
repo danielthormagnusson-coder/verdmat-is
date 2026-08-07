@@ -120,7 +120,10 @@ FRESH_MIN_ROWS = 1       # by construction tiny right after a retrain; 0 is stil
 # stored nominal scale. Pinning to the FREEZE anchor (not the live pipeline_config value)
 # keeps the adapter reproducing the frozen rows even after a weekly CPI re-anchor moves
 # sales_history_anchor_ym past it.
-FREEZE_ANCHOR_YM = "2026-08"
+# Þrep 7 flippsins (cc101): frosnu spárnar eru nú iter4r_20260805_reglaR_strukt,
+# skrifaðar með --anchor-ym 2026-09 (flipp-txn setti model_pred_anchor_ym='2026-09');
+# predicted_at stendur áfram á 2026-07-01 (verðmats-mánuðurinn, mælt í DB).
+FREEZE_ANCHOR_YM = "2026-09"
 PRED_VALUATION_YM = "2026-07"
 
 # The E2/parity adapter (phase_d3_score_extract) still loads D:\iter4a_*.lgb and stamps
@@ -162,8 +165,47 @@ class _Tee:
 # MAPE/coverage flag thresholds (validate_metrics.py convention)
 MAPE_FLAG_PP = 0.5
 COV_FLAG_PP = 3.0
-# validate_metrics held baseline (for context flags in `extra`)
-BASELINE = {"mape": 7.00, "cov80": 73.1, "cov95": 92.7}
+# ---- GRUNNLÍNUR (þrep 7 flippsins, cc101): nýtt upphaf á D2+3.1+3.3 ----
+# Heimildin er 3.2-specið á diski (AGUST_ENDURTHJALFUN_FASI2_SKREF31_32 §4 +
+# SKREF33 §7): serían er NÝTT UPPHAF við flipp (FASI0 §4.4) og grunnlínan er
+# §7-grunnur 3.3-auditsins — framreiðslurammi, frosni kohorturinn, ekki
+# validate_metrics-grunnurinn gamli. Flags mæla frávik frá þessum grunni.
+BASELINE = {"mape": 8.23, "cov80": 81.58, "cov95": 96.69}          # holdout30 (n=847)
+BASELINE_FRESH = {"mape": 11.59, "cov80": 83.48, "cov95": 95.58}   # fresh_edge (n=339)
+
+# ---- BIAS-PER-HÓLF vöktunarlínan (3.2-spec §4.3, bindandi forskrift) ----
+# (a) src_R='R_gerd' · (b) src_R='notkun' ∧ cc_R==cc_gamalt ·
+# (c1) src_R='notkun' ∧ cc_R≠cc_gamalt. Hólfin krefjast flokkunar-ættarinnar:
+# cc_source úr properties_class_cc78_staging (flokkunar-staging flippsins) og
+# gamla canonical_code úr properties_canonical_pre_cc78 (R3-rollback-akkerið).
+# Báðar töflur eru varanleg flipp-artifact; hverfi þær er hólfalínan HÁVÆRT
+# gat í skilunum, aldrei þögul núll (sjá segments()).
+# Viðvörunarmörk skv. GO-bréfi §3: |bias(b)| > 4,0 pp flaggar HÁTT (ekki HALT).
+BIAS_B_FLAG_PP = 4.0
+# Upphafslínan (holdout30, 3.2-spec §4.3): (a) +5,57 n=96 · (b) +2,45 n=484 ·
+# (c1) +1,42 n=265 — bókuð í extra til samanburðar í hverri viku.
+R_SCOPE_UPPHAF = {"a_r_gerd": 5.57, "b_notkun_ohreyfd": 2.45, "c1_notkun_hreyfd": 1.42}
+
+# ---- VEIKU BLETTIRNIR FJÓRIR (GO-bréf §5) sem fastar vöktunarlínur ----
+# Engin n-gólf: lágt n er hluti merkisins og bókast með. Grunnlínur (cov80/n)
+# af GO-bréfi §5, framreiðslurammi 05.08 — aðgerð aðeins ef mynstur styrkist
+# á vaxandi n.
+VEIKIR_BLETTIR_UPPHAF = {
+    "sfh_rvk_core": {"cov80": 64.7, "n": 17},
+    "r_gerd_rvk_core": {"cov80": 59.1, "n": 22},
+    "undir_40m": {"cov80": 72.1, "n": 43},
+    "apt_attic": {"cov80": 60.0, "n": 10},
+}
+
+# ---- VAKTAREIGNIR í weekly-skil (þrep 7, GO 07.08) ----
+# Ástæða 2013952: GO-bréfs-prófeign flippsins + ásett verð 26% yfir mati
+# (174,0 M vs mat 138,0 M — 4,5 M yfir hi95) + cc106-greiningin send út.
+# Vikulega: ásett verð + verðbreytingar + virk/horfin; við þinglýsingu:
+# kaupverð vs bókaða matið m/fráviki.
+VAKTAREIGNIR = [
+    {"fastnum": 2013952, "mat_ref_kr": 138_000_000,
+     "astaeda": "GO-bréfs prófeign flippsins · ásett 26% yfir mati · cc106-greining send út"},
+]
 
 PRICE_BANDS = [(0, 40_000_000, "<40M"), (40_000_000, 70_000_000, "40-70M"),
                (70_000_000, 100_000_000, "70-100M"), (100_000_000, 9e18, ">=100M")]
@@ -297,11 +339,16 @@ _OOS_SELECT = """
            p.real_pred_mean, p.real_pred_lo80, p.real_pred_hi80,
            p.real_pred_lo95, p.real_pred_hi95,
            cs.cpi AS cpi_sale, %(anchor_cpi)s::numeric AS anchor_cpi,
-           pr.matsvaedi_numer, pr.canonical_code, pr.is_new_build, pr.region_tier
+           pr.matsvaedi_numer, pr.canonical_code, pr.is_new_build, pr.region_tier,
+           -- 3.2-spec §4.3: flokkunar-ættin fyrir bias-per-hólf línuna. LEFT JOIN:
+           -- fastnum utan flipp-staging (nýjar eignir) fá NULL og falla utan hólfa.
+           cls.cc_source, gam.canonical_code AS canonical_pre
     FROM public.predictions p
     JOIN public.sales_history s ON s.fastnum = p.fastnum
     JOIN public.properties pr ON pr.fastnum = p.fastnum
     LEFT JOIN public.cpi_index cs ON cs.year_month = to_char(s.thinglystdags, 'YYYY-MM')
+    LEFT JOIN public.properties_class_cc78_staging cls ON cls.fastnum = p.fastnum
+    LEFT JOIN public.properties_canonical_pre_cc78 gam ON gam.fastnum = p.fastnum
     WHERE p.model_version = %(mv)s
       AND s.onothaefur = 0          -- arm's-length only; onothaefur=1 are non-market
                                     -- (gifts/partial transfers) and would wreck MAPE/bias
@@ -425,6 +472,28 @@ def segments(df: pd.DataFrame):
     # new build
     for flag, sub in df.dropna(subset=["is_new_build"]).groupby("is_new_build"):
         yield ("new_build", "true" if flag else "false", sub)
+
+    # ---- bias-per-hólf (3.2-spec §4.3, inn við flipp) ----
+    # (a) R_gerd · (b) notkun óhreyfð (cc==gamalt) · (c1) notkun hreyfð.
+    # Byggir á flokkunar-ættinni (cc_source + canonical_pre) úr flipp-töflunum;
+    # vanti hana alfarið er það HÁVÆRT gat — bókað í main(), aldrei þögul núll.
+    if "cc_source" in df.columns:
+        src = df["cc_source"]
+        yield ("r_scope", "a_r_gerd", df[src == "R_gerd"])
+        er_notkun = src == "notkun"
+        ohreyfd = er_notkun & (df["canonical_code"] == df["canonical_pre"])
+        yield ("r_scope", "b_notkun_ohreyfd", df[ohreyfd])
+        yield ("r_scope", "c1_notkun_hreyfd", df[er_notkun & ~ohreyfd])
+
+    # ---- veiku blettirnir fjórir (GO-bréf §5) — engin n-gólf, n er hluti merkisins ----
+    yield ("veikur_blettur", "sfh_rvk_core",
+           df[(cc == "SFH_DETACHED") & (rt == "RVK_core")])
+    if "cc_source" in df.columns:
+        yield ("veikur_blettur", "r_gerd_rvk_core",
+               df[(df["cc_source"] == "R_gerd") & (rt == "RVK_core")])
+    nom_vb = df["kaupverd_nominal"].astype(float)
+    yield ("veikur_blettur", "undir_40m", df[nom_vb < 40_000_000])
+    yield ("veikur_blettur", "apt_attic", df[cc == "APT_ATTIC"])
 
 
 # ======================================================================
@@ -559,6 +628,63 @@ def append_extract_cache(key: str, fastnum: int, raw: dict) -> None:
     with open(EXTRACT_CACHE, "a", encoding="utf-8") as f:
         f.write(json.dumps({"key": key, "fastnum": fastnum, "raw": raw},
                            ensure_ascii=False) + "\n")
+
+
+def vaktareign_skil(conn, v: dict) -> dict:
+    """Vaktareign í weekly-skil (þrep 7): ásett verð + verðbreytingar + virk/horfin
+    úr lifandi vöktuninni, og við þinglýsingu kaupverð vs bókaða matið m/fráviki.
+    Allt SELECT — engin skrif. Villa í vaktareign fellir ALDREI mælinguna sjálfa."""
+    fn = int(v["fastnum"])
+    out = {"fastnum": fn, "astaeda": v["astaeda"], "mat_ref_kr": v["mat_ref_kr"]}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT source, source_listing_id, price_amount, asett_verd_dags::text,
+                   er_fjarveru_flaggad, last_seen_at::date::text
+            FROM scraper.v_leit_listings
+            WHERE fastnum=%s AND tenure='sale' AND er_nyjasta_birting
+            ORDER BY last_seen_at DESC NULLS LAST LIMIT 1""", (fn,))
+        row = cur.fetchone()
+        if row is None:
+            out["auglysing"] = "HORFIN úr lifandi leit (engin virk söluauglýsing)"
+        else:
+            src, slid, verd, dags, fjarvist, sedast = row
+            out["auglysing"] = {
+                "asett_kr": int(verd) if verd is not None else None,
+                "asett_dags": dags, "heimild": src,
+                "stada": "fjarvistarflögguð" if fjarvist else "virk",
+                "sidast_sed": sedast,
+            }
+            cur.execute("""
+                SELECT observed_at::date::text, price_amount
+                FROM scraper.listing_price_history
+                WHERE source=%s AND source_listing_id=%s
+                ORDER BY observed_at""", (src, slid))
+            ph = cur.fetchall()
+            verdrod = []
+            for d, p in ph:
+                if not verdrod or verdrod[-1][1] != p:
+                    verdrod.append((d, int(p) if p is not None else None))
+            out["verdbreytingar"] = (
+                [f"{d}: {p:,} kr" for d, p in verdrod] if len(verdrod) > 1
+                else "engin verðbreyting mæld")
+        # Þinglýsing EFTIR flipp-daginn: kaupverð vs bókaða matið.
+        cur.execute("""
+            SELECT thinglystdags::text, kaupverd_nominal
+            FROM public.sales_history
+            WHERE fastnum=%s AND onothaefur=0 AND thinglystdags >= DATE '2026-08-06'
+            ORDER BY thinglystdags DESC LIMIT 1""", (fn,))
+        sala = cur.fetchone()
+        if sala:
+            dags, kaup = sala
+            fravik = 100.0 * (float(kaup) - v["mat_ref_kr"]) / v["mat_ref_kr"]
+            out["thinglyst"] = {"dags": dags, "kaupverd_kr": int(kaup),
+                                "fravik_fra_mati_pct": round(fravik, 2)}
+        else:
+            out["thinglyst"] = "óselt (engin þinglýsing frá flipp-degi)"
+        cur.execute("SELECT real_pred_mean FROM public.v_current_predictions WHERE fastnum=%s", (fn,))
+        m = cur.fetchone()
+        out["lifandi_mat_kr"] = int(m[0]) if m and m[0] is not None else None
+    return out
 
 
 def read_model_anchor_cpi(conn) -> tuple[str, float]:
@@ -917,8 +1043,9 @@ def main() -> int:
               f"{edge_overall['bias']:+.2f}% · cov80 {edge_overall['cov80']:.1f}% · cov95 "
               f"{edge_overall['cov95']:.1f}%   (EKKI lagt við aðaltöluna)")
 
-        # flags vs validate_metrics held baseline (context only)
+        # flags vs 3.2/3.3-grunnlínunum (nýtt upphaf flippsins — sjá BASELINE)
         flags = {
+            "baseline": "3.3-audit §7 (D2+3.1+3.3, framreiðslurammi)",
             "mape_vs_baseline_pp": round(overall["mape"] - BASELINE["mape"], 2),
             "cov80_vs_baseline_pp": round(overall["cov80"] - BASELINE["cov80"], 2),
             "cov95_vs_baseline_pp": round(overall["cov95"] - BASELINE["cov95"], 2),
@@ -926,7 +1053,46 @@ def main() -> int:
             "cov80_flag": abs(overall["cov80"] - BASELINE["cov80"]) > COV_FLAG_PP,
             "cov95_flag": abs(overall["cov95"] - BASELINE["cov95"]) > COV_FLAG_PP,
         }
-        print(f"\n  overall flags vs held baseline: {flags}")
+        print(f"\n  overall flags vs grunnlínu flippsins: {flags}")
+        flags_fresh = {
+            "baseline": "3.3-audit §7 fresh_edge",
+            "cov80_vs_baseline_pp": round(edge_overall["cov80"] - BASELINE_FRESH["cov80"], 2),
+            "cov95_vs_baseline_pp": round(edge_overall["cov95"] - BASELINE_FRESH["cov95"], 2),
+            "cov80_flag": abs(edge_overall["cov80"] - BASELINE_FRESH["cov80"]) > COV_FLAG_PP,
+        }
+        print(f"  fresh_edge flags vs grunnlínu flippsins: {flags_fresh}")
+
+        # ---- bias-per-hólf flaggið (3.2-spec §4.3): |bias(b)| > 4,0 pp = hávær lína ----
+        r_holdout = {val: m for sc, _c, dim, val, m in rows
+                     if dim == "r_scope" and sc == SCOPE_HOLDOUT}
+        if not r_holdout:
+            loud("BIAS-PER-HÓLF GAT: engin r_scope-lína mældist — flokkunar-ættin "
+                 "(properties_class_cc78_staging / properties_canonical_pre_cc78) "
+                 "vantar eða skilar engu. Hólfalínan er spec-skylda (3.2 §4.3).")
+        else:
+            b = r_holdout.get("b_notkun_ohreyfd")
+            if b is None:
+                loud("BIAS-PER-HÓLF GAT: hólf (b) notkun-óhreyfð er tómt á holdout30.")
+            elif abs(b["bias"]) > BIAS_B_FLAG_PP:
+                loud(f"BIAS-PER-HÓLF FLAGG: (b) notkun-óhreyfð bias = {b['bias']:+.2f}% "
+                     f"(|·| > {BIAS_B_FLAG_PP} pp, n={b['n']}; upphaf +2,45).")
+                print("  Túlkunarlykill (3.2-spec §4.3): vaxi (b)-VANMATIÐ er það REK; "
+                      "kólni markaðurinn inn í spálínuna sest það. Hávær lína, ekki HALT.")
+            else:
+                print(f"  bias-per-hólf (b) notkun-óhreyfð: {b['bias']:+.2f}% "
+                      f"(n={b['n']}, mörk ±{BIAS_B_FLAG_PP} pp, upphaf +2,45) — innan marka")
+
+        # ---- vaktareignir (þrep 7): aldrei fella mælinguna ----
+        vaktir = []
+        for v in VAKTAREIGNIR:
+            try:
+                vaktir.append(vaktareign_skil(conn_ro, v))
+            except Exception as e:
+                vaktir.append({"fastnum": v["fastnum"],
+                               "villa": f"{type(e).__name__}: {str(e)[:200]}"})
+        print("\n  VAKTAREIGNIR (weekly-skil):")
+        for v in vaktir:
+            print(f"    {v}")
 
         # ---- DÓMSREGLA (cc47): cov80 of the AÐALTALA below 80% is an architect HALT ----
         # Evaluated here so the verdict rides along in every write below, but acted on
@@ -1041,8 +1207,10 @@ def main() -> int:
             SCOPE_HOLDOUT: {"pairs": len(df), "overall": overall,
                             "oos_cutoff": manifest["train_end"], "flags": flags},
             SCOPE_FRESH: {"pairs": len(edge_df), "overall": edge_overall,
-                          "oos_cutoff": manifest["data_end"]},
+                          "oos_cutoff": manifest["data_end"], "flags": flags_fresh},
             "domsregla": verdict,
+            "bias_per_holf": r_holdout,
+            "vaktareignir": vaktir,
             "paired_summary": paired_summary, "selection": selection,
         }
 
@@ -1067,8 +1235,14 @@ def main() -> int:
                          "AÐALTALA" if scope == SCOPE_HOLDOUT else "HLIÐARTALA",
                          "never_sum_with": SCOPE_FRESH if scope == SCOPE_HOLDOUT
                          else SCOPE_HOLDOUT}
-                if scope == SCOPE_HOLDOUT:
-                    extra.update(flags)
+                extra.update(flags if scope == SCOPE_HOLDOUT else flags_fresh)
+            elif dim == "r_scope":
+                # 3.2-spec §4.3: upphafslínan fylgir hverri hólfaröð + b-flaggmörkin.
+                extra = {"upphaf_bias_pp": R_SCOPE_UPPHAF.get(val),
+                         "flagg_regla": f"|bias(b)| > {BIAS_B_FLAG_PP} pp (hávær, ekki HALT)"}
+            elif dim == "veikur_blettur":
+                extra = {"upphaf": VEIKIR_BLETTIR_UPPHAF.get(val),
+                         "regla": "aðgerð aðeins ef mynstur staðfestist á vaxandi n (GO-bréf §5)"}
             payload.append((run_id, model_version, cutoff, "baseline", dim, val,
                             scope, m["n"], m["mape"], m["med_ape"], m["bias"],
                             m["cov80"], m["cov95"], json.dumps(extra) if extra else None))

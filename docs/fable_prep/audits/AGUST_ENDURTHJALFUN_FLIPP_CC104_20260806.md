@@ -212,3 +212,44 @@ m/§10.5 calibration_version-leiðréttingunni og þetta flipp-audit-skjal — a
 
 *(Committ-sha beggja repoa bókast í HALT-skilum cc101 — skjalið sjálft committast
 í sömu aðgerð og getur ekki borið eigið sha.)*
+
+## Þrep 6 — PROD-RAUNPRÓFUN + ±10%-LEITIN + §4b-LÍNAN — **LOKIÐ 06.08 (cc101)**
+
+A-hluti: 5/5 prófeignir prod == lifandi DB nákvæmlega (2013952 R_gerd→ROW_HOUSE
+138,0M/A/T1 · 2000296 155,0M/B · 2000309 121,5M/A · Country-sérbýli ×2 rel80
+0,552/C, bil óbrotin); líkans-kafli /markadur ber nýju stöðuna (72/76 innan ±5%);
+console hreint. ±10%-leitin: A-merking HVERGI skjalfest sem prósenta á notendafleti
+— fjarveran bókuð, engin ±12%-uppfærsla. §4b-línan (val (b), dagsett 06.08.2026)
+LIVE á /adferdafraedi — verdmat-ai commit `f153163`.
+
+## Þrep 7 — VAKTIR Á NÝJA GRUNNINN (3.2-spec) — **LOKIÐ 07.08 (cc101)**
+
+Heimildir af diski: 3.2-specið (SKREF31_32 §4, bindandi §4.3) + §7-grunnur
+3.3-auditsins (SKREF33). Forsenda leyst fyrst: `<version>_holdout_rows.csv`
+vantaði fyrir nýja artifactið — `precompute/holdout_eval.py` keyrð (M1 ✓ M2 ✓;
+M3-flokkahreyfingin er endurleiddu þröskuldarnir, kvittað mál); 950 raðir.
+
+`scripts/model_quality_eval.py` færð á nýja grunninn:
+- BASELINE → §7-grunnur 3.3 (8,23 / 81,58 / 96,69) + BASELINE_FRESH
+  (11,59 / 83,48 / 95,58) m/flöggum á báðum skópum; „nýtt upphaf“ bókað.
+- FREEZE_ANCHOR_YM 2026-08 → **2026-09** (flipp-akkerið); PRED_VALUATION_YM
+  2026-07 óbreytt (predicted_at mælt í DB).
+- **bias-per-hólf línan inn (spec §4.3):** r_scope a/b/c1 gegnum flokkunar-ættina
+  (properties_class_cc78_staging × properties_canonical_pre_cc78, LEFT JOIN í
+  _OOS_SELECT); |bias(b)|>4,0 pp = hávær lína; upphafslínan í extra; töflu-hvarf
+  = hávært gat, aldrei þögul núll.
+- **Veiku blettirnir FJÓRIR** (GO-bréf §5) sem fastar vöktunarlínur án n-gólfs
+  m/upphafsgildum í extra: sfh_rvk_core · r_gerd_rvk_core · undir_40m · apt_attic.
+- **Vaktareign 2013952** í weekly-skil (ásett/verðbreytingar/virk-horfin;
+  við þinglýsingu kaupverð vs mat 138,0 m/fráviki); villa í vaktareign fellir
+  aldrei mælinguna.
+
+**Fyrsta prófkeyrsla (dryrun, lifandi grunnur, 07.08):** AÐALTALA holdout30
+n=949: **MAPE 8,23 (Δ±0,0 frá grunnlínu) · cov80 82,8 (+1,24) · cov95 96,1**
+— dómsreglan FÆDDIST GRÆN. Hliðartala fresh_edge n=42: cov80 78,6 (−4,91,
+flagg á litlu n — tripwire, ekki HALT). Hólfin: (a) n=113 +1,04 · (b) n=535
+**+2,33 innan ±4,0** · (c1) n=298 +1,64. Veiku blettirnir: 89,5/19 · 78,1/32 ·
+67,2/58 · 81,8/11. Vaktareignin: ásett 174,0 M virk (mbl, síðast séð 30.07),
+engin verðbreyting, óselt, lifandi mat 138,03 M. Paired/E2 sjálfhafnar hávært
+(adapter iter4_final_v1 ≠ lifandi — engin Haiku-keyrsla). Scheduler
+`verdmat-weekly-model-quality` bendir þegar á vélina — ENGIN breyting.
