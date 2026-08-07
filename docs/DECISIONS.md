@@ -5098,3 +5098,359 @@ Ein keyrsla: frosni listinn 1–17 + viðaukar cc61–cc69 (18–32). Allar töl
 **Heimild**: `D:\VIDHALDSSAGA_D_HONNUN_CC85_20260804T0030Z.md` §0.1 (TOM-taflan, `n_relistings`), §0.2, §3 (fjöleiningarsían, 1.565 → 1.284), §6 (D1–D5-taflan).
 
 *— Lok bókunarlotu cc95 §5B (DECISIONS-hluti).*
+
+---
+
+# BÓKUNARLOTA cc108 — §5C (2026-08-07, append-only í enda skjals skv. verkbeiðni)
+
+**Umfang:** cc93–cc107. Allt bókast hér í fyrsta sinn nema EFTIR-dálkur cc93, sem leiðréttir §5B-11 úr spá í mælingu. **Bókunarregla lotunnar:** hver tala er sannreynd af diski, úr git eða úr skjalfestri mælingu ÁÐUR en hún er skrifuð hér; tala sem finnst ekki á diski er **ekki bókuð** heldur talin upp á frávikalista í HALT-skilum lotunnar. Heimildaslóð fylgir hverri færslu.
+
+## 2026-08-07 — §5C-1 · cc93: EFTIR-DÁLKURINN ER MÆLDUR — spáin stenst, og PAR-REGLAN fæðist
+
+**Hvað**: §5B-11 bókaði EFTIR-dálk cc93 sem **SPÁ** og tók fram að eftirá-mæling lægi ekki á diski. Hún liggur þar núna og **spáin stenst lið fyrir lið**: safngrein **55.636** eignir / 2.583.775 myndir (spáð 55.636) · auglýsingagrein **5.377** / 125.319 (spáð 5.377) · stöðumerki **0** eignir (var 52.132) · raðir í viewinu 2.800.968 → **2.709.094** · fastnúmer í viewinu **61.013 óbreytt**. **TAP = 0** mælt, ekki ályktað (skilyrðið „birti myndir fyrir OG er myndalaus eftir" skilar 0 röðum; 0 eignir með view-röð en enga lifandi röð; 0 raðir eftir á dauðalistanum). Kostnaðurinn stendur óbreyttur frá §5B-11: 3.504 eignir skipta um lind, þar af **559 með FÆRRI myndir** (18.146 → 11.449, −6.697), 2.339 með fleiri (58.690 → 175.161), 606 jafnmargar, lágmark 1 — engin dettur í núll.
+
+**Sópunin var raunsókn, ekki ályktun af hýsilnafni**: 32 eignir × 3 rútur = 96 síður, 77 svöruðu 200 og 19 `/soluyfirlit` 404 (rétt ástand). **536 ólíkar uppstreymis-slóðir sóttar**, þar af safnhýsillinn **504 slóðir / 0 dauðar** og `myigloo.is` 12 / 0. Prod eftir deploy gaf **sömu tölur og staðbundið, lið fyrir lið**: 536 slóðir, 504/0, **0 af 77 síðum með stöðumerki** (prod FYRIR deploy: **42 af 77**), myndaslóðir A/B/C/D/P 229/270/88/0/112 í báðum. Prófeignir eftir: 2000276 **14** · 2123239 **100** · 2298591 **134** · 2302209 **28**, allar á safngrein, engin með stöðumerki. **Bókað utan cc93**: `cdn.mbl.is` ber **5 dauðar (404) af 20** sóttum slóðum, sama tala staðbundið og á prod — ferskleikavandi auglýsingamynda, ósnertur af cc93.
+
+**Tímalínan er mæld**: applý 22:38Z → push `00621d3` 23:06:14Z → fyrsta græna prod-síða **23:06:32Z (18 s)** → full sópun græn 23:07:53Z (99 s). Glugginn þar sem prod-DB var komin á nýja stöðu en prod-kóði bar enn hýsilinn stóð **~28 mínútur** og kostaði **3.504 eignir** myndirnar sínar á meðan (B-flokkur mældist með 24 slóðir í stað 270; A- og C-flokkur óbreyttir).
+
+**Af hverju**: **PAR-REGLAN.** Þegar migration og kóðadeploy mynda PAR — DB-breyting sem kóðinn verður að fylgja — er **hvorug röðin hlutlaus**. „Applýja fyrst" opnar glugga þar sem gamli kóðinn les nýja stöðu vitlaust; „deploya fyrst" opnar glugga þar sem nýi kóðinn les gömlu stöðuna vitlaust. Hér var **seinni glugginn meinlaus** (nýi kóðinn hefði rendrað safn-slóðir sem svara 200 — hýsillinn var á lífi) og sá **fyrri kostaði 3.504 eignir myndirnar sínar**. Röðin á að veljast af því **HVOR glugginn er skaðlaus**, ekki af vana. Aukalærdómur sem mældist í leiðinni: `EIGN_CACHE_UTGAFA`-hækkunin gerði lokunina samstundis — 18 sekúndur frá push að fyrstu grænu prod-síðu, í stað allt að klukkustundar `unstable_cache`-fyrningar (§5B-6).
+
+**Tæknilegur varnagli sem fylgir reglunni**: `DAUDAR_SLODIR_OR` er `DAUDIR_MYNDAHYSLAR.map(...).join(",")` og verður **tómur strengur** á tómum lista; `.or("")` er ógildur síustrengur sem PostgREST hafnar, svo `faldar`-sóknin hefði KASTAÐ á eignasíðunni í stað þess að skila núlli. Þess vegna varð `ERU_DAUDIR_HYSLAR` nauðsyn, ekki snyrtimennska — `anDaudraHysla` er hlutleysa af sjálfu sér (reduce yfir tómt) og mátti ekki fá sömu meðferð.
+
+**Heimild**: `D:\_audit\HYSILL_AF_DAUDALISTA_CC93_20260804T2320Z.md` §2 (fyrir/eftir-taflan m/nefnurum), §3 (prófeignir), §4 (sópun), §4b (prod), §5 (atvikið + reglan), §6 (kóðabreytingar); `verdmat-ai` commit `00621d3`.
+
+## 2026-08-07 — §5C-2 · cc94: COMPONENTS-SPILLINGIN STÖÐVUÐ Í ÞREMUR LÖGUM — 0 brot af 5.491
+
+**Hvað**: Blæðing frá **2026-06-27** sem bætti við ~6 spilltum útdráttum á nóttu er stöðvuð. Umfangið mælt með nefnurum: **152 af 5.122 útdráttum (2,97 %)** báru `components` sem **streng** í stað hlutar (cc85 hafði mælt 148/4.922 = 3,01 % — vísitalan stóðst yfir 200 nýja útdrætti). Auk þess 2 ár utan [1900, 2026] af 4.449 fylltum (0,045 %), 11 component-lyklar utan 18-mengisins af 89.471 hólfum (0,012 %), 5 `status`-gildi utan enum (0,006 %) og 12 útdrættir af 5.122 sem bera **ritvillu-afbrigði í STAÐINN fyrir** `reported_issues` (`reporting_issues` 9× + `report_issues` 3× = nákvæmlega 5.122 − 5.110).
+
+**Vörnin er þrjú lög, ekki eitt:**
+1. **Þrep A (LIVE 04.08 23:04Z)** — `validate_extraction()` í `extraction_engine.py`, sett á **eina skrifstaðinn**. Kallstaðurinn var **rakinn með grepi, ekki gefinn**: `grep -rn extract_and_store` skilar einum kallstað (`run_extraction.py:131`); `extract_listing` á tvo, en hinn (`model_quality_eval.py:725`) skrifar í JSONL-cache, ekki í töfluna. Valið var **A1** (dálkur `validation_status`) fram yfir sér höfnunartöflu (A2 hefði búið til nýjan RLS-flöt) og fram yfir logg eingöngu (A3 hefði skilið eftir eilífa endurkeyrslu á sömu lýsingu).
+2. **Þrep B (05.–06.08)** — afturvirk viðgerð. B1: 153 raðir endurlesnar með föstu mynstri; **2.752 af 2.754 hólfum (99,93 %)** lesin, 274 ár endurheimt, tvö töpuðu hólfin **nákvæmlega þau sem spáð var** (eitt ólesið `foundation_drainage`, eitt `mixed` → NULL). B3: 11 aukahólf + 5 status-gildi hreinsuð. B2: 2 ár → NULL.
+3. **Þrep C (LIVE 06.08)** — `scraper.extraction_er_gilt(jsonb)` IMMUTABLE + CHECK með undanþágu fyrir raðir merktar `rejected:%`. Röðin B → C er **skilyrði, ekki smekkur**: á óviðgerðum gögnum hefði CHECK-ið fallið á 152 + 2 + 11 + 5 brotum, og hefði C komið á undan A hefði **ein spillt lína fellt allt 200-raða `execute_values`-batchið** og nóttin tapað öllu.
+
+**Mældur árangur**: brot í töflunni **0 af 5.491**. Nótt 05.08: 169 raðir, 168 `ok`, 1 hafnað, **0 ómerktar**. Nótt 06.08: 200 raðir, 197 `ok`, 3 hafnaðar, **0 ómerktar**. **Endurkallið mælist marktækt**: 10 endurköll á 06.08, **8 björguð**; með 05.08 (2 af 3) er hlutfallið **10 af 13 = 77 %** — sem staðfestir forsenduna sem endurkallið hvíldi á, að form-rekið sé **slembið** en ekki eiginleiki tiltekinnar lýsingar. Kostnaður endurkalla mældur $0,021 nóttina 05.08 (spáð ~$0,04).
+
+**Bókaður kostnaður viðgerðarinnar**: **1.309 `detail`-textar felldir** í B1. Þeir voru þegar spilltir (brotin unicode-escape), bera enga mælingu niðurstraums og liggja óbreyttir í afritstöflunni `scraper.listing_extractions_pre_cc94b` (163 raðir) — **hún má ekki fara** fyrr en sér-go liggur fyrir. Fjórar frystar verðmatsraðir voru endurfrystar (V2) og **sundurliðunin gengur upp sem sjálfstæð staðfesting**: 2074179 akkerisfærsla −0,383 % + ársáhrif −1,44 % = −1,82 % spáð gegn **−1,81 % mælt**; 2170257 −0,383 % + 0,32 % = −0,06 % gegn **−0,06 % mælt**.
+
+**Af hverju**: Rótin var ekki parse-galli heldur **form-rek líkansins, hleypt í gegn af ENGRI valideringu**. `input_schema` í tólaskilgreiningu API-sins er leiðbeining til líkansins, ekki server-side validator. Sönnunin er táknfræðileg: öll 152 gildin byrja á `{` og líta út fyrir að vera JSON-serialisering, en **0 af 152 parsast**, og samhengið sýnir hálfkláruð escape-sekvens þar sem sami íslenski stafurinn er ýmist escape-aður eða hrár **innan sama orðs** (`m\u00e1l og m\u00farvið\u00ger\u00f0ir`). Enginn serialiserari framleiðir það: `ensure_ascii=True` escape-ar alla ekki-ASCII stafi einsleitt, `ensure_ascii=False` engan. Líkanið **typar strenginn staf fyrir staf og misritar escape-kóðunina**.
+
+**Hitt lærdómsatriðið er þögnin.** Fjögur lög vörðu sig sjálf og **ekkert lag hafnaði eða loggaði**: `extract_listing` skilaði óbreyttu, `extract_and_store` INSERT-aði, brúin `scraper.eigindi_ur_extraction` varpaði strengnum í `'{}'::jsonb` og sleppti þremur eigindalyklum, og `build_extraction_features` fékk 18 NaN + 2 NaN-stuðla. Notandinn sá **„Óþekkt"** á eldhús-, baðherbergis- og gólfefna-ástandi á 93 eignum í virkri sölu — nákvæmlega einkennið sem cc75 var smíðuð til að útrýma. Sama mynstur og `feedback_wrapper_eydir_eigin_sonnun`.
+
+**Hönnunarval sem víkur frá upphaflegu drögunum og er bókað sem slíkt**: drögin lögðu til að valideringin **lagfærði** röðina í skrifleiðinni. Það var fellt. Röðin er vistuð **ÓBREYTT og aðeins merkt**, því hrásvarið er sönnunargagnið sem gerði þessa greiningu mögulega — hefði fyrri lota hreinsað í skrifleiðinni væri `\u00ger`-sporið horfið og rótin ógreinanleg. Öll leiðrétting á heima afturvirkt og afturkræft. Sömu röksemd fylgir merkingin `repaired:` (ekki `ok`): viðgerð röð er hvorki `ok` (hún stóðst ekki upphaflega og `detail` er fallið) né `rejected` (hún er nothæf núna), og að setja hana á `ok` hefði þurrkað út upprunann.
+
+**Bókað frávik frá GO-inu**: neðri ármörkin. GO-ið tilgreindi [1900, 2026] og það var implementerað; skýrslan hafði lagt til **1850** því disksafnið ber 1882 (1×) og 1898 (3×) sem eru trúverðug íslensk byggingarár. Tíðni: 4 af 27.464 fylltum árum = **0,015 %**, og **0 í lifandi DB**. Höfnun er afturkræf (röðin vistast óbreytt), svo víkkun + endurvalidering endurheimtir hana; það er breyting á einni línu. Í DB eru mörkin **[1900, 2100]** af annarri ástæðu sem er líka bókuð: `CHECK` verður að vera IMMUTABLE og má ekki lesa `now()`, svo hörð 2026-mörk yrðu jarðsprengja — 1. janúar 2027 felldi fyrsta rétta 2027-ártalið nóttina.
+
+**Heimild**: `D:\_audit\COMPONENTS_SPILLING_CC94_20260804T2251Z.md` §1.1–§1.6, §2.2, §2.5, §4, §6.1–§6.4, §7, §9.1–§9.3, §10.1–§10.4, §11.1–§11.4, §13, §14, §15; commits `verdmat-ai` **`51445aa`** (mælt af git: 7 skrár, +413/−0) og `app` **`156d3e1`** (mælt af git: 3 skrár, +184/−16).
+
+## 2026-08-07 — §5C-3 · TILGÁTAN `10 → 2010` ER FELLD: LÍKANIÐ SKRIFAR AFSTÆÐAN ALDUR Í ÁRTALSREIT
+
+**Hvað**: Verkbeiðni cc94 gerði ráð fyrir að `year = 10` og `year = 20` „ættu væntanlega að vera 2010, 2020" — stytt ártöl. **Frumtextarnir hrekja það.** Tilvik 1 (`5deba5f0a0e1`, `heating.year = 20`, fastnum 2170257): „*Hitaveita var leidd í húsið fyrir um það bil **20 árum**…*" ⇒ rétt ártal væri ~**2006**, ekki 2020. Tilvik 2 (`41dd858097e3`, `plumbing.year = 10`, fastnum 2074179): „*…endurnýjaðar **fyrir um 10 árum**.*" ⇒ ~**2016**, ekki 2010; `detail`-reiturinn staðfestir lesturinn sjálfur („klóakalag°ir endurnýjaðar um 10 árum"). **Disksafnið staðfestir mynstrið á 71 hólfi**: hvert einasta spillta ár undir 1900 í `batch_extraction_unique.jsonl` er heiltala ≤ 20 (1–11, 13, 14, 15, 17, 20). Viðgerðin varð því **NULL**, ekki 2010/2020.
+
+**Af hverju**: `10 → 2010` hefði verið **ágiskun ofan á ranga forsendu** og skrifað ártal sem er 6–14 árum frá réttu. Grunnregla 10 (óþekkt = NULL) á beint við. Þetta er annar flokkur en hin spilltu árin: 1882 og 1898 á diski eru **trúverðug raunveruleg byggingarár** sem skema-mörkin 1900 útiloka ranglega — tveir aðskildir flokkar, ekki einn, og varnarþrepið má ekki henda þeim síðari.
+
+**Fylgifiskur sem leiðréttir mína eigin ábendingu**: cc94 §1.5c flaggaði +20,37 %-bil á 2170257 sem grunsamlegt og tók fram að orsakasamband væri ómælt. Nú er það mælt: spillta árið skýrir **+0,32 %** af því bili — og **í ÖFUGA átt**. Bilið kemur nær alfarið frá öðrum extraction-eiginleikum. Raunverulega skekkjan var á hinni eigninni: `years_since_plumbing = 2016` blés verðmat 2074179 upp um **1,5 milljónir** (−1,44 % við leiðréttingu). Fyrirvarinn var réttmætur; ábendingin var villuslóð.
+
+**Heimild**: `COMPONENTS_SPILLING_CC94` §2.3 (frumtextarnir), §1.6 (disksafnið), §10.2 (ársáhrifin mæld).
+
+## 2026-08-07 — §5C-4 · CHECK SEM SKILAR NULL ER CHECK SEM HLEYPIR RÖÐINNI Í GEGN — sama gildran birtist ÞRISVAR
+
+**Hvað**: Þrep C var applýjað og **tvö NULL-göt fundust í rauðprófun eftir á**. **Gat 1**: `jsonb_typeof(ext->'components')` er NULL þegar lykilinn vantar; `NULL = 'object'` er NULL; `NULL and true` er NULL — og **CHECK telur NULL uppfyllt**. Röð án `components` hefði sloppið. **Gat 2**: `validation_status` er NULL á öllum 5.128 röðum sem voru skrifaðar fyrir cc94; `NULL like 'rejected:%'` er NULL og `NULL or false` er NULL — **þvingunin var óvirk á nákvæmlega þeim röðum sem hún átti að ná til**. Bæði lokuð með `coalesce(…, false)`.
+
+**Gat 2 fannst ekki með lestri heldur með LIFANDI INSERT**: eftir apply tókst `insert … values ('CC94PROF0001', '{"components":"strengur"}'::jsonb, …)` þótt fallið sjálft skilaði `false` á sama gildi. Röðin var lesin, staðfest og eydd. Eftir lagfæringu: spillt röð ómerkt → **`23514 check constraint violation`**; spillt röð merkt `rejected:` → tekst (undanþágan virkar); fallið 11/11 PASS (var 10/11); 0 brot af 5.291.
+
+**Þetta er ÞRIÐJA birting sömu gildru í einni og sömu lotu.** Hinar tvær: `NULL NOT LIKE …` í `fetch_extracted_listings_to_value` (þrep A — án skýrs `IS NULL OR` skilyrðis hefðu allar 5.122 eldri raðirnar hætt að fá verðmat) og `jsonb_typeof(NULL) = 'object'` (gat 1).
+
+**Af hverju**: **REGLA — hver NULL-anlegur dálkur í CHECK-i verður að fara gegnum `coalesce`, og hver þvingun skal rauðprófuð með lifandi INSERT en aldrei með lestri.** Lestur á fallinu gaf rétt svar (`false`) á meðan þvingunin hleypti röðinni inn; aðeins skrifpróf greindi þar á milli. Reglan hefur aukamerkingu sem er sjálfskýrandi og bókast með: **ÓMERKT RÖÐ ER GILD RÖÐ** — eftir C er fjarvera merkis fullyrðing, ekki þögn.
+
+**Heimild**: `COMPONENTS_SPILLING_CC94` §11.1–§11.3, §6.4 (síunarsemantíkin sönnuð á gildum); `feedback_null_i_check_hleypir_i_gegn`.
+
+## 2026-08-07 — §5C-5 · CHAIN-STIGIN ÞRJÚ: MERKIÐ BER STIGSMUNINN, EKKI EXIT-KÓÐINN
+
+**Hvað**: Nóttin 05.08 skrifaði `=== CHAIN CLEAN (exit 0) ===` þótt **31 af 200 extraction-köllum hefðu fallið** — öll á `BadRequestError 400 — Your credit balance is too low`, samfellt frá kalli 170 til 200. Rótin var mæld: `run_extraction.py` grípur hvert fall per kall og skilar 0 úr `main()`, og summary-grepið í keðjunni tínir `effective_n`, `day_total` og `valued N listings` — **`failed` er hvergi**. Fallið var ósýnilegt nema extraction-loggið væri opnað.
+
+Lagfæringin er **þriggja stiga merki**, ekki exit-kóði: `CHAIN CLEAN` (0 föll) / **`CHAIN DEGRADED:n`** (n>0, keðjan kláraði, exit 0) / `CHAIN FAIL (<hvar>, exit n)`. Þriðja stigið er nýtt — fallandi útgöngin hættu áður **þögult** og próbinn las það sem ABORT af FJARVERU CLEAN-línunnar (rétt niðurstaða, engin ástæða). Próbinn prófar **DEGRADED á undan CLEAN**, því sama loggskrá getur borið báðar línurnar ef keðja er endurkeyrð handvirkt sama dag (append-only næturlogg) og þá á **verra stigið að ráða**; DEGRADED telst offender og kveikir VAKT-flagg. Sex prófmál græn, þar á meðal „báðar línur í sama loggi → DEGRADED ræður".
+
+**Af hverju**: Exit-kóði dugar ekki. Léti `run_extraction` falla með exit≠0 færi keðjan í „ABORT extraction — NO RETRY" og hætti með exit 1 við **eitt** fallið kall af 200 — 169 heppnaðir útdrættir og verðmötin glötuðust úr nóttinni. **Merkið á að bera stigsmuninn, exit-kóðinn ekki.**
+
+**Tvö atriði bókast með, bæði hreinskilin:** (1) **DEGRADED-leiðin er prófuð HERMT, ekki í framleiðslu.** Fyrsta raunverulega DEGRADED-nóttin er ókomin; nóttin 05.08 hefði átt að bera hana, en hún fór óskráð og er ástæða patchsins — hún er **ekki afturvirkt merkjanleg**. (2) **Föllnu 31 komu aftur í biðröðina, mælt en ekki ályktað**: keyrt gegnum `E.fetch_listings_needing_extraction(ro, 200)` — sömu fyrirspurn og keðjan notar, ekki eftirlíkingu — 31/31 í biðröð, í sætum 1–31 af 200, 0 hálfvistuð. **Þau höfðu samt ekki fengið extraction við mælingu cc103 (0/31 í DB)**; nætur-pickerinn endurvelur þau ekki og það er óleyst biðraðar-gat (sjá backlog).
+
+**Heimild**: `COMPONENTS_SPILLING_CC94` §7.1, §7.2, §8, §12, §15; `app` commit `156d3e1` (`nightly_delta_chain.sh` +44, `verdmat_status_probe.ps1` +16).
+
+## 2026-08-07 — §5C-6 · cc96-DÓMURINN: MYNDASAFNIÐ ER FROSIN LJÓSMYND — og gatið er EIGNARGAT, ekki birtingargat
+
+**Hvað**: Spurningin var hvort myndasafnið sé lifandi straumur eða frosin ljósmynd. Svarið er mælt: **frosin ljósmynd**. Full sópun á **öllum níu myndarótum** (ekki úrtak): 2.862.224 skrár / 586,8 GiB á 140 sekúndum. Nýjasta mtime á öllu safninu er **2026-07-02T09:21Z** og hún kom úr einskiptis bæti-sókn sem lauk þá; evalue-safnið sjálft (`property_images`, 2.583.775 raðir) hreyfðist síðast **2026-05-15**. Mánaðardreifing: 2026-04 895.283 · 2026-05 1.753.098 · 2026-06 197.946 · 2026-07 15.897 · **2026-08: 0**. **Núll af níu Task-Scheduler-verkum snertir myndir**; báðar næturkeðjur lesnar línu fyrir línu og **hvorug hefur mynda-þrep** — auglýsinga-*slóðir* koma inn í `photos_json` á hverri nóttu, **bætin eru aldrei sótt**. Aðeins tvö forrit í öllu safninu skrifa myndagögn og hvorugt er skráð verk.
+
+**Gatið vex mælt**: jafnvægisástand yfir 5 heilar vikur (06-29 → 07-27) gefur **10.042 nýjar einstakar myndaslóðir á viku ≈ 1.435 á nótt** (mbl 8.894/viku, myigloo 1.148) og **~237 ný fastnúmer utan safns á viku ≈ 12.300 á ári**. Umfangið í dag: **5.377 af 8.886 fastnúmerum (60,5 %)** með virka mynda-auglýsingu eiga **enga röð** í safninu, og 2.950 til viðbótar bera auglýsingu sem sást fyrst eftir frystingu — samanlagt **8.327 af 8.886 = 93,7 %** bera myndaefni sem safnið á ekki.
+
+**Þrír fundir sem breyta túlkun allra talna:**
+1. **Slóða-diff milli safns og auglýsingar er merkingarlaus.** `property_images` ber 100 % slóðir á einum hýsli, lifandi auglýsingar bera `cdn.mbl.is` og `myigloo.is` — **nafnrýmin eru aðskilin með smíði**, svo skörunin er núll og allar 218.916 slóðir lifandi auglýsinga eru „utan safns" án þess að það segi nokkuð. Eina nothæfa mælingin er **tilvist raðar** á fastnúmera-stigi og **bætatilvist** á mynda-stigi.
+2. **Þekjan aftur í tímann er SÖGULEG og skarpt afmörkuð, ekki kerfisbundinn galli okkar.** Sundurliðað eftir ári síðustu evalue-lotu er **2019–2023 nánast fullkomið (0,7–1,1 % vantar)**, en fyrir 2019 vex eyðan hratt afturábak (2018 22,2 % → 2012 91,7 % → 2011 90,0 %). Evalue geymir ekki myndir gamalla auglýsinga: textinn lifir, myndirnar ekki. Sú eyða er **óendurheimtanleg úr þessari lind**. Bungan 2024–2025 (8,3 % / 9,1 %, samtals 1.542 fastnúmer) er hins vegar **ekki skýrð af aldri** og er eini hlutinn sem gæti verið raunverulegt sóknargat.
+3. **EINA-EINTAKS-FUNDURINN.** cc87-spegillinn gekk á **sjö** rætur og fann 2.648.381 skrár; níu-rótar sópunin gefur 2.862.224. Mismunurinn er **nákvæmlega** `image_store\mbl` + `image_store\myigloo` = **213.843 skrár / 38,3 GiB** (2.862.224 − 213.843 = 2.648.381, *exact*). Sama safn er hvorki í `backup_paths.json` `include` né `exclude` — það er einfaldlega utan við. **38,3 GiB af auglýsingamyndum áttu því EITT eintak, á D:** — nákvæmlega ástandið sem cc87 leysti fyrir evalue-safnið og gleymdist hér.
+
+**Af hverju**: **Gatið er ekki birtingargat í dag heldur EIGNARGAT.** Fastnúmerin 5.377 eru þegar sýnileg í appinu — gegnum beinan hotlink á mbl/myigloo, ekki eigin bæti. Þrír ytri rofar (CloudFront, `cdn.mbl.is`, `myigloo.is`) ráða allri myndbirtingu, og cc83/cc92 sýndu að sá fyrsti getur fallið og komið aftur án fyrirvara. Og við **eigum bætin fyrir 64,1 %** mynda á lifandi auglýsingum (140.318 af 218.916) — þau eru bara ótengd `property_images` og því ósýnileg appinu.
+
+**SKEMALEIÐ (b) er afstaða arkitekts, óafgreidd sem go.** Þrep 4 í ingestion-keðjunni er raunverulega ákvörðunin, því `property_images` er `(fastnum, url, img_order)` — ekkert `source`, ekkert `sha256`, engin tímastimplun (§5B-12), og `fastnum NOT NULL` útilokar 808 auglýsingar með smíði. Þrjár leiðir: (a) víkka `property_images` additíft, **(b) ný systkinatafla `public.listing_images` + `v_eign_myndir` í þrjú lög**, (c) `image_store` sem hreint varðveislulag og birting áfram á hotlink. **Leið (b) er sú sem mælt er með**: hún heldur cc92-mælingunni („einn hýsill = 100 % af töflunni") ósnortinni sem sögulegri staðreynd og forðast að blanda tveimur ólíkum auðkennarýmum í eina töflu — sama regla og réð nafngiftinni í cc97 (§5C-7).
+
+**Forgangsröðun bakfyllingar er þegar mæld og snýr við innsæinu**: mbl hefur **enga aldursbrún** (99,3 % lifun aftur til 2014 í Thumbor `fs-pool`) svo mbl-afskráðar liggja ekki á; **myigloo er óprófað** og 7.076 af 10.359 virkum myigloo-slóðum eiga engin bæti. **myigloo er brýnna en mbl þrátt fyrir að vera 5 % af fjöldanum.** Sama gildir um bæta-hlutfallið: myigloo er 11 % myndanna en **57 % bætanna** (1,52 MB gegn 149 KB), svo upplausnin er fyrsti stillanlegi hnappurinn ef bætamagn verður bindandi — ekki tíðnin.
+
+**Heimild**: `D:\_audit\MYNDA_GAP_CC96_20260804T2303Z.md` §0–§1.4, §2.0–§2.4, §3, §4.1–§4.4, §5 (mælingar sem úttektin gerir EKKI), §6.
+
+## 2026-08-07 — §5C-7 · cc97: AUGLÝSINGAMYNDA-SPEGILLINN — og 9 %-REGLAN um fulla checksum-þekju
+
+**Hvað**: `D:\verdmat-is\image_store` er speglað á R2 undir nýju forskeyti **`augl-myndir/{lind}/{sha[:2]}/{sha256}.{ending}`**: **213.843 hlutir / 41.096.112.349 bæti (38,274 GiB)**, 12 lotur, **12/12 HEILAR, 0 mismunir**. Σ `check_matching` = 213.843 = nefnarinn sem mældist á diski FYRIR flutning. Keyrslugluggi 33 mínútur.
+
+**Sannreyningin var þríþætt og tvístefnu**: (1) full `rclone check --checksum` per lotu strax á eftir copy, ekki úrtak; (2) **önnur, óháð** `check` á allt forskeytið utan lotubókhaldsins — `exit 0 · 0 differences found · 213843 matching files`, **án `--one-way`** svo hún bókar bæði það sem vantar og það sem er umfram; (3) `rclone size` sem hittir nefnarann **upp á bæti** (0 / 0 mismunur). **Reikningsjöfnuður á fötu-heild gengur upp á hlut OG bæti**: 2.649.033 + 213.843 + 7 = **2.862.883** hlutir og 615.113.485.681 + 41.096.112.349 + 520.329.104 = **656.729.927.134** bæti, hvort tveggja jafnt flatri rótartalningu eftir á. **D: er ósnert upp á bæti** (endurmæling: 213.843 / 41.096.112.349, óbreytt), og engin `sync`-skipun var nokkurn tímann gefin — keyrsluvélin neitar að ræsa ef forskeytið byrjar ekki á `augl-myndir`.
+
+**9 %-REGLAN**: full checksum-þekja kostaði **9,4 %** af copy-tíma hér (170,5 / 1.821,2 s) og **9,1 %** í cc87 á 588 GB. Hlutfallið heldur yfir **tvær stærðargráður** og er þar með regla, ekki tilviljun: **úrtak er aldrei réttlætanlegt.** Aukalærdómur sem staðfestist í leiðinni: sannreyningartími vex með **stærð ÁFANGASTAÐAR** — lota02, sú fyrsta sem keyrði á ekki-tóman áfangastað, tók 82,7 s gegn 6,5–16,5 s í öðrum mbl-lotum, en flatti strax út aftur á þessari stærðargráðu.
+
+**Hraðinn er skráarstærðarbundinn, ekki bandbreiddarbundinn**: sama `--transfers 64` skilaði **37,4–38,1 MB/s á myigloo** (1,5 MB meðalskrá) og **18,6–24,7 MB/s á mbl** (155 KB). Heildin 22,56 MB/s gegn 19,20 sem cc87 mældi á 588 GB — munurinn er skráarstærð, ekki betri tenging. **Spá um flutningstíma verður því að byggja á meðalskráarstærð, ekki bara á GB.**
+
+**Af hverju**: Nafnið `augl-myndir/` var valið fram yfir `myndir-augl/` af mældri ástæðu: auðkennarýmin eru **ólík í eðli** — `myndir/` er lyklað á **fastnúmer**, þetta safn á **innihalds-hash**. cc87-reglan um aðskilin auðkennarými bannar blöndun og hún bannar líka **nálæga nafngift sem býður upp á `myndir*`-víxlun** í handvirkri listun eða framtíðar-glob. Endingin verður að fylgja lyklinum því safnið er **ekki ein-endingar** eins og evalue-safnið (mbl `.jpg` 207.499 / `.png` 763 / `.webp` 24; myigloo `.jpg` 5.215 / `.png` 341 / `.jpeg` 1), og lindaskiptingin er ókeypis því **0 sha eru sameiginleg milli mbl og myigloo**.
+
+**Næturafrits-liðurinn er MÆLDUR, ekki afgangur.** Hreyfingin +7 hlutir / +520.329.104 bæti er `backup_nightly.py` sem keyrði kl. 03:00 **á meðan glugginn stóð**; hún var mæld sér á afritsforskeytunum í báðum endum. **Lærdómur: þegar speglað er á fötu með lifandi afritum verður að mæla afritsforskeytin í BÁÐUM endum, annars er hver mismunur ógreinanlegur frá gagnatapi.**
+
+**Hvað þetta leysir EKKI (stendur óbreytt)**: næturafritið nær **enn** ekki yfir `image_store` — cc97 er einskiptis-spegill, ekki sjálfvirkni, svo nýsóttar myndir lenda aftur á einu eintaki; ekkert sækir myndir svo gatið vex áfram; `augl-myndir/` er **varðveislulag, ekki birtingarlag** (fatan er ekki opinber); bakfyllingin á 78.598 slóðum er ógerð.
+
+**Heimild**: `D:\_audit\AUGL_MYNDIR_SPEGILL_CC97_20260805T0000Z.md` §1–§9.
+
+## 2026-08-07 — §5C-8 · R2-KOSTNAÐURINN Í ÞREMUR MÆLINGUM — og hvað er ENN ekki staðfest
+
+**Hvað**: Kostnaðarlínan er nú mæld þrisvar og hver mæling leiðréttir þá fyrri. **cc83 (áætlun)**: 577,6 GB → geymsla $8,51/mán, PUT $7,13. **cc87 (mælt)**: 586,26 GB (`SUM(file_size_bytes) WHERE downloaded=1`) → jaðarkostnaður spegils **$8,79/mán**, heildarreikningur fötu **$9,04/mán** ((586,26 + 26,19 − 10) × $0,015), PUT eitt skipti **$7,34** ((2.631.427 − 1.000.000 frí) × $4,50/M). Hækkun frá cc83: $0,28/mán og $0,21 eitt skipti. **cc97 (mælt eftir viðbót)**: ný bæti 41.096.112.349 (41,10 GB) → jaðarkostnaður **$0,62/mán**, heildarreikningur fötu **$9,70/mán** ((656,73 − 10) × $0,015, var $9,04), **Class A PUT $0,96** (213.843 × $4,50/M — fríþrepið 1 M **uppurið af cc87 innan sama almanaksmánaðar**), útflæði **$0** (R2), listun v/sannreyningar ~2.900 Class A (hverfandi). Að auki standa **probe-forskeytin átta** í 3.200 hlutum / 718,44 MB / **$0,011 á mánuði**, óhreyfð frá cc87 og staðfest tvímælt (cc87 §18 og cc91 §3.2, sama tala upp á aukastaf).
+
+**Af hverju**: Fríþrepin eru ekki hlutlaus og það er lærdómurinn sem gildir framvegis. Geymslu-fríþrepið (10 GB) var **þegar uppurið af næturafritunum** áður en spegillinn kom, svo jaðarkostnaður spegilsins er fullur taxti frá fyrsta bæti. PUT-fríþrepið (1 M/mán) var uppurið af cc87 **innan sama almanaksmánaðar**, svo cc97 greiddi fullt fyrir alla 213.843 hlutina. Hvor tveggja er mælt, ekki áætlað.
+
+**Bókað sem ÓSTAÐFEST**: **staðfesting á reikningi úr Cloudflare-mælaborðinu finnst ekki á diski.** Allar tölur hér að ofan eru **reiknaðar úr mældum bætum og birtum taxta**, ekki lesnar af mælaborði veitandans. Þær eru því spá um reikning, ekki reikningur. (Til samanburðar var Vercel-brennslan mæld beint af notkunarspjaldinu 06.08 — það liggur ekki fyrir hér.) Liðurinn fer á frávikalista og á backlog: **næsta R2-snerting á að lesa mælaborðið og bóka mismuninn.**
+
+**Heimild**: `docs/fable_prep/audits/R2_SPEGILL_FASI0_CC87_20260803T2325Z.md` §6 (kostnaðartaflan), §7 (probe-forskeytin); `D:\_audit\AUGL_MYNDIR_SPEGILL_CC97_20260805T0000Z.md` §7; `D:\_audit\R2_SANNPROFUN_CC91_20260804T2220Z.md` §3.2.
+
+## 2026-08-07 — §5C-9 · cc100: JÚLÍ-SKÝRSLAN LIVE — og LIMIT-ROFS-SANNREYNINGIN sem GO-ið bar
+
+**Hvað**: `FASTEIGNASKYRSLA_2026-07` fór í loftið á www.verdmat.ai eftir go: `verdmat-ai` **`95d1621`** og `app` **`e7e577f`**, bæði pushuð. Önnur útgáfa mánaðarraðarinnar: 12 kaflar (1–10 spegla júní) + **tveir nýir fastakaflar** — 11 „Verð á 100 fermetrum eftir tegund" (skyldukafli eiganda) og 12 „Staða verðmatslíkans". Mánaðaflipar á `/skyrslur/[timabil]`; **júní-slóðin `/skyrslur/2026-06` stendur óbreytt**. Forsíðukassi og agent-verkfærið lesa `nyjastaSkyrsla()` og uppfærast sjálfkrafa.
+
+**LIMIT-ROFS-SANNREYNINGIN — það sem GO-ið krafðist og var mælt af git FYRIR push:**
+
+| repo | commit | skrár | +  | − |
+|---|---|---:|---:|---:|
+| `verdmat-ai` | `95d1621` | 10 | **+2.084** | **−17** |
+| `app` | `e7e577f` | 5 | **+1.381** | **−0** |
+
+**Lykilmælingin er þó sú sem er NÚLL**: `content/skyrslur/skyrsla-2026-06.ts` **kemur alls ekki fyrir í diffinu** — 0 diff-línur, hvorki innsetning né eyðing. Endurmælt í þessari lotu með `git show --numstat` á báðum sha-um: tölurnar stemma upp á einingu.
+
+**Af hverju**: Þetta er reglan sem liðurinn ber. **Additífa reglan er ekki „engar eyðingar nokkurs staðar" heldur „engin eyðing í frosnu efni".** Nýr mánuður í mánaðarröð krefst óhjákvæmilega breytinga á sameiginlegu lagi (`types.ts`, `SkyrslaGrof.tsx`, `config/skyrslur.ts`) og þær breytingar bera eyðingar. **Rofið er því leyfilegt — en það verður að vera MÆLT, ekki fullyrt**, og mælingin sem gildir er tvíþætt: heildar-numstat á commitinu **og** sönnun þess að frosna nágranna-einingin (fyrri mánuður) beri **núll diff-línur**. Fullyrðing um að „júní sé ósnertur" án numstat er nákvæmlega sú fullyrðing sem tvisvar áður hefur kostað 200+ línur í þessum skjölum. Sama regla og §5A-22 (diskur fyrir commit) og `feedback_git_add_a_braut_explicit_paths`, í framsetningarlagi.
+
+**Efnistölur júlí, bókaðar með nefnurum**: HMS-vísitala júní **113,4** (+0,1 % m/m, +1,8 % y/y, útg. 21.07) = raunlækkun 11. mánuðinn í röð; VNV júlí **5,3 %**; velta júlí **636** síuð (bráðabirgða, 902 í fyrra) og **júní-talan 609 stóð ÓBREYTT** frá 14.07-mælingu, sem bindur þinglýsingartöfina við **<2 vikur**; list-to-sale **0,974** (n=609, nýr mælir). **Framboð er birt sem 7.772 aðgreind heimilisföng**, ekki 15.072 færslur — færslutalan er ofmat vegna auðkennaflökts, og HMS-krossskoðun gefur ~6.400. 100 m²-kaflinn: band 85–115 m², n<30 → stöðumerki; **einbýli í bandinu er nánast ekki til (n=8 á höfuðborgarsvæðinu) og það er sjálft niðurstaðan**. Model-kaflinn ber **aðeins lifandi framleiðslu** (holdout30 n=847 medAPE 7,7 % cov80 81,1; fresh_edge n=339 10,3 %/76,7) — **endurþjálfunin er ónefnd skv. banni**.
+
+**Heimild**: `app` commit `e7e577f`, `verdmat-ai` commit `95d1621` (báðar diffstat-tölur endurmældar með `git show --numstat` 07.08); `app/docs/fable_skyrslur/FASTEIGNASKYRSLA_2026-07_20260805T0928Z.md`, `HEIMILDASKRA_2026-07_…`, `VINNSLUGOGN_2026-07_…`.
+
+## 2026-08-07 — §5C-10 · cc101: MARKAÐURINN ENDURSMÍÐAÐUR Í ÞRJÚ LÖG — engin DB-breyting í öllu verkinu
+
+**Hvað**: `/markadur` fór úr 14 lokuðum flipum í **þriggja laga síðu** — LIVE með `5b6e1d4` (mælt af git: **21 skrá, +2.542/−83**), Vercel-deploy READY. **Lag 1 Púlsinn**: 6 stórar tölur með sparkline, **server-rendrað SVG án client-JS** — 10-sekúndna upplifunin hleður engin gröf. **Lag 2**: sex kaflar (Verðið · Kaupin og ásetta verðið · Umsvifin · Landakortið · Eignirnar · Líkanið og mánaðarritið) með **opnum** fastreiknuðum greiningum. **Lag 3**: fliparnir 16 sem löt dýpt. Prod-raunprófun græn: púlsinn ber allar sex tölurnar (−1,2 % vísitala 12 mán · 96,8 % kaupverð/ásett · 8.737 samningar −14,3 % · 41 dagur · 7.383 framboð · 22 % endurkomur), **16/16 flipar opnast villulaust**, console hrein, krossvísanir /markadur↔/skyrslur virka báðar áttir, enginn `semantic.v_`-leki og enginn tómur dagsstimpill.
+
+**Sjö nýjar greiningar** komu inn: BMN-endursöluvísitalan sjálf (pooled 2006Q2=100 + 13 segment-hólf í hvítlista eftir mældu `n_pairs`), ástand eigna úr auglýsingum (`llm_aggregates_quarterly` 2013→ með n-nefnurum), kaupverð vs ásett 2015–2026, endurkomur á lægra verði, sölutími (heildardreifing), árstíðamynstur 20 ára og verðstigull frá miðju.
+
+**Af hverju**: Þrennt er bókunarvert umfram formið sjálft.
+
+**(1) Engin DB-breyting reyndist nauðsynleg — af því að grantarnir voru ÞEGAR til.** `v_repeat_sale_index` (+`_main_pooled`, `_by_segment`) og `llm_aggregates_quarterly` báru **anon SELECT allan tímann og voru ónotaðar á síðunni**. Verkið var að finna það sem þegar var opið, ekki að opna nýtt. Þungu nýju greiningarnar eru **fastreiknað CONTENT með keyrsludegi, aðferðaskjölun og n**, ekki MV — því lindirnar (`listing_sessions`, `v_units`, `_sales_base`) eiga enga anon-heimild og mynstrin hreyfast hægt.
+
+**(2) Höfnunarlistinn er bókfærsluskyldur og hann er lengri en samþykktarlistinn.** Sjö hugmyndir voru **felldar með mælingu**, ekki með smekk: framboðs-saga úr `listing_sessions` (þekjuhrun mælt — 2026-01 sýnir **32** „virkar" meðan lifandi mæling er **8.598**, svo stig-lína hefði verið þekjumæling en ekki framboðsmæling); verðlækkanir innan auglýsingar (`listing_price_history` nær nær eingöngu yfir 2026 — 36.088 af 40.829, svo „0,9 % breytt" er gluggabjagi); `n_relistings` í hvaða formi sem er (spilltur, mbl-ID-churn); TOM eftir hverfum/tegundum (n=1.082 alls, hólfin falla undir lágmarks-n og −3,3 d vanmatið bjagar þau misjafnt); `above_list_rate` (`ats_lookup_by_quarter` **stale 2025Q2**); orðatíðni beint úr `listing_extractions` (þekja ~9 % og trigger-bjöguð); og póstnúmeraverð (grant vantar — **UI var EKKI smíðað fyrir grant sem ekki er til**).
+
+**(3) Röðun eftir yield eða vanmati er bönnuð og bannið nær til nýrra greininga líka** (§5A-14). Sömuleiðis: model-tölur á markaðnum koma **aðeins úr lifandi framleiðslu** (`v_model_vs_sold_by_hood`) og ekkert endurþjálfunarefni er nefnt.
+
+**Heimild**: `verdmat-ai/docs/fable_prep/audits/MARKADUR_ENDURSMIDI_CC101_2026-08-06T1112Z.md` §A1–A3, A2b, FORMIÐ, FASI B, FASI C; `verdmat-ai` commit `5b6e1d4` (diffstat endurmæld 07.08).
+
+## 2026-08-07 — §5C-11 · EXCLUDE-LÆRDÓMURINN: „nýr dálkur úr flokkuninni" ER EKKI SAMA OG „dálkur sem má ekki þjálfa á"
+
+**Hvað**: Í skrefi 1 ágúst-endurþjálfunarinnar voru **sex** nýir dálkar settir í `EXCLUDE` í `retrain_sales_model.py` — `src_R, has_dvalar, notkun_kodi, gerd, n_ibudareininga, flm_hlutfall` — og hliðið krafðist **154 features** (staðfest: enginn þeirra í `feature_importance.csv`). Í D2 voru **tveir þeirra teknir ÚT úr EXCLUDE** og settir í features: `n_ibudareininga` og `flm_hlutfall`; `EXPECTED_N_FEATURES` fór **154 → 156** sem meðvituð hlið-uppfærsla. **Útkoman réttlætti það mælt**: `flm_hlutfall` fékk **3,37 % gain og sæti 6 af 156**; `n_ibudareininga` 0,171 % og sæti 20. Heildar-MAPE á holdout30 fór 8,41 → **8,23** og fresh_edge 11,96 → **11,59**.
+
+**Af hverju**: Dálkarnir sex komu allir úr sömu vinnu (regla R, HMS-flokkunin) og voru **flokkaðir eftir uppruna en ekki eftir eðli**. Þeir fjórir sem áfram eiga heima í EXCLUDE — `src_R`, `has_dvalar`, `notkun_kodi`, `gerd` — **lýsa flokkunarákvörðuninni sjálfri** og eru þar með sama upplýsingin og segmentið sem líkanið er þegar skilyrt á. Hinir tveir eru **sjálfstæðar byggingarmælingar** á eigninni (hlutfall flatarmáls, fjöldi íbúðareininga) sem eiga ekkert skylt við flokkunina nema að hafa verið sóttar í sömu ferð. **Reglan sem lifir þetta: EXCLUDE ver gegn leka frá merkinu, ekki gegn nýjum dálkum. Prófið er hvort dálkurinn sé afleiða af flokkunar-/merkingarákvörðuninni — ekki hvenær eða með hverju hann barst.**
+
+**Bókuð afleiðing sem er skilyrði, ekki athugasemd**: nýju featurarnir tveir búa í frosna hms-laginu, ekki í skorunar-inntakinu. Í mati var serving-X **sprautaður** með dálkunum tveimur úr sha-hliðuðu lindinni (`16d78e39d57cfcad`), og **alheims-skorunin við flipp þarf nákvæmlega sömu innspýtingu — annars verður train/serve-skekkja**. Þetta rataði inn í flipp-röðina sem skref 1 (runbók §10.4.2) og var framkvæmt (§5C-16).
+
+**Aðferðafræðileg vörn sem fylgdi með**: eftir D2-keyrsluna var `retrain_sales_model.py` **endurheimtur í R154-ástandið** og það sha-sannreynt (`3a35a13dc847b01b`), svo D2-diffið væri sannanlega **þessi þrjú atriði og ekkert annað**, endurgeranlegt úr tímastimplaða afritinu `.cc98_R154_20260805T093342Z`.
+
+**Heimild**: `app/docs/fable_prep/audits/AGUST_ENDURTHJALFUN_FASI2_SKREF1_CC98_20260805T0010Z.md` §1 (læstu ákvarðanirnar, liður 3); `…FASI2_D1D2_CC98_20260805T1000Z.md` §2 (keyrslan, gain, endurheimt trainer); `docs/GO_BREF_FLIPP_REGLA_R_CC98_20260806.md` §1, §6 skref 1 og 8.
+
+## 2026-08-07 — §5C-12 · ÚTILOKUNARRÖÐ ENDURÞJÁLFUNARINNAR: fimm tilgátur felldar hver af sínum FYRIRFRAMBÓKAÐA ramma
+
+**Hvað**: Level-rekið (punktmatið færðist úr −2,56 % í +2,46 % bias á holdout30) var ekki „skýrt" eftir á heldur **sundurgreint í mælda þætti eftir fyrirfram skrifuðum römmum**, í fastri röð, þar sem hver rammi bar sín eigin höfnunarskilyrði áður en mælt var:
+
+| tilgáta | rammi | dómur |
+|---|---|---|
+| Konvergens/es-skema | A | **FELLD** sem aðalskýring — ~+1,15 pp |
+| Akkeris-vélbúnaður | 3.0 §5 | mældur **≤0,7 pp** |
+| Gögnin sjálf (revisjónir/CPI) | B | **STENDUR: +2,14 pp** — óháð flokkun |
+| Merkingarþáttur gegnum innan-hólfs-samsetningu | D1 | **FELLD** — skilyrt gap ~0 í sérbýli |
+| Merkingarþáttur leiðréttur með strúktúr-featurum | D2 | **FELLD** — (b)-bias +2,20 → **+2,45**, ekki að núlli |
+| **Eftir stendur** | — | merkingarþátturinn (+2,9 pp) verkar gegnum **level-endurmat segmentanna sjálfra** (categorical-split-far), ekki gegnum mælanlega innan-hólfs-verðsamsetningu — **rót ekki fullskilin** |
+
+**D1 sagði fyrirfram það sem D2 mældi eftir á.** Hráa gapið í sérbýli (fluttar eignir −11,9 % í SFH, −12,5 % í ROW) **hverfur nær alveg við feature-skilyrðingu**: −0,75 % (SFH) og +1,07 % (ROW) með matsvæðis-FE. **Skilyrðið úr GO-forskrift D1 („ef já í sérbýlishólfunum") var því EKKI uppfyllt** — það var einfaldlega engin innan-hólfs-samsetningarskekkja fyrir strúktúr-featurana að éta, og spáin um að D2 yrði lagfæringin veiktist áður en D2 var keyrt.
+
+**Af hverju**: **Röðin er verndin.** Hefði D2 verið keyrt fyrst og dæmt á heildar-MAPE einni saman hefði hann verið útnefndur „lagfæringin" — hann er nefnilega **betri á nær öllum öðrum mælum** (R_gerd bias +6,73 → +5,57; SFH 13,44/+5,61 → 13,24/+4,47; ROW 9,98/+6,76 → 9,36/+5,84; SEMI 11,52/+7,35 → 8,65/+5,26). Fyrirframbókaði ramminn kom í veg fyrir þá ályktun: **varðan var (b)-bias ≤ ±1,0 og hún var ekki hreyfð þegar mælingin skilaði +2,45.** Módelið var samþykkt á eigin verðleikum og **level-spurningin bókuð ósvarað** í stað þess að láta hana hverfa inn í heildartöluna. Samhliða gilti hart bann: **enginn eftirá-bias-stuðull** — talan stendur og fær engan leiðréttingarstuðul (staðfest í §3 GO-bréfsins, §5C-16).
+
+**Heimild**: `app/docs/fable_prep/audits/AGUST_ENDURTHJALFUN_FASI2_D1D2_CC98_20260805T1000Z.md` §1 (D1-taflan), §2 (D2 + dómurinn), §3 (tilgátustaðan), §4 (HALT-staðan, bias-stuðuls-bannið); `docs/GO_BREF_FLIPP_REGLA_R_CC98_20260806.md` §3.
+
+## 2026-08-07 — §5C-13 · cc102 MÓDELA-EINVÍGIÐ: nákvæmnistalan ER EKKI nákvæmni þegar dómarinn er í inntakinu
+
+**Hvað**: Afturvirk mæling gegn fjórum íslenskum verðmatsflötum á frystum úrtökum (A = 4.706 þinglýstar sölur ≥ `train_end` 2026-01-15, sha `c2bc26263031dcb6`; B = 7.732 virkar söluauglýsingar, sha `55c59bf2a274a59e`). **Hliðið var upp á aukastaf**: endurgerð cc78 á holdout30 skilaði n 847 / medAPE 7,6634 / MAPE 9,9552 / bias −2,5598 **orðrétt**, og 1.199 skörunarraðir báru **0,000000 kr frávik**.
+
+**Á paraða kjarnamenginu (n=4.115)**: e-fasteignir **2,84 %** medAPE, fasteignamat HMS **6,32 %**, okkar líkan **7,85 %** (bias **+4,18 % = OFMAT** — óháð staðfesting á level-reki cc98). **En talan er ekki nákvæmni.** Lekinn er mældur **fjórum óháðum leiðum sem stemma**: L3 (öll eigindi föst, aðeins eigin samningur breytist) medAPE **2,55 → 8,07 (3,2×)** og bias +0,15 → **+14,32**; L5 (fastnúmer vs hnit, sama veitandi, sama módel, n=4.135) **2,84 → 9,20 (3,2×)**; L1b lagskipt 0,55×/0,77×; L6 aðhvarf gefur **akkerunarvigt a = 0,337** (R² 0,822) — **34 % af fermetraverði þeirra kemur beint úr sölunni sem dæmir þá**. Vélbúnaðurinn er mældur enda á milli: skrá þeirra fær söluna strax (**100 % innan 4 vikna**) en módelið meltir hana á 4–8 vikum, og medAPE fellur **6,19 → 2,52** við innlestur.
+
+**Þekja er niðurstaða, ekki fyrirvari**: e-fasteignir metur **56 % eigna sem eru á sölu í dag** (92 % seldra) — notandi í söluhugleiðingum fær svar í rúmum helmingi tilvika. Sundurliðað: `APT_FLOOR` 45 % gegn `APT_STANDARD` 97 % (**mælt, ekki skýrt** — gæti eins verið afleiðing af okkar eigin flokkunarlagi og aldri þess).
+
+**Af hverju**: Tvennt gerir mælinguna gilda. **(1) Jákvæð viðmiðun á tækinu sjálfu**: vísitölulínan getur **ekki lekið í smíði** (inntak hennar er sala eldri en `train_end` og hún sér aldrei söluna sem dæmir hana) og hún mælist `AKKERUN ÚTILOKUÐ` — tækið gefur rétt svar á línu þar sem rétta svarið er þekkt fyrirfram. **(2) L4 á okkur sjálf** sýndi enga akkerun (IQR 0,90×, aldur flatur) og var **skilyrði, ekki formsatriði**. Heiðarleikinn er líka bókaður: fyrirframbókaði L1-þröskuldurinn **féll á hársbreidd** (2 %-hlutfall 1,99× gegn kröfu 2,00×) og var **EKKI hreyfður**; L1b og L5 eru merktar sem eftir-á-viðbætur með mældri ástæðu.
+
+**REGLA BÓKUÐ: panel- og keppinautagögn fara ALDREI nálægt módelþjálfun okkar — þau eru mælingarandlag, ekki feature.** Ástæðan er mælifræðileg, ekki lögfræðileg: gögn sem eru sjálf akkeruð í dómarann flytja þá akkerun inn í okkar líkan og eyðileggja hvern framtíðar-samanburð.
+
+**ÁKVARÐANIR EIGANDA 06.08 (koma í stað opinna liða):**
+1. **Creditinfo/Aurbjörg: EKKI óskað aðgangs** — lokað hlið, bókað sem markaðsverðviðmið; `eignar.is` stendur utan og engin beiðni fer. **Umfang einvígisins er þar með ENDANLEGT.** *Ósamræmi bókað: FASI 0 mældi 1.990 kr á creditinfo.is en eigandi gefur ~5.000 kr — ólíkar vörur/þrep, ekki upplýst.*
+2. **ENGIN OPINBER BIRTING samanburðarins.** Markaðskassinn sem stóð til er felldur (verkið keyrði aldrei, ekkert að fjarlægja). Okkar eigin tölur mega birtast **síðar** sem aðferðafræðisíða án keppinautatalna, með sér-go. **Keppinautanöfn eru bönnuð í öllu sem fer út úr húsi.**
+3. **Fasteignasala-útgáfan verður sér skjal, eftir flipp**: okkar nákvæmni með nefnurum, samanburður við fasteignamat HMS **eingöngu**, þekja, heiðarleika-nálgunin og framvirka aðferðin lýst án nafngreininga.
+
+**Aðferðarreglur sem gilda áfram**: `eignar.is` og `aurbjorg.is` voru **útilokuð af robots.txt — okkar eigin regla, meðvitað með sýnileikakostnaði**; skrapið var 36.498 beiðnir með **0 villum**, heiðarlegum UA með netfangi, 0,5–0,6 s tíðni og kill-switch. Fyrsta gilda framvirka heildartalan er áætluð ~01.10.2026.
+
+**Heimild**: `D:\_audit\CC102_NIDURSTODUR_20260806T0950Z.md` §1–§7; `CC102_SKORUNARRAMMI_PREREG_20260806T0045Z.md` (skrifaður FYRIR mælingu); `CC102_SIDULISTI_FASI0_…`, `CC102_B2_VIKUTAKTUR_…`, `CC102_AUDIT_…` (allar 20260806T0950Z); `reference_e_fasteignir_avm_api`, `feedback_sott_verdmat_a_seldri_eign_maelir_akkerun`.
+
+## 2026-08-07 — §5C-14 · FLOKKAÞRÖSKULDARNIR ENDURLEIDDIR — aðferðin er TÓM BIL, ekki gömul merking
+
+**Hvað**: Öryggisflokkarnir A/B/C hvíla á hlutfallslegri 80 %-bilbreidd og gömlu skurðirnir (A < 0,20, B < 0,36) voru leiddir af gömlu bilunum. Nýja framreiðslulagið breytir breiddunum, svo skurðirnir voru **endurleiddir í sömu aðgerð og flippið** — annars hefði A-flokkur horfið sem hliðarverkun. Niðurstaða, kvittuð við borðið 06.08: **A < 0,240 · B < 0,443**.
+
+**Aðferðin speglar upprunalegu leiðsluna (cc49 §5.2) og er mæld, ekki valin**: skurðirnir eru settir í **raunverulega TÓM bil** strjálu sellu-breiddanna (69 og 210 raðir inni í bilunum). Skurðirnir sem lágu nærri gömlu **merkingunni** (0,222 / 0,365) voru felldir af mælingu: þeir skera **gegnum byggt band 38 þúsund raða** og **skilja A og B ekki að** (MAPE 6,85 gegn 7,11). Staðfesting á nýju skurðunum er MAPE-einhalli á holdout30: **A 6,71 % (n=575) < B 9,84 % (n=166) < C 14,00 % (n=106)**. Flokkur er **deterministic úr bilunum** — frávik **0 af 167.503**.
+
+**Afleiðingin á dreifinguna er stór og bókast sem leiðrétting, ekki hliðarverkun**: A/B/C/D fer úr **515 / 111.236 / 43.858 / 11.894** í **84.893 / 40.939 / 29.777 / 11.894**. Lifandi A-flokkur hafði verið **515 raðir = 0,3 %** allt frá cc51 — sem er í reynd horfinn flokkur. **A þýðir nú ±12 % (var ±10 %).**
+
+**Af hverju**: Þröskuldur sem er valinn til að halda gömlu merkingunni („A = ±10 %") er þröskuldur sem er valinn til að fela breytinguna. Reglan sem gildir: **skurður skal liggja þar sem gögnin eru strjál, og merkingin (±%) skal elta skurðinn — ekki öfugt.** Þröskuldarnir búa í `rebuild_predictions_iter4.py` (`GRADE_A_THR`, `GRADE_B_THR`) og voru færðir þar, ekki í birtingarlaginu.
+
+**Viðbótarkrafa borðsins og útkoma hennar**: kvittunin bar skilyrði um að leita „±10"/„10 %" í öllum notendaflötum og uppfæra í ±12 % í sömu deploy ef A-merking væri skjalfest sem prósenta. Leitin var gerð í þrepi 6: **A-merking finnst HVERGI skjalfest sem prósenta á notendafleti** — **fjarveran er bókuð og engin ±12 %-uppfærsla var gerð**. Þrepin T1–T5 eru **ósnert** af þessu (70.113/82.249/3.209/8.525/3.407, ruleset `tiers_v1_K3_F5_N8_2026-07-03`) — ásarnir tveir eru aðskildir sem fyrr.
+
+**Heimild**: `app/docs/fable_prep/audits/AGUST_ENDURTHJALFUN_FLIPP_CC104_20260806.md` þrep 2c (hlið 6 + þröskuldakaflinn), þrep 2d (kvittunin), þrep 3 (lifandi tölur), þrep 4 (kóðafastarnir), þrep 6 (±10 %-leitin); logg `D:\cc104_grade_thresholds.log`; `precompute` commit `05dc55f`.
+
+## 2026-08-07 — §5C-15 · ÆFINGARSTIGS-FUNDURINN: ÞRIÐJI LYKILLINN — rollback-SQL sem eyðir ekki því sem flippið bætti við
+
+**Hvað**: Æfingarstig 3 (þvingað rollback gegn **rauntöflunum**, í einni transaction sem inniheldur enga commit-leið) var keyrt fyrir flipp og reyndist allt grænt: INSERT predictions ← R1 **167.503**, INSERT feature_attributions ← R2 **1.675.030**, UPDATE properties ← R3 **0 snertar raðir** (krafa fyrir flipp), in-txn recheck **öll átta gildi jöfn rollback-dálki §4 nákvæmlega**, endurheimtar-sönnun in-txn gegnum checksum (predictions == R1 `477b2fcab049606a…`, FA == R2 `e9cc8411cc30bf81…`), og lifandi tölur eftir æfingu jafnar þeim fyrir.
+
+**En fundurinn sjálfur var annar og hann er efnið hér**: flippið bætir **NÝJUM lykli `calibration_version`** í `pipeline_config`, en rollback-röð runbókarinnar (§3 þrep 6) taldi **aðeins tvo lykla**. Rollback eftir flipp hefði því skilið nýja lykilinn eftir — DB hefði verið í ástandi sem hvorki var fyrir-ástandið né eftir-ástandið. **Fundurinn var bókaður strax, runbókin leiðrétt í sömu lotu (viðauki §10.5), og rollback-SQL-ið `D:\cc104_flip_rollback.sql` skrifað á disk MEÐ þriðja-lykils-eyðingunni FYRIR flippið.**
+
+**Af hverju**: Þetta er nákvæmlega það sem æfingarstig eru til fyrir og röksemdin fyrir þeim er nú mæld, ekki fræðileg. **Æfing sem er keyrð gegn rauntöflunum með réttum lásum finnur ósamræmi milli fram-leiðar og aftur-leiðar sem lestur finnur ekki** — sami lærdómur og §5C-4 (lifandi INSERT gegn lestri), í öðru lagi kerfisins. Þrep 5 í rollback-röðinni (UPDATE properties) var **eina óæfða þrepið** og það var æft hér gegn rauntöflunni áður en flippið fékk go. **Reglan: rollback-röð er ekki fullgild fyrr en hún er æfð gegn rauntöflunum, og hún verður að telja hvern lykil sem fram-leiðin BÆTIR VIÐ, ekki bara þá sem hún breytir.**
+
+**Heimild**: `AGUST_ENDURTHJALFUN_FLIPP_CC104_20260806.md` þrep 2d (æfingarstig 3, taflan + athugasemdin), þrep 3 (undirbúningur fyrir txn, liður a); `docs/ROLLBACK_RUNBOOK_CC78.md` §3, §5, §10.3, §10.5; logg `D:\cc104_stage3_rehearsal.log`.
+
+## 2026-08-07 — §5C-16 · FLIPPIÐ: FRAMKVÆMDARKORTIÐ ER TVEIR GLUGGAR EN EITT FLIPP — þrep 0–5 með mældum tölum
+
+**Hvað**: Ágúst-endurþjálfunin (`iter4r_20260805_reglaR_strukt` = D2 + Mondrian-kvörðun 3.1 + framreiðslulag 3.3, **sem EIN heild — ekkert laganna þriggja flippar sér**) fór í framleiðslu 06.08. **Framkvæmdin dreifðist á tvo lotu-glugga og það er bókað hér svo kortið sé rétt lesið eftir á: þrep 0–3 voru keyrð í cc104-glugganum (mannað, eigandi og arkitekt við borðið), þrep 4–6 í cc101-glugganum sama dag samkvæmt go eiganda („þrep 4+5 saman — MV FYRST"), þrep 7 að morgni 07.08. Þetta er EITT flipp með einni atómískri transaction, ekki tvö.**
+
+**Þrep 0 — kvittanir**: §3 level-myndin kvittuð, §4 notendaupplifun **VAL = (b)**, flipp-sér-GO kvittað við þrep 3. **Frávik bókað þar: GO-bréfið og runbókin reyndust ÓTRÖKKUÐ í git** og fóru inn með flipp-committinu (explicit paths).
+
+**Þrep 1 — R1-frystingin, ALLT GRÆNT**: `public.predictions_2026_08_pre_cc78` búin til með **CTAS + ENABLE RLS + REVOKE ALL FROM anon, authenticated í SÖMU transaction**, og RLS-staðan **mæld eftir á** (`relrowsecurity=true`, engin `role_table_grants` fyrir anon/authenticated) í stað þess að treysta REVOKE-eintakinu — cc52-reglan. Frystingin keyrð í **einni REPEATABLE READ READ WRITE txn** svo lifandi talning, afritið og frosna talningin mælist öll á sama snapshot-augnabliki: **167.503 == 167.503**, endurmælt á öðru snapshoti sama. NULL í átta lykil-dálkum **0/0/0/0/0/0/0/0**; `model_version` = `iter4r_20260716` á öllum. **Checksum yfir allar raðir**: frosið == lifandi = `477b2fcab049606a3695663719d63642`. **Kohort-krossprófið**: n=100 úrtak, **max|Δ| = 0,0 á öllum FIMM dálkum**. Spönnun sönnuð úr fjórum áttum (CTAS án WHERE, rowcount á sama snapshot, anti-join báðar áttir 0/0, checksum).
+
+**Þrep 2a — R2 + R4–R9**: `feature_attributions_2026_08_pre_cc78` **1.675.030 == 1.675.030**, munaðarleysingjar 0, anti-join 0/0, checksum `e9cc8411cc30bf813f5a65bd3ca562ed`. R4–R9 allar PASS á sha-samanburði, þar á meðal `training_data_v2_pre_cc78.pkl` sha `aa2e191e750fd513` == manifest gamla líkansins og lifandi `training_data_v2.pkl` `32f9a1242b212d11` == GO-bréf §1.
+
+**Þrep 2b — UNIQUE-index á öllum SEX MV-um** staðfest gilt fyrir refresh, svo `REFRESH CONCURRENTLY` gæti ekki fallið þögult.
+
+**Þrep 2c — STAGING, skilin sex græn**: universe 175.929 → D3-hlið −8.426 → **167.503 == lifandi**, anti-join 0/0. Kohort-endurgerð **1.186/1.186 raðir með max|Δ| = 0,0000 kr** á punktmati og < 0,50 kr á bilum (ytri kr-rúnnun). Calibration: serving_v1 **155.609** (= öll non-D) + segcal_fb **11.894** (= öll D), NULL 0. Bil-röðunarbrot **1.284, öll á segcal-leið — lifandi bar 1.447 slík**, þ.e. fyrirliggjandi quantile-crossing sem **batnar**, ekki regression.
+
+**Villa sem hliðin sjálf fundu og felldu**: fyrsta útgáfa skorunarinnar lét sellulausar non-D raðir falla á segcal; **kohort-krossprófið felldi hana** (13 „global"-raðir báru max|Δ| upp í **21,4 M kr**). Cascade var lagfærður í seg_reg → seg → **GLOBAL fyrir non-D** (speglar 3.3-matsvélina; 1.834 raðir) og öll D á segcal (cc51-fordæmið). **Hliðin unnu vinnuna sína — villan komst aldrei nálægt lifandi töflu.**
+
+**Þrep 3 — flippið sjálft, EIN atómísk transaction**, COMMIT **2026-08-06T12:24:26,04Z**: UPDATE predictions ← staging **167.503** → TRUNCATE+INSERT feature_attributions **1.675.030** → pipeline_config 1/1/1 (`model_version` → `iter4r_20260805_reglaR_strukt`, akkeri → `2026-09`, `calibration_version` NÝR) → UPDATE properties ← flokkunar-staging **58.765** → **in-txn sannprófun 15/15 PASS** fyrir commit. **Tvær tölur voru mældar fyrirfram þar sem runbókin bar aðeins mat**: `n_frav` = **58.765** (runbókar-mat ≈58.500/58.561) og `n_apt_std` = **57** (runbókar-mat ≈206) — sú síðari í samræmi við hms-lindarskýrsluna. Strax eftir commit, mælt af lifandi: allar sömu tölur staðfestar, canonical-dreifing lifandi == staging á **öllum 14 gildum**.
+
+**Þrep 5 — MV-REFRESH SEX (ekki einn)**, 6/6 grænar 12:30:28Z, keyrðar í **autocommit** (CONCURRENTLY má ekki standa í txn-blokk) með fail-fast. Raðafjöldi óbreyttur er væntanlegt (hópunarlyklarnir standa, innihaldið skiptist um); efnisleg staðfesting: `v_model_vs_sold_by_hood` ber nýju spárnar (Σ`n_pairs` 8.535, miðgildi `median_ratio` 1,0044). **Glugginn predictions-nýjar/MV-gamlar var þar með LOKAÐUR** — hann var **vitað millibilsástand** frá commit til refresh, bókað sem slíkt í þrepi 3, ekki uppgötvað eftir á.
+
+**Af hverju**: Röðin var valin svo að **canonical_code og predictions.segment gætu aldrei verið sitt í hvoru ástandi** — falli eitt þrep rúllar öll transactionin. Og MV-listinn er **runbókar-listinn (sex), ekki `flip_iter4r.py`-listinn (einn)**; það gat var þekkt fyrirfram og bókað í GO-bréfinu sem skylda, ekki valkvætt.
+
+**Heimild**: `AGUST_ENDURTHJALFUN_FLIPP_CC104_20260806.md` þrep 0–5; `docs/GO_BREF_FLIPP_REGLA_R_CC98_20260806.md` §1, §2, §6, kvittanataflan; `docs/ROLLBACK_RUNBOOK_CC78.md` §1, §7, §10.4; logg `D:\cc104_r1_freeze.log`, `cc104_r2_freeze.log`, `cc104_universe_rebuild.log`, `cc104_staging_gates.log`, `cc104_flip_txn.log`, `cc101_mv_refresh.log`; commits `app` **`fd06628`** (3 skrár, +1.114/−0) og `precompute` **`05dc55f`** (2 skrár, +163/−10), báðar diffstat-tölur endurmældar 07.08.
+
+## 2026-08-07 — §5C-17 · ÞREP 6: PROD-RAUNPRÓFUN, §4b-LÍNAN — og APT-ATHUGASEMDIN við „almennt lítillega"
+
+**Hvað**: Þrep 6 er lokið og grænt. **A-hluti**: 5 af 5 prófeignum á prod **jafnar lifandi DB nákvæmlega** — 2013952 (R_gerd → ROW_HOUSE) **138,0 M / A / T1**, 2000296 **155,0 M / B**, 2000309 **121,5 M / A**, og tvö Country-sérbýli með **rel80 = 0,552** og óbrotin bil / C. Líkans-kafli `/markadur` ber nýju stöðuna sjálfkrafa (72/76 innan ±5 %), console hreint. **±10 %-leitin**: A-merking finnst **hvergi skjalfest sem prósenta** á notendafleti — fjarveran bókuð, engin ±12 %-uppfærsla gerð (§5C-14). **§4b-línan** (val (b) úr §4 GO-bréfsins, dagsett 06.08.2026) er **LIVE á `/adferdafraedi`** — `verdmat-ai` commit **`f153163`** (mælt af git: 1 skrá, +9/−0), línan orðrétt á prod og stikkprufa á 2013952 óbreytt eftir deploy.
+
+**APT-ATHUGASEMDIN — hún leiðréttir orðalag GO-bréfsins og verður að fylgja hverri framtíðar-tilvísun í það.** §4 sagði að verðmöt færðust „almennt ~2–5 % NIÐUR (mest á dýrari eignum og sérbýli)". **Mælda dreifingin á öllu þýðinu (n=167.503) er miðgildi 0,9614 = −3,9 %, sem stenst bandið — en hún er ekki einsleit og sérbýlis-hlutinn er ÖFUGUR:**
+
+| hólf | mælt miðgildi staging/lifandi |
+|---|---|
+| ALLT (n=167.503) | 0,9614 (**−3,9 %**) |
+| **APT_\*** | **0,9359 (−6,4 %)** — utan „2–5 %"-bandsins |
+| sérbýli, heild | 1,0234 (**+2,3 %**) |
+| … þar af **kyrr** sérbýli (n=28.928) | 1,0030 |
+| … þar af **fluttar R_gerd-eignir** (n=27.036) | **1,0497** |
+| SUMMERHOUSE | 0,9964 (nær ósnert) |
+
+**Lesningin er samsetningaráhrif og hún er kjarni endurþjálfunarinnar, ekki hliðarverkun**: heil hús sem fasteignaskrá merkti sem íbúðir og voru verðlögð sem íbúðir **HÆKKA** — það er lagfæringin sjálf. Íbúðirnar bera lækkunina, og þær bera hana **dýpra en GO-bréfið orðaði** (−6,4 % gegn „2–5 %").
+
+**Af hverju**: Notandi sem man töluna sína frá því í síðustu viku sér lækkun, og GO-bréfið gerði ráð fyrir því. **En sá sem les „almennt lítillega niður, mest á dýrari eignum og sérbýli" og býst svo við að íbúð lækki minna en sérbýli les rangt** — mælingin snýr því við. Athugasemdin er bókuð hér svo hvorki skýrslutexti, `/adferdafraedi`-lína né stuðningssvar byggi á öfugu orðalagi. **Fyrirvarinn um breikkun bilanna stendur óbreyttur og er líka mældur**: miðgildi rel80 fer 0,303 → 0,236 á öllu þýðinu (bil MJÓKKA á íbúðum — lifandi cc51-leið-A bilin voru breiðari en 3.3-kerfið), en **breikka þar sem óvissan er raunverulega mest**: SFH 0,419 → **0,552**, SEMI 0,412 → 0,514, ROW p90 0,419 → 0,666, og Country-sérbýli miðgildi rel80 **0,552 (n=27.222)** == „halinn í 55 %+" úr GO-bréfinu.
+
+**Opin vöruákvörðun bókuð, ekki leyst**: `/eign`-hausinn birtir `tegund_raw` (HMS-hrálabel) samkvæmt fyrirliggjandi hönnun. Hvort hann eigi að sýna R-flokkunina í staðinn er **opin vöruákvörðun** — flippið breytti spánni og segmentinu, ekki hausnum.
+
+**Heimild**: `AGUST_ENDURTHJALFUN_FLIPP_CC104_20260806.md` þrep 2c hlið (3) og (4), þrep 6; `docs/GO_BREF_FLIPP_REGLA_R_CC98_20260806.md` §4, §5; `verdmat-ai` commit `f153163`.
+
+## 2026-08-07 — §5C-18 · cc105 FASI 1: ANON-FLÖTURINN ER BURÐARVIRKI SÍÐUNNAR — REVOKE er ekki hættulaus fjöldaaðgerð
+
+**Hvað**: Supabase-advisory-póstur („Table publicly accessible — `rls_disabled_in_public`", taflan ónefnd í póstinum) var rakinn til enda með **tæmandi sópun á öllum 74 töflum í public/scraper/semantic**. **Fjórar töflur bera `rowsecurity=false`** og aðeins **ein þeirra er raunopin**: `public.spatial_ref_sys` (PostGIS-kerfistafla, 8.500 raðir, anon+authenticated SELECT, **engin skrif-grants**). **Advisory-pósturinn er þessi tafla og engin önnur.** Hinar þrjár — `scraper.listing_extractions_pre_cc94b` (163), `_pre_cc94b2` (2), `listing_valuations_pre_cc94b2` (4) — bera **engar grants** og eru ekki aðgengilegar um API þótt `scraper` sé PostgREST-útsett. Þær eru viðgerðar-snapshots cc94 og **cc94 er lotan sem á frávikið frá fæðingarreglunni** (RLS+REVOKE í sömu migration og CREATE); reglunni sjálfri er ekki um að kenna.
+
+**Anon-notkunarmælingin er niðurstaðan sem ræður umfangi FASA 2.** Fjórir klientar mældir per skrá: `lib/supabase.js` (anon) keyrir **bæði í vafra og á server**; `/leit` er **hrá REST-köll með ANON-lyklinum** (`rpc/search_properties_grouped` + `properties`); `/eign` les `properties`, `property_images`, `sales_history`, `comps_index_v2`, `v_properties`, `v_current_predictions`, `v_eign_myndir`, `v_fjoleining_fastnum`, `repeat_sale_index` o.fl. **sem anon**; dashboard og `/markadur` sömuleiðis. **Niðurstaða: REVOKE anon á view/MV-flötinn myndi brjóta síðuna.**
+
+**Definer-view-mynstrið er VÍSVITANDI OPNUNARLEIÐ, ekki gleymska.** Átta SECURITY DEFINER-view (ERROR-stig hjá advisor) lesa undirtöflur sem eru RLS-á og policy-lausar (default deny). **Sex af átta eru mæld í raunnotkun anon-megin**; scraper-viewin tvö (`v_leit_listings`, `v_eign_virk_auglysing`) bera **enga anon-grant** og eru service_role-eingöngu í notkun — samræmi, ekki frávik. Sama gildir um 10 semantic-MV með anon-grant: MV-RLS er ekki til í Postgres, grant-stýring er eina vörnin, og innihaldið eru samlagðar markaðstölur sem síðan birtir hvort eð er. **Ósamræmi fundið og bókað**: þrjár MV til viðbótar (`v_postnr_prices_yearly`, `v_street_activity`, `v_street_directory`) bera **engar grants** — grant-sagan er handvirk, ekki regluleg.
+
+**Af hverju**: Áhættumatið er per hlut, ekki per flagg. **(a) Póst-flaggið er LÁGMARKS-áhætta**: les-aðgangur að opinberri EPSG-uppflettitöflu, engin viðskipta- eða notendagögn, engin skrifleið, ástandið upprunalegt frá fæðingu verkefnisins. **(b) Snapshot-þrennan er HREINLÆTI**: 169 raðir, núll raunáhætta í dag; frávikið er að þær myndu opnast ef einhver grantaði seinna. **(c) Aukafundirnir réttlæta ENGA fjöldaaðgerð** — allt sem anon les er efni sem síðan birtir hvort eð er opinberlega.
+
+**Hörð raunprófunarkrafa sem fylgir FASA 2a og má ekki falla niður**: `poi_naesta` er **SECURITY INVOKER** og anon-kallanlegt PostGIS-fall. Fletti innri geography-aðgerðir þess upp í `spatial_ref_sys` **brotnar POI-lagið á `/eign` undir anon við REVOKE**. Prófa verður `poi_naesta` + `/eign` + `/leit` + `/markadur` + `/leiguverd` **eftir** apply, með rollback-SQL tilbúið **fyrir**. Sami fyrirvari gildir um ALTER-leiðina: taflan er extension-eign og `ENABLE ROW LEVEL SECURITY` kann að stranda á eignarhaldi (líkleg ástæða þess að cc52 skildi hana eftir); þá er REVOKE-leiðin til vara, því grantor er `postgres` samkvæmt ACL.
+
+**HIBP-flaggið er LÁGVÆGT en EKKI N/A**: `auth_leaked_password_protection` er af, og Auth **er í notkun** — 5 notendur í `auth.users` (prófnotendur cc17 + hlutverk). Enginn opinn signup-flötur mældist, svo vægið er lágt; lagfæringin er í dashboard (Auth → Passwords), ekki SQL-breyting.
+
+**Skilyrði beggja FASA-2-skammta**: cc104 þrep 6 grænt fyrst — **ein breyting í kerfinu í einu** — og sér-go frá eiganda á hvorn skammt.
+
+**Heimild**: `docs/HALT_SKIL_RLS_GAT_CC105_FASI1_20260806.md` §1–§5 (committað í þessari lotu með explicit path).
+
+## 2026-08-07 — §5C-19 · cc106 ÁLFTAMÝRI 39: ÞRJÁR BIRTINGARREGLUR SEM GILDA UM ALLAR GREININGAR SEM FARA ÚT
+
+**Hvað**: Greining fyrir eiganda á Álftamýri 39 (fastnr. **2013952**), ásett **174,0 M** gegn verðmati **138,0 M**, skrifuð read-only gegn lifandi grunni 06.08 (`ALFTAMYRI39_GREINING_20260806.{md,html}`). Kjarnamælingar: punktmat **138.031.587 kr**, 80 %-bil 127,3–157,5 M, 95 %-bil 111,6–169,5 M, flokkur **A**, þrep **T1**, segment **ROW_HOUSE** undir `iter4r_20260805_reglaR_strukt` + `conformal_serving_v1`. **Ásetta verðið liggur 4,5 M kr OFAN við efri mörk 95 %-bilsins.** Akkerið er þinglýst sala 13.07.2017 á 70,0 M × 1,8221 (hólf, 2026Q2) = **127,55 M**; nærviðmið (8 af 148 comps) vegið miðgildi **151,3 M**; fasteignamatsviðmið **134,6 M**. Breið sópun: **48 sölur** (raðhús+einbýli 160–220 m² í 103/105/108, 24 mánuðir, framreiknaðar) — **174,0 M situr á 85,4-percentíli** (7 af 48 ná verðinu) og **910 þús. kr/m² á 89,6-percentíli** (5 af 48). Allar sjö sem ná verðinu eru í Fossvogslöndunum; nýlegu sölurnar við Háaleitisbraut liggja á 135–144 M framreiknað.
+
+**Af hverju — þrjár reglur sem greiningin setti og gilda framvegis:**
+
+**1. MILLISTIG FER ALDREI ÚT ÚR HÚSI.** Brú-mælingin á þessari eign (124,1 → 128,4 M, +3,5 %, `iter4_final_v1`, 24.07) var **fjarlægð úr lokaútgáfunni** við rýni borðsins. Hún er millistigsafurð úr frosinni brú á eldri líkansútgáfu — rétt sem innri mæling, röng sem tala í skjali sem fer út, því lesandinn getur ekki greint millistig frá framleiðslu. Ástandskaflinn stendur þess í stað á **iter5-kontrostunum tveimur** (+11,0 % brúttó með staðalvillu 0,4 á 6.260 sölum með merki, gegn **+2,1 % beinum kontrast** „uppgert" á móti „vel viðhöldnu" með staðalvillu 0,25).
+
+**2. NÆMNISATHUGUN VERÐUR AÐ VERA MERKT SEM SLÍK OG MÁ EKKI RATA Í NIÐURLAG.** Talan **145,7 M** (punktmat leiðrétt um alla bókuðu hólfaskekkjuna +5,57 %) stendur **aðeins í kafla 1 og aðeins með orðunum „sem næmnisathugun á þeirri bókuðu skekkju, ekki verðmat"**. Niðurlagið ber **+5,57 % / n=96 án útreiknaðrar tölu**. Ástæðan er hörð: leiðrétt tala í niðurlagi verður að öðru verðmati í huga lesandans, og þá ber skjalið tvö möt.
+
+**3. UMBOÐSLÍNAN.** Skjalið segir berum orðum hvað það er og hvað það er ekki: *„Greiningin er unnin af verdmat.ai að eigin frumkvæði og er ekki söluyfirlit, ástandsskýrsla né loforð um söluverð"*, og *„Þinglýsingin sker úr. Þessi greining fullyrðir ekkert um hana."* Hún **fullyrðir ekkert um niðurstöðu sölunnar** og útilokar hana ekki heldur (7 af 48 náðu verðinu).
+
+**Heiðarleikinn gengur í báðar áttir og það er bókað**: tvær skekkjur sem vinna **með seljandanum** eru nefndar (heildarvanmat +2,46 %, hólfaskekkja **+5,57 % á n=96**), og á móti er nefnt að **veikast mælda vissubil kerfisins er í nákvæmlega þessu hólfi** — `R_gerd|RVK_core` cov80 **59,1 % (n=22)**, systurhólfið `SFH|RVK_core` 64,7 % (n=17), samanlagt 39 raðir. Sömuleiðis er bókað að kaupverðshlutfallið (0,968, n=459) mælist **aðeins á eignum sem seldust** — eignir sem seljast ekki detta úr mælingunni, svo hlutfallið eitt og sér segir björtustu útgáfu sögunnar.
+
+**Ástandsþátturinn fékk sína eigin reglu og hún er endurleiðanleiki**: ástand birtist í kerfinu sem **merki** en færir **punktmatið ekki sjálfkrafa**, því punktmat verður að vera rekjanlegt í mæld gögn sem til eru **fyrir allar eignir jafnt**. Ástandstextar liggja aðeins fyrir um **5.491 af 60.807 = 9 %** eignasafnsins, og mælt er að ástandsmerkin bæti engri spánákvæmni utan úrtaks.
+
+**Staða skjalsins**: **ÓCOMMITTAÐ að ósk eiganda** — hann rýnir og sendir sjálfur. Það stendur í `verdmat-ai/docs/fable_prep/greiningar/`, sem er gitignoruð mappa (cc69).
+
+**Heimild**: `verdmat-is/verdmat-ai/docs/fable_prep/greiningar/ALFTAMYRI39_GREINING_20260806.md` §1–§6 + heimildaklausa; `docs/GO_BREF_FLIPP_REGLA_R_CC98_20260806.md` §2, §5; `content/markadur/fastgreiningar.ts` (keyrsludagur 06.08).
+
+## 2026-08-07 — §5C-20 · cc107 LEIGUSÍÐAN: EININGIN ER AUGLÝSINGIN, EKKI FASTNÚMERIÐ
+
+**Hvað**: Leigu-spjald í `/leit?ham=leiga` opnaði **`/eign/[fastnum]`** — söluverðmatssíðuna, sem birtir vísvitandi ekkert leiguefni (cc33-reglan) — og eign án fastnúmers var **óvirkt spjald, blindgata**. Lagfæringin er ný síða **`/leiga/[listing_id]`**, LIVE með `1d7cf1f` (mælt af git: 7 skrár, +783/−2), pushuð 07.08 eftir sér-go og prod-sópun græn í heild.
+
+**Route-afstaðan er rökstudd, ekki valin**: **(1)** einingin er auglýsingin — fastnúmer getur átt margar leiguauglýsingar yfir tíma (og sölu samhliða), svo fastnum-keyed route þyrfti vals-/tvíræðnilag strax; **(2) 24,4 % leiguauglýsinga hafa ekkert fastnúmer** og fastnum-route getur aldrei borið þær, en `listing_id`-route þekur 100 % og leysir blindgötuna í leiðinni; **(3)** `listing_id` er innri, stöðugur bigint-lykill á meðan mbl `source_listing_id` churn-ar (`feedback_mbl_listing_id_er_ekki_lota`); **(4)** eignarsíðan helst hrein — krossvísanir í stað samruna; **(5)** fordæmið er til: `soluyfirlit`-síðan er strúktúrlega sama síða (afritað auglýsingaefni + fyrirvari + `noindex` + myndagrid).
+
+**VARALEIÐIN VAR VALIN FYRST — og það er reglan sem liðurinn ber.** Rétta lokamyndin er nýtt view `scraper.v_leiga_auglysing` (drög skrifuð, **óapplýjuð**), því ekkert lesanlegt yfirborð ber auglýsingaefnið í heild: `v_leit_listings` vantar lýsingu/titil/URL, `v_eign_virk_auglysing` vantar myndir og síar á `status='active'`, og `listings_canonical` — sem ber bæði `url` og `listing_title` — hefur **engin API-grants og er ólesanleg jafnvel fyrir service_role um REST**. En **skrifröðin gengur fyrir: einn DB-skrifari í einu**, og flipp-frágangur ásamt cc105 FASA 2a stóðu framar í röðinni. Síðan fór því í loftið á fyrirliggjandi flötum **með takmarkanirnar fjórar bókaðar í haus gagnalagsins**: (1) aðeins virkar auglýsingar (horfin auglýsing skilar 404 í stað stöðumerkis), (2) enginn titill, (3) URL frumauglýsingar **alltaf smíðað, aldrei lesið úr gögnum**, (4) fjarveru-flögguð auglýsing missir lýsingu og söluaðila. **Uppfærslan verður hrein skipti á gagnalaginu þegar view-ið fær go — síðan stendur óbreytt.**
+
+**PHOTOS_JSON-FUNDURINN**: leigusíðan les **`photos_json` beint**, ekki `v_eign_myndir`. Ástæðan er mæld: `v_eign_myndir` setur **SÖLU-safnmyndir framar auglýsingamyndum** (cc23-forgangurinn), svo leigusíða sem læsi hana myndi sýna sölumyndir eignarinnar á leiguauglýsingu. Auk þess bera **allar 1.475 virkar leiguauglýsingar eigin `photos_json`** og **0 tilfelli** mældust þar sem auglýsingamyndir vantar en safnið ætti þær — frosna safnið er einfaldlega **óþarft fyrir virkar leiguauglýsingar**. Myndalaganirnar tvær (mbl = fylki hluta með `big`-URL, myigloo = flatt strengjafylki) eru samræmdar með sama `fyrstaMynd()`-mynstri og spjaldið notar.
+
+**TEGUND_RAW-BIRTINGARFIXIÐ**: mbl-leiga ber **óupplausta `leiga_type_N`-kóða** í `tegund_raw` (`promote_mbl.py:427` skrifar `"leiga_type_%s" % type_id`). Síðan birtir hrátt gildi **aðeins þegar það er merkingarbært** og fellur annars á `sub_type`-merkimiðann. **Þetta er birtingarlagfæring, ekki rótarfix** — rótin er í promoternum og fer á backlog.
+
+**Af hverju**: Sama regla og §5C-6 og §5C-7 í öðru lagi — **auðkennarými má ekki blanda**. Fastnúmer er eignarlykill, `listing_id` er auglýsingarlykill, og leigumarkaðurinn hefur 24,4 % framboð sem á sér engan eignarlykil. Sbr. líka `project_rangt_asett_verd_cc90`: **fastnúmer er ekki sölueining** — og hér er það ekki leigueining heldur.
+
+**Prod-sópunin, mæld**: `/leit` leiga **24/24 → `/leiga`** (kaup 24/24 → `/eign` óbreytt); spjaldsmellur → `/leiga/326051` með 9/9 myndum, BETA- og Módelspá-merkjum, fyrirvara og krossvísunum; auglýsing án fastnúmers ber matsvöntunarlínu og smíðaðan mbl-hlekk; `noindex` í prod-HTML; rusl-id gefur 404; console 0 skilaboð; `/eign/2008374` ber áfram fulla sölusíðu **án leiguefnis**. Leigumat er til fyrir **871 af 1.475 (59 %)** og kortið birtist aðeins þegar mat er til — **matsvöntun er staða, ekki galli** (ákvörðun borðsins).
+
+**Verkfæra-gotcha bókað því það kostaði tíma og lítur út eins og allt annað**: harness-drepinn bakgrunns-dev-þjónn skilur `node` eftir á :3000 með **stíflaða stdout-pípu**, og þá hengist allt — líka RSC-navigation, sem lítur út nákvæmlega eins og dauður hlekkur. Lækning: drepa `node`, ræsa detached með logg í skrá. Sömuleiðis: `curl` á `www.verdmat.ai` gefur hviklynd SSL/h2 exit-35; **`--http1.1 --retry-all-errors` er stöðuga prófunarleiðin**, og Chrome/`get_page` er trausta prod-sannprófunarleiðin (cc10-lærdómurinn, óbreyttur).
+
+**Heimild**: `verdmat-ai/docs/HALT_SKIL_LEIGUSIDA_CC107_FASI_A_20260806.md` (allir kaflar); `verdmat-ai/docs/drog_migration_cc107_leiga_view_DROG_EKKI_APPLYJA.sql`; `verdmat-ai/lib/leiga-queries.js` haus (takmarkanirnar fjórar); `verdmat-ai/app/leiga/[id]/page.tsx:116–122`; `app/scripts/promote_mbl.py:427`; `verdmat-ai` commit `1d7cf1f`.
+
+## 2026-08-07 — §5C-21 · VAKTAREIGNIN 2013952 — vöktun sem er BUNDIN VIÐ EIGN, ekki bara við hólf
+
+**Hvað**: Þrep 7 færði vikulegu gæðamælinguna á nýja grunninn (`scripts/model_quality_eval.py`, `app` commit **`3f31365`** — mælt af git: 2 skrár, +224/−9). BASELINE varð §7-grunnur 3.3-auditsins (**8,23 / 81,58 / 96,69**) auk BASELINE_FRESH (**11,59 / 83,48 / 95,58**), með flöggum á báðum skópum og „nýtt upphaf" bókað; `FREEZE_ANCHOR_YM` 2026-08 → **2026-09** (flipp-akkerið). Inn komu **bias-per-hólf línan** (r_scope a/b/c1 gegnum flokkunar-ættina, **hávær lína við |bias(b)| > 4,0 pp**, töflu-hvarf = hávært gat en aldrei þögul núll) og **veiku blettirnir fjórir** sem fastar vöktunarlínur **án n-gólfs**: `sfh_rvk_core` · `r_gerd_rvk_core` · `undir_40m` · `apt_attic`.
+
+**Og — nýmælið sem þessi færsla er um — EIN NAFNGREIND VAKTAREIGN: 2013952.** Hún fer í vikuleg skil með ásettu verði, verðbreytingum og virk/horfin-stöðu, og **við þinglýsingu: kaupverð gegn matinu 138,0 M með fráviki**. **Villa í vaktareigninni fellir aldrei mælinguna.**
+
+**Fyrsta prófkeyrsla (dryrun á lifandi grunni, 07.08)**: aðaltala holdout30 n=949 — **MAPE 8,23 (Δ ±0,0 frá grunnlínu) · cov80 82,8 (+1,24) · cov95 96,1**. **Dómsreglan fæddist GRÆN.** Hliðartala fresh_edge n=42: cov80 78,6 (−4,91) — **flagg á litlu n, tripwire en ekki HALT**. Hólfin: (a) n=113 +1,04 · **(b) n=535 +2,33, innan ±4,0** · (c1) n=298 +1,64. Veiku blettirnir: 89,5/19 · 78,1/32 · 67,2/58 · 81,8/11. Vaktareignin: ásett **174,0 M virk** (mbl, síðast séð 30.07), engin verðbreyting, óseld, lifandi mat **138,03 M**. Paired/E2 **sjálfhafnar hávært** (adapter `iter4_final_v1` ≠ lifandi — engin Haiku-keyrsla). Scheduler `verdmat-weekly-model-quality` bendir þegar á vélina — **engin breyting þar**.
+
+**Af hverju**: Hólfamæling svarar „er kerfið að reka?" en hún svarar ekki „hvað gerðist um eignina sem við gáfum álit á?". **2013952 er eignin sem cc106-greiningin fjallar um, eignin sem GO-bréfið nefnir sem veika blettinn (`R_gerd|RVK_core` cov80 59,1 %, n=22) og eignin sem regla R endurflokkaði úr íbúð í raðhús.** Hún er þar með raunprófunartilvik fyrir þrjú kerfislög í einu, og **þinglýsingin á henni verður hlutlægur dómur um mat sem við höfum þegar sett á blað**. Það á ekki að uppgötvast fyrir tilviljun. Varnaglinn (villa í vaktareign fellir ekki mælinguna) er skilyrði: **stök eign má aldrei geta þaggað niður vikulega gæðamælingu á öllu safninu.**
+
+**Forsenda sem varð að leysa fyrst og er bókuð**: `<version>_holdout_rows.csv` vantaði fyrir nýja artifactið, svo `precompute/holdout_eval.py` var keyrð (M1 ✓, M2 ✓; **M3-flokkahreyfingin er endurleiddu þröskuldarnir — kvittað mál**, sjá §5C-14) og skilaði 950 röðum.
+
+**Heimild**: `AGUST_ENDURTHJALFUN_FLIPP_CC104_20260806.md` þrep 7; `…SKREF31_32_CC98_20260805T2350Z.md` §4 (3.2-specið, bindandi §4.3) og `…SKREF33_CC98_20260806T0010Z.md` §7 (grunnurinn); `docs/GO_BREF_FLIPP_REGLA_R_CC98_20260806.md` §5; `app` commit `3f31365`.
+
+*— Lok bókunarlotu cc108 §5C (DECISIONS-hluti).*
