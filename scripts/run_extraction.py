@@ -162,4 +162,8 @@ def main():
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    # cc112: stderr LÍKA. Keðjan fangar `> "$xlog" 2>&1`, svo útgáfuhliðið fellur ofan í
+    # sama loggið gegnum stderr-rakninguna. Án þessarar línu kom íslenski villutextinn
+    # þangað sem cp1252-hakk („SKRIF ST??VU?") — hávær villa sem enginn les er ekki hávær.
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

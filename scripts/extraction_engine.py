@@ -32,8 +32,14 @@ sys.path.insert(0, r"D:\\")                                  # build_training_da
 # cc47 replaced the hardcoded MODEL_VERSION with pipeline_config.model_version + the adapter's
 # own stamp; these valuations are computed BY the freeze-anchored adapter, so its stamp is the
 # honest model_version here (same value the historical listing_valuations rows carry).
+#
+# cc112: that stamp being "honest" is what makes the mismatch DANGEROUS, not safe. The adapter
+# still loads D:\iter4a_*.lgb (154 features, untouched since 21.04) while pipeline_config has
+# moved on to iter4r_20260805_reglaR_strukt (156). read_model_version is imported here so the
+# write path asks the SAME question, off the SAME key, as the measurement does.
 from model_quality_eval import (  # noqa: E402
     load_models_freeze_anchored, _score_iter4, _coerce_numeric,
+    read_model_version, MODEL_VERSION_KEY,
     ADAPTER_MODEL_VERSION as MODEL_VERSION)
 from build_training_data_v2 import build_extraction_features  # noqa: E402
 
@@ -171,8 +177,65 @@ def fetch_extracted_listings_to_value(pg, limit=None):
     return out
 
 
+class ModelWorldMismatch(RuntimeError):
+    """Skrif-hliðið féll: vélin skorar úr öðrum heimi en framleiðslan lifir í."""
+
+
+def assert_write_world_matches_live(pg, log=print):
+    """cc112 F1-VÖRN — ÚTGÁFUHLIÐ Á SKRIFLEIÐINNI.
+
+    model_quality_eval.py:130-134 hefur borið þetta hlið síðan cc47, en aðeins á
+    MÆLINGUNNI: reiknist E2-gap milli tveggja LÍKANA er það ekki extraction-gap, svo
+    mælingin neitar að birta töluna. Skrifleiðin bar ekkert samsvarandi hlið og hélt
+    því áfram að frysta raðir í scraper.listing_valuations úr gamla heiminum.
+
+    MÆLT (cc110 morgunvakt 07.08, S1): adapterinn hleður D:\\iter4a_*.lgb (154
+    eiginleikar, óhreyfðir frá 21.04) og stimplar 'iter4_final_v1' meðan
+    pipeline_config.model_version ber 'iter4r_20260805_reglaR_strukt' (156). 953 raðir
+    skrifaðar eftir 2026-08-06T12:24:26Z, 103 af 478 eignum (21,5%) á eignum sem regla R
+    endurflokkaði. Frystu tölurnar eru því ekki það sem framleiðslan myndi segja í dag.
+
+    Sama regla og mælingin ber: VÉL SEM SKORAR MÁ EKKI SKRIFA ÞEGAR HÚN SKORAR ÚR ÖÐRUM
+    HEIMI EN FRAMLEIÐSLAN. Hliðið fellur með villu (ekki þöglu `return 0`) svo
+    run_extraction fari út með exit != 0 og nightly_delta_chain.sh riti CHAIN FAIL —
+    þögul sleppa væri nákvæmlega sama bilunin og hún á að stöðva, bara hljóðlát.
+
+    Hliðið er ekki tengingin sjálf: það stöðvar bara blæðinguna. Endurtenging við
+    iter4r-artefaktana + endurreikningur röðanna 953 eru sér verk (PLANNING_BACKLOG).
+    """
+    live = read_model_version(pg)
+    # pipeline_config-lesturinn opnaði lestrar-txn á rw-tengingunni (autocommit=False).
+    # Hún VERÐUR að lokast hér, annars er `SET TRANSACTION READ WRITE` neðar ekki lengur
+    # fyrsta stæðan í sinni txn og skrifin falla á pooler-num.
+    pg.rollback()
+    if live != MODEL_VERSION:
+        raise ModelWorldMismatch(
+            "\n" + "!" * 78 + "\n"
+            "SKRIF STÖÐVUÐ — ÚTGÁFUHLIÐ FÉLL (cc112 F1-VÖRN)\n"
+            f"  adapter (phase_d3_score_extract / D:\\iter4a_*.lgb) skorar og stimplar: "
+            f"'{MODEL_VERSION}'\n"
+            f"  lifandi pipeline_config.{MODEL_VERSION_KEY}:                          "
+            f"'{live}'\n"
+            "Vélin skorar úr ÖÐRUM HEIMI en framleiðslan. Frystar raðir í\n"
+            "scraper.listing_valuations væru ekki það sem lifandi líkanið segir, svo\n"
+            "EKKERT er skrifað. Þetta er sama hlið og mælingin ber\n"
+            "(model_quality_eval.py:130-134), nú líka á skrifleiðinni.\n"
+            "Útdrátturinn sjálfur er ÓSKERTUR — hann var vistaður og committaður áður\n"
+            "en hér var komið.\n"
+            "VIÐGERÐ: endurtengja nætur-vélina við iter4r-artefaktana + serving-lagið\n"
+            "(sér verk með eigin sannprófunarkröfu, sjá PLANNING_BACKLOG cc112).\n"
+            "Þetta hlið má EKKI fjarlægja til að þagga keðjuna.\n"
+            + "!" * 78)
+    log(f"  útgáfuhlið: adapter '{MODEL_VERSION}' == lifandi '{live}' — skrif heimiluð")
+    return live
+
+
 def value_listings(pg, models, rows, log=print):
     """Score + freeze valuations for the given extracted listings. Returns n_written."""
+    # cc112: hliðið er FYRSTA stæðan, á undan tómleikaprófinu. Nótt þar sem `rows` er tómt
+    # skrifar ekkert hvort sem er — en að þegja þá væri að láta viðvörunina ráðast af
+    # biðröðinni frekar en af heiminum. Mismunurinn á að heyrast í hvert sinn.
+    assert_write_world_matches_live(pg, log=log)
     if not rows:
         log("  no listings to value")
         return 0
