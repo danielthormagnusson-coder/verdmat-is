@@ -28,7 +28,7 @@ import psycopg2
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, r"D:\\")
 
-from model_quality_eval import load_models_freeze_anchored, anthropic_key  # noqa: E402
+from model_quality_eval import anthropic_key  # noqa: E402
 import extraction_engine as E  # noqa: E402
 
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
@@ -78,6 +78,14 @@ def main():
     ap.add_argument("--daily-cap-usd", type=float, default=10.0)
     ap.add_argument("--trigger", default="nightly", choices=["nightly", "ondemand"])
     ap.add_argument("--confirm", action="store_true")
+    # cc113: þak á VERÐMATS-hrinuna (ekki Haiku-hrinuna — hún hefur --max-n/--daily-cap).
+    # Sjálfgefið ótakmarkað = óbreytt hegðun. Ástæðan fyrir að rofinn er til: biðröðin
+    # er skilgreind sem "auglýsingar án verðmats FYRIR ÞETTA model_version", svo fyrsta
+    # keyrsla eftir líkanaskipti sér ALLT safnið sem óverðmetið (mælt 07.08: 3 raðir
+    # undir gamla stimplinum -> 21.354 undir þeim nýja). Það er ekki bilun heldur
+    # skilgreiningin, en það er hrina sem á að vera valin, ekki að koma á óvart.
+    ap.add_argument("--value-limit", type=int, default=None,
+                    help="hámarksfjöldi auglýsinga sem verðmetnar eru í þessari keyrslu")
     # cc75 — BRÚIN Í EIGINDALAGIÐ ER OPT-IN, EKKI SJÁLFGEFIN.
     #
     # Hún er OPT-IN af ástæðu og hún er ekki sú venjulega („nýtt sé slökkt
@@ -98,8 +106,11 @@ def main():
 
     ro, rw = _connect()
     # Líkönin þarf aðeins verðmatsfrystingin; brúin er hrein SQL-aðgerð.
+    # cc113: load_serving_models hleður artifactið sem pipeline_config vísar á OG
+    # bindur E.MODEL_VERSION við stimpil þess af diski. Það verður að gerast HÉR,
+    # á undan fetch_extracted_listings_to_value, sem síar biðröðina á þeim stimpli.
     models = None if (args.bridge_only and not (args.forward or args.value_seeded)) \
-        else load_models_freeze_anchored(ro)
+        else E.load_serving_models(ro)
 
     # cc75: kostnaðarþak og dry-run STÖÐVA Haiku-hlutann — en máttu ekki
     # lengur stöðva keyrsluna alla, því brúin (ókeypis SQL) á að fá að
@@ -133,8 +144,9 @@ def main():
                 print(f"extract: {res} | day_total=${_load_today_spend():.4f}")
 
     if not haiku_stodvud and (args.value_seeded or args.forward):
-        rows = E.fetch_extracted_listings_to_value(ro)
-        print(f"value: {len(rows)} extracted listings without a valuation")
+        rows = E.fetch_extracted_listings_to_value(ro, limit=args.value_limit)
+        print(f"value: {len(rows)} extracted listings without a valuation"
+              + (f" (--value-limit {args.value_limit})" if args.value_limit else ""))
         if args.confirm or args.value_seeded:
             E.value_listings(rw, models, rows)
         else:

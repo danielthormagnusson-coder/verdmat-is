@@ -37,11 +37,30 @@ sys.path.insert(0, r"D:\\")                                  # build_training_da
 # still loads D:\iter4a_*.lgb (154 features, untouched since 21.04) while pipeline_config has
 # moved on to iter4r_20260805_reglaR_strukt (156). read_model_version is imported here so the
 # write path asks the SAME question, off the SAME key, as the measurement does.
+#
+# cc113 ENDURTENGING: MODEL_VERSION er ekki lengur FASTI heldur BINDING. Sjálfgefið
+# gildi er sögulegi stimpillinn (fail-safe: sé artifactið aldrei hlaðið fellur hliðið),
+# en load_serving_models() endurbindur hann við stimpil þess artifacts sem raunverulega
+# var hlaðið af diski. Hliðið sjálft (assert_write_world_matches_live) er ÓSNERT —
+# breytingin er á því HVAÐ nafnið vísar á, ekki á því hvað hliðið gerir.
 from model_quality_eval import (  # noqa: E402
-    load_models_freeze_anchored, _score_iter4, _coerce_numeric,
+    load_models_live_artifact, _score_iter4, _coerce_numeric,
     read_model_version, MODEL_VERSION_KEY,
     ADAPTER_MODEL_VERSION as MODEL_VERSION)
 from build_training_data_v2 import build_extraction_features  # noqa: E402
+
+
+def load_serving_models(pg, log=print):
+    """cc113 — hlaða artifactið sem pipeline_config vísar á og binda MODEL_VERSION við
+    stimpil þess AF DISKI (manifest), ekki við hardkóðaðan fasta.
+
+    Kallað af run_extraction ÁÐUR en biðröðin er sótt: `fetch_extracted_listings_to_value`
+    síar á MODEL_VERSION, svo binding eftir á myndi sækja biðröð fyrir rangt líkan.
+    """
+    global MODEL_VERSION
+    models = load_models_live_artifact(pg, log=log)
+    MODEL_VERSION = models["model_version"]
+    return models
 
 VALUATION_YEAR = 2026
 SCHEMA_VERSION = "v0.2.2"

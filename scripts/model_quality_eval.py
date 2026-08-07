@@ -131,7 +131,20 @@ PRED_VALUATION_YM = "2026-07"
 # public.predictions, so rescoring through it would compare two models and call the
 # difference "extraction gap". The paired block therefore refuses to run unless the
 # adapter's stamp matches the live model_version — loudly, and booked, never silently.
+#
+# cc113: ÞETTA ER SJÁLFGEFNA GILDIÐ, EKKI LENGUR EINA GILDIÐ. load_models_live_artifact()
+# hleður artifactið sem pipeline_config vísar á og skilar stimplinum LESNUM ÚR MANIFESTINU
+# á diski (models["model_version"]) — ekki úr pipeline_config. Það er forsenda þess að
+# cc112-hliðið hafi enn tennur eftir tenginguna: læsi báðar hliðar sömu töfluna væri
+# samanburðurinn sjálfgefið sannur. Hér er borið saman ÞAÐ SEM VAR HLAÐIÐ AF DISKI
+# gegn ÞVÍ SEM FRAMLEIÐSLAN SEGIST KEYRA.
 ADAPTER_MODEL_VERSION = "iter4_final_v1"
+
+# hms-flokkunarlindin sem alheims-skorunin fékk innspýtta við flippið (n_ibudareininga +
+# flm_hlutfall — eiginleikarnir tveir sem lyfta 154 -> 156). sha er bókað í manifest
+# flippsins (flip_status) og er hliðað hér eins og í rebuild-vélinni.
+HMS_CLASSIFICATION_PKL = Path(r"D:\hms_classification_v1.pkl")
+HMS_SHA16_EXPECTED = "16d78e39d57cfcad"
 
 # Resumable raw-extraction cache (outside repo). Keyed by fastnum + listing-hash so a
 # killed/repeated run resumes without re-paying Haiku, and a changed listing re-extracts.
@@ -597,6 +610,80 @@ def load_models_freeze_anchored(conn) -> dict:
     print(f"  cpi_factor override: live(pkl)={live:.6f} -> "
           f"freeze[{FREEZE_ANCHOR_YM}/{PRED_VALUATION_YM}]={models['cpi_factor']:.6f} "
           f"(ÁKVÖRÐUN 1: pin to frozen predictions)")
+    return models
+
+
+def load_models_live_artifact(conn, log=print) -> dict:
+    """cc113 ENDURTENGING — hlaða ARTIFACTIÐ SEM FRAMLEIÐSLAN KEYRIR.
+
+    load_models_freeze_anchored() hér að ofan hleður sögulegu iter4a-boosterana á D:\\
+    (154 eiginleikar, stimpill 'iter4_final_v1'). Eftir flippið 06.08 er það annar heimur
+    en public.predictions lifir í, og cc112-hliðið stöðvar öll skrif þaðan — réttilega.
+
+    Þetta fall lokar bilinu, og gerir það á þann eina hátt sem heldur hliðinu beittu:
+
+      * VAL á artifacti kemur úr pipeline_config.model_version (fylgir næsta flippi
+        sjálfkrafa, ekkert hardkóðað — sama rótarfix og cc47),
+      * STIMPILLINN kemur úr <version>_manifest.json Á DISKI. Læsi hann líka
+        pipeline_config væri hliðið sjálfgefið satt og bæri engar tennur lengur.
+        Nú ber það saman það-sem-var-hlaðið gegn því-sem-framleiðslan-segist-keyra,
+        og bítur á misræmi milli möppunafns og manifests, á artifact sem vantar, og á
+        hverri pinnun sem fer fram hjá pipeline_config.
+
+    Fjórar hliðanir, allar mældar áður en nokkur röð er skoruð:
+      (1) manifest til og les-hæft (read_manifest),
+      (2) feature-fjöldi boosteranna == manifest.n_features,
+      (3) hms-lindin sha-hliðuð (16d78e39d57cfcad) — sama hlið og rebuild-vélin ber,
+      (4) FREEZE_ANCHOR_YM == pipeline_config.model_pred_anchor_ym. Fastinn er
+          verðskali frystu spánna; flipp sem færir akkerið án þess að færa fastann
+          myndi annars skala hverja einustu adapter-spá hljóðlaust — nákvæmlega
+          gerð cc112-bilunarinnar, bara á öðrum ási.
+    """
+    live = read_model_version(conn)
+    ad = ARTIFACT_ROOT / live
+    if not ad.is_dir():
+        raise MeasurementFailure(
+            f"artifact-mappa fannst ekki: {ad} — pipeline_config.{MODEL_VERSION_KEY} ber "
+            f"'{live}' en ekkert artifact er á diski undir því nafni. Adapterinn má ekki "
+            f"giska á líkan.")
+    manifest = read_manifest(live)
+
+    anchor_ym, _ = read_model_anchor_cpi(conn)
+    if anchor_ym != FREEZE_ANCHOR_YM:
+        raise MeasurementFailure(
+            f"akkerismisræmi: FREEZE_ANCHOR_YM='{FREEZE_ANCHOR_YM}' en "
+            f"pipeline_config.{ANCHOR_KEY}='{anchor_ym}'. Adapterinn skalar úr log-rúmi "
+            f"um cpi[akkeri]/cpi[{PRED_VALUATION_YM}]; rangt akkeri skalar HVERJA spá "
+            f"hljóðlaust. Uppfærðu fastann með flippinu.")
+
+    serving = ad / f"{live}_conformal_serving_v1.json"
+    from phase_d3_score_extract import load_models as load_iter4
+    models = load_iter4(
+        artifact_dir=str(ad),
+        serving_json=str(serving) if serving.exists() else None,
+        hms_pkl=str(HMS_CLASSIFICATION_PKL),
+        hms_sha16=HMS_SHA16_EXPECTED,
+    )
+    if not serving.exists():
+        log(f"  serving-lag: EKKERT ({serving.name} ekki á diski) — bil falla á 3.1/segcal")
+
+    # Stimpillinn af DISKI, ekki úr pipeline_config (sjá docstring).
+    models["model_version"] = manifest["version"]
+
+    n_feat = len(models["feature_names"])
+    if n_feat != manifest.get("n_features"):
+        raise MeasurementFailure(
+            f"feature-fjöldi {n_feat} != manifest.n_features {manifest.get('n_features')} "
+            f"fyrir '{live}' — boosterarnir og manifestið lýsa ekki sama líkani.")
+
+    live_pkl = float(models["cpi_factor"])
+    models["cpi_factor"] = freeze_cpi_factor(fetch_cpi_lookup(conn))
+    log(f"  cpi_factor override: live(pkl)={live_pkl:.6f} -> "
+        f"freeze[{FREEZE_ANCHOR_YM}/{PRED_VALUATION_YM}]={models['cpi_factor']:.6f} "
+        f"(ÁKVÖRÐUN 1: pin to frozen predictions)")
+    log(f"  adapter tengdur: model_version='{models['model_version']}' (manifest) · "
+        f"{n_feat} eiginleikar · calver='{models['calibration_version']}' · "
+        f"verðmats-mánuður {models['valuation_year']}-{models['valuation_month']:02d}")
     return models
 
 
