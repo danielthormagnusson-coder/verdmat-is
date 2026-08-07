@@ -151,7 +151,56 @@ flokk — taflan hefur aðeins `expected_base` / `expected_extraction` (bæði `
 `public.predictions` (sýnd hér að ofan um join). Að láta frystu verðmötin bera þau er
 migration og því SÉR ÁKVÖRÐUN, ekki hluti af endurtengingu.
 
-## 5. ÓTEKIN ÁKVÖRÐUN SEM ERFÐIST AF TENGINGUNNI
+## 4b. ÞAK Á NÓTTINA — GO 07.08 (viðbót eftir HALT)
+
+Ákvörðun eigandans: keðjan keyrir í nótt **með `--value-limit 2000`**, ekki ~21.344 í einni
+ómannaðri hrinu. Rök: tengingin hefur keyrt 10 raðir í raun; fyrsta stóra hrinan á að vera
+VALIN en ekki afleiðing af fullri biðröð; enginn notendaflötur les töfluna svo ekkert liggur á.
+
+**Hvar þakið var sett — þar sem keðjan les það, ekki handvirkt:**
+`scripts/nightly_delta_chain.sh`, fasti `EXTRACT_VALUE_LIMIT=2000` við hlið
+`DELTA_MAX_PAGES` / `NIGHT_BUDGET`, ásamt `EXTRACT_FORWARD=200`.
+
+**TVÖ AÐSKILIN ÞÖK, ekki eitt.** `EXTRACT_FORWARD` þakar HAIKU-hrinuna (kostnað);
+`EXTRACT_VALUE_LIMIT` þakar VERÐMATS-hrinuna (skrif). Þau eru ótengd: verðmats-biðröðin er
+allt safnið sem á ekki verðmat undir lifandi `model_version` — ekki bara það sem var
+útdregið í nótt — svo Haiku-þakið ver hana ekki. Það var einmitt gildran.
+
+**Rökin eru byggð EINU SINNI og notuð af BÁÐUM greinum** (`local xargs=(...)`). Áður var
+þurrkeyrslu-línan handskrifaður strengur við hliðina á raunkallinu og gat sagt eitt meðan
+nóttin gerði annað. Þurrkeyrsla sem sannar ekki raunkallið sannar ekki neitt.
+
+**Þurrkeyrsla (`bash scripts/nightly_delta_chain.sh --dry-run`, exit 0):**
+```
+[dry-run] would run: run_extraction --forward 200 --confirm --value-limit 2000
+                     (max-n 500, daily-cap $10)
+```
+
+**Að talan BÍTI er sér mæling** — að flaggið sé sent sannar ekki að það klippi. Mælt um
+sama fall og keðjan kallar (`fetch_extracted_listings_to_value`), read-only:
+
+| | raðir |
+|---|---|
+| biðröð ÁN þaks | **21.372** |
+| biðröð MEÐ þaki | **2.000** |
+| klippt af nóttinni | **19.372** |
+
+⇒ þakið bítur. Eftir nóttina standa ~19.372 eftir, ~10 nætur í viðbót á sama þaki.
+Þegar biðröðin er tæmd verður þakið hlutlaust (biðröð < þak) og má hækka eða fjarlægja.
+`bash -n` hreint.
+
+**Dómur morgunvaktar 08.08:** n raðir skrifaðar (≤2.000), **allar** á
+`iter4r_20260805_reglaR_strukt`, **0** á gamla stimplinum, og hliðið hleypti í gegn með
+læsilegri log-línu í `scraper_data/logs/extraction_<TS>.log`
+(`útgáfuhlið: adapter … == lifandi … — skrif heimiluð`; stderr er utf-8 frá cc112, svo
+línan lendir ekki sem cp1252-hakk). Keðjulínan ber `valued N listings` gegnum
+`summary`-grepið sem fyrir var.
+
+**Liður (ii) er ÓSNERTUR af þessu og getur ekki lent í hrinunni:** 953-mengið ber gamla
+stimpilinn `iter4_final_v1` og biðröðin síar á lifandi `model_version`, svo þær raðir
+komast aldrei í þetta fetch.
+
+## 5. ÓTEKIN ÁKVÖRÐUN SEM ERFÐIST AF TENGINGUNNI (staðan fyrir GO-ið að ofan)
 
 Biðröðin er skilgreind sem „auglýsingar án verðmats **fyrir þetta `model_version`**".
 Mælt 07.08: **3** undir gamla stimplinum → **21.354** undir þeim nýja. Nætur-keðjan keyrir
@@ -162,6 +211,8 @@ liður (ii) (gömlu raðirnar standa óhreyfðar) — en það er hrina sem á a
 `--value-limit` var bætt við sem rofa (sjálfgefið ótakmarkað = óbreytt hegðun).
 Neytandi töflunnar er `scraper.v_expected_vs_real` + ferskleikalínan á `/ops`; **engin
 notendasíða les hana**, svo bakfyllingin er greiningarlag, ekki framleiðsluflötur.
+
+**LEYST í §4b:** þakið sett á 2.000 í keðjunni sjálfri, þurrkeyrt og mælt að það bíti.
 
 ## 6. BREYTTAR SKRÁR
 
