@@ -253,3 +253,54 @@ flagg á litlu n — tripwire, ekki HALT). Hólfin: (a) n=113 +1,04 · (b) n=535
 engin verðbreyting, óselt, lifandi mat 138,03 M. Paired/E2 sjálfhafnar hávært
 (adapter iter4_final_v1 ≠ lifandi — engin Haiku-keyrsla). Scheduler
 `verdmat-weekly-model-quality` bendir þegar á vélina — ENGIN breyting.
+
+
+## Þrep 8 — FÖLLNU 31 frá nóttinni 04→05.08 — **31/31 útdregin, 30/31 verðmetin 07.08 (cc101)**
+
+**Listinn af diski (ekki úr minni):** `D:erdmat-is\scraper_data\logs\extraction_20260805.log`
+— 31 `skip <lysing_hash>: BadRequestError … credit balance is too low`, 31/31 staðfest sem
+sama villa (engin önnur fallástæða í mengið). Listinn geymdur í scratchpad
+`fallnir31.txt`; DB-staða fyrir: **0/31** (hash-lengd 12 stemmir við töfluna).
+
+**Framkvæmd:** einnota skrifta `cc101_fallnir31.py` (scratchpad) · logg
+`D:\cc101_fallnir31.log`. **ENGIN pipeline-breyting:** skriftan kallar NÁKVÆMLEGA sömu
+vélarföll og nóttin (`extraction_engine.extract_and_store` / `value_listings`); eini
+munurinn er FETCH-SÍAN — markviss á lysing_hash-listann (`--ids`-leiðin) í stað
+ferskleika-pickersins. `--ids` er EKKI til í `run_extraction.py`; leiðin var því
+einnota-driver, ekki flagg-viðbót. Efnisvistföng + `ON CONFLICT DO NOTHING` gera
+endurkeyrslu skaðlausa (rauðsannað: seinni keyrsla sótti 0 raðir, kallaði ekki Haiku).
+Lykill AÐEINS úr `D:\env.local` (dotenv_values).
+
+| mæling | fyrir | eftir |
+|---|---:|---:|
+| extraction á listanum | 0/31 | **31/31** |
+| `scraper.listing_extractions` (safn) | 5.491 | **5.522** (+31) |
+| verðmat: auðkenni af listanum | 0/31 | **30/31** |
+| `scraper.listing_valuations` (safn) | 20.642 | **20.851** (+209) |
+
+**Sundurliðun sem skiptir máli:**
+- **Útdráttur 31/31, `failed: 0`.** 33 Haiku-köll (31 + 2 endurköll á
+  components_string; 1 bjargaðist). Öll `claude-haiku-4-5 / v0.2.2`.
+- **1 af 31 ber `rejected:key_outside_enum`** (`c5434c7d1179`) — cc94-hliðið dæmdi
+  svarið eftir seinna kallið. Röðin ER í töflunni (þess vegna 31/31) en er RÉTTILEGA
+  utan verðmats: cc94-reglan „hafnaður útdráttur má ALDREI verða að eiginleikavigri“
+  síar hana í verðmats-fetchinu. Verðmatið er því **30/31 að hönnun**, ekki fall.
+- **209 verðmatsraðir af 30 auðkennum** — einingamunur, ekki ósamræmi:
+  `listing_valuations` er á `source_listing_id` en listinn á `lysing_hash`; sami
+  auglýsingatexti liggur undir mörgum auglýsinga-auðkennum (30 einstök fastnúmer).
+
+**Kostnaður:** 33 köll × $0,0071 = **$0,2343** (dagbókhald `extraction_cost_state.json`
+$0,0000 → $0,2343). Áætlun GO var ~$0,13; frávikið er kallafjöldinn (33 en ekki ~18)
+á bókuðu einingarverði — bókað, ekki jafnað út.
+
+**Atvik í keyrslunni (leyst, engin gagnaáhrif):** fyrsta atrenna féll í verðmatsþrepinu
+á `ActiveSqlTransaction: transaction read-write mode must be set before any query` —
+fetch-ið hafði opnað txn á SKRIF-tengingunni áður en `value_listings` setti
+`SET TRANSACTION READ WRITE` fyrst. Lagað eins og næturdriverinn gerir (fetch á
+read-only tengingu, skrif á rw); útdrátturinn var þá þegar frágenginn og endurkeyrslan
+kostaði ekkert. Útdráttarhlutinn skrifaðist óskaddaður í fyrri atrennu.
+
+**Óbreytt skv. GO:** nætur-pickerinn endurvelur ekki föllnu raðir — biðraðar-gatið
+stendur og engin pipeline-breyting var gerð. **ATH til bókunar:** liðurinn finnst
+hvergi í skriflegum backlog (`docs/PLANNING_BACKLOG.md`, `verdmat-ai/docs/BACKLOG.md`) —
+hann lifir aðeins í cc103-minninu. Að skrá hann er bókunar-ákvörðun eiganda.
