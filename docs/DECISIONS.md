@@ -5454,3 +5454,27 @@ Lagfæringin er **þriggja stiga merki**, ekki exit-kóði: `CHAIN CLEAN` (0 fö
 **Heimild**: `AGUST_ENDURTHJALFUN_FLIPP_CC104_20260806.md` þrep 7; `…SKREF31_32_CC98_20260805T2350Z.md` §4 (3.2-specið, bindandi §4.3) og `…SKREF33_CC98_20260806T0010Z.md` §7 (grunnurinn); `docs/GO_BREF_FLIPP_REGLA_R_CC98_20260806.md` §5; `app` commit `3f31365`.
 
 *— Lok bókunarlotu cc108 §5C (DECISIONS-hluti).*
+
+---
+
+## 2026-08-07 — §5C-22 · VIÐAUKI (leiðrétting í sömu lotu): ÞREP 8 LENTI MEÐAN cc108 SKRIFAÐI — föllnu 31 eru útdregnar
+
+**Hvað**: Samhliða lota pushaði `f5b45e6` **2026-08-07T00:43:05Z** — eftir að cc108 hafði lesið heimildirnar en áður en cc108 committaði. Það gerir tvennt í þessari bókunarlotu úrelt og hér er það leiðrétt: **föllnu 31 eru ekki lengur óunnar.** Mælt fyrir/eftir: extraction á listanum **0/31 → 31/31**, `scraper.listing_extractions` **5.491 → 5.522** (+31), verðmat af listanum **0/31 → 30/31**, `scraper.listing_valuations` **20.642 → 20.851** (+209). `failed: 0`, 33 Haiku-köll (31 + **2 endurköll** á `components_string`, 1 bjargaðist).
+
+**Þrennt í útkomunni er hönnun en ekki fall og verður að lesast þannig:** (1) **30/31 en ekki 31/31 í verðmati** — ein röð (`c5434c7d1179`) ber `rejected:key_outside_enum`, er í töflunni (þess vegna 31/31 í útdrætti) en er **réttilega utan verðmats** því cc94-reglan síar hafnaðan útdrátt úr verðmats-fetchinu (§5C-2). (2) **209 verðmatsraðir af 30 auðkennum** er **einingamunur, ekki ósamræmi**: `listing_valuations` er á `source_listing_id` en listinn á `lysing_hash`, og sami auglýsingatexti liggur undir mörgum auglýsinga-auðkennum (30 einstök fastnúmer). (3) **Kostnaður $0,2343 gegn ~$0,13 áætlun** — frávikið er kallafjöldinn (33, ekki ~18) á bókuðu einingarverði; **bókað, ekki jafnað út**.
+
+**Aðferðin er bókunarverð**: listinn var tekinn **af diski** (`extraction_20260805.log`, 31 `skip … credit balance is too low`, 31/31 staðfest sem sama villa), ekki úr minni; skriftan kallaði **nákvæmlega sömu vélarföll og nóttin** og eini munurinn var FETCH-SÍAN (markviss á `lysing_hash`-listann). **Engin pipeline-breyting** — `--ids` er ekki til í `run_extraction.py` og var ekki bætt við; leiðin var einnota driver. Endurkeyrsla rauðsönnuð skaðlaus (seinni keyrsla sótti 0 raðir og kallaði ekki Haiku).
+
+**NÝR FUNDUR SEM GILDIR UM ALLA SKRIF-DRIVERA**: fyrsta atrenna féll í verðmatsþrepinu á `ActiveSqlTransaction: transaction read-write mode must be set before any query`. Rótin: **fetch-ið hafði opnað transaction á SKRIF-tengingunni áður en `value_listings` náði að setja `SET TRANSACTION READ WRITE`**. Á transaction-poolernum (port 6543) verður sú stæða að vera **fyrsta stæðan í transactioninu**, og hver SELECT á undan henni fellir hana. Lagfæringin er sama mynstur og nætur-driverinn notar: **fetch á read-only tengingu, skrif á rw-tengingu**. Útdrátturinn var þegar frágenginn þegar þetta gerðist, svo endurkeyrslan kostaði ekkert.
+
+**Af hverju**: Tvennt.
+
+**(1) Þetta er `feedback_samhlida_lota_pushar_undir_ther` í öfuga átt og bókast sem slíkt.** Bókunarlota les heimildir á einum tímapunkti og skrifar á öðrum; **milli þeirra getur önnur lota breytt heiminum sem verið er að bóka.** Vörnin er ekki að hraða sér heldur að **endurmæla `git log` og `origin/main` beint fyrir commit** — sem cc108 gerði, og þess vegna fannst þetta. Reglan sem lifir: **bókunarlota skal endurlesa git-stöðu allra snertra repoa rétt fyrir commit og bæta viðauka við það sem breyttist á meðan; hún má aldrei laga það með því að endurskrifa færslu sem þegar er skrifuð.**
+
+**(2) Fjarvera í skriflegum backlog er sjálf niðurstaða.** Þrep-8-liðurinn fannst **hvergi** í `docs/PLANNING_BACKLOG.md` né `verdmat-ai/docs/BACKLOG.md` þegar hann var framkvæmdur — hann lifði **aðeins í cc103-minninu**. Verk sem lifir aðeins í lotuminni er verk sem hverfur þegar lotan gleymist; sami vandi og §5A-17 leysti fyrir úttektarskjöl.
+
+**Það sem stendur EFTIR og cc108 bókaði rétt**: **biðraðar-gatið sjálft.** Nætur-pickerinn endurvelur ekki föllnu raðir, engin pipeline-breyting var gerð, og næsta inneignar- eða netbilun framleiðir sama gat aftur. Sá liður er óleystur og fer á backlog í uppfærðri mynd (viðauki cc108-A).
+
+**Heimild**: `app` commit `f5b45e6` (1 skrá, +51/−0) og skilaboð hans; `docs/fable_prep/audits/AGUST_ENDURTHJALFUN_FLIPP_CC104_20260806.md` þrep 8 (taflan, sundurliðunin, atvikið); logg `D:\cc101_fallnir31.log`; `feedback_set_transaction_read_write_verdur_ad_vera_fyrsta`, `feedback_samhlida_lota_pushar_undir_ther`.
+
+*— Lok viðauka cc108 §5C (DECISIONS-hluti).*
