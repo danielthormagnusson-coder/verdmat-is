@@ -57,7 +57,21 @@ EXTRACT_FORWARD=200          # Haiku-hrinan: ný lysingar sem eru útdregnar í 
 # Þakið stendur þar til biðröðin er tæmd; þá er það hlutlaust (biðröð < þak) og má
 # hækka eða fjarlægja að athuguðu máli. Liður (ii) — endurreikningur 953 raðanna —
 # er ÓSNERTUR af þessu: það mengi ber gamla stimpilinn og kemst aldrei í þessa biðröð.
-EXTRACT_VALUE_LIMIT=2000
+#
+# cc121 — PÁSA (ákvörðun eiganda 08.08). ÞETTA ER EKKI BILUN.
+# 0 = PÁSA (verðmats-þrepinu sleppt alveg); >0 = þak á fjölda raða per nótt.
+# Biðröðin var 18.734 raðir við pásu (mælt 08.08, sama tala og cc119).
+# Rökin: biðröðin er BAKFYLLING á eldri auglýsingum sem enginn notendaflötur les
+# (aðeins scraper.v_expected_vs_real + ferskleikalínan á /ops), og hún á að klárast í
+# EINNI mannaðri keyrslu — ellefu skammtar gefa ellefu ósambærilegar frávikadreifingar,
+# ein keyrsla gefur EINA hreina á sama akkeri. Kostnaður er $0,00 hvort sem er
+# (útdrættirnir eru til, engin Haiku-köll í verðmats-þrepinu).
+# FORSENDA fyrir þeirri keyrslu: cc120 (miðsæknin — expected_base ber real_pred_median
+# meðan /eign og /leit birta real_pred_mean) verður að vera AFGREIDD FYRST, annars
+# frystum við 18.734 raðir á skilgreiningu sem gæti þurft að endurreikna.
+# ENDURRÆSING = ÞESSI EINA TALA (0 -> 2000) og engin önnur breyting.
+# Útdrátturinn (EXTRACT_FORWARD, Haiku) er ÓSNERTUR — hann er ferskleiki, ekki bakfylling.
+EXTRACT_VALUE_LIMIT=0
 
 DRY=0
 [ "$1" = "--dry-run" ] && DRY=1
@@ -245,7 +259,17 @@ run_extract() {
   # cc113: rökin eru byggð EINU SINNI og notuð af BÁÐUM greinum. Áður var þurrkeyrslu-
   # línan handskrifaður strengur við hliðina á raunkallinu — hún gat því sagt eitt meðan
   # nóttin gerði annað, og þurrkeyrsla sem sannar ekki raunkallið sannar ekki neitt.
-  local xargs=(--forward "$EXTRACT_FORWARD" --confirm --value-limit "$EXTRACT_VALUE_LIMIT")
+  local xargs=(--forward "$EXTRACT_FORWARD" --confirm)
+  # cc121 — PÁSAN ER ÞÝDD HÉR, EKKI SEND NIÐUR SEM 0. MÆLT 08.08: `--value-limit 0` er
+  # ÓTAKMARKAÐ, ekki ekkert — fetch_extracted_listings_to_value sleppir LIMIT-liðnum á
+  # falsy limit (`if limit`, extraction_engine.py:188), svo limit=0 skilaði sömu 18.734
+  # röðum og limit=None. Að senda 0 niður hefði því skrifað ALLA biðröðina í nótt —
+  # þveröfugt við pásuna. Skelin ber `-gt 0`, þar sem 0 er ótvírætt, og velur sér-rofann.
+  if [ "$EXTRACT_VALUE_LIMIT" -gt 0 ]; then
+    xargs+=(--value-limit "$EXTRACT_VALUE_LIMIT")
+  else
+    xargs+=(--skip-valuation)
+  fi
   if [ $DRY -eq 1 ]; then
     say "[dry-run] would run: run_extraction ${xargs[*]} (max-n 500, daily-cap \$10)"
     return 0

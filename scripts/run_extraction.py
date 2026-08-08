@@ -86,6 +86,23 @@ def main():
     # skilgreiningin, en það er hrina sem á að vera valin, ekki að koma á óvart.
     ap.add_argument("--value-limit", type=int, default=None,
                     help="hámarksfjöldi auglýsinga sem verðmetnar eru í þessari keyrslu")
+    # cc121 GILDRA — MÆLD 08.08: `--value-limit 0` er ÓTAKMARKAÐ, ekki ekkert.
+    # fetch_extracted_listings_to_value byggir LIMIT-liðinn með
+    # `{('LIMIT %d' % int(limit)) if limit else ''}` (extraction_engine.py:188), og 0 er
+    # falsy — svo liðurinn fellur út og fyrirspurnin skilar ALLRI biðröðinni. Mælt beint
+    # á lifandi DB: limit=None -> 18.734 raðir, limit=0 -> 18.734 raðir, limit=5 -> 5.
+    # Þess vegna er PÁSAN EKKI 0 heldur eigin rofi hér að neðan: nightly_delta_chain.sh
+    # sendir ALDREI 0 í --value-limit, heldur þýðir sitt EXTRACT_VALUE_LIMIT=0 í
+    # --skip-valuation í skelinni (`-gt 0`, þar sem 0 er ótvírætt). Ekki „einfalda" það
+    # aftur í að hleypa 0 hér inn — það myndi skrifa 18.734 raðir í stað engra.
+    #
+    # PÁSU-ROFI (ákvörðun eiganda 08.08, cc121). Verðmats-hrinan er BAKFYLLING á eldri
+    # auglýsingum sem enginn notendaflötur les; hún á að klárast í EINNI mannaðri keyrslu,
+    # ekki í ~300-raða skömmtum yfir 11 nætur. Rofinn slítur EINGÖNGU verðmats-skrifin:
+    # útdrátturinn (--forward, Haiku) er ferskleiki og heldur áfram óbreyttur.
+    ap.add_argument("--skip-valuation", action="store_true",
+                    help="sleppa verðmats-þrepinu alveg (engin skrif í listing_valuations); "
+                         "útdrátturinn er ósnertur")
     # cc75 — BRÚIN Í EIGINDALAGIÐ ER OPT-IN, EKKI SJÁLFGEFIN.
     #
     # Hún er OPT-IN af ástæðu og hún er ekki sú venjulega („nýtt sé slökkt
@@ -143,7 +160,12 @@ def main():
                 _record_spend(res["cost_est_usd"])
                 print(f"extract: {res} | day_total=${_load_today_spend():.4f}")
 
-    if not haiku_stodvud and (args.value_seeded or args.forward):
+    # cc121: pásan er FYRSTA skilyrðið og hún er HÁVÆR. Þögul sleppa væri óaðgreinanleg
+    # frá tómri biðröð í næturlogginu — og pása sem enginn sér er pása sem enginn afturkallar.
+    if args.skip_valuation:
+        print("VALUATION SKIPPED: --skip-valuation (pása að ákvörðun eiganda 08.08, cc121). "
+              "Engin skrif í scraper.listing_valuations. Útdráttur ósnertur.")
+    elif not haiku_stodvud and (args.value_seeded or args.forward):
         rows = E.fetch_extracted_listings_to_value(ro, limit=args.value_limit)
         print(f"value: {len(rows)} extracted listings without a valuation"
               + (f" (--value-limit {args.value_limit})" if args.value_limit else ""))
