@@ -5494,3 +5494,78 @@ Lagfæringin er **þriggja stiga merki**, ekki exit-kóði: `CHAIN CLEAN` (0 fö
 **Sannreynt í reynd samdægurs:** báðar leiðir á `spatial_ref_sys` reyndust ófærar — `ENABLE ROW LEVEL SECURITY` féll á raunreyndu `42501: must be owner of table spatial_ref_sys`, og REVOKE-varaleiðin var **ekki keyrð** af ásettu ráði (kvittað af eiganda 07.08) því hún hefði framleitt falska „tókst"-línu. Flaggið stendur known-accepted; support-beiðni fer á backlog (viðauki cc105 í PLANNING_BACKLOG).
 
 **Heimild**: `docs/HALT_SKIL_RLS_GAT_CC105_FASI2A_20260807.md` §2–§3 (mældar ACL-strengir, `42501`-villan, `pg_has_role`/GRANT OPTION mælingarnar); `docs/HALT_SKIL_RLS_GAT_CC105_FASI1_20260806.md` §1 + tveir viðaukar 07.08 (upprunalega ranga lesningin stendur óbreytt með leiðréttingu undir); migration `20260807082414_cc105_2a_rls_snapshot_toflur`; CLAUDE.md (cc52/cc72-bókanirnar).
+
+## 2026-08-11 — §5D-1 · cc123 OOS-EINVÍGI HÖFÐANNA TVEGGJA → AFSTAÐA BORÐSINS: KOSTUR (a), ALLT Á `real_pred_mean`
+
+> *Athugasemd um númerun:* §5C-blokkin var lokuð í cc108 (07.08) og nær yfir cc93–cc107. **cc109–cc122 eru óbókaðar í DECISIONS** og standa enn í `PLANNING_BACKLOG` og lotuminni; §5D-1 er því ekki samfelld við §5C-22 og á ekki að lesast sem slík.
+
+**Málið**: cc120 (08.08) mældi **miðsæknina**: `scraper.listing_valuations.expected_base` og `expected_extraction` eru skoruð á `real_pred_median` (`scripts/extraction_engine.py:316–317`) meðan `/eign`, `/leit`, `/markadur` og allur birtingarflöturinn les `real_pred_mean` — **17 af 21 neytanda á `mean`, 4 á `median`, |Δ| > 10 % á 24.969 eignum**. cc120 lagði fram þrjá kosti: **(a)** allt á `mean` · **(b)** allt á `median` · **(c)** báðar tölur birtar. cc120 §5 bókaði sjálft að mælingin sem þá lá fyrir (n=180, einn stimpill, 30 daga gluggi) **skæri EKKI úr**. cc123 (08.08) var forsendumælingin sem borðið bað um: READ-ONLY OOS-einvígi höfðanna tveggja á réttu úrtaki, engin ákvörðun tekin í lotunni.
+
+**ÁKVÖRÐUN BORÐSINS (kvittuð 11.08): KOSTUR (a) — allt á `real_pred_mean`.**
+
+---
+
+### 1. Hvað var mælt (nefnarar á undan tölum)
+
+**Aðaltala: `holdout30` á BIRTINGARSLÓÐ, n = 949**, stimpill `iter4r_20260805_reglaR_strukt`. Þetta er sama mengi og `scripts/model_quality_eval.py` keyrir á (30 % lagskipt frátekt sem er utan BÆÐI þjálfunar og conformal-kvörðunar, aðild lesin af `<mv>_holdout_rows.csv` á `FAERSLUNUMER`). **`listing_valuations`-mengið var VÍSVITANDI ekki notað** — það er auglýsingaþungt og ber mildari dreifingu (cc120 §4: 4,77 % gegn 6,43 %).
+
+**Tækið var sannprófað áður en nokkur tala var lesin:** `model_quality_eval`-vélin var endurgerð lið fyrir lið (sama SELECT, sömu síur `onothaefur=0` og `kaupverd_nominal>0`, sama CPI-afakkerun, sami mælikjarni) og MAPE(`mean`) mældist **8,2284 %** gegn bókaðri `BASELINE["mape"] = 8,23` (`scripts/model_quality_eval.py:186`). **Vélin er endurgerð, ekki eftirlíkt** — og það er forsenda þess að nokkur samanburðartala hér sé marktæk.
+
+| mæling (n = 949) | `real_pred_mean` | `real_pred_median` | marktækt? |
+|---|---|---|---|
+| **\|bias\|** | 1,9341 % | **0,2642 %** | **JÁ** — `ttest_rel` t = −10,74, **p = 1,75·10⁻²⁵**; Δ\|bias\| −1,535 pp, CI [−2,391; −0,055] |
+| MAPE | 8,2284 | **8,0640** | NEI — p = 0,42, CI [−0,56; +0,23] |
+| MdAPE | **5,5256** | 5,5267 | jafntefli (0,001 pp) |
+| innan ±10 % | 73,66 % | **75,03 %** | NEI — McNemar 64/51, p = 0,26 |
+| cov80 / cov95 | 82,824 / 96,101 | **sömu tölur** | bilin eru þau sömu (sjá §3) |
+
+**Formerkjaregla:** `bias = meðaltal((raun − spá)/raun)`, svo **jákvætt = líkanið UNDIR söluverði**. Þetta er ÖFUGT formerki við cc120 §3.2 og verður að lesast þannig.
+
+**Hólfun (skylda skv. beiðninni, 18 hólf: `canonical_code` · flokkur A–D · bilbreidd · verðbil): EKKERT hólf er marktækt.** Hæsta |t| er 1,81. `median` ber lægri MAPE í **14 af 18** hólfum en enginn munur ber próf. **Einhallinn eftir bilbreidd snýst við frá cc120** — því breiðara bil, því meira vinnur `median`, ekki `mean`.
+
+**Hliðarmengin bera engan dóm og eru bókuð sem slík:** `fresh_edge` n = 93 er **mengað** — fjórar raðir með APE > 100 % ráða heildartölunni, þ.á m. 2.000.000 kr fyrir 128 m² einbýli sem `onothaefur = 0` átti að stöðva (hlutasala/fjölskylduafsal). „Eftir flipp" er n = 15. Hvorugt er dómhæft.
+
+### 2. Af hverju (a) var valið
+
+**Nákvæmnismunurinn er ómarktækur og skipunin sjálf batt hvað þá gerist:** *„Sé munurinn innan suðmarka: segja það berum orðum — þá ræður innbyrðis samræmi (a) og ekki nákvæmni."* Skilyrðið er uppfyllt (MAPE p = 0,42 · ±10 % p = 0,26 · MdAPE jafntefli · 0 af 18 hólfum), og **cc120-vísbendingin (n = 180, `mean` betri á öllum fjórum) endurtekur sig ekki: þrjú af fjórum formerkjum snúast við og ekkert þeirra er marktækt.**
+
+**Kerfið er ÞEGAR á `mean` í öllu sem ber vigt** — og það er ekki venja heldur burðarvirki: bilin (`lo80/hi80/lo95/hi95`) eru conformal-kvörðuð um `mean`, `rel80 = (hi80−lo80)/mean` er nefnarinn í flokkuninni, **flokkaþröskuldarnir A < 0,240 / B < 0,443 (§5C-14) sitja í MÆLDUM GÖTUM á `mean`-nefnara en SKARAST á `median`-nefnara (cc118)**, SHAP-vatnsfallið, comps og allur birtingarflöturinn lesa `mean`. (a) færir 4 neytendur að 17, ekki öfugt.
+
+### 3. Hvað (b) hefði kostað — mælt, ekki áætlað
+
+Orðalagið „óbreytt bil" ber tvær lesningar og **báðar voru mældar**:
+
+- **(i) bilin standa nákvæmlega eins og þau eru birt:** þekjan er skilgreiningarlega óháð punktmatinu og **hreyfist ekki** (82,824 % / 96,101 % fyrir bæði höfuð). Kostnaðurinn er annar: **`median` lendir UTAN eigin 80 %-bils á 1,475 % (14 af 949)**. Aukaathugun sem á heima hér: `mean` situr að meðaltali á **34,0 %** af bilbreiddinni en `median` á **42,5 %** — punktmatið sem við birtum í dag er það sem er LENGRA frá miðju bilsins, og (b) hefði lagað það á kostnað þekjunnar.
+- **(ii) sömu hálfbreiddir endurmiðjaðar á `median`** (talan sem raunverulega verðleggur (b)): **cov80 82,824 % → 80,084 %, −2,740 pp, McNemar p = 0,0103.** cov95 96,101 % → 96,523 % (ómarktækt).
+
+> **DÓMSREGLA `model_quality_eval` (cov80 < 80 % → exit 2 + HALT til arkitekts) hefði staðist með 0,08 pp — INNAN VIÐ EINA RÖÐ AF 949.** Flokkur A (633 raðir, meirihluti vefsins) fellur í **78,5 %**. **(b) er þar með ekki umskrift heldur ENDURKVÖRÐUN**, og hún ætti ekki að vera keyrð undir merkjum „við skiptum bara um dálk". Sbr. `feedback_endurkvordun_verdur_ad_endurgera_maelinguna`.
+
+**(c) — báðar tölur birtar — var hafnað á framsetningarrökum, ekki tölfræðilegum.** Tvær tölur verða tvö möt í huga lesandans þótt þær séu tvö möt á sama hlut; sama rök og §5A-31 (leiguflötunum) og cc106-birtingarreglurnar (§5C-19) hvíla á. *(Borðið vísaði einnig í „GLOSSARY §97". Sú tilvísun finnst ekki í `app/docs/GLOSSARY.md` né í `verdmat-ai` — skráð hér sem óstaðfest tilvísun; rökin standa á §5A-31/§5C-19 sem eru staðfest.)*
+
+### 4. ÞRENNT SEM FYLGIR ÁKVÖRÐUNINNI OG MÁ EKKI TÝNAST
+
+**(1) BIAS ER ÞEKKT OG MÆLT, EKKI FALIÐ.** `mean` ber **+1,9341 % OOS-bjaga (t = −10,74, p = 1,75·10⁻²⁵)** — **birt verðmat er kerfisbundið ~2 % UNDIR markaði**, og það er eina marktæka, rammaóháða niðurstaða einvígisins. Hún hallar á höfuðið sem var valið. Ákvörðunin er tekin **með opnum augum**: talan fer í vöktun sem sjálfstæð lína og **skal nefnd þegar við tölum um nákvæmni út á við**. Rökin fyrir að velja ekki (b) þrátt fyrir hana: **að kaupa fallegri bjaga-tölu fyrir 2,74 pp af þekju er öfug forgangsröð — þekjan er loforðið sem bankinn kaupir**, bjaginn er tala sem má birta.
+
+**(2) /markadur-FÆRSLAN 1,006 → 1,026 ER AFHJÚPUN, EKKI VERSNUN.** cc120 §3.4 mældi að (a) færði vísinn úr +0,6 % í +2,6 % og kallaði það „sýnilega versnun". Þessi mæling fellir þá lesningu: **+2,6 % er sama stærðargráða og mældur OOS-bjagi `mean`-haussins (+1,93 %)**, svo vísirinn hefur hingað til mælt tölu sem hvergi er birt. Færslan er **vísirinn að byrja að segja satt**. Það skal orðast þannig alls staðar þar sem færslan er nefnd.
+
+**(3) ÓMÆLT STENDUR ÓMÆLT.** **Flokkur D og `SUMMERHOUSE` eru n = 0 á holdout30.** Þar sem höfuðgapið er stærst (cc120 §4: SUMMERHOUSE meðal |Δ| 19,77 %, hámark 526,2 %; flokkur D 19,59 %) **er ENGIN OOS-mæling til á hvorugu höfðinu**. Þetta er bókað sem GAT. Það má ekki fyllt með ágiskun, ekki brúað með `listing_valuations`-mengið (rangur nefnari, mildari dreifing) og ekki lesið sem „ekkert vandamál fannst".
+
+### 5. Skekkjuáttin (cc120 §4-spurningin) — LEYST, og hún er ekki galli
+
+cc120 fann `mean` < `median` á **70,7 %** og kallaði það öfugt við vænta hægri skekkju. Þrjár tilgátur voru mældar, ekki settar fram:
+
+- **T1 Jensen/bakvörpun ÚTILOKUÐ — strúktúrellt.** `to_kr(x) = round(expm1(x)/cpi_f × 1000)` er **strangt vaxandi** og BÁÐIR hausar fara í gegnum nákvæmlega sama fall (`precompute/rebuild_predictions_iter4.py`). Einhalla vörpun getur breytt STÆRÐ munar en aldrei FORMERKI hans. Mælt framlag kúpninnar: **0,238 pp af 2,331 % gapi og 0 % af formerkinu.** Að auki er cc120-orðalagið flokkunarvilla: **hægri skekkjan sem búist er við er í VERÐSTIGINU — sem er einmitt ástæðan fyrir því að markmiðið er log-verð.** Skekkja log-leifarinnar er allt annar hlutur.
+- **T2 kvörðunarlagið ÚTILOKAÐ á kóðaslóð.** Punktmötin eru reiknuð af HRÁUM höfðum áður en nokkuð kvörðunarlag keyrir; conformal, segcal-teygjan og 3.3-framreiðslu-offsetin skrifa **aðeins** `lo80_kr/hi80_kr/lo95_kr/hi95_kr`. **Heiðarlegur fyrirvari sem er bókaður: stimplarnir tveir skarast ekki á segmenti, svo T2 er ekki EMPÍRÍSKT aðgreinanleg — hún er felld á kóðalestri, ekki á mælingu.**
+- **T3 STAÐFEST MEÐ BEINNI MÆLINGU: HÖFUÐIN SJÁLF, OG ÞAU HAFA BÆÐI RÉTT FYRIR SÉR.** Skilyrt log-leifadreifing er **VINSTRI-skekkt** (skewness **−3,67** á train), svo `E[log p] < miðgildi(log p)` — það er stærðfræðileg afleiðing, ekki villa. `q500` mælist miðgildis-óbjagaður upp á **5·10⁻⁵** á train; `mean` situr fyrir neðan **af hönnun** (L2 metur meðaltal). **Per segment fylgir FORMERKI gapsins formerki leifaskekkjunnar: `APT_FLOOR` er eina segmentið með hægri-skekkta log-leif (+1,21) og eina segmentið þar sem gapið snýst við (−0,0025).** Vinstri halinn er sami hali og mengar `fresh_edge` — eitt fyrirbæri, ekki tvö.
+
+### 6. Nýtt og ómælt: höfuðgapið er 3,2× stærra á birtingarslóð en í artifactinu
+
+Utan beiðninnar en of stórt til að þegja yfir: á **sömu 1.165 eignum**, sömu tveimur höfðum, mælist gapið gjörólíkt eftir SKORUNARSAMHENGI — artifact-rammi (hver sala skoruð í eigin tímasamhengi) `dlog` **+0,00825** gegn birtingarslóð **+0,02638**; `q500 > mean` **53,2 %** (myntkast) gegn **71,5 %**. `mean`-hausinn féll **2,6× meira** milli ramma en `q500` (−0,0297 gegn −0,0116) þótt fylgni punktmatsins milli slóða væri 0,977. **Þar með er cc120-talan „70,7 %" eiginleiki verðmatsmánaðar-skorunarinnar, ekki eiginleiki líkansins.**
+
+**Og afleiðingin er á DÓMI, ekki bara á stærð: í artifact-rammanum vinnur `mean` — og ÞAR er ±10 %-munurinn MARKTÆKUR** (79,89 % gegn 76,11 %, McNemar **p = 0,00061**; Wilcoxon á pöruðum APE p = 0,0114). Sama úrtak, sami sannleikur, öfug niðurstaða. `scripts/model_quality_eval.py:48-52` bókar þetta þegar beint („Do not quote one as the other") og þessi mæling er fyrsta staðfesta tilvikið þar sem rammarnir skila ÖFUGUM dómi. **Hvaða eiginleiki veldur er ÓMÆLT** — tímaeiginleikar eru útilokaðir sem eina orsök (artifact-`dlog` eftir söluári spannar aðeins +0,005…+0,017, 2026 á +0,0054). Liðurinn fer á backlog sem sér mál. Sbr. `feedback_hofudgapid_er_eiginleiki_skorunarsamhengis`.
+
+### 7. Framkvæmdin er EKKI hluti þessarar ákvörðunar
+
+Ákvörðunin er kvittuð; **breytingin sjálf var ekki gerð í þessari lotu og má ekki gerast í framhjáhlaupi**. `expected_base`/`expected_extraction` → `real_pred_mean` snertir `scripts/extraction_engine.py:316–317` OG D2-parity-hliðið í `scripts/model_quality_eval.py:557–576 / 874–881`, sem les `p.real_pred_median AS frozen_median` sem viðmið — **hliðið fellur ef aðeins vélin er færð.** Liðurinn er skilgreindur sem sér lota með eigin rowcount-sönnun í `PLANNING_BACKLOG` (viðauki cc123) og er **bindandi forsenda** verðmats-bakfyllingarinnar sem cc121 setti á pásu.
+
+**Heimild**: `D:\_audit\cc123_oos_einvigi\OOS_EINVIGI_CC123_20260808.md` (§0 nefnarar + tækjasannprófun, §1 aðaltafla, §2 hólfun, §3 kvörðunarkostnaður, §4 skekkjuátt T1/T2/T3 + §4.1 rammamunurinn, §5 artifact-krosspróf, §6 dómur, §7 sannprófunarslóð); `D:\_audit\cc120_midsaekni\MIDSAEKNI_CC120_20260808.md` §1.1/§2/§3.2/§3.4/§4/§5; `scripts/model_quality_eval.py:48-52, 186-187, 557-576, 874-881`; `scripts/extraction_engine.py:316-317`; `precompute/rebuild_predictions_iter4.py` (`to_kr`, punktmöt fyrir kvörðun); artifakt `D:\model_artifacts\iter4r_20260805_reglaR_strukt\` (`_predictions.pkl`, `_holdout_rows.csv`, `_manifest.json`); DECISIONS §5C-14 (þröskuldarnir 0,240/0,443), §5C-19 (birtingarreglurnar), §5A-31 (tvær tölur á sama fleti).
