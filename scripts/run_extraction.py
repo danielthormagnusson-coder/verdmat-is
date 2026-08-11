@@ -7,8 +7,14 @@ Hard cost guard on the forward path (a cache regression must never silently burn
   --max-n        per-run ceiling on Haiku calls (default 500).
   --daily-cap-usd  cumulative Haiku spend allowed per calendar day (default 10.0); tracked in
                  scraper_data/extraction_cost_state.json. effective N = min(N, max-n, budget-left).
-  The per-run cost (calls × per-call) is printed (lands in the nightly promote log / morning report)
-  and added to today's tally.
+  The per-run cost is printed (lands in the nightly promote log / morning report) and added to
+  today's tally.
+
+  cc127 — kostnaðurinn sem BÓKAST er RAUNNOTKUN hvers kalls (input/output/cache_read/
+  cache_creation × verðskrá Haiku 4.5), lögð saman úr svörunum sjálfum. Fastinn
+  PER_CALL_USD er eftir sem VARAÁÆTLUN á tvennum stað: forspá fyrir budget_calls
+  (óhjákvæmilegt — þakið verður að vita verðið á undan kallinu) og fallback fyrir köll
+  sem skila engri notkun. Áætlaði hlutinn er talinn sér og merktur í logginu.
 
 Two connections: read-only (autocommit) for model load + fetch; read-write (SET TRANSACTION
 READ WRITE per tx) for the inserts. The Haiku key is read ONLY from D:\env.local via
@@ -33,7 +39,18 @@ import extraction_engine as E  # noqa: E402
 
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
 COST_STATE = Path(r"D:\verdmat-is\scraper_data\extraction_cost_state.json")
-PER_CALL_USD = 0.0071  # VÉL 1 empirical Haiku cost per extraction
+
+# cc127 — FORSPÁ, EKKI BÓKUN. Þakið verður að umreikna „dollarar eftir" í „köll sem
+# má kaupa" ÁÐUR en nokkurt kall er gert, svo einhver forspá er óhjákvæmileg; en það
+# sem BÓKAST eftir hrinuna er raunnotkunin sem svörin bera (E.extract_and_store →
+# res["cost_usd"]), ekki þessi tala. Fastinn býr í extraction_engine svo forspáin og
+# fallbackið séu SAMA talan á einum stað — tvö eintök myndu reka í sundur.
+#
+# Gamla gildið 0,0071 var 2,8× of lágt (mælt $0,0197–0,0200/kall, cc125 §A2), svo
+# dagsþakið hét $10 en beit fyrst við ~$27,9: budget_calls = 10/0,0071 = 1.408 köll,
+# sem kosta í raun 1.408 × 0,0198 ≈ $27,9. Þakið hefur því ALDREI getað gripið.
+# Talan $10 er ÓBREYTT hér að neðan — það er merking hennar sem lagast.
+PER_CALL_USD = E.PER_CALL_USD_EST
 
 
 def _today():
@@ -57,10 +74,16 @@ def _record_spend(amount):
         except Exception:
             data = {}
     data[_today()] = round(float(data.get(_today(), 0.0)) + amount, 4)
-    # keep only the last ~30 days
-    for k in sorted(data)[:-30]:
+    # keep only the last ~30 days.
+    # cc127: TELJA AÐEINS DAGSETNINGAR. Skráin ber nú líka `_*`-lykla (skýringar-
+    # línur, sjá `_athugasemd`), og þeir eru hvorki dagar né kostnaður. Áður hefði
+    # `sorted(data)[:-30]` talið slíkan lykil með í þeim 30 sem haldið er eftir og
+    # stytt gluggann í 29 daga í hljóði — og af því að `_` raðast Á EFTIR tölustöfum
+    # hefði það alltaf verið ELSTI DAGURINN sem félli út, ekki athugasemdin.
+    dagar = sorted(k for k in data if not k.startswith("_"))
+    for k in dagar[:-30]:
         data.pop(k, None)
-    COST_STATE.write_text(json.dumps(data), encoding="utf-8")
+    COST_STATE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
 
 def _ekki_neikvaett(s):
@@ -183,8 +206,20 @@ def main():
                 client = anthropic.Anthropic(api_key=anthropic_key(), timeout=60.0,
                                              max_retries=0)
                 res = E.extract_and_store(rw, client, need, args.trigger)
-                _record_spend(res["cost_est_usd"])
-                print(f"extract: {res} | day_total=${_load_today_spend():.4f}")
+                # cc127: bókað er RAUNNOTKUNIN sem svörin bera. Áætlaði hlutinn
+                # (köll sem skiluðu engri notkun) er talinn sér og MERKTUR í
+                # logginu — tölurnar tvær mega aldrei renna saman í eina.
+                _record_spend(res["cost_usd"])
+                merki = (f"MÆLT ${res['cost_measured_usd']:.6f} "
+                         f"({res['calls_measured']} köll)")
+                if res["calls_estimated"]:
+                    merki += (f" + ÁÆTLAÐ ${res['cost_estimated_usd']:.6f} "
+                              f"({res['calls_estimated']} köll án notkunar "
+                              f"@ ${PER_CALL_USD}/kall)")
+                print(f"extract: {res}")
+                print(f"kostnaður: {merki} = ${res['cost_usd']:.6f} "
+                      f"| day_total=${_load_today_spend():.4f} "
+                      f"(þak ${args.daily_cap_usd})")
 
     # cc121: pásan er FYRSTA skilyrðið og hún er HÁVÆR. Þögul sleppa væri óaðgreinanleg
     # frá tómri biðröð í næturlogginu — og pása sem enginn sér er pása sem enginn afturkallar.

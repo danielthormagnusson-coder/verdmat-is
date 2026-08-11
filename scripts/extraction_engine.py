@@ -66,6 +66,34 @@ VALUATION_YEAR = 2026
 SCHEMA_VERSION = "v0.2.2"
 EXTRACT_MODEL = "claude-haiku-4-5"
 
+# ── cc127 KOSTNAÐARBÓKHALD — RAUNNOTKUN Í STAÐ FASTA ─────────────────────────
+# Fram að cc127 var kostnaður bókaður sem `n_call × 0.0071` — FASTI margfaldaður
+# með kallafjölda. `extract_listing` skilar raunnotkun (input/output/cache_read/
+# cache_creation) og kallandinn henti henni. Fastinn sjálfur var afkomandi
+# calc_cost-vanmatsins (DECISIONS.md 2026-04-19, lagað á diski í cc127) og mældist
+# 2,8× of lágur: raunkostnaður $0,0197–0,0200/kall á TVEIMUR óháðum $10-hringjum
+# (A: 06.–08.08, B: 09.–11.08, cc125 §A2).
+#
+# Þessi fasti er nú EINGÖNGU VARAÁÆTLUN, í tveimur hlutverkum:
+#   (a) FORSPÁ  — run_extraction verður að umreikna „dollarar eftir af dagsþaki"
+#                 í „hversu mörg köll má kaupa" ÁÐUR en nokkurt kall er gert.
+#                 Þess vegna verður hann að vera >= raunkostnaður, annars hleypur
+#                 hrinan fram úr þakinu (nákvæmlega bilunin sem cc127 lagar).
+#   (b) FALLBACK — kall sem skilar engri notkun (fallið kall) er bókað á þessu
+#                 verði og TALIÐ SÉR, svo áætlun og mæling ruglist aldrei saman.
+# Forspá sem VANMETUR er þak sem lekur, svo talan verður að DROTTNA yfir mælda
+# versta tilviki — ekki hitta meðaltalið. Fyrsta tilraun cc127 setti hana á efri
+# mörk bilsins ($0,0200) og ÞURRKEYRSLAN FELLDI HANA: rauðsönnunin í §4 mældi
+# $0,020717/kall (köld skyndiminnis-ræsing innifalin), svo 500 leyfð köll hefðu
+# endað í $10,36 — þakið lak enn, bara 3,6% í stað 179%.
+#
+# $0,0225 er versta mælda tilvikið + ~9% svigrúm. Mælda dreifingin sjálf sýnir af
+# hverju fastinn getur aðeins verið ÞAK en aldrei VERÐ: sama hrinan kostaði
+# $0,019430/kall með heitt skyndiminni en $0,020717/kall með kalt. Þess vegna er
+# BÓKUNIN raunnotkun; þessi tala er eingöngu forspá og fallback.
+# Rekstrarleg áhrif engin: nóttin kaupir 200 köll (~$4,1), langt undir þakinu.
+PER_CALL_USD_EST = 0.0225
+
 # ── cc94 ÞREP A — validering á skrif-leiðinni ────────────────────────────────
 # MÆLT 2026-08-04 (read-only, nefnari 5.122 útdrættir): 152 (2,97%) bera
 # `components` sem STRENG — 0 af 152 parsast, því líkanið typar strenginn sjálft
@@ -326,11 +354,36 @@ def fetch_listings_needing_extraction(pg, limit):
 
 def extract_and_store(pg, client, rows, source_trigger, log=print):
     """Haiku 108-field extract for each distinct lysing, store content-addressed. Returns counts."""
-    from pilot_extract_v022 import build_tool_schema, extract_listing
+    from pilot_extract_v022 import build_tool_schema, extract_listing, calc_cost
     schema = build_tool_schema()
     out = []
     n_call = n_fail = n_rejected = n_retry_saved = 0
     reason_tally = {}
+
+    # cc127 — raunkostnaður safnast PER KALL, ekki sem fasti × kallafjöldi.
+    # Tvö aðskilin bókhöld: MÆLT (notkun fylgdi svarinu) og ÁÆTLAÐ (hún gerði það
+    # ekki). Þau eru lögð saman í eina dagstölu en aldrei brædd saman í logginu.
+    cost_measured = 0.0
+    n_measured = n_unmeasured = 0
+    tok = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}
+
+    def _bok_notkun(usage):
+        """Bóka raunnotkun eins Haiku-kalls. Skilar True ef notkun fylgdi svarinu.
+
+        Fallið kall skilar `{}` (pilot_extract_v022:701-704) — þá er ENGIN tala til
+        og kallið fer í áætlunar-dálkinn frekar en að vera bókað á núll.
+        """
+        nonlocal cost_measured, n_measured, n_unmeasured
+        if not usage or usage.get("input_tokens") is None:
+            n_unmeasured += 1
+            return False
+        cost_measured += calc_cost(usage)
+        n_measured += 1
+        tok["input"] += usage["input_tokens"]
+        tok["output"] += usage["output_tokens"]
+        tok["cache_read"] += usage["cache_read_tokens"]
+        tok["cache_creation"] += usage["cache_creation_tokens"]
+        return True
     for i, r in enumerate(rows, 1):
         h = r["lysing_hash"]
         # content-addressed idempotency is handled by the fetch filter + ON CONFLICT DO NOTHING
@@ -338,6 +391,7 @@ def extract_and_store(pg, client, rows, source_trigger, log=print):
         try:
             raw, usage, err = extract_listing(client, schema, r["lysing"], lambda *a, **k: None)
             n_call += 1
+            _bok_notkun(usage)          # cc127: bóka ÁÐUR en villa kastar okkur út
             if err or raw is None:
                 raise RuntimeError(err or "no extraction")
 
@@ -353,6 +407,7 @@ def extract_and_store(pg, client, rows, source_trigger, log=print):
                 raw2, usage2, err2 = extract_listing(client, schema, r["lysing"],
                                                      lambda *a, **k: None)
                 n_call += 1          # kostnaðarbókhaldið verður að telja endurkallið
+                _bok_notkun(usage2)  # cc127: og verðleggja það á SINNI eigin notkun
                 if not err2 and raw2 is not None:
                     status2, reasons2 = validate_extraction(raw2)
                     if status2 == "ok":
@@ -388,10 +443,20 @@ def extract_and_store(pg, client, rows, source_trigger, log=print):
             " source_trigger, lysing_len, validation_status) VALUES %s "
             "ON CONFLICT (lysing_hash) DO NOTHING", out, page_size=500)
         pg.commit()
+    # cc127 — kostnaðurinn er nú SUMMA raunkalla, ekki fasti × fjöldi.
+    # `cost_usd` er talan sem bókast á daginn; hinar tvær sýna úr hverju hún er gerð.
+    # Gamli lykillinn `cost_est_usd` er FALLINN VILJANDI (ekki endurnefndur hljóðlega):
+    # hann bar áætlun og hver sem les hann á að fá KeyError, ekki ranga tölu.
+    cost_fallback = n_unmeasured * PER_CALL_USD_EST
     return {"haiku_calls": n_call, "stored": len(out), "failed": n_fail,
             "rejected": n_rejected, "retry_saved": n_retry_saved,
             "reasons": reason_tally,
-            "cost_est_usd": round(n_call * 0.0071, 4)}
+            "cost_usd": round(cost_measured + cost_fallback, 6),
+            "cost_measured_usd": round(cost_measured, 6),
+            "cost_estimated_usd": round(cost_fallback, 6),
+            "calls_measured": n_measured,
+            "calls_estimated": n_unmeasured,
+            "tokens": dict(tok)}
 
 
 # ───────────────────────────── brúin í eigindalagið ─────────────────────────────
