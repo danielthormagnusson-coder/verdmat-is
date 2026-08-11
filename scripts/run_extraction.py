@@ -63,6 +63,24 @@ def _record_spend(amount):
     COST_STATE.write_text(json.dumps(data), encoding="utf-8")
 
 
+def _ekki_neikvaett(s):
+    """cc128: --value-limit tekur 0 eða hærra. Neikvætt er HAFNAÐ, ekki túlkað.
+
+    Eftir að falsy-gildran var lokuð (0 = ekkert, None = ótakmarkað) er -1 eina
+    gildið sem eftir stendur án merkingar. Þrír kostir voru til: (a) láta það
+    renna niður í `LIMIT -1` og falla á SQL-villu langt frá kallstaðnum,
+    (b) túlka það sem „ótakmarkað" eins og sums staðar tíðkast, (c) hafna því
+    strax. Valið er (c): ótvírætt er betra en klókt — sá sem skrifar -1 meinti
+    annaðhvort 0 eða ekkert þak, og vélin á ekki að giska á hvort.
+    """
+    v = int(s)
+    if v < 0:
+        raise argparse.ArgumentTypeError(
+            f"--value-limit má ekki vera neikvætt (fékk {v}). "
+            "Notaðu 0 fyrir ENGAR verðmats-raðir eða slepptu rofanum fyrir ótakmarkað.")
+    return v
+
+
 def _connect():
     dsn = DBCONFIG.read_text(encoding="utf-8-sig").strip()
     ro = psycopg2.connect(dsn); ro.autocommit = True; ro.set_session(readonly=True)
@@ -84,8 +102,15 @@ def main():
     # keyrsla eftir líkanaskipti sér ALLT safnið sem óverðmetið (mælt 07.08: 3 raðir
     # undir gamla stimplinum -> 21.354 undir þeim nýja). Það er ekki bilun heldur
     # skilgreiningin, en það er hrina sem á að vera valin, ekki að koma á óvart.
-    ap.add_argument("--value-limit", type=int, default=None,
-                    help="hámarksfjöldi auglýsinga sem verðmetnar eru í þessari keyrslu")
+    ap.add_argument("--value-limit", type=_ekki_neikvaett, default=None,
+                    help="hámarksfjöldi auglýsinga sem verðmetnar eru í þessari keyrslu "
+                         "(0 = engar; sleppt = ótakmarkað; neikvætt er hafnað)")
+    # cc128 GILDRAN LOKUÐ 11.08 — kaflinn hér að neðan er SAGAN, ekki lifandi hegðun.
+    # `--value-limit 0` gefur nú 0 raðir eins og talan segir (mælt: None -> 20.270,
+    # 0 -> 0, 5 -> 5). Pásu-rofinn hér að neðan stendur ÓBREYTTUR: keðjan þýðir sitt
+    # EXTRACT_VALUE_LIMIT=0 áfram í --skip-valuation, sem er háværa leiðin og sú sem
+    # næturloggið sýnir. Sagan sem var:
+    #
     # cc121 GILDRA — MÆLD 08.08: `--value-limit 0` er ÓTAKMARKAÐ, ekki ekkert.
     # fetch_extracted_listings_to_value byggir LIMIT-liðinn með
     # `{('LIMIT %d' % int(limit)) if limit else ''}` (extraction_engine.py:188), og 0 er
@@ -95,6 +120,7 @@ def main():
     # sendir ALDREI 0 í --value-limit, heldur þýðir sitt EXTRACT_VALUE_LIMIT=0 í
     # --skip-valuation í skelinni (`-gt 0`, þar sem 0 er ótvírætt). Ekki „einfalda" það
     # aftur í að hleypa 0 hér inn — það myndi skrifa 18.734 raðir í stað engra.
+    # (Sögunni lýkur hér — það sem á eftir kemur er LIFANDI hegðun.)
     #
     # PÁSU-ROFI (ákvörðun eiganda 08.08, cc121). Verðmats-hrinan er BAKFYLLING á eldri
     # auglýsingum sem enginn notendaflötur les; hún á að klárast í EINNI mannaðri keyrslu,
@@ -167,8 +193,11 @@ def main():
               "Engin skrif í scraper.listing_valuations. Útdráttur ósnertur.")
     elif not haiku_stodvud and (args.value_seeded or args.forward):
         rows = E.fetch_extracted_listings_to_value(ro, limit=args.value_limit)
+        # cc128: `if args.value_limit` þagði um --value-limit 0 — sama falsy-gildra og í
+        # fyrirspurninni sjálfri, nema hér birtist hún sem ÞÖGN: keyrsla með þaki 0 leit
+        # út í logginu eins og keyrsla án þaks. `is not None` prentar þakið alltaf.
         print(f"value: {len(rows)} extracted listings without a valuation"
-              + (f" (--value-limit {args.value_limit})" if args.value_limit else ""))
+              + (f" (--value-limit {args.value_limit})" if args.value_limit is not None else ""))
         if args.confirm or args.value_seeded:
             E.value_listings(rw, models, rows)
         else:

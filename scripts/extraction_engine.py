@@ -185,7 +185,13 @@ def fetch_extracted_listings_to_value(pg, limit=None):
         -- eru viðfangsefni ÞREPS B2, ekki þessarar síu.
         AND (e.validation_status IS NULL OR e.validation_status NOT LIKE 'rejected:%%')
       ORDER BY l.source_listing_id, l.last_seen_at DESC NULLS LAST
-      {('LIMIT %d' % int(limit)) if limit else ''}
+      -- cc128 FALSY-GILDRAN LOKUÐ. Skilyrðið var `if limit` — og 0 er falsy, svo
+      -- LIMIT-liðurinn FÉLL ÚT og limit=0 skilaði ALLRI biðröðinni. Mælt á lifandi
+      -- DB fyrir lagfæringu (11.08): None -> 20.270, 0 -> 20.270, 5 -> 5.
+      -- Eftir: None -> 20.270, 0 -> 0, 5 -> 5. `is not None` er eina greiningin sem
+      -- heldur „ótakmarkað" (None) aðskildu frá „ekkert" (0). Neikvæð gildi komast
+      -- ekki hingað: run_extraction hafnar þeim í argparse (--value-limit >= 0).
+      {('LIMIT %d' % int(limit)) if limit is not None else ''}
     """
     cur = pg.cursor()
     cur.execute(sql, (MODEL_VERSION,))
