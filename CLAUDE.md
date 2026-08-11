@@ -102,6 +102,7 @@ Map only; canonical detail in the noted docs.
 ## Locked operational rules (recur every session)
 
 - **Supabase writes** via psycopg2 on the transaction pooler (port 6543) default read-only — the first statement of every write transaction must be `SET TRANSACTION READ WRITE`. SQL migrations go through the Supabase MCP `apply_migration` (CLI is blocked by Windows Smart App Control).
+- **`.dbconfig` is UTF-8 **with BOM** (`EF BB BF`) — read it with `encoding='utf-8-sig'`, never plain `utf-8`.** Plain `utf-8` leaves `﻿` at the head of the URI and the connection fails on an unreadable error, not on "bad BOM". Reference implementation: `scripts/myndasaekjari.py:381`. *This fact was already stated at the top of this file (Supabase project paragraph) and that placement did **not** prevent cc117 from writing plain `utf-8` in a new loader — hence the duplicate here, in the section that is meant to be re-read every session. If the two ever disagree, this line is the one to trust and the other is the one to fix.*
 - **Task Scheduler**: S4U logon type (password principal fails silently).
 - **Docs discipline**: additive str_replace only on the journal files (STATE / DECISIONS / PLANNING_BACKLOG), verify wc -l grows, never regenerate from memory. Git: always explicit paths, never `git add .`. HALT at decision points before consequential actions. Commits carry a Co-Authored-By trailer naming the actual session model. Secrets stay in terminal + .env.
 
