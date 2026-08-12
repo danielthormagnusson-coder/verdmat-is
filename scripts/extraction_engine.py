@@ -433,9 +433,132 @@ def fetch_listings_needing_extraction(pg, limit):
                max(l.lysing) AS lysing, max(l.listed_at) AS fresh
         FROM scraper.listings l
         LEFT JOIN scraper.listing_extractions e ON e.lysing_hash = substr(md5(l.lysing), 1, 12)
+        -- cc150: joinið er MARGFELDIS-ÖRUGGT og það var mælt, ekki gefið sér.
+        -- `public.properties` er einkvæm á fastnum (12.08: 232.887 raðir,
+        -- 232.887 einkvæm fastnúmer), svo þessi lína breytir engri af
+        -- samantektartölunum í HAVING-liðnum að neðan.
+        LEFT JOIN public.properties pr ON pr.fastnum = l.fastnum
         WHERE l.source = 'mbl' AND l.lysing IS NOT NULL AND length(l.lysing) >= 300
           AND e.lysing_hash IS NULL
         GROUP BY 1
+        -- ══ cc150 · TVÆR SÍUR Á VERKEFNASKRÁNA — heimild cc130 (12.08) ══════
+        --
+        -- ATH. ENGIN PRÓSENTUMERKI Í ÞESSUM ATHUGASEMDUM — skrifaðu orðið.
+        -- Þessi strengur fer í dag í `cur.execute(sql)` ÁN params, svo bert
+        -- merki fellir ekki kallið EINS OG ER. Það er nákvæmlega ástæðan fyrir
+        -- að reglan er skrifuð hingað: cc134 fann villuna í systurfallinu og
+        -- lærdómurinn var að athugasemdir fá enga skoðun og params bætast við
+        -- síðar. Sama regla og í `fetch_extracted_listings_to_value`.
+        --
+        -- Hin cc134-gildran, cc128-falsy: hún er skoðuð og hún er ekki hér.
+        -- Hliðin að neðan bera BER `> 0` samanburð, ekki sannleiksgildi, og
+        -- þetta fall hefur enga `if limit`-grein (`limit` er alltaf heiltala
+        -- frá `run_extraction`, sem stöðvar á `effective_n <= 0` á undan).
+        --
+        -- BÁÐAR SÍURNAR ERU Á VERKEFNASKRÁNNI — hvaða lýsingar eru KEYPTAR í
+        -- kvöld — ekki á neinni röð sem þegar liggur í `listing_extractions`.
+        -- Sama mynstur og cc134. Ekkert er eytt og hvorug sían er endanleg:
+        -- röð sem hættir að uppfylla skilyrðið birtist aftur í biðröðinni af
+        -- sjálfu sér næstu nótt. Þetta er FRESTUN, ekki brottfelling.
+        --
+        -- ── SÍA #2 — DAUÐ KÖLL (cc130 liður 5d + tillaga 2) ─────────────────
+        -- cc130 ORÐRÉTT, liður 5d („Flokkarnir sem enginn getur lesið"):
+        --   „fastnum ÓLEYST (NULL) | 108 | $2,24 |
+        --    `fetch_extracted_listings_to_value` krefst `fastnum IS NOT NULL`;
+        --    brúin lyklar á fastnum. Hvorug leiðin nær þeim."
+        --   „engin mbl-auglýsing ber textann | 163 | $3,38 |
+        --    textinn er horfinn úr `listings` — hvorki verðmat né brú finnur
+        --    hann"
+        --   „samtals | 271 | $5,62 | 6,3 prósent næturinnar"
+        -- og dómur borðsins: „RÉTTLÆTT ÁN SKILYRÐA. Eini sannanlega dauði
+        -- flokkurinn." (cc130 tillaga 2.)
+        --
+        -- SEINNI HELMINGURINN FÆR ENGA LÍNU — hann er 0 AF BYGGINGU hérna.
+        -- Biðröðin er sótt ÚR `scraper.listings`, svo lýsing sem engin
+        -- auglýsing ber kemst aldrei í hana. Mælt í dag: 0 af 9.037. Sá liður
+        -- var mæling á ÞEGAR KEYPTUM útdráttum, ekki á biðröðinni; hann bítur
+        -- á texta sem HVARF eftir kaupin og engin forsía nær því.
+        --
+        -- `count(l.fastnum) > 0` er FAIL-CLOSED útgáfan: röðin fellur aðeins
+        -- ef ENGIN auglýsing sem ber textann hefur fastnúmer. Fulltrúa-
+        -- útgáfan (fastnum NULL á `MIN(source_listing_id)`, sú sem cc130 taldi
+        -- í lið 4) fellir 560 — fjórar þeirra eiga systkina-auglýsingu MEÐ
+        -- fastnúmeri sem brúin næði. Sbr. `feedback_single_deed_sian_er_timahad`:
+        -- samantekt á ÖLLUM systkinum er eina greiningin sem er ekki tímaháð.
+        --
+        -- STAÐFEST GEGN LIFANDI KÓÐA 12.08, ekki tekið á orðinu:
+        -- `public.bru_extraction_i_eigindi` ber `where v.fastnum is not null`,
+        -- og `fetch_extracted_listings_to_value` ber `l.fastnum IS NOT NULL`.
+        -- Greppað yfir bæði repó: `listing_extractions` er hvergi lesin af
+        -- `verdmat-ai` (aðeins ferskleika-stimpillinn á `/ops`), svo þriðja
+        -- leiðin sem gæti bjargað þessum röðum er ekki til. MÆLT: 556 af
+        -- 9.037 (6,15 prósent, $11,52).
+        --
+        -- ── SÍA #4 — commercial / plot / other (cc130 tillaga 4) ────────────
+        -- cc130 ORÐRÉTT: „Sleppa `category IN (commercial, plot, other)` |
+        -- $7,19 | 8,0 prósent | 347 köll (þar af 319 á EXCLUDE-eignum) missa
+        -- eigindi | RÉTTLÆTT EF eigandi ákveður að `/eign` á atvinnuhúsnæði sé
+        -- ekki afurð. 319 af 347 bera enga spá (allar EXCLUDE); 28 falla á
+        -- íbúðarflokka og eru mistalning, ekki atvinnuhúsnæði."
+        -- Borðið svaraði 12.08: JÁ, SÍA — `/eign` á atvinnuhúsnæði og lóðum er
+        -- ekki afurð.
+        --
+        -- ÁSINN ER `scraper.listings.category`, EKKI `canonical_code`.
+        -- `canonical_code` ber ekki gildin commercial/plot/other yfirhöfuð —
+        -- mótsvar hans er EXCLUDE, og hann er notaður hér sem VÖRN en ekki sem
+        -- sía. cc130 felldi jafnframt þriðja ásinn: `er_atvinnuhusnaedi` er
+        -- RENT-ONLY (NULL á öllum 37.236 sölu-auglýsingum) og því ónothæfur.
+        --
+        -- VARÐHLIÐIÐ SEM MÆLINGIN KREFÐIST. Hrá sían (öll systkin c/p/o)
+        -- fellir 1.158 raðir — og 67 þeirra bera EIGN MEÐ GILDU ÍBÚÐAR-
+        -- CANONICAL: SFH_DETACHED 38, SUMMERHOUSE 20, APT_FLOOR 6, ROW_HOUSE 1,
+        -- SEMI_DETACHED 1. Það eru lóðar-auglýsingar á eign sem BER hús — sama
+        -- mistalning og cc130 sá (28 af 347 í 30-daga glugganum). Þess vegna er
+        -- seinni liður hliðsins til: beri EINHVER auglýsing textans eign sem
+        -- cc134-hliðið hleypir í gegn, er röðin ÍBÚÐARHÆF og stendur. Með
+        -- vörninni fellur 1.091, og mótprófið er 0 raðir með gilt
+        -- íbúðar-canonical í fellda menginu.
+        --
+        -- SKÖRUNIN VIÐ cc134 ER FULLKOMIN, OG ÞAÐ ER NIÐURSTAÐAN SEM SKIPTIR
+        -- MÁLI: varðaða mengið 1.091 ER nákvæmlega það mengi c/p/o-raða sem
+        -- cc134-hliðið (`pr.canonical_code <> 'EXCLUDE'` í
+        -- `fetch_extracted_listings_to_value`) stöðvar hvort sem er. ENGIN
+        -- VERÐMÖT tapast við þessa síu. Það sem tapast er eigindalagið: 892
+        -- eignir sem hefðu fengið `source='auglysing'`-raðir gegnum brúna.
+        -- Það er nákvæmlega fórnin sem borðið samþykkti, hvorki meira né minna.
+        --
+        -- OG cc134 DREGUR SAMT EKKERT FRÁ SPARNAÐINUM: hún situr á
+        -- VERÐMATSLEIÐINNI, sem gerir engin Haiku-köll ($0,00 í cc134).
+        -- Haiku-kallið er keypt HÉR, á útdráttarleiðinni. cc134 sparaði enga
+        -- kalla; hún stöðvaði skorun. Sparnaðurinn að neðan er því nýr og
+        -- ekki tvítalinn.
+        --
+        -- ── MÆLT 12.08 MEÐ RAUNFALLINU — NEFNARINN ER BIÐRÖÐIN ─────────────
+        --   biðröð fyrir      9.037   ($187,22 · 45,2 nætur á 200/nótt)
+        --   sía 2 (dautt)       556   (6,15 prósent, $11,52)
+        --   sía 4 (varðað)    1.091   (12,07 prósent, $22,60)
+        --   skörun 2 og 4        69   (0,76 prósent, $1,43)
+        --   SAMEINING         1.578   (17,46 prósent, $32,69)
+        --   biðröð eftir      7.459   ($154,53 · 37,3 nætur)
+        -- Verðeining $0,020717/kall (cc127). NEFNARINN ER ANNAR en cc130-
+        -- tölurnar ($5,62 og $7,19), sem eru á 30-daga KEYPTA glugganum:
+        -- biðröðin ber þyngri c/p/o-hlut (12,8 gegn 8,0 prósentum) af því að
+        -- atvinnu-auglýsingar liggja lengur ólesnar en íbúðir. cc130-tölurnar
+        -- mega því EKKI flytjast hingað óbreyttar.
+        --
+        -- ÞETTA LÆKKAR EKKI `day_total` STRAX, OG ÞAÐ ER EKKI GALLI. Nóttin
+        -- kaupir `min(--forward, biðröð)`; biðröðin er 7.459 eftir síun, svo
+        -- 200 köll seljast áfram á $4,143/nótt. Sparnaðurinn kemur fram sem
+        -- STYTTRI BIÐRÖÐ: 1.578 köll verða aldrei keypt. Koma nýrra hasha
+        -- mælist 15,5/dag (418 á 27 dögum), svo nettó-tæming er 184,5/nótt:
+        -- 49,0 nætur að tæmingu fyrir, 40,4 eftir. Fyrst þegar biðröðin fer
+        -- undir 200 fellur `day_total` af sjálfu sér.
+        HAVING count(l.fastnum) > 0
+           AND (count(*) FILTER (WHERE l.category IS DISTINCT FROM 'commercial'
+                                   AND l.category IS DISTINCT FROM 'plot'
+                                   AND l.category IS DISTINCT FROM 'other') > 0
+             OR count(*) FILTER (WHERE pr.canonical_code IS NOT NULL
+                                   AND pr.canonical_code <> 'EXCLUDE') > 0)
       )
       SELECT h, slid, lysing FROM need ORDER BY fresh DESC NULLS LAST LIMIT {int(limit)}
     """

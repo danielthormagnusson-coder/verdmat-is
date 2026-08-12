@@ -6329,3 +6329,196 @@ er sér verk og bætist á backlog. (`www.verdmat.is` er annað vefsvæði og sk
 **Rollback:** `app/scripts/comps_v2_rollback_cc145.sql` (TRUNCATE + INSERT úr
 `*_pre_cc145`, replica-mode txn). ATH: sá bakleikur endurheimtir comps-dálkana;
 `prior_*` hreyfðust aldrei og þarfnast einskis.
+
+## 2026-08-12 — §5D-10 · cc150 API-SÍUR #2 OG #4 INNI Á ÚTDRÁTTARLEIÐINNI: 1.578 KÖLL ($32,69) ÚR BIÐRÖÐINNI MEÐ 0 RESIDENTIAL-RÖÐUM FELLDUM — OG RÖÐUNARSKULDIN BÓKUÐ BERUM ORÐUM
+
+> *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4 til §5D-9. Framkvæmd á
+> mælingu **cc130** (READ-ONLY, `e0ced3e`); allar formælingar hér READ-ONLY,
+> **0 Haiku-köll** (eina keyrslan á vélinni var `--forward 5` ÁN `--confirm`).
+> Full úttekt (committuð með þessari bókun, sbr. cc143/cc146/cc147):
+> `docs/fable_prep/audits/UTDRATTAR_SIUR_CC150_20260812.md`. **cc130-úttektin
+> sjálf stendur áfram órakin** — hún var bókuð þannig og er ekki hreyfð hér.
+
+**Málið**: cc130 mældi útdráttarbiðröðina og setti tillöguborð með átta liðum.
+Tveir báru skilyrðislausan eða skilyrtan dóm: **#2 dauð köll** („RÉTTLÆTT ÁN
+SKILYRÐA. Eini sannanlega dauði flokkurinn", $5,62 / 6,3 prósent á 30-daga
+glugganum) og **#4 commercial/plot/other** ($7,19 / 8,0 prósent, „RÉTTLÆTT EF
+eigandi ákveður að `/eign` á atvinnuhúsnæði sé ekki afurð" — borðið svaraði JÁ).
+Hvorug hafði verið framkvæmd.
+
+### 1. NEFNARINN ER BIÐRÖÐIN, EKKI cc130-GLUGGINN
+
+Formælingin var gerð **með raunfallinu** (`fetch_listings_needing_extraction`,
+`limit=10.000.000`) og mælitækið sannað fyrst: `need`-CTE-ið endurgert í SQL gaf
+**0 mismun** á hash-mengi og **0 mismun** á fulltrúa-`source_listing_id` gegn
+fallinu (9.037 raðir hvor).
+
+| | biðröð (cc150) | 30-daga keypt (cc130) |
+|---|---|---|
+| N | **9.037** ($187,22) | 4.312 ($89,33) |
+| #2 dautt | **556 · 6,15 prósent** | 271 · 6,3 prósent |
+| #4 c/p/o | **1.158 · 12,81 prósent** | 347 · 8,0 prósent |
+
+**cc130-tölurnar mega EKKI flytjast hingað óbreyttar.** Dauða hlutfallið helst
+(6,15 gegn 6,3), en c/p/o-hluturinn er **helmingi þyngri á biðröðinni** af því að
+atvinnu-auglýsingar liggja lengur ólesnar en íbúðir. Sparnaðartalan að neðan er
+því reiknuð á biðraðar-nefnaranum, ekki á cc130-glugganum.
+
+**Seinni helmingur cc130-skilgreiningarinnar á #2 („engin mbl-auglýsing ber
+textann") er 0 AF BYGGINGU** og fær enga línu í kóðanum: biðröðin er sótt ÚR
+`scraper.listings`, svo texti sem engin auglýsing ber kemst aldrei í hana. Sá
+liður var mæling á ÞEGAR KEYPTUM útdráttum — hann bítur á texta sem hvarf EFTIR
+kaupin, og engin forsía nær því. Mælt: 0 af 9.037.
+
+### 2. VARÐHLIÐIÐ SEM MÆLINGIN KREFÐIST — HRÁA SÍAN FÉLL Á MÓTPRÓFINU
+
+**Ásinn sem ber commercial/plot/other er `scraper.listings.category`, EKKI
+`canonical_code`** (sá síðarnefndi ber ekki þau gildi; mótsvar hans er
+`EXCLUDE`). Hrá sían „öll systkin c/p/o" fellir **1.158** raðir — og **67 þeirra
+bera eign með GILDU ÍBÚÐAR-CANONICAL**: SFH_DETACHED 38, SUMMERHOUSE 20,
+APT_FLOOR 6, ROW_HOUSE 1, SEMI_DETACHED 1. Það eru lóðar-auglýsingar á eign sem
+BER hús — sama mistalning og cc130 sá („28 falla á íbúðarflokka og eru
+mistalning, ekki atvinnuhúsnæði"), bara á öðrum nefnara.
+
+Þess vegna ber sían þriðja liðinn: **beri EINHVER auglýsing textans eign sem
+cc134-hliðið hleypir í gegn, stendur röðin.** Með vörninni fellur **1.091** og
+mótprófið verður **0**.
+
+### 3. SKÖRUNIN VIÐ cc134 ER FULLKOMIN — OG HÚN DREGUR SAMT EKKERT FRÁ
+
+| | teljari / nefnari | prósent |
+|---|---|---|
+| c/p/o-raðir sem bera **enga** eign sem cc134-hliðið hleypir í gegn | **1.091 / 1.158** | **94,21** |
+| c/p/o-raðir sem sleppa gegnum cc134 (varðar af hliðinu) | 67 / 1.158 | 5,79 |
+
+Varðaða mengið **ER** nákvæmlega það mengi sem `pr.canonical_code <> 'EXCLUDE'`
+í `fetch_extracted_listings_to_value` (§ cc134) stöðvar hvort sem er. Af því
+leiðir tvennt sem er bókað sem niðurstaða, ekki sem tilviljun:
+
+1. **0 VERÐMÖT TAPAST** við síu #4. Það sem tapast er **eigindalagið**: 892
+   eignir sem hefðu fengið `source='auglysing'`-raðir gegnum brúna. Það er
+   nákvæmlega fórnin sem borðið samþykkti, hvorki meira né minna.
+2. **cc134 dregur samt EKKERT frá sparnaðinum.** Hún situr á VERÐMATSLEIÐINNI,
+   sem gerir engin Haiku-köll (cc134 bókaði $0,00); Haiku-kallið er keypt á
+   ÚTDRÁTTARLEIÐINNI. cc134 sparaði enga kalla — hún stöðvaði skorun.
+   Sparnaðurinn hér er nýr og ekki tvítalinn.
+
+### 4. FRAMKVÆMDIN OG SÖNNUNIN
+
+Ein breyting, `fetch_listings_needing_extraction` í
+`app/scripts/extraction_engine.py`, **hreint viðbætandi: 123 línur inn, 0 út**
+(`LEFT JOIN public.properties` + `HAVING`-hlið + heimildar-athugasemd).
+Sama mynstur og cc134: **sían er á VERKEFNASKRÁNNI**, ekki á neinni röð sem
+þegar liggur í `listing_extractions`. Ekkert eytt, ekkert gamalt snert, og
+hvorug sían er endanleg — **þetta er FRESTUN, ekki brottfelling:** leysist
+`fastnum` eða breytist `category`, birtist röðin aftur næstu nótt af sjálfu sér.
+
+Fail-closed alls staðar: `count(l.fastnum) > 0` fellir röð aðeins ef **engin**
+auglýsing sem ber textann hefur fastnúmer (fulltrúa-útgáfan hefði fellt 560 —
+fjórar þeirra eiga systkina-auglýsingu MEÐ fastnúmeri sem brúin næði; sbr.
+`feedback_single_deed_sian_er_timahad`). Skilgreiningin var **staðfest gegn
+lifandi kóða**, ekki tekin á orðinu: `bru_extraction_i_eigindi` ber
+`where v.fastnum is not null`, `fetch_extracted_listings_to_value` ber
+`l.fastnum IS NOT NULL`, og greppað yfir bæði repó: `listing_extractions` er
+hvergi lesin af `verdmat-ai`.
+
+**Báðar cc134-gildrurnar skoðaðar í þessari skrá:** (i) **engin prósentumerki í
+SQL-athugasemdum** — strengurinn fer í dag í `cur.execute(sql)` ÁN params, svo
+bert merki fellir hann ekki EINS OG ER, og það er einmitt ástæðan fyrir að
+reglan er skrifuð inn í blokkina; (ii) **cc128-falsy** er ekki hér — hliðin bera
+ber `> 0` samanburð og fallið hefur enga `if limit`-grein.
+Margfeldi mælt en ekki gefið sér: `public.properties` er einkvæm á `fastnum`
+(232.887 af 232.887), svo joinið breytir engri samantektartölu.
+
+**Sönnun, gamla fallið sótt orðrétt úr `git show HEAD:` og keyrt í sama ferli:**
+
+| | n | $ | nætur á 200/nótt |
+|---|---|---|---|
+| **fyrir** | **9.037** | $187,22 | 45,2 |
+| **eftir** | **7.459** | $154,53 | 37,3 |
+| **FELLT** | **1.578** | $32,69 | 17,46 prósent |
+| **BÆTT VIÐ** | **0** | — | — |
+
+`eftir ⊆ fyrir` satt · fulltrúi/texti óbreyttur á lifandi röðum (0 frávik) ·
+**RÖÐUNIN ÓBREYTT** (gamla röðin síuð == nýja röðin, lið fyrir lið — sían
+fjarlægir raðir, hún endurraðar engu). Sundurliðun: #2 **556** · #4 **1.022**
+(= 1.091 − 69 skörun).
+
+**Mótpróf: 0 raðir með gilt íbúðar-canonical í fellda menginu.**
+`canonical`-dreifing fellda mengisins: `EXCLUDE` 1.018 · `<engin eign>` 556 ·
+`<engin eign>,EXCLUDE` 4. **487 raðir bera `category='residential'` og eru samt
+felldar — allar af síu #2, engin af síu #4**: þær eru dauðar þrátt fyrir
+flokkinn af því báðir neytendur lykla á `fastnum`, sem er NULL á öllum
+auglýsingum sem bera textann. Þar af 310 leigu-auglýsingar — leigan hverfur að
+hluta hér, en **af því hún ber ekkert fastnúmer, ekki af því hún er leiga**
+(cc130 #7 stendur felld).
+
+Þurrkeyrsla `--forward 5 --skip-valuation` ÁN `--confirm`: adapterinn hleðst
+óbreyttur (156 eiginleikar, `iter4r_20260805_reglaR_strukt`), 5 raðir valdar,
+allar residential með fastnúmeri og gildu canonical (APT_FLOOR ×2, ROW_HOUSE,
+SEMI_DETACHED, SFH_DETACHED). **0 Haiku-köll í allri sönnuninni.**
+
+### 5. SPARNAÐARSPÁIN — OG HVERS VEGNA `day_total` Á EKKI AÐ FALLA STRAX
+
+**1.578 köll = $32,69**, á biðraðar-nefnaranum 9.037, eftir að skörunin (69) er
+dregin frá og eftir að varðhliðið hefur skilað 67 röðum aftur.
+
+**Nóttin kaupir `min(--forward, biðröð)`, og biðröðin er 7.459 eftir síun — langt
+yfir 200.** `day_total` heldur því áfram að vera **~$4,14/nótt**, og það er
+SPÁIN, ekki merki um að sían virki ekki. Koma nýrra hasha mælist **15,5/dag**
+(418 á 27 dögum), svo nettó-tæming er 184,5/nótt:
+
+| | brúttó (200/nótt) | nettó (184,5/nótt) |
+|---|---|---|
+| nætur að tæmingu **fyrir** | 45,2 | 49,0 |
+| nætur að tæmingu **eftir** | 37,3 | 40,4 |
+| **flýting** | 7,9 | **8,6 nætur** |
+
+**Hvað morgunvaktin les næstu nætur:** (1) `day_total ≈ $4,14` **óbreytt** — falli
+hún strax er eitthvað annað að; (2) **biðraðardýpt féll um 1.578 við flippið** —
+það er talan sem staðfestir síuna; (3) samsetning: **0 nýjar
+`listing_extractions`-raðir án fastnúmers og 0 c/p/o-raðir án íbúðarhæfrar
+eignar**; (4) fyrst þegar biðröðin fer undir 200 (~40 nætur) fellur `day_total`
+af sjálfu sér, og þá 8,6 nóttum fyrr en ella. Sbr.
+`feedback_thak_verdur_ad_bita_a_somu_kornastaerd_og_verkid`: þak sem mælist á
+öðru en verkinu finnur ekki liðinn sem hreyfðist.
+
+### 6. RÖÐUNARSKULDIN — BERUM ORÐUM, SVO HÚN ENDURTAKIST EKKI
+
+cc130 bókaði **„RÖÐIN ER BINDANDI: #2 → #1 → endurmæla #3"** og setti **LIÐ 0
+(útganginn) ofar öllum síum**: *„Áður en picker er þrengdur ætti að liggja fyrir
+ákvörðun um (a) hvenær verðmats-pásan er tekin af og (b) hvort brúin fer í
+`nightly_delta_chain.sh`."*
+
+**Sú forsenda féll í §5D-6.** Ákvörðunin sem stöðvar sjálfvirkni brúarinnar
+(47,4 prósenta margföldunarþak leiðréttingarlagsins, cc75 §8 → γ) var þar
+endurskilgreind sem **endurþjálfunar-verk** (n ≈ 629, holdout utan þjálfunar
+beggja líkana, mótpróf) — ekki biðstaða heldur ótímabundin frestun. **Síurnar
+biðu því að óþörfu frá 12.08 kl. 00:10.** Lærdómurinn bókast hér: **síu-röð sem
+hangir á öðru verki verður að bera dagsetningu eða mælanlegt skilyrði sem
+einhver les — annars breytist „röðin er bindandi" í þögult stopp.** Röðin
+#2 → #1 stendur að öðru leyti óhögguð.
+
+### 7. STAÐA HINNA LIÐANNA — BÓKAÐ SVO ENGINN ENDURVEKI ÞÁ
+
+**#1 nær-eins-sía ($32,86 á 30-daga glugganum) — STENDUR Á BACKLOG SEM EIGIN
+LOTA.** Dedup-lykill **`cc130-#1-naer-eins-sia`**. Hún þarf hönnun á því hvernig
+vigurinn erfist (byggingarstigs-reitir frá kjarna klasans, íbúðarstigs-reitir
+sértækir) og er jafnframt gæðabót: `sameign_cosmetic` er ósamstillt í
+**51,0 prósentum** klasa með 3+ köllum í dag.
+
+| # | tillaga | staða |
+|---|---|---|
+| **#3** | endurtekningarsía á eign | **FELLD SEM BANN, stendur sem TÍMAÞAK.** 62,1 prósent endurtekninga eru NÝR TEXTI frá öðrum fasteignasala — tilgátan féll á nefnaranum. Bíður endurmælingar eftir #1 (skörun 897 köll gerir sjálfstæða tölu hennar villandi). |
+| **#5** | sleppa EXCLUDE í heild | **FELLD.** cc116-talan (0 af 56.958 spám) á við BIRTINGARLEIÐINA, ekki eigindaleiðina: EXCLUDE ber 1.225 eigindaraðir á 379 eignum sem `/eign` sýnir (`t5_astaeda='engin_spa'`). Ekki „enginn les". |
+| **#6** | sleppa landsbyggð (`Country`) | **FELLD.** Þekjuskerðing á 26,4 prósentum kalla án nokkurs mælds mótvægis; Country-eignir bera spá og eigindi eins og aðrar. |
+| **#7** | sleppa leigu | **FELLD.** 1,0 prósent — undir suðmörkum. *(Hluti leigunnar fellur samt hér, en sem DAUÐ köll — 310 af 556 — af því þau bera ekkert fastnúmer.)* |
+| **#8** | fella `--forward` úr 200 | **ÓSNERT.** Hangir á LIÐ 0 og var ekki á dagskrá þessarar lotu. |
+
+### 8. ÓSNERT
+
+`predictions*`, `valuation_tiers*`, tiers-vélar, brúin, `nightly_delta_chain.sh`,
+`--forward 200`-þakið og **cc134-EXCLUDE-sían í `fetch_extracted_listings_to_value`
+(óbreytt)**. Engin migration, engin skrif í gagnagrunn, ekkert snapshot.
+**Rollback:** `git revert` á commitinu — sían er ein `HAVING`-klausa og eitt
+`LEFT JOIN`; ekkert ástand fylgir henni.

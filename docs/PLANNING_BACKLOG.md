@@ -1582,3 +1582,49 @@ Bókun: `docs/DECISIONS.md` §5D-9. Úttekt:
   hógværðarmerkið §5D-7 liður 3, eða T5-grunnurinn), eða er `comps_index`
   meðvitað látið standa? **Þangað til svarið liggur fyrir má enginn bóka
   comps-flipp sem „notendaáhrif" — þau eru engin, mælt.**
+
+### Viðauki cc150 (logged 2026-08-12) — SÍUR #2 OG #4 ERU INNI; #1 ER EINA LOTAN SEM STENDUR EFTIR AF cc130-BORÐINU
+
+Framkvæmd á cc130-viðaukanum hér að ofan. **Liðir #2 og #4 eru LOKAÐIR** — báðir
+inni í `fetch_listings_needing_extraction` (`app/scripts/extraction_engine.py`),
+bókaðir í `docs/DECISIONS.md` **§5D-10**, úttekt
+`docs/fable_prep/audits/UTDRATTAR_SIUR_CC150_20260812.md` (committuð með bókuninni).
+Biðröð **9.037 → 7.459** (1.578 köll / **$32,69**), mótpróf 0 residential-raðir
+felldar, 0 Haiku-köll í sönnuninni.
+
+- **RÖÐUNARSKULDIN, bókuð svo hún endurtakist ekki.** cc130 setti LIÐ 0
+  (útganginn) ofar öllum síum og gerði „brúin fyrst" að forsendu fyrir að þrengja
+  pickerinn. **Sú forsenda féll í §5D-6**: ákvörðunin sem stöðvar sjálfvirkni
+  brúarinnar (47,4 prósenta margföldunarþakið, cc75 §8 → γ) var þar endurskilgreind
+  sem **endurþjálfunar-verk** (n ≈ 629, holdout utan þjálfunar beggja líkana,
+  mótpróf) — ekki biðstaða heldur ótímabundin frestun. Síurnar biðu því að óþörfu.
+  **Regla: síu-röð sem hangir á öðru verki verður að bera dagsetningu eða
+  mælanlegt skilyrði sem einhver les.** Röðin #2 → #1 → endurmæla #3 stendur
+  að öðru leyti óhögguð.
+
+- **NÆSTA LOTA — dedup-lykill `cc130-#1-naer-eins-sia`.** #1 (nær-eins-sía innan
+  húss, **$32,86** á 30-daga glugganum, stærsti liðurinn og ónæmur á þröskuldinn
+  21,7–41,4 prósent) er **EIGIN LOTA** og hún er hönnunarverk, ekki `HAVING`-klausa:
+  hvernig erfist eiginleikavigurinn — byggingarstigs-reitir frá kjarna klasans,
+  íbúðarstigs-reitir (`balcony_orientation`, `ceiling_height_premium`, fermetrar)
+  sértækir. Hún er **jafnframt gæðabót**: `sameign_cosmetic` er ósamstillt í
+  **51,0 prósentum** klasa með 3+ köllum, óstöðugasti liður af öllum þrettán, og
+  endurtekið kall á nær-eins texta skrifar mótsagnir inn í
+  `building_condition_score`. **Suðgólfs-fyrirvarinn úr cc130-viðaukanum flyst
+  óbreyttur með þessum lið.** Endurmæling #3 kemur á eftir #1, aldrei á undan
+  (skörun 897 köll).
+
+- **#3 / #5 / #6 / #7 STANDA FELLD AF MÆLINGU — endurvakning krefst NÝRRAR
+  mælingar, ekki nýrrar skoðunar.** #3 er tímaþak en ekki bann (62,1 prósent
+  endurtekninga eru nýr texti frá öðrum sala); #5 fellur á því að eigindaleiðin
+  LES EXCLUDE þótt birtingarleiðin geri það ekki; #6 er þekjuskerðing án mælds
+  mótvægis; #7 er undir suðmörkum. **cc150 hreyfir ekkert af þessu.** Þó er eitt
+  mælt sem á að fylgja #7: **310 af 556 dauðu röðunum eru leigu-auglýsingar** —
+  þær falla af síu #2 (ekkert fastnúmer, hvorki verðmat né brú nær þeim), **ekki
+  af því þær eru leiga**. Sá teljari má ekki flytjast yfir í rök fyrir #7.
+
+- **#8 (fella `--forward` úr 200) ÓSNERT og hangir enn á LIÐ 0.** cc150 mældi þó
+  tvennt sem sá liður þarf: koma nýrra hasha er **15,5/dag** (418 á 27 dögum) og
+  biðröðin tæmist á **~40 nóttum** eftir síun. Þakið 200 er því **tæmingarhraði á
+  eftirstöðvum**, ekki jafnvægisstilling — og fyrst þegar biðröðin fer undir 200
+  fellur `day_total` af sjálfu sér.
