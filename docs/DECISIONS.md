@@ -5638,6 +5638,8 @@ Migration-skráin er **skrifuð á disk og bókuð, EKKI keyrð** gegnum Supabas
 3. **`/ops` lyklar backlog á `listings_canonical.category` (AUGLÝSINGAflokk) en verðmatið á `properties.canonical_code` (EIGNAflokk)** — 109 gegn 2.093. Tvær skilgreiningar á „íbúð" á sama spjaldi. (c) gerir teljarana innbyrðis samkvæma en lagar ekki lyklunina sjálfa.
 4. **`v_expected_vs_real` telur á AUGLÝSINGU, ekki eign** (5,25 raðir/eign). Bugðufljót 9 vó þrefalt í sex-raða menginu.
 
+> **➜ FRAMHALD: `### §5D-2 VIÐAUKI (12.08 kl. 10:07Z)` — KOSTUR (c) APPLÝJAÐUR.** Hann stendur **neðst í skránni, á eftir §5D-3**, ekki hér: samhliða lota (cc136) bætti §5D-3 við á meðan cc134 var í keyrslu, og skráin er viðbætandi svo viðaukinn fór aftast frekar en að vera skotið inn hér. **§7 hér að ofan („framkvæmdin er EKKI hluti þessarar ákvörðunar") er þar með úrelt** — lestu viðaukann áður en þú vitnar í tölurnar í §4.
+
 ---
 
 ## 2026-08-12 — §5D-3 · cc136 BRÚARKEYRSLAN 11.08 BÖKKUÐ: raðirnar voru ekki rangar, þær voru OF SNEMMA
@@ -5749,7 +5751,9 @@ Liðurinn sem stóð opinn í §2 er afgreiddur. Rök borðsins: raðirnar eru m
 
 ### §5D-2 VIÐAUKI (12.08 kl. 10:07Z, sama dag) — KOSTUR (c) APPLÝJAÐUR
 
-**§7 hér að ofan stendur óbreytt** („framkvæmdin er EKKI hluti þessarar ákvörðunar", migration óapplýjuð). Sú lesning var rétt þegar hún var skrifuð. Borðið gaf GO síðar sama dag; leiðréttingin stendur hér undir, ekki í stað hennar.
+> *Um staðsetningu:* þessi viðauki tilheyrir **§5D-2** en stendur á eftir **§5D-3** af því að samhliða lota (cc136) bætti §5D-3 við á meðan cc134 var í keyrslu. Skráin er viðbætandi, svo viðaukinn fór aftast frekar en að vera skotið inn ofar. Vísun stendur neðst í §5D-2.
+
+**§7 í §5D-2 hér að ofan stendur óbreytt** („framkvæmdin er EKKI hluti þessarar ákvörðunar", migration óapplýjuð). Sú lesning var rétt þegar hún var skrifuð. Borðið gaf GO síðar sama dag; leiðréttingin stendur hér undir, ekki í stað hennar.
 
 **RÁSIN VAR PSYCOPG2, EKKI MCP.** `apply_migration` var **ótengt í lotunni** (staðfest með þremur ToolSearch-leitum; aðeins `claude-in-chrome`, `context7`, `financial-analysis` til staðar). Borðið heimilaði psycopg2 á transaction pooler gegn **þremur skilyrðum sem smíða jafngildið í stað þess að gefa sér það**, öll uppfyllt: **(1)** `schema_migrations`-færslan skrifuð **í sömu txn og stæðan sjálf** (MCP gerir það sjálfkrafa, psycopg2 ekki — fall skilur því enga munaðarlausa færslu eftir); **(2)** **hvert statement sér** (cc86), átta aðskildar txn-ir, `SET TRANSACTION READ WRITE` fyrsta stæðan í hverri, fall á n stöðvar n+1; **(3)** **spegillinn lesinn orðrétt úr töflunni**, ekki endurritaður úr drögunum. `created_by` ber rásina svo hún sjáist í `schema_migrations` sjálfri en ekki aðeins í skjölum. Versions `20260812002226`–`002233`, **8/8 keyrðar, engin féll**.
 
