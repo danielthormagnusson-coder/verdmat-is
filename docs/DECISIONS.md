@@ -5977,3 +5977,73 @@ Biðröðin mæld gegnum **raunfallið** eftir keyrslu: **0 raðir.** Skilyrta G
 Út af stendur: (1) **`<NULL>`-flokkurinn** — 2.848 raðir með fimmfalt gap, ómælt; (2) **fyrsta mean-alda `base_pct_error`** bíður fyrstu sölu eftir 12.08; (3) **parity-hliðið vaktar enn `median`-höfuðið eitt** (§5D-4 §6, óbreytt af cc142); (4) **STATE.md** var ekki uppfært — cc144 hafði umboð til viðbóta í DECISIONS eingöngu.
 
 **Heimild**: `docs/fable_prep/audits/CC142_BAKFYLLING_20260812.md` (git-afritið, sama nafn og frumritið, með cc144-viðauka aftast) og frumritið `D:\_audit\cc142_verdmats_bakfylling\CC142_BAKFYLLING_20260812.md` + `SONNUN_OG_DREIFING_CC142.md` + `keyrsla_cc142.log` + `stada_FYRIR/EFTIR.json` í sömu möppu. **Sundurliðunarskráin fylgir EKKI í git**: hún ber 12 raða stikkprufu á eignastigi (per-eign spár) og app-repoið er opið og deploy-tengt — raðgögn úr prod fara ekki þangað, aggregat gerir það. Sjá einnig §5D-4 (miðsæknin, forsenda keyrslunnar), §5D-2 + viðauki (cc134-sían) og `scripts/nightly_delta_chain.sh` (cc121-pásukaflinn stendur óréttur sem saga; „LIFANDI HEGÐUN"-kaflinn ber raunstöðuna).
+
+## 2026-08-12 — §5D-6 · cc141 γ-FORPRÓFIÐ: γ ER MÆLT Á RAUNSÖLUM (0,633 [0,317; 0,949]) — γ = 1 HAFNAÐ, γ = 0,5 ÓDÆMT, BRÚIN STENDUR FROSIN OG HLIÐIÐ ER ENDURSKILGREINT MÆLANLEGA
+
+> *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4/§5D-5. Bókuð af **cc144** á verki **cc141** (READ-ONLY lota, `set_session(readonly=True)`, engin skrif í gagnagrunn).
+
+**Málið**: cc81 §9.1 hannaði γ — leiðrétting = `grunn × exp(γ·Σln(1+p_i))`, klemmt á eftir — og mældi hana á **þjálfunarþýði** (0,781 S0 / 0,610 S3). cc81 setti þrjú skilyrði fyrir því að γ færi inn: frysting, **mótpróf á öðru þýði**, og holdout utan þjálfunar **beggja** líkana. cc141 er forprófið sem sker úr hvort γ > 0 yfirhöfuð á **raunverulegum þinglýstum sölum** — ekki hvaða γ, og ekki mótprófið sjálft.
+
+### 1. AÐFERÐ — ENGIN REGLA VAR SPEGLUÐ
+
+Þrjár reglur keyrðu **orðrétt**: `scraper.eigindi_ur_extraction` (sama fall og brúin kallar), `lib/attributes-queries.getAttributes` með **minnis-klienti** (cc136-mynstrið, svo uppruna-forgangur og já-hlutdrægnisían keyri eins og í framleiðslu) og `lib/leidretting.reiknaLeidrettingu` óbreytt. Þakið var **ekki aftengt í vörunni**: fallið skilar `lidir[]` með óklemmdu `pct` og klemman býr aðeins í `breyting_pct`; óklemmda summan er endurreiknuð úr þeim sama lista. **Krossmæling: þakið bítur á 74 af 164 = 45,12 %, gegn 46,23 % sem cc136 mældi á öðru og stærra mengi — samhljóða.**
+
+**Ein bókuð víkkun frá brúnni**, og hún er nauðsyn en ekki þægindi: brúin les aðeins **virka** auglýsingu (`v_eign_virk_auglysing`), og eign sem **seldist** er einmitt eignin sem hverfur úr virka menginu — 4.000 eigna virkt mengi ber aðeins **46** sölur eftir auglýsingadegi. Því var lesið úr `scraper.listings` **án status-síu**. Vörpunarfallið er óhreyft; inntakið er breikkað.
+
+### 2. ÞÝÐIÐ — 284 HRÁPÖR → 163 MÆLD RÖÐ
+
+Hver sía með nefnara: hrápör **284** → ónothæfur samningur −32 → fleiri en ein sala per eign −1 → EXCLUDE/NULL `canonical_code` (cc134) −9 → **nýbygging við sölu −76 (31,4 %)** → berandi ≥ 1 birtanlegan lið −2 → spá í eigin árgangi −1 = **163**. Bil auglýsingar → sölu: miðgildi **32 dagar** (p25 20, p75 59).
+
+**OOS-staðan er byggð inn í árgangsvalið:** valinn er síðasti árgangur sem var **lifandi** þegar salan var þinglýst, svo spáin varð til á undan sölunni. Eina undantekningin eru **5 sölur ≤ 2026-04-21** og þær eru teknar út í `hreint OOS`-specinu (n = 158).
+
+### 3. NIÐURSTAÐAN — ÞRJÚ SVÖR, OG EITT ORÐALAG LEIÐRÉTT
+
+Aðalspec (OLS, `y = log(þinglýst raunverð) − log(grunnspá árgangsins)`, `x` = óklemmd log-summa, HC3): **γ = +0,633, SE 0,161, 95 % CI [+0,317, +0,949], R² 0,122, n = 163.**
+
+1. **γ > 0.** Liðirnir bera raunverulega upplýsingu um sölufrávikið; lagið er ekki hávaði. **Marktækt í 10 af 12 specum við p ≤ 0,0006** (efra markið er árgangs-fixed-effects, z = 3,44). **⚠ LEIÐRÉTTING á §3 audit-skjalsins**, sem segir „p ≤ 0,0006 í hverjum einasta spec": tveir specar bera CI sem nær yfir núll — **án þak-eigna** (n = 90, γ = +1,030, SE 0,560, p ≈ 0,066) og **+fjölskyldu-fixed-effects** (γ = +0,463, SE 0,242, p ≈ 0,056). Bæði punktmötin eru jákvæð og bæði eru specarnir sem taka mestan x-breytileika út (án þak-eigna fjarlægir há-x halann; fjölskyldu-FE gleypa milli-fjölskyldu-breytileikann sem er tvöfaldur — x +0,238 sérbýli á móti +0,098 fjölbýli). **Kraftmissir, ekki formerkjaskipti** — en fullyrðingin sem gildir er sú leiðrétta.
+2. **γ < 1 — staðfest.** z −1,8 til −4,9. **Stöflunin ofmetur**, eins og cc81 mældi á allt öðru þýði. Miðgildisaðferðirnar liggja **lægra** en OLS (Theil-Sen 0,499, quantile 0,528) — halarnir toga γ **upp**, ekki niður, svo robustness-krafan færir svarið nær cc81-S3 (0,610), ekki frá því.
+3. **Samleitnin við cc81 er sjálfstæð:** ólíkt þýði, ólíkt mælitæki, ólíkur estimand — og **0,610 fellur inn í CI allra tólf speca.**
+
+**Spádómar borðsins dæmdir:** „γ < 0,5 á heildinni" → **ÓDÆMD** (CI nær yfir 0,5; punktmatið yfir í OLS, við í miðgildisaðferðum). „Jákvæði endinn ber lægra γ en sá neikvæði" → **ÓDÆMANLEG**, sjá §4. **Nákvæmlega: γ = 1 er hafnað; γ = 0,5 er það ekki.**
+
+### 4. NEIKVÆÐI ENDINN ER ÓMÆLANLEGUR Í ÞESSU ÞÝÐI — SJÁLFSTÆÐ NIÐURSTAÐA
+
+**Aðeins EIN neikvæð lína er til í stuðlaskránni** (`needs_immediate_work`, −13,3 %). Hún kviknar á **5 af 164 eignum (3,0 %)** og aðeins **3** eignir bera nettó-neikvæða summu (−8,73 / −8,22 / −12,19 %) — þ.e. `formerki = neikvæð` er n = **3**, ekki 30 og ekki 300. **Já-hlutdrægni þýðisins er alger: 160 af 163 bera jákvæða summu.**
+
+Þetta staðfestir cc81 §9.3 lið 2b beint úr gögnum: **γ mælt hér er kvarði á JÁKVÆÐA stöflun og þetta þýði mun ekki geta mælt neikvæða endann.** Afleiðingin er bókuð sem regla: **sé γ látið gilda í báðar áttir er −13,3 %-línan færð inn fyrir −13,0 %-klemmuna og klemmumerkið hverfur af eignunum í verstu ástandi — án nokkurrar mælingar sem styður það.** Neikvæði endinn þarf sína eigin mælingu, ekki þessa.
+
+### 5. ÞÝÐIÐ BER EKKI MÓTPRÓF — OG ÞAÐ ER MÆLT, EKKI ÁÆTLAÐ
+
+**Slembihelmingarnir tveir (fastnum jafn/oddatala) gefa γ = 0,405 og 0,796 — munur upp á tvöfalt, á sömu gögnum, af hreinni tilviljun.** Þýðið þolir ekki skiptingu.
+
+Kraftgreining: **n ≈ 82 þarf til að hafna γ = 1 → náð. n ≈ 629 þarf til að hafna γ = 0,5 → vantar ~4× þýðið.** Vöxtur er ~25–45 nýtanleg pör á mánuði, svo **n = 629 næst ekki fyrr en eftir ~12–18 mánuði** af óbreyttri söfnun.
+
+### 6. BRÚIN STENDUR FROSIN — OG HLIÐIÐ ER ENDURSKILGREINT ÚR ÁSTANDI Í MÆLINGU
+
+**γ fer ekki inn núna.** Bilið [+0,317, +0,949] leyfir ekki val á tölu og formið er grunsamlegt (§7). Brúin (eigindalagið, cc133/cc136) **stendur frosin** og cc141 breytti engu lagi.
+
+**Hliðið var ástand („þegar γ er staðfest"); hér er það gert mælanlegt.** Það opnast við **γ staðfest á holdout-endurþjálfunarleið**, þ.e. þegar öll þrjú skilyrðin liggja fyrir: (a) n ≥ ~629 svo γ = 0,5 sé dæmanlegt, (b) holdout **utan þjálfunar beggja líkana**, (c) mótpróf sem þýðið þolir. **Sú leið er ekki forpróf heldur endurþjálfunar-verk**, og það er bókað hér svo enginn reyni hana sem ódýrt skref:
+
+`public.last_listing_text` ber **51.834 pöruð sölu-söluyfirlit (37.671 eignir)** sem standast **nákvæmlega sömu síur** og §2 — 300× stærra þýði. **En 0 þeirra er þinglýst eftir 2026-04-21**: allar liggja **innan** þjálfunargagna apríl-líkansins og allar spár urðu til **eftir** söluna. Að keyra γ þar mælir akkerun, ekki nákvæmni (sama gildran og cc102 bókaði um verðmat keppinautar sótt eftir söludag). Leiðin er **fær en dýr**: útdráttur hefur aðeins verið keyrður á ~50 af 44.418 eignum, og hann er **gagnslaus fyrir γ nema samhliða komi líkan þjálfað án þeirra sölna**.
+
+**SAMLEGÐIN ER BÓKUÐ:** þetta er **sama innviðavinnan** og iter5-áhrifastærðar-próban sem DECISIONS **2026-07-04** („Tveggja laga verðmat") gerði að skilyrði fyrir birtingu skilyrts mats. Þar var forsendan mæld ófullnægð af sömu ástæðu og hér: **aðeins ~24 % þjálfunarraða bera extraction-merki** (rest NaN), svo 133 af 154 features leggja 0,83 % til gain. **Bæði hlið — γ-hliðið og skilyrt-mats-hliðið — bíða sama verks: útdráttur á sögulega corpusið + líkan þjálfað án holdout-sölnanna.** Þau á að skipuleggja sem eitt verk, ekki tvö, og hvorugt opnast af mælingu á 163 röðum.
+
+**Ódýra vaxtarleiðin stendur á meðan og er valin:** endurkeyra `cc141_thydi` / `cc141_lag` / `cc141_gamma` **mánaðarlega** á sama tæki — n ≈ 300 í kringum áramót, n ≈ 629 vorið 2027. **Ekkert nýtt þarf að smíða.**
+
+### 7. KÚPTA LÖGUNIN — BÓKUÐ SEM TILGÁTA FYRIR MÓTPRÓFIÐ, EKKI SEM NIÐURSTAÐA
+
+Milli-bindja myndin (þriðjungar x, meðaltöl):
+
+| þriðjungur | n | x meðaltal | y meðaltal | y ±SE |
+|---|---|---|---|---|
+| T1_lág | 55 | +0,0501 | **−0,0240** | 0,0214 |
+| T2_mið | 54 | +0,1259 | **−0,0268** | 0,0142 |
+| T3_hátt | 54 | +0,2435 | **+0,0656** | 0,0281 |
+
+**T1→T2 er Δy/Δx = −0,04 (engin mælanleg svörun); T2→T3 er +0,78.** Svörunin er **kúpt**: neðri tveir þriðjungar summunnar bera enga svörun, efsti þriðjungurinn ber ~0,8. Innan-þriðjungs-hallarnir (2,12 / 1,30 / 0,55) mæla annað og eru þröngskornir í x — **milli-bindja myndin er áreiðanlegri lestur**, og hún er sjálfstæð vísbending um að **flatur γ sé rangt form**: cc81 §9 (A) fann há-N ofmetið, cc141 finnur lág-x svörunarleysið. Sömu átt, öfugt formerki. **Hvorugt lagast með einni tölu.**
+
+**Bókað sem tilgáta með fyrirfram-ákveðnum dómara, ekki sem niðurstaða:** mótprófið skal keppa **línulegu γ gegn þröskulduðu formi** (svörun frá þröskuldi í x, engin undir) og **OOS ræður** — sami agi og cc102/§5C-12 (fyrirframbókaður rammi) og §5C-13 (dómarinn má ekki vera í inntakinu). Fylgispurningin sem cc81 §9 (A) skilaði stendur með: **ber lág-x svörunarleysið vitni um að neðstu liðirnir séu rangir frekar en að kvarðinn sé rangur?** Það er (A)-verkið, ekki γ-verkið, og það má ekki afgreiðast með γ-tölu.
+
+**Fyrirvari sem er bókaður sem slíkur:** þessi lögunar-mæling er **lýsandi á 163 röðum**, þrjú bindi með 54–55 röðum hvert. Hún er nógu skýr til að vera tilgáta og **ekki nógu sterk til að velja form**.
+
+**Heimild**: `docs/fable_prep/audits/GAMMA_FORPROF_CC141_20260812.md` (í git frá cc144, með cc144-viðauka aftast sem ber p-gildis-leiðréttinguna í §3 lið 1) · mælitækin `cc141_thydi.py` / `cc141_lag.mjs` / `cc141_loader.mjs` / `cc141_gamma.py` í `precompute` @ **`f20140d`** · útkoman (`cc141_inntak.json`, `cc141_lag.json`, `cc141_punktar.csv`, `cc141_dreifirit.png`, `cc141_gamma.json`) liggur **utan git** í `precompute/data/cc141/` og fer þangað ekki: `cc141_punktar.csv` er raðgögn á eignastigi. Sjá einnig cc81 §9.1/§9.3 (γ-hönnunin og skilyrðin), §5D-2 (cc134-sían sem þýðissían notar), DECISIONS 2026-07-04 („Tveggja laga verðmat" — iter5-áhrifastærðar-próban sem hliðið deilir innviðum með).
