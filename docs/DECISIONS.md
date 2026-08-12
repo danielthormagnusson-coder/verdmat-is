@@ -5569,3 +5569,71 @@ Utan beiðninnar en of stórt til að þegja yfir: á **sömu 1.165 eignum**, s�
 Ákvörðunin er kvittuð; **breytingin sjálf var ekki gerð í þessari lotu og má ekki gerast í framhjáhlaupi**. `expected_base`/`expected_extraction` → `real_pred_mean` snertir `scripts/extraction_engine.py:316–317` OG D2-parity-hliðið í `scripts/model_quality_eval.py:557–576 / 874–881`, sem les `p.real_pred_median AS frozen_median` sem viðmið — **hliðið fellur ef aðeins vélin er færð.** Liðurinn er skilgreindur sem sér lota með eigin rowcount-sönnun í `PLANNING_BACKLOG` (viðauki cc123) og er **bindandi forsenda** verðmats-bakfyllingarinnar sem cc121 setti á pásu.
 
 **Heimild**: `D:\_audit\cc123_oos_einvigi\OOS_EINVIGI_CC123_20260808.md` (§0 nefnarar + tækjasannprófun, §1 aðaltafla, §2 hólfun, §3 kvörðunarkostnaður, §4 skekkjuátt T1/T2/T3 + §4.1 rammamunurinn, §5 artifact-krosspróf, §6 dómur, §7 sannprófunarslóð); `D:\_audit\cc120_midsaekni\MIDSAEKNI_CC120_20260808.md` §1.1/§2/§3.2/§3.4/§4/§5; `scripts/model_quality_eval.py:48-52, 186-187, 557-576, 874-881`; `scripts/extraction_engine.py:316-317`; `precompute/rebuild_predictions_iter4.py` (`to_kr`, punktmöt fyrir kvörðun); artifakt `D:\model_artifacts\iter4r_20260805_reglaR_strukt\` (`_predictions.pkl`, `_holdout_rows.csv`, `_manifest.json`); DECISIONS §5C-14 (þröskuldarnir 0,240/0,443), §5C-19 (birtingarreglurnar), §5A-31 (tvær tölur á sama fleti).
+
+## 2026-08-12 — §5D-2 · cc134 EXCLUDE Í VERÐMATSLEIÐINNI → AFSTAÐA BORÐSINS: (a)+(c) SAMAN, (b) FELLD
+
+**Málið**: cc130 §5c (11.08) fann að `scraper.listing_valuations` ber **2.372 frystar raðir á 410 EXCLUDE-eignum** meðan `public.predictions` ber **0 af 56.958 EXCLUDE-eignum** — og það síðara er ÁSETNINGUR (regla R, cc76–cc78). Vélin sem skorar og vélin sem birtir voru ósammála um hvaða flokkur er verðmetanlegur, og sú ósýnilega var sú sem skoraði. cc134 (12.08, READ-ONLY) var forsendumælingin.
+
+**Heimild**: `docs/fable_prep/audits/EXCLUDE_VERDMATSLEID_CC134_20260812T0006Z.md` (§1 þjálfunarþekjan + skorunarprófið, §2 tæmandi neytendalisti m/mældum áhrifum, §3 síuhönnunin, §4 kostirnir, §5 opnir liðir, §6 aðferð).
+
+### 1. Skorunin var ekki „óbirt" — hún var UTAN SKILGREININGARSVIÐS
+
+`D:\training_data_v2.pkl` — sha256[:16] **`32f9a1242b212d11`, endurmælt á diski = `_manifest.json` lifandi líkans**, svo nefnarinn er sannreyndur en ekki gefinn — ber **0 EXCLUDE-raðir af 146.841**, og **enga `NaN`-röð heldur** (summa 12 flokkanna er nákvæmlega 146.841). `canonical_code` er `pandas.Categorical` með **12 flokkum**; við skorun keyrir `phase_d3_score_extract.py:263` `pd.Categorical(vals, categories=cat_map[cat])`, svo `'EXCLUDE'` varpast í **`-1` → `NaN`**. Eiginleiki með 2,87 prósenta gain hverfur og röðin fer niður grein sem **engin þjálfunarröð þjálfaði**.
+
+**Sannprófað með skorun, ekki ályktað.** Parity fyrst, annars mælir prófið ekki vélina: 201 EXCLUDE-eignir undir lifandi stimpli, adapter gegn frystu töflunni — **max |Δ| = 0 kr, 201/201**. Á sömu 410 eignum, aðeins `canonical_code` breytt:
+
+| þvingað í | meðal \|Δ\| gegn EXCLUDE |
+|---|---|
+| `APT_FLOOR` | **3,10 %** |
+| `ROW_HOUSE` | 4,33 % |
+| `SFH_DETACHED` | 7,86 % |
+
+**Flokkurinn skiptir nánast engu.** Talan er „íbúð af þessari stærð í þessu matsvæði", knúin af `EINFLM` (30,17 % gain) og matsvæðinu (30,13 % samanlagt). **82 eignanna (20,0 %) hafa ekkert byggingarflatarmál** og bera samt 22,12 M kr að meðaltali — sumarbústaðaland 19,94 M, íbúðarhúsalóð 26,82 M, 1,81 ma. kr bókfært alls. Gegn ásettu verði er MdAPE **60,2 %** gegn 7,7 % á `APT_FLOOR`.
+
+### 2. Mengunin var mæld á báðum nefnurum
+
+`scraper.v_expected_vs_real`, 23.605 raðir / 206 seldar; EXCLUDE er 10,05 % af heild og 2,9 % af seldum:
+
+| mæling | ALLT | ÁN EXCLUDE | Δ |
+|---|---|---|---|
+| `base_pct_error` bjagi (auglýsingastig, n=206) | +8,22 % | **+6,06 %** | 2,16 pp |
+| MAPE | 15,50 % | **13,56 %** | 1,94 pp |
+| sama á **eignastigi** (n=82) | +5,46 % | **+3,16 %** | 2,30 pp |
+| **`extraction_gap` meðaltal (n=23.605)** | +0,2721 M kr | **+0,4927 M kr** | **−45 %** |
+
+Áhrifin standa á BÁÐUM nefnurum — þetta er ekki tvítalningar-tálsýn. `extraction_gap` er versta línan: **10 % af röðunum lækka mælt framlag útdráttarins um 45 %**, og EXCLUDE-raðirnar draga í ÖFUGA átt við alla aðra flokka.
+
+### 3. Rótin: hliðið var TIL, en í röngu falli
+
+`phase_d3_score_extract.main()` (línur 451–464) ber þriggja hliða trekt — `is_residential | is_summerhouse`, `byggar.notna()`, `matsvaedi_confident`. **`value_listings` kallar `score()` BEINT** gegnum `_score_iter4` og sleppir öllum þremur. Sían var skrifuð í **keyrslu-drifið, ekki í vélina**. Sama gerð og cc112 (hlið á mælingu en ekki á skrifleið) og cc94 (`flatten_row`-skynjarinn í falli sem keðjan kallaði aldrei). Sbr. `feedback_hlid_a_maelingu_en_ekki_a_skrifleid`.
+
+### 4. AFSTAÐA BORÐSINS (12.08): (a)+(c) SAMAN
+
+**(a) SÍA FRAMVEGIS — GERT.** Ein WHERE-lína í `fetch_extracted_listings_to_value` (`scripts/extraction_engine.py`): `AND pr.canonical_code <> 'EXCLUDE'`. `public.properties` var þegar í JOIN-inu, svo engin ný tenging. Borðið valdi S1-orðalagið; **mælt að S1 og S2 (`NOT (is_residential OR is_summerhouse)`) eru SAMA MENGIÐ — 0 frávik af 232.887 eignum**, svo línan má lesast sem hvort tveggja. Sannprófað gegnum RAUNVERULEGA fallið (SQL-strengurinn fangaður úr því, ekki handskrifað afrit — cc113-lexían): biðröð **20.270 → 18.177**, 2.093 burt (10,33 %), **0 EXCLUDE eftir**, og cc128-falsy-hegðunin ósnert (`None`→18.177, `0`→0, `5`→5).
+
+**(c) UNDANSKILJA Á MÆLIFLÖTUNUM — HANNAÐ, ÓAPPLÝJAÐ.** `supabase/migrations/20260812002226_cc134_exclude_utilokun_maelifleti.sql` (+ rollback). Ný `scraper.v_expected_vs_real_all` er ósíaða heimildin (allar 23.605 raðirnar + nýr `canonical_code`-dálkur); `scraper.v_expected_vs_real` verður `SELECT * FROM …_all WHERE canonical_code IS DISTINCT FROM 'EXCLUDE'`. Sjö teljarar í `ops_scraper_signals()` fá sömu síu. **Líkami sýnarinnar var keyrður sem `SELECT` á lifandi DB í read-only txn**: 23.605 ósíað / 21.233 síað, 33 dálkar í óbreyttri röð + `canonical_code` aftast (skilyrði `CREATE OR REPLACE VIEW`), og mælingin endurgerð: 8,22 → 6,06.
+
+**(b) HREINSUN GAMALLA RAÐA — FELLD.** Þær 2.372 standa. Þær eru **söguleg heimild um hvað vélin sagði**, sömu rök og cc116 fyrir 20.642 sögulegu raðirnar og cc131 fyrir sama flokk („ekki endurbyggingarefni"). Óafturkræft er of dýrt fyrir hreinlæti sem (c) leysir án þess að eyða neinu.
+
+**(a) og (c) LOKA HVOR ANNARRI.** (a) ein hefði skilið eftir **varanlegt gólf 109** í `/ops` `backlog.unprocessed` — auglýsingar sem vélin sækir aldrei framar en spjaldið teldi sem ógert verk að eilífu. (c) fjarlægir nákvæmlega þær 109. Backlog-teljararnir ÞRÍR fá sömu síu svo samlagningin haldi: **11.792 = 4.156 + 7.636** (var 11.944 = 4.199 + 7.745).
+
+### 5. BÓKAÐ SÉRSTAKLEGA: cc120-talan var hrein FYRIR TILVILJUN
+
+cc120 §3.2 birti **+7,84 %** sem gæðatölu. Sá nefnari (n=180) krafðist tengingar við `public.predictions_2026_04` til að endurheimta samfrysta meðaltalið — og **spátöflurnar bera 0 EXCLUDE-eignir**, svo **öll sex seldu EXCLUDE-röðin féllu út af sjálfum sér** (mælt í dag: 6/6 utan apríl-árgangs, 186/200 af hinum innan hans). **cc120-talan var því rétt — en hún var rétt af því að tenging sem mælingin þurfti í ÖÐRUM tilgangi virkaði óvart sem EXCLUDE-sía.**
+
+Sá sem spyr sýnina beint — `select avg(base_pct_error) from scraper.v_expected_vs_real`, augljósasta leiðin og sú sem næsta lota fer — fékk **+8,22 %**. **Þetta er lexían sem ver næstu mælingu: hrein tala sem enginn hannaði til að vera hrein er ekki vörn, hún er heppni sem rennur út.** Það er nákvæmlega ástæðan fyrir að (c) fer í SÝNINA en ekki í hverja mælingu fyrir sig — sía sem þarf að MUNA eftir er ekki sía, hún er minnisatriði sem bíður eftir að gleymast.
+
+### 6. Glugginn var réttur
+
+Verðmats-þrepið hefur verið í PÁSU frá 09.08 (`EXTRACT_VALUE_LIMIT=0` → `--skip-valuation`, cc121), svo sían fór inn án þess að nokkuð væri í keyrslu og engin röð er í hættu. Kostnaður **$0,00 í allar áttir** — verðmats-þrepið gerir engin Haiku-köll; útdrættirnir voru þegar keyptir. Þetta var aldrei sparnaðarákvörðun.
+
+### 7. Framkvæmdin er EKKI hluti þessarar ákvörðunar
+
+Migration-skráin er **skrifuð á disk og bókuð, EKKI keyrð** gegnum Supabase MCP `apply_migration`. HALT stendur fyrir framkvæmd. Þegar hún er applýjuð skal endurmæla teljarana sjö gegn töflunni í §4 hér að ofan — ekki treysta á að þeir hafi lent rétt.
+
+### 8. Opnir liðir sem mælingin fann (PLANNING_BACKLOG, viðauki cc134)
+
+1. **`APT_SENIOR` — 89 BIRTAR spár á óþjálfuðum flokki.** `public.properties` ber 14 `canonical_code`-gildi, þjálfunin 12; umframgildin eru `EXCLUDE` (útilokað með ásetningi) og **`APT_SENIOR`, sem er hvergi útilokað og ber spá á öllum 89 eignum**. Sannprófað: adapter gegn `public.predictions`, **max |Δ| = 0 kr, 89/89** — birtu spárnar voru raunverulega reiknaðar með `canonical_code = NaN`. **Þetta fellir einföldunina „birtingarleiðin útilokar það sem líkanið kann ekki".** Sjálfstætt mál, ekki leyst hér.
+2. **531 eign / 2.716 raðir í biðröðinni sem eru íbúðarhæfar en bera samt enga spá** — SUMMERHOUSE 16,18 % af flokknum, SFH_DETACHED 8,33 %, APT_FLOOR 2,47 %. Þetta er halinn sem S4 (`EXISTS predictions`) hefði tekið; S4 var ekki valin því hún er hlið á afurð annarrar vélar sem er endurbyggð per flipp.
+3. **`/ops` lyklar backlog á `listings_canonical.category` (AUGLÝSINGAflokk) en verðmatið á `properties.canonical_code` (EIGNAflokk)** — 109 gegn 2.093. Tvær skilgreiningar á „íbúð" á sama spjaldi. (c) gerir teljarana innbyrðis samkvæma en lagar ekki lyklunina sjálfa.
+4. **`v_expected_vs_real` telur á AUGLÝSINGU, ekki eign** (5,25 raðir/eign). Bugðufljót 9 vó þrefalt í sex-raða menginu.

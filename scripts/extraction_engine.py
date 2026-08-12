@@ -212,6 +212,60 @@ def fetch_extracted_listings_to_value(pg, limit=None):
         -- stöðva verðmat á öllu safninu sem fyrir er. Tvö spillt ár lifa þar og
         -- eru viðfangsefni ÞREPS B2, ekki þessarar síu.
         AND (e.validation_status IS NULL OR e.validation_status NOT LIKE 'rejected:%%')
+        -- ── cc134 SKORUNARHLIÐIÐ — SAMA ÚTILOKUN OG BIRTINGARLEIÐIN ──────────
+        -- Hliðið var TIL, en í röngu falli. `phase_d3_score_extract.main()`
+        -- (línur 451-464) ber þriggja hliða trekt:
+        --     is_scorable = is_residential | is_summerhouse   <- þetta hlið
+        --     has_byggar  = byggar.notna()
+        --     is_confident= matsvaedi_confident
+        -- `value_listings` kallar `score()` BEINT gegnum `_score_iter4` og
+        -- sleppir því öllum þremur. Sama gerð og cc112 (hlið á mælingu en ekki
+        -- á skrifleið) og cc94 (`flatten_row`-skynjarinn í falli sem keðjan
+        -- kallaði aldrei): sían var skrifuð í keyrslu-drifið, ekki í vélina.
+        --
+        -- ATH. ENGIN PRÓSENTUMERKI Í ÞESSUM ATHUGASEMDUM — skrifaðu orðið.
+        -- Strengurinn fer í `cur.execute(sql, params)`, svo psycopg2 les hvert
+        -- prósentumerki sem placeholder — líka inni í SQL-athugasemd, því
+        -- interpólunin gerist á undan parsernum. Bert prósentumerki hér fellir
+        -- næturkeyrsluna með `IndexError: tuple index out of range` ÁÐUR en
+        -- nokkur röð er sótt. Eina leyfða notkunin í þessu falli er tvöfölduð
+        -- (`rejected:` -liðurinn að ofan), sem psycopg2 skilar sem einu merki.
+        -- Fannst í sannprófun cc134 12.08 — á þessari sömu athugasemd.
+        --
+        -- MÆLT cc134 (12.08, read-only): `training_data_v2.pkl` — sha256[:16]
+        -- 32f9a1242b212d11, endurmæld = manifest lifandi líkans — ber 0
+        -- EXCLUDE-raðir af 146.841 og enga NaN-röð. `canonical_code` er pandas
+        -- Categorical með 12 flokkum; EXCLUDE er ekki í þeim, svo
+        -- `pd.Categorical('EXCLUDE', categories=<12>)` -> -1 -> NaN
+        -- (phase_d3_score_extract.py:263). Eiginleiki með 2,87 prósenta gain
+        -- hverfur og röðin fer niður grein sem ENGIN þjálfunarröð þjálfaði.
+        -- Skorað í minni á 410 EXCLUDE-eignum: að þvinga flokkinn í APT_FLOOR
+        -- færir töluna um 3,10 prósent að meðaltali — talan er „íbúð af þessari
+        -- stærð hér", ekki mat á atvinnuhúsnæði. 82 eignanna hafa ekkert
+        -- byggingarflatarmál og bera samt 22,12 M kr að meðaltali
+        -- (sumarbústaðaland 19,94 M). Gegn ásettu verði: MdAPE 60,2 gegn 7,7 á
+        -- APT_FLOOR.
+        --
+        -- BORÐIÐ VALDI S1 (12.08). Mælt að S1 og S2 eru SAMA MENGIÐ:
+        -- `canonical_code = 'EXCLUDE'` og `NOT (is_residential OR is_summerhouse)`
+        -- greinir á um 0 eignir af 232.887. S2 er orðalag birtingarleiðarinnar,
+        -- S1 er orðalagið sem borðið bókaði; þau eru jafngild og línan má lesast
+        -- sem hvort tveggja.
+        --
+        -- NULL FELLUR MEÐ, AF ÁSETTU RÁÐI. `<>` sleppir NULL, og það er RÉTT
+        -- hegðun hér en ekki í cc94-línunni að ofan: NULL `canonical_code` fer
+        -- sömu leið í NaN og EXCLUDE, svo fail-closed er eina stefnan sem
+        -- samræmist reglunni. Mælt í dag: 0 af 232.887 eignum bera NULL, svo
+        -- línan fjarlægir ekkert umfram EXCLUDE eins og er.
+        --
+        -- ÁHRIF Á BIÐRÖÐINA, mælt 12.08: 20.270 -> 18.177 raðir (2.093 burt,
+        -- 10,33 prósent; 415 eignir). Kostnaður $0,00 — verðmats-þrepið gerir engin
+        -- Haiku-köll. Þessi lína snertir ENGA röð sem þegar er í töflunni: hún er
+        -- á VERKEFNASKRÁNNI. Gömlu 2.372 raðirnar standa (ákvörðun borðsins,
+        -- kostur (b) FELLDUR — söguleg heimild um hvað vélin sagði, sömu rök og
+        -- cc116 fyrir 20.642 sögulegu raðirnar). Hreinsun MÆLINGARINNAR er
+        -- kostur (c) og býr í scraper.v_expected_vs_real + ops_scraper_signals().
+        AND pr.canonical_code <> 'EXCLUDE'
       ORDER BY l.source_listing_id, l.last_seen_at DESC NULLS LAST
       -- cc128 FALSY-GILDRAN LOKUÐ. Skilyrðið var `if limit` — og 0 er falsy, svo
       -- LIMIT-liðurinn FÉLL ÚT og limit=0 skilaði ALLRI biðröðinni. Mælt á lifandi
