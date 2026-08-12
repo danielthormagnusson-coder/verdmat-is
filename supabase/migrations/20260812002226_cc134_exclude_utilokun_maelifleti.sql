@@ -1,3 +1,76 @@
+-- cc134 KOSTUR (c) — EXCLUDE UNDANSKILIÐ Á MÆLIFLÖTUNUM.
+-- APPLÝJAÐ 2026-08-12 gegnum psycopg2 á transaction pooler (port 6543).
+--
+-- ⚠ RÁSIN VAR EKKI SUPABASE MCP. `apply_migration` var ÓTENGT í lotunni
+--   (staðfest með þremur ToolSearch-leitum: `+supabase apply_migration`,
+--   `select:mcp__supabase__apply_migration,…`, `apply_migration` — engin
+--   niðurstaða; aðeins claude-in-chrome, context7 og financial-analysis
+--   voru til staðar). Borðið heimilaði psycopg2 gegn ÞREMUR SKILYRÐUM sem
+--   smíða jafngildið í stað þess að gefa sér það:
+--     (1) schema_migrations-færslan skrifuð Í SÖMU TXN og stæðan sjálf —
+--         MCP gerir það sjálfkrafa, psycopg2 ekki. Fall á stæðu skilur því
+--         enga munaðarlausa færslu eftir.
+--     (2) hvert statement sér: átta aðskildar txn-ir, hver með
+--         `SET TRANSACTION READ WRITE` sem FYRSTU stæðu (þriðja
+--         birtingarmynd pooler-gildrunnar; cc113 og þrep 8 féllu á henni).
+--         Fall á stæðu n stöðvar n+1 — engin blindkeyrsla áfram.
+--     (3) þessi skrá er SPEGILL úr töflunni, ekki drögin (sjá neðar).
+--   `created_by` ber rásina svo hún sjáist í töflunni sjálfri en ekki
+--   aðeins í þessari athugasemd.
+--
+-- Applýjað sem ÁTTA aðskildar stæður (cc86-venjan: eitt statement í einu svo
+-- fall sé staðbundið og sjáist á sínum stað í schema_migrations),
+-- versions 20260812002226 .. 20260812002233, samfellt og í röð:
+--
+--   20260812002226  cc134_01_v_expected_vs_real_all
+--   20260812002227  cc134_02_comment_all
+--   20260812002228  cc134_03_v_expected_vs_real_sia
+--   20260812002229  cc134_04_comment_sia
+--   20260812002230  cc134_05_revoke_all_syn
+--   20260812002231  cc134_06_ops_scraper_signals
+--   20260812002232  cc134_07_revoke_ops_fall
+--   20260812002233  cc134_08_grant_ops_service_role
+--
+-- ⚠ ÞESSI SKRÁ ER SPEGILL, SÓTTUR ORÐRÉTT ÚR
+--   supabase_migrations.schema_migrations.statements — EKKI endurritun úr
+--   drögunum. Munurinn skiptir máli: endurrituð migration getur vikið frá því
+--   sem raunverulega var keyrt án þess að nokkur sjái það. Lesturinn var
+--   borinn saman við drögin við speglun: ENGIN FRÁVIK — drögin voru keyrð óbreytt.
+--
+-- ⚠ ÞVERSÖGN SEM MÁ EKKI „LAGAST": stæða 01 hér að neðan ber innbyggðan haus
+--   draganna, þar á meðal línuna „ÓAPPLÝJUÐ … hefur EKKI verið keyrð" og
+--   for-apply tölurnar úr DECISIONS §5D-2 §4 (11.944 -> 11.792). Sá texti var
+--   hluti af statement-inu sem var raunverulega keyrt og stendur ÞVÍ ÓBREYTTUR
+--   — að snyrta hann hér væri að falsa spegilinn. ÞESSI HAUS GILDIR þar sem
+--   þeim ber á milli: skráin ER applýjuð, og réttu eftir-tölurnar eru þær sem
+--   standa hér að neðan.
+--
+-- EFTIRMÆLING (skylda skv. GO, mæld eftir apply með því að KALLA
+-- ops_scraper_signals(), ekki með endurrituðu SQL):
+--   total_valuations      23.605 -> 21.233      live_res_sale        11.993 -> 11.840
+--   val_count_latest_day   2.000 ->  1.821      live_res_sale_valued  4.199 ->  4.156
+--   syn_radir             23.605 -> 21.233      unprocessed           7.794 ->  7.684
+--   base_pct_error bjagi   +8,67 -> +5,55       MAPE                  14,93 -> 11,98
+--   samlagning heldur: 11.840 = 4.156 + 7.684 · ferskleiki ÓSÍAÐUR eins og til stóð
+--   v_expected_vs_real_all ber `canonical_code` í sæti 34 (vantaði í cc120)
+--   Nefnararnir eru hærri en í DECISIONS §5D-2 §4 af því að gögnin hreyfðust
+--   milli mælingar (00:06) og apply — 49 nýjar auglýsingar og 53 nýjar seldar
+--   raðir úr daily_sales_refresh. Forspá var því reiknuð á FERSKUM gögnum rétt
+--   fyrir apply og öll níu gildin lentu á henni upp á tölu.
+--
+-- RÉTTINDI mæld á pg_class.relacl / pg_proc.proacl (cc105-reglan — grantor og
+-- PUBLIC-grants sjást hvergi í information_schema):
+--   scraper.v_expected_vs_real_all   {postgres=arwdDxtm/postgres}
+--   scraper.v_expected_vs_real       <engin skráð — erfir eiganda>
+--   public.ops_scraper_signals()     {postgres=X/postgres,service_role=X/postgres}
+--   aclexplode á nýju sýninni: anon/authenticated/public bera EKKERT.
+--
+-- ROLLBACK: supabase/rollback/20260812002226_cc134_exclude_utilokun_maelifleti_rollback.sql
+-- Ákvörðun: DECISIONS §5D-2 · úttekt:
+-- docs/fable_prep/audits/EXCLUDE_VERDMATSLEID_CC134_20260812T0006Z.md
+-- ============================================================================
+
+-- ── 20260812002226  cc134_01_v_expected_vs_real_all ─────────────────────────────
 -- cc134 KOSTUR (c) — EXCLUDE UNDANSKILIÐ Á MÆLIFLÖTUNUM
 -- ============================================================================
 -- ÓAPPLÝJUÐ. Þessi skrá er HÖNNUN, skrifuð á diski og bókuð; hún hefur EKKI
@@ -124,11 +197,12 @@ LEFT JOIN LATERAL (
   WHERE l3.unit_key = l.unit_key
 ) ph ON true;
 
+-- ── 20260812002227  cc134_02_comment_all ────────────────────────────────────────
 COMMENT ON VIEW scraper.v_expected_vs_real_all IS
   'cc134: ÓSÍAÐA heimildin — allar raðir listing_valuations, líka EXCLUDE. '
   'Notaðu v_expected_vs_real fyrir MÆLINGAR; þessa fyrir sögu og þekjumat.';
 
-
+-- ── 20260812002228  cc134_03_v_expected_vs_real_sia ─────────────────────────────
 -- ── 2. MÆLIFLÖTURINN ────────────────────────────────────────────────────────
 -- CREATE OR REPLACE heldur nafninu, dálkaröðinni og öllum 33 dálkunum óbreyttum
 -- og bætir `canonical_code` AFTAST (Postgres leyfir aðeins viðbót í enda —
@@ -148,12 +222,13 @@ SELECT *
 FROM scraper.v_expected_vs_real_all
 WHERE canonical_code IS DISTINCT FROM 'EXCLUDE';
 
+-- ── 20260812002229  cc134_04_comment_sia ────────────────────────────────────────
 COMMENT ON VIEW scraper.v_expected_vs_real IS
   'cc134: MÆLIFLÖTUR — EXCLUDE undanskilið (líkanið var aldrei þjálfað á '
   'flokknum; mengaði base_pct_error um 2,16 pp og extraction_gap um 45 prósent). '
   'Raðirnar sjálfar standa í töflunni og sjást í v_expected_vs_real_all.';
 
-
+-- ── 20260812002230  cc134_05_revoke_all_syn ─────────────────────────────────────
 -- ── 3. GRANTS ───────────────────────────────────────────────────────────────
 -- scraper-skemað er ekki opið PostgREST og v_expected_vs_real ber engin grants
 -- nema eiganda (mælt cc134: aðeins `postgres`). Nýja sýnin á að erfa sama
@@ -161,7 +236,7 @@ COMMENT ON VIEW scraper.v_expected_vs_real IS
 -- skv. reglunni í CLAUDE.md.
 REVOKE ALL ON scraper.v_expected_vs_real_all FROM anon, authenticated;
 
-
+-- ── 20260812002231  cc134_06_ops_scraper_signals ────────────────────────────────
 -- ── 4. /ops TELJARARNIR ─────────────────────────────────────────────────────
 -- Óbreytt frá 20260628093000_ops_scraper_signals.sql NEMA fjórir teljarar sem
 -- snerta listing_valuations + þrír backlog-teljarar. search_path='' stendur, svo
@@ -250,5 +325,9 @@ AS $$
   );
 $$;
 
+-- ── 20260812002232  cc134_07_revoke_ops_fall ────────────────────────────────────
 REVOKE ALL ON FUNCTION public.ops_scraper_signals() FROM PUBLIC, anon, authenticated;
+
+-- ── 20260812002233  cc134_08_grant_ops_service_role ─────────────────────────────
 GRANT EXECUTE ON FUNCTION public.ops_scraper_signals() TO service_role;
+

@@ -451,3 +451,125 @@ mælingarniðurstaða, ekki sem ákvörðun.
 
 **HALT.** Engin sía sett, engu eytt, engri vél breytt. Kostirnir fjórir (+ samsetti
 (a)+(c)) bíða ákvörðunar borðsins.
+
+---
+
+## 7. VIÐAUKI 12.08 kl. 10:07Z — KOSTUR (c) APPLÝJAÐUR
+
+**Þessi kafli er viðbót eftir á. §0–§6 hér að ofan standa ÓBREYTT eins og þau
+voru skrifuð fyrir apply** — þar á meðal setningin í §4 um að migration væri
+óapplýjuð. Sú lesning var rétt þegar hún var skrifuð og er leiðrétt hér að
+neðan, ekki þurrkuð út (sama regla og cc105 fylgdi).
+
+### 7.1 RÁSIN VAR PSYCOPG2, EKKI SUPABASE MCP — OG JAFNGILDIÐ VAR SMÍÐAÐ
+
+`apply_migration` var **ótengt í lotunni**. Staðfest með þremur ToolSearch-leitum
+(`+supabase apply_migration`, `select:mcp__supabase__apply_migration,…`,
+berum `apply_migration`) — engin niðurstaða; aðeins `claude-in-chrome`,
+`context7` og `financial-analysis` voru til staðar. Borðið heimilaði psycopg2 á
+transaction pooler gegn **þremur skilyrðum**, sem öll voru uppfyllt:
+
+| # | skilyrði | hvernig það var uppfyllt | sannprófun |
+|---|---|---|---|
+| 1 | `schema_migrations` handvirkt, **í sömu txn og stæðan** | `INSERT` í `supabase_migrations.schema_migrations` er inni í sama txn og DDL-ið; fall veltur báðum til baka | 8 færslur, `20260812002226`–`002233`, `n_stmt = 1` hver |
+| 2 | **hvert statement sér** (cc86), `SET TRANSACTION READ WRITE` fyrst, fall á n stöðvar n+1 | átta aðskildar txn-ir; `SET TRANSACTION READ WRITE` er fyrsta stæðan í hverri; `raise` eftir `rollback()` stöðvar lykkjuna | 8/8 keyrðar, engin féll |
+| 3 | **spegill úr töflunni**, ekki úr drögunum | `supabase/migrations/20260812002226_…sql` endurskrifuð úr `schema_migrations.statements` | sjá §7.4 |
+
+`created_by` ber rásina (`… (psycopg2, cc134 — MCP ótengt)`) svo hún sjáist **í
+töflunni sjálfri**, ekki aðeins í þessu skjali. Næsta lota sem les
+`schema_migrations` sér því strax að þessar átta færslur komu ekki frá MCP.
+
+**Af hverju þetta var ekki hljóðlát rásaskipti:** MCP-leiðin gerir tvennt
+sjálfkrafa sem psycopg2 gerir ekki — hún skráir migrationina og hún bindur
+skráninguna við keyrsluna. Skilyrðin þrjú eru nákvæmlega þessi tvö atriði
+handsmíðuð, plús krafan um að spegillinn sanni hvað var keyrt. **Jafngildið var
+því smíðað, ekki gefið sér.**
+
+### 7.2 EFTIRMÆLING — NEFNARARNIR HREYFÐUST, OG ÞAÐ ER SJÁLFSTÆÐ NIÐURSTAÐA
+
+Milli mælingarinnar kl. 00:06 og apply kl. ~10:00 **breyttust lifandi gögnin**:
+49 nýjar virkar auglýsingar og **53 nýjar seldar raðir** úr `daily_sales_refresh`
+(206 → 259 raðir með `base_pct_error`). **Töflurnar í DECISIONS §5D-2 §4 eru því
+ekki lengur beinn samanburður** — þær mældu annan nefnara.
+
+Þess vegna var **forspá reiknuð á FERSKUM gögnum rétt fyrir apply**, svo
+sannprófunin yrði forspárpróf en ekki eftiráskýring. Teljararnir voru síðan
+lesnir eftir apply með því að **kalla `ops_scraper_signals()`** — sömu leið og
+`/ops` fer — ekki með endurrituðu SQL.
+
+| teljari | fyrir | forspá | **MÆLT** | |
+|---|---|---|---|---|
+| `total_valuations` | 23.605 | 21.233 | **21.233** | ✓ |
+| `val_count_latest_day` | 2.000 | 1.821 | **1.821** | ✓ |
+| `backlog.live_res_sale` | 11.993 | 11.840 | **11.840** | ✓ |
+| `backlog.live_res_sale_valued` | 4.199 | 4.156 | **4.156** | ✓ |
+| `backlog.unprocessed` | 7.794 | 7.684 | **7.684** | ✓ |
+| `v_expected_vs_real` raðir | 23.605 | 21.233 | **21.233** | ✓ |
+| `base_pct_error` bjagi | +8,67 % | +5,55 % | **+5,55 %** | ✓ |
+| MAPE | 14,93 % | 11,98 % | **11,98 %** | ✓ |
+| n seldar | 259 | 252 | **252** | ✓ |
+
+**Öll níu gildin lentu á forspánni upp á tölu.** Samlagningin heldur:
+**11.840 = 4.156 + 7.684**. Ferskleikalínan (`valuation_max`) er **ósíuð** eins og
+til stóð — hún svarar „keyrði vélin", ekki „hvað skrifaði hún".
+
+**Gólfið 109 er farið.** `unprocessed` féll um 110 (109 EXCLUDE + 1 sem varð
+verðmetin/afskráð í millitíðinni), og (a)+(c) eru þar með báðar inni.
+
+**Um 8,22 → 6,06 úr GO-inu:** sú tala var rétt á 00:06-nefnaranum (n=206). Á
+10:07-nefnaranum (n=259) er hún **8,67 → 5,55**. Áttin og stærðin standa
+(≈3,1 pp), en **talan sjálf er nefnaraháð og má ekki vitna í hana án dagsetningar.**
+
+### 7.3 SKILYRÐI GO-INS: `canonical_code`-DÁLKURINN
+
+`scraper.v_expected_vs_real_all` ber **`canonical_code` í sæti 34**. Báðar sýnir
+bera 34 dálka (33 upprunalegir + nýi aftast), sem er skilyrði
+`CREATE OR REPLACE VIEW`. Þetta er dálkurinn sem vantaði í cc120 og er ástæðan
+fyrir að EXCLUDE-halinn sást ekki þá.
+
+### 7.4 SPEGILLINN — OG ÞVERSÖGNIN SEM MÁTTI EKKI „LAGAST"
+
+Statements voru lesin **orðrétt úr `schema_migrations.statements`** og skráin
+endurskrifuð af þeim lestri. Lesturinn var borinn saman við drögin: **0 frávik af
+8 — drögin voru keyrð óbreytt.**
+
+Samanburðurinn er festur við **git-útgáfu draganna (`581e092`)**, ekki við skrána
+á diski. Fyrsta útgáfa speglunar-skriptsins las drögin af diski og gaf því
+`0 frávik` í fyrstu keyrslu en `8 frávik` í annarri — af því að það var þá farið
+að bera töfluna saman við spegilinn sem það hafði sjálft skrifað. **Sannprófun
+sem skiptir um merkingu við aðra keyrslu er ekki sannprófun**; hún er nú
+idempotent (sama sha, sama dómur, endurtekið).
+
+**Þversögn sem stendur af ásettu ráði:** stæða 01 ber innbyggðan haus draganna,
+þar á meðal línuna *„ÓAPPLÝJUÐ … hefur EKKI verið keyrð"* og for-apply tölurnar
+(11.944 → 11.792). Sá texti **var hluti af því sem var keyrt** og stendur því
+óbreyttur — að snyrta hann væri að falsa spegilinn. Skráarhausinn ber viðvörun um
+að hann gildi þar sem þeim ber á milli.
+
+| skrá | sha256[:16] |
+|---|---|
+| drögin sem voru keyrð (`581e092`) | `870a25195041f3ff` |
+| **spegillinn úr töflunni** | **`efd673ceed639ed9`** |
+| rollback (ósnertur) | `cc09761ba588d2fd` |
+
+### 7.5 RÉTTINDI — MÆLD Á `relacl`/`proacl`, EKKI `information_schema`
+
+cc105-reglan: grantor og `PUBLIC`-grants sjást hvergi í `information_schema`.
+
+| object | ACL |
+|---|---|
+| `scraper.v_expected_vs_real_all` | `{postgres=arwdDxtm/postgres}` |
+| `scraper.v_expected_vs_real` | `<engin skráð — erfir eiganda>` |
+| `public.ops_scraper_signals()` | `{postgres=X/postgres,service_role=X/postgres}` |
+
+`aclexplode` á nýju sýninni: **`anon`, `authenticated` og `PUBLIC` bera EKKERT.**
+Nýja sýnin er því jafn lokuð og sú sem fyrir var, sagt berum orðum í migrationinni
+frekar en látið ráðast af default privileges.
+
+### 7.6 HVAÐ STENDUR EFTIR
+
+Óbreytt frá §5: fjórir opnir liðir á `PLANNING_BACKLOG` (`APT_SENIOR` fremst).
+Verðmats-þrepið er **áfram í pásu** (`EXTRACT_VALUE_LIMIT=0`) — cc134 breytti því
+ekki og átti ekki að gera það. Rollback er óbreyttur og gildur; hann skilar
+`v_expected_vs_real` beint á töfluna, sleppir `_all` og setur teljarana sjö í
+fyrra horf.

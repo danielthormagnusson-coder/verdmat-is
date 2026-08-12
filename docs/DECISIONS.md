@@ -5746,3 +5746,33 @@ Liðurinn sem stóð opinn í §2 er afgreiddur. Rök borðsins: raðirnar eru m
 **Þriðja eignin á þakinu er 2522544 og hún kemur frá 07:43-lotunni, ekki frá endurvirkjuninni** — hún fór úr **1 lið í 6** og þar með á þakið. **Endurvirkjunin sjálf hreyfði þakfjöldann ekki**: `2013952` stóð í 12 liðum fyrir og eftir (raðirnar fjórar — `annad`, `badherbergi`, `geymsla`, `golfefni` — bera engan lykil sem stuðull virkjast á) og `2230688` fór úr 8 í 9 liði (`thvottahus` er stuðulslykill) en var **þegar á þakinu**. **Spá borðsins stenst því orðrétt: þakið stendur í ~0,12 % og eignirnar tvær sem eftir liggja eru einmitt prófanirnar og voru þar fyrir.**
 
 **Eini munurinn á töflunni og 11.08-myndinni eru þessar 11 raðir frá 12.08 — nýtt verk, ekki leif.** Að telja það sem frávik frá for-keyrslu-ástandi væri að rugla saman „ástandinu sem keyrslan skildi eftir" og „öllu sem hefur gerst síðan".
+
+### §5D-2 VIÐAUKI (12.08 kl. 10:07Z, sama dag) — KOSTUR (c) APPLÝJAÐUR
+
+**§7 hér að ofan stendur óbreytt** („framkvæmdin er EKKI hluti þessarar ákvörðunar", migration óapplýjuð). Sú lesning var rétt þegar hún var skrifuð. Borðið gaf GO síðar sama dag; leiðréttingin stendur hér undir, ekki í stað hennar.
+
+**RÁSIN VAR PSYCOPG2, EKKI MCP.** `apply_migration` var **ótengt í lotunni** (staðfest með þremur ToolSearch-leitum; aðeins `claude-in-chrome`, `context7`, `financial-analysis` til staðar). Borðið heimilaði psycopg2 á transaction pooler gegn **þremur skilyrðum sem smíða jafngildið í stað þess að gefa sér það**, öll uppfyllt: **(1)** `schema_migrations`-færslan skrifuð **í sömu txn og stæðan sjálf** (MCP gerir það sjálfkrafa, psycopg2 ekki — fall skilur því enga munaðarlausa færslu eftir); **(2)** **hvert statement sér** (cc86), átta aðskildar txn-ir, `SET TRANSACTION READ WRITE` fyrsta stæðan í hverri, fall á n stöðvar n+1; **(3)** **spegillinn lesinn orðrétt úr töflunni**, ekki endurritaður úr drögunum. `created_by` ber rásina svo hún sjáist í `schema_migrations` sjálfri en ekki aðeins í skjölum. Versions `20260812002226`–`002233`, **8/8 keyrðar, engin féll**.
+
+**NEFNARARNIR HREYFÐUST — OG ÞAÐ ER SJÁLFSTÆÐ NIÐURSTAÐA.** Milli mælingar (00:06) og apply (~10:00) bættust **49 nýjar virkar auglýsingar og 53 nýjar seldar raðir** (`daily_sales_refresh`), svo `base_pct_error`-nefnarinn fór 206 → 259. **Töflurnar í §4 hér að ofan eru því ekki beinn samanburður lengur.** Forspá var þess vegna reiknuð á **ferskum gögnum rétt fyrir apply**, svo sannprófunin yrði forspárpróf en ekki eftiráskýring, og teljararnir voru lesnir eftir apply með því að **kalla `ops_scraper_signals()`** — sömu leið og `/ops` fer.
+
+| teljari | fyrir | forspá | **MÆLT** |
+|---|---|---|---|
+| `total_valuations` | 23.605 | 21.233 | **21.233** ✓ |
+| `val_count_latest_day` | 2.000 | 1.821 | **1.821** ✓ |
+| `backlog.live_res_sale` | 11.993 | 11.840 | **11.840** ✓ |
+| `backlog.live_res_sale_valued` | 4.199 | 4.156 | **4.156** ✓ |
+| `backlog.unprocessed` | 7.794 | 7.684 | **7.684** ✓ |
+| `v_expected_vs_real` raðir | 23.605 | 21.233 | **21.233** ✓ |
+| `base_pct_error` bjagi | +8,67 % | +5,55 % | **+5,55 %** ✓ |
+| MAPE | 14,93 % | 11,98 % | **11,98 %** ✓ |
+| n seldar | 259 | 252 | **252** ✓ |
+
+**Öll níu lentu á forspánni upp á tölu.** Samlagning heldur (**11.840 = 4.156 + 7.684**), ferskleikalínan ósíuð eins og til stóð, **gólfið 109 farið**. `scraper.v_expected_vs_real_all` ber **`canonical_code` í sæti 34** (dálkurinn sem vantaði í cc120); báðar sýnir 34 dálkar.
+
+**⚠ TALAN „8,22 → 6,06" ÚR GO-INU ER NEFNARAHÁÐ.** Hún var rétt á 00:06-nefnaranum (n=206). Á 10:07-nefnaranum (n=259) er hún **8,67 → 5,55**. Áttin og stærðin standa (≈3,1 pp) en **talan má ekki vitnast án dagsetningar** — sama gerð og §5 varar við, nú á okkar eigin tölu.
+
+**Spegill og réttindi.** Statements lesin úr `schema_migrations.statements`: **0 frávik af 8 — drögin voru keyrð óbreytt** (samanburður festur við git-útgáfu draganna `581e092`, ekki við skrána á diski, svo hann sé idempotent). Sha: drög `870a25195041f3ff` → **spegill `efd673ceed639ed9`**; rollback `cc09761ba588d2fd` ósnertur. Réttindi mæld á **`pg_class.relacl` / `pg_proc.proacl`** (cc105-reglan): `v_expected_vs_real_all` = `{postgres=arwdDxtm/postgres}`, fallið = `{postgres=X/postgres,service_role=X/postgres}`, og `aclexplode` staðfestir að **`anon`/`authenticated`/`PUBLIC` bera ekkert**.
+
+**Bókað af ásettu ráði:** stæða 01 í speglinum ber innbyggðan haus draganna með línunni „ÓAPPLÝJUÐ … hefur EKKI verið keyrð" og for-apply tölunum. Sá texti **var hluti af því sem var keyrt** og stendur óbreyttur — að snyrta hann væri að falsa spegilinn. Skráarhausinn ber viðvörun um að hann gildi þar sem þeim ber á milli.
+
+Verðmats-þrepið er **áfram í pásu** (`EXTRACT_VALUE_LIMIT=0`); cc134 breytti því ekki. Heimild: úttekt §7 (`docs/fable_prep/audits/EXCLUDE_VERDMATSLEID_CC134_20260812T0006Z.md`).
