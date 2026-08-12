@@ -6522,3 +6522,148 @@ sértækir) og er jafnframt gæðabót: `sameign_cosmetic` er ósamstillt í
 (óbreytt)**. Engin migration, engin skrif í gagnagrunn, ekkert snapshot.
 **Rollback:** `git revert` á commitinu — sían er ein `HAVING`-klausa og eitt
 `LEFT JOIN`; ekkert ástand fylgir henni.
+
+## 2026-08-12 — §5D-11 · cc149 LEIGU-ENDURSJÓNUNIN KLÁRUÐ (ÞREP 3+4 AF 4): SPÁIN OG ÞREPIÐ FLIPPUÐ SAMAN, STUÐNINGSHLIÐIÐ F300 SETT UPP — 3.539 EIGNIR MISSA BIRT MAT OG ÞAÐ ER HÖNNUNIN
+
+**Afstaða borðsins: flippa bæði lögin í sömu lotu OG setja stuðningshliðið upp í
+sömu umferð.** Rök: (a) `predictions_rent` og `valuation_tiers_rent` eru tvö lög
+af sama mati — að flippa aðeins spána hefði skilið þrepatöfluna eftir á stöðnuðu
+`pi80`-lagi, sem er nákvæmlega ástandið sem cc135 kostaði fjórar lotur að finna;
+(b) hliðið er afurð cc148, sem borðið kvittaði fyrir, og að fresta því hefði þýtt
+aðra flipp-umferð á sömu töflu innan sólarhrings.
+
+Full úttekt: `docs/fable_prep/audits/LEIGU_ENDURSJONUN_CC149_20260812.md`.
+Flipp: `cc149_flip_pred.py --go` (22:20:08) og `cc149_flip_tiers.py --go` (22:20:42),
+postverify PASS 11/11 á báðum. Snapshot `*_pre_cc149` ×2 STANDA, bakleikir í
+`app/scripts/`. Birting: verdmat-ai **316ef09**. Sölu-hliðin ósnert.
+
+### 1. MÆLITÆKIÐ SANNAÐ ÁÐUR EN NOKKRU VAR HREYFT
+
+Þrepavélin með nýja ásnum var keyrð á **gömlu, lifandi spánni** fyrst. Grunnþrepin
+endurgera lifandi töfluna upp á rað þegar hliðið er dregið frá (32.274+252=32.526 ·
+70.501+1.059=71.560 · 19.730+1.242=20.972 · 18.175+986=19.161 · 17.634−3.539=14.095)
+og hliðið endurgerir cc148-töluna nákvæmlega (3.539 / sérbýli 3.040 / fjölbýli 499
+af nefnara 144.219). **Forspá flippsins var því mæld FYRIR flipp**, með því að
+beina byggjaranum á cc147-staging. Sú keyrsla skilaði nákvæmlega töflunni sem
+síðar var flippuð — engin tala kom á óvart eftir COMMIT.
+
+### 2. TVÖ HLIÐ SEM EKKI VAR HÆGT AÐ SETJA ÁÐUR
+
+**`segment` vs `properties.canonical_code` = 0.** cc135 bókaði ólæknað: *„segment
+ber pre-R canonical_code á 57.612 röðum (36,39 %); ás 2 læknast AÐEINS með
+endurskorun."* Endurskorunin er lifandi og mismunurinn er **57.417 → 0**.
+`model_version` fer úr `rent_v1_nan` í `rent_v1_reglaR_20260812`.
+
+**`pi80_pct` verður að endurgerast úr LIFANDI `predictions_rent`** upp á tvo
+aukastafi — nýtt hlið í þrepa-flippinu. Falli það er þrepataflan byggð á öðru
+lagi en talan sem notandinn sér. cc135 gat ekki sett þetta hlið því þar VAR lagið
+stöðnuð viljandi; héðan í frá er sú tegund stöðnunar vöktuð sjálfvirkt í hverju
+flippi, ekki fundin eftir á.
+
+### 3. STUÐNINGSHLIÐIÐ (ÁS 5) — ÞYKKT ER EKKI NÁLÆGÐ
+
+Ásarnir fjórir sem fyrir voru mæla allir hve þykk sellan er. Enginn þeirra mælir
+hvort eignin liggi INNAN hennar. cc148 sýndi að sérbýli á T1 fer OFTAR út fyrir
+stærðarstuðning sellunnar (72,59 %) en sérbýli á T4 (35,59 %).
+
+Reglan: **`einflm` > sellu-max á einflm-ás (samningar 2011–2023, live-endurmerktir)
+EÐA `einflm` > 300 m² → Þrep 5, `t5_astaeda='utan_studnings_staerd'`.** Þröskuldarnir
+standa í `STUDNINGSHLID`-config í `build_rent_tiers.py` með heimildarvísun í cc148,
+ekki harðkóðaðir inni í `assign()`. Nýja ástæðan er NEÐST í forgangsröð, svo eign
+sem var þegar óbirtanleg heldur ástæðunni sem hún bar áður.
+
+**Hvorugur liðurinn dugir einn** — og sundurliðunin sannar það: 2.035 falla aðeins
+á sellu-max, 3.031 aðeins á fasta þakinu, 705 á báðum. Sellu-max eitt sleppir
+Sjafnargötu 14 (384 m², percentíla 93,77) og öllu bandinu þar sem umsnúningurinn
+er þegar mældur; fast þak eitt hunsar þunna sellu löngu fyrir 300 m². Fasti
+liðurinn ÞARF að vera til því sellu-max á einflm-ás er MENGAÐ af hlutasamningum:
+samningur um kjallaraíbúð í 400 m² húsi lyftir max-inu í 400 án þess að nokkur
+hafi leigt húsið.
+
+**300 m² er MÆLT, ekki valið** (cc148 lið 1B/4): þar hverfa stuðningur og mark
+samtímis. Heilir sérbýlissamningar 300–350 m²: 41 alls, 4 frá 2021, 41,5 % á
+ritskoðunarþaki þjálfunarmarksins; >350 m²: 7 á þrettán árum, 0 frá 2021.
+Log-log hallinn snýst úr +0,433 (20–200 m², markaður +0,390) í −0,343 (350–1000 m²).
+
+**Kostir A/C/D/G/H voru felldir** (5,8–30,5 % þýðisins í T5 = afturköllun á
+vörunni; STAERD-ásinn blandar auk þess saman „utan stuðnings" og train/serve-galla).
+**B eitt** var fellt (sleppir Sjafnargötu). **F300 = 2,45 %.**
+
+### 4. VÖKTUNARLIÐUR SEM FYLGIR HLIÐINU — BANDIÐ 200–350 m²
+
+**Hliðið FELUR töluna, það LAGAR hana ekki.** Umsnúningurinn byrjar við 200 m² þar
+sem enn eru **481 heilir samningar** — bandið 200–350 m² ber því vanmetna tölu SEM
+ER ENN BIRT. Meðvituð málamiðlun: að loka því bandi hefði kostað margfalt fleiri
+eignir án þess að mælingin þar sé jafn afdráttarlaus. **Þetta er vöktunarliður á
+PLANNING_BACKLOG, ekki leyst mál** — og hann fellur með yield-akkeruðu leigunni
+(cc148 lið 6: kvörðunargrunnur 80–160 m², yield 4,4–5,3 %, n=71.477), sem er sá
+staður þar sem hægt væri að LAGA töluna í stað þess að fela hana.
+
+### 5. NIÐURSTAÐAN
+
+T1 32.526→32.274 · T2 71.560→70.501 · T3 20.972→19.731 · T4 19.161→18.174 ·
+**T5 14.095→17.634**. Ástæður: `of_fair_samningar` 13.586→13.530 ·
+**`utan_studnings_staerd` 0→3.539** · `eignaflokkur` 314→314 ·
+`engin_svaedisgogn` 195→251.
+
+**Kohort: FÁ birt mat 0 · MISSA 3.539 (3.524 sýnileg — fjöleiningar-vörnin tekur
+15 sem báru aldrei tölu).** Þeir sem missa: sérbýli 3.040, fjölbýli 499; einflm
+p50 329,7 m²; leigumatið sem hverfur ber miðgildi **347.019 kr./mán**. Þau þrep sem
+þeir báru: T1 252 · T2 1.059 · T3 1.242 · T4 986 — **hliðið bítur á ÖLLUM þrepum**,
+sem er einmitt innistæðan: þykkt sellu ver ekki gegn því að eignin liggi utan hennar.
+
+pi80 lendir nákvæmlega á cc147-staging: heildarmiðgildi **38,54 %** (frávik 0,00 pp),
+sérbýli **57,76 %** (frávik 0,00 pp). 105.460 þrengjast, 52.854 víkka, **0 standa
+kyrrar**. Meðaltalið hreyfist áfram í ÖFUGA átt við miðgildið (41,08→42,74).
+
+### 6. VIÐAUKI — VÍXLAMATRIXAN Á 56 RÖÐUM
+
+`of_fair_samningar` fellur um 56 og `engin_svaedisgogn` hækkar um 56. **Mismunur
+tveggja teljara segir EKKI hvaða raðir hreyfðust** — hann er samhljóma bæði við
+„56 hurfu úr T5" og við „56 skiptu um ástæðu". Víxlamatrixan, talin á röðum, hefur
+aðeins TVÆR færslur í öllu þýðinu: `— birt mat — → utan_studnings_staerd` (3.539)
+og `of_fair_samningar → engin_svaedisgogn` (56). Þær 56 fara `fallback_lvl` 1→3 á
+öllum 56, `n_local` hæst 4 (enn undir MIN_LOCAL=5), þrep T5→T5. **Engin röð fór úr
+T5.** Nýja spáin setti þær á global-fallback, sem er OFAR í forgangsröðinni, svo
+ástæðan endurmerkist. Báðar voru sannar fyrir og eftir; taflan skrifar aðeins þá
+efstu. Endurmerkingin sést á yfirborðinu: Vesturgata 30 ber nú
+`engin_svaedisgogn`-textann en ekki `of_fair`-textann.
+
+### 7. DÓMSKILYRÐI cc147 DÆMD — FLOKKA-VÍXLIN ERU AFHJÚPUN, EKKI AFTURFÖR
+
+`k_global` **ÓHREYFT** eins og bannið sagði (1,108152 → endurmælt 1,107372,
+−0,070 %; level-frávik sem getur ekki hreyft pi80).
+
+**Flokkur B→C á 13.608 (C→B á 3): VÍXLIN STANDA — bilið segir satt.** Engin tala
+versnaði. Það sem gerðist er að sérbýli hætti að lesa fjölbýlis-conformal-sellu:
+miðgildisbreidd sérbýlis fer úr 46,76 % í **57,76 %** (+11,00 pp) á 56.447 eignum.
+Gamla, þrengra bilið var RANGT — reiknað á sellu sem eignin átti ekki heima í.
+Bókstafurinn versnar af því hann segir loksins satt. Sama tegund niðurstöðu og
+§5D-8 bókaði um sellu-driftina: mæling sem lítur út eins og afturför en er
+leiðrétting á ómældri skekkju.
+
+### 8. BIRTINGARLAGIÐ — ÞÖGUL BILUN SEM PUSHIÐ LOKAR
+
+`LEIGU_T5_ASTAEDUR[t5_astaeda]` skilar `undefined` fyrir óþekktan lykil og
+`&&`-hliðið í `Leigumatskort.tsx` fellir málsgreinina **ÁN VILLU**: eignin hefði
+borið Þrep 5 án ástæðu um óákveðinn tíma. Þess vegna fóru DB-flippið og pushið í
+sömu lotu með stystum mögulegum glugga (22:20 → 22:5x). Einn `Record`, fjögur
+yfirborð — engin önnur skrá þurfti breytingu.
+
+**Raunprófun á production (eftir 316ef09):** Skeljatangi 9 og Sjafnargata 14 bera
+Þrep 5 með textanum orðréttum; Bröndukvísl 17 (397.221 kr.) og Jakasel 25
+(361.265 kr.) halda mati upp á krónu með nýju breiddinni; Vesturgata 30 ber
+`engin_svaedisgogn`-textann; Auðnukór 6 ber nýja textann á `/leiga/[id]`;
+Ránargata 8A (T2, viðmið) óhreyfð. **Cache-TTL virt:** fyrsta sókn á Sjafnargötu
+skilaði nákvæmlega `pre_cc149`-röðinni — það var staðfest gegn snapshot-töflunni
+áður en nokkuð var dæmt, svo stöðnun væri ekki lesin sem rökvilla. Útgáfa ógildir
+`unstable_cache` EKKI; sókn eftir veltu skilaði nýja ástandinu.
+
+### 9. ÓSNERT
+
+`predictions` og `valuation_tiers` (sölu-hliðin) · `leiga_train.parquet` á diski
+(aðeins lesin) · `k_global`/CFG · `rent_conformal_corrections.json` · þröskuldarnir
+T1–T4 og MIN_LOCAL · `feature_attributions_rent` (áfram tóm, meðvituð úrfelling).
+Engin migration. Snapshot `*_pre_cc135` og `*_pre_cc149` standa bæði.
+
+> *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4 til §5D-10.

@@ -1628,3 +1628,67 @@ felldar, 0 Haiku-köll í sönnuninni.
   biðröðin tæmist á **~40 nóttum** eftir síun. Þakið 200 er því **tæmingarhraði á
   eftirstöðvum**, ekki jafnvægisstilling — og fyrst þegar biðröðin fer undir 200
   fellur `day_total` af sjálfu sér.
+
+### Viðauki cc149 (logged 2026-08-12) — LEIGU-ENDURSJÓNUNIN ER KLÁRUÐ; FIMM LIÐIR STANDA EFTIR, EINN ÞEIRRA ER HÖNNUNARVERK
+
+Leigu-endursjónunin (cc146 → cc147 → cc148 → **cc149**) er lokið og bæði lögin
+eru lifandi (`docs/DECISIONS.md` **§5D-11**, úttekt
+`docs/fable_prep/audits/LEIGU_ENDURSJONUN_CC149_20260812.md`). Það sem stendur
+eftir er hér — hver liður með þeirri mælingu sem hann hangir á, svo enginn þeirra
+sé endurvakinn á skoðun einni.
+
+- **YIELD-AKKERUÐ LEIGA — EIGIN LOTA, dedup-lykill `cc148-yield-akkerud-leiga`.
+  HÖNNUNARVERK, ekki stilling.** Þetta er eini liðurinn sem getur LAGAÐ töluna í
+  stað þess að fela hana eins og stuðningshliðið gerir. Inntakið er cc148 liður 6:
+  brúttó-yield (leigumat×12 / `predictions.real_pred_mean`) fellur einhalla úr
+  **6,11 %** (<80 m²) í **1,57 %** (>450 m²) á sérbýli — ótrúverðugt frá
+  **200–250 m² (3,07 %)** og gjörsamlega frá 300 m² (2,23 %). **Kvörðunargrunnur:
+  80–160 m², yield 4,4–5,3 %, n=71.477.** Hönnunarspurningin sem lotan þarf að
+  svara ÁÐUR en kóði er skrifaður: yield-akkerið yrði sterkast nákvæmlega þar sem
+  leiguvélin er veikust (stór sérbýli), svo það erfir styrk sölulíkansins inn í
+  leigutöluna — það er kostur OG áhætta, því sölulíkanið ber sína eigin skekkju á
+  sama jaðri. Fyrirvari: sami staður og umsnúningurinn = **sjálfstæð staðfesting,
+  ekki óháð merki**. Ekki byrja fyrr en 01.09 (cc148-forsenda).
+
+- **BANDIÐ 200–350 m² — VÖKTUNARLIÐUR sem fylgir stuðningshliðinu (§5D-11 lið 4).**
+  F300 lokar frá 300 m², en umsnúningurinn BYRJAR við 200 m² þar sem enn eru **481
+  heilir samningar**. Bandið ber því vanmetna tölu SEM ER ENN BIRT — meðvituð
+  málamiðlun, ekki yfirsjón. **Skilyrði fyrir endurskoðun: mæld, ekki tímasett** —
+  liðurinn opnast þegar (a) yield-akkeraða leigan liggur fyrir og gefur sjálfstætt
+  stigmat á bandinu, eða (b) ný leigugögn breyta heilleika-tölunni (nú 481 heilir
+  samningar 200–350 m², 41 þeirra 300–350). **Að þrengja þröskuldinn úr 300 í 250
+  án annars hvors er bannað:** það setti 8.278 eignir í T5 (F250) gegn 3.539 og
+  á sér enga sjálfstæða mælingu.
+
+- **`staerd`/`einflm` TRAIN-SERVE-GAPIÐ (30,48 %) — ÓLEYST OG NÚ NAFNGREINT.**
+  Frumásinn `staerd` er **leigt rými** í þjálfun en **matseiningarstærð** í
+  skorun. Afleiðing: 30,48 % þýðisins liggur utan p95 á þeim ási gegn 5,84 % á
+  `einflm`-ásnum (cc148 lið 2). Þetta er ÁSTÆÐAN fyrir því að stuðningshliðið
+  mælir á `einflm`-ásnum en ekki `staerd`-ásnum — kostur C var felldur einmitt af
+  því hann blandar saman „utan stuðnings" og train/serve-galla. **Lagfæringin er
+  endurþjálfunar-verk** (annaðhvort skora á leigðu rými, sem krefst gagna sem eru
+  ekki til per eign, eða þjálfa á matseiningarstærð, sem breytir markinu). Bókast
+  hér svo næsta endurþjálfun leigulíkansins beri hann sem skilyrði, ekki uppgötvun.
+
+- **p99-KLIPPINGIN Á MARKINU — ómælanleiki, ekki bara skekkja.**
+  `build_rent_training_data` winsorar `heildarverd` við p99 = **300.000 kr./mán**.
+  **44,7 % heilla sérbýlissamninga >300 m² sitja á þakinu**, svo mótprófið (0,84)
+  er **NEÐRI MÖRK á vanmatinu, ekki mæling á því**. Meðan þakið stendur er
+  ómögulegt að mæla hversu mikið líkanið vanmetur stórar eignir — hvaða lagfæring
+  sem er á jaðrinum yrði mæld á ritskoðuðu marki. **Fyrsta verk í hvaða
+  jaðar-lotu sem er: ákveða hvað kemur í stað p99-winsorunar** (hærri þröskuldur,
+  log-mark, eða tvíhliða líkan), því ella er árangurinn ómælanlegur.
+
+- **pi95 HREYFIST Í ÖFUGA ÁTT VIÐ pi80 á miðgildinu (cc147 liður 5).** Enginn
+  flötur les 95 %-bilið í dag, svo þetta er ekki notendamál — en það er merki um
+  að conformal-leiðréttingin sé ekki einhalla í kvantílum. **Skilyrði: mæla ÁÐUR
+  EN nokkur flötur er látinn lesa pi95**, ekki eftir á.
+
+- **101 RAÐIR MEÐ `canonical_code` SEM ER EKKI TIL Í LEIGU-ÞJÁLFUNINNI (cc147
+  liður 4).** LightGBM tekur þær sem NaN-flokk. Fyrirliggjandi hegðun, ómæld áður
+  og enn ómæld: **enginn hefur mælt hvort spáin á þeim 101 sé kerfisbundið önnur**
+  en á sambærilegum eignum. Lítill liður, en hann er á birtingarleiðinni.
+
+- **`feature_attributions_rent` ER TÓM (0 raðir) — meðvituð úrfelling, bókuð.**
+  Enginn flötur les hana. Standi til að birta attributions fyrir leigu þarf
+  `score_rent_universe.py` að framleiða þær; hún gerir það ekki í dag.
