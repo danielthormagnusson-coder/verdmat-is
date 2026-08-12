@@ -232,4 +232,23 @@ Skrá yfir lykilhugtök sem koma fyrir í verkefninu — bæði íslensk fasteig
 
 ---
 
+## Miðsækni frystra verðmata (cc140, 12.08.2026)
+
+**`expected_base` / `expected_extraction`** — frystu krónutölurnar í `scraper.listing_valuations`: matið án útdráttar og matið með 108-reita útdrættinum ofan á, bæði nominal @ verðmatsmánuði. Mismunurinn er `extraction_gap`. Skrifuð af `value_listings` í `scripts/extraction_engine.py`; **aldrei endurritaðar** — hver röð er punktmæling og söguleg heimild um hvað vélin sagði þann dag.
+
+**Miðsæknis-aldirnar tvær** — `expected_base` hefur **ekki alltaf verið sama stærðin**. Það er ekki gagnaspilling heldur skjalfest skil:
+
+| öld | tímabil | dálkur sem var frystur |
+|---|---|---|
+| **`median`** | 27.06.2026 – 11.08.2026 | `real_pred_median` (`q500`-höfuðið) |
+| **`mean`** | frá **2026-08-12 00:00:00+00** | `real_pred_mean` (L2-höfuðið) |
+
+Skiptin eru framkvæmd á DECISIONS §5D-1 (afstaða borðsins: allt á `real_pred_mean`, innbyrðis samræmi ræður þegar nákvæmnismunur er ómarktækur) og bókuð í **§5D-4**. Gömlu **23.605** raðirnar standa óendurritaðar.
+
+**`midsaekni_old`** — dálkur í `scraper.v_expected_vs_real_all` og `scraper.v_expected_vs_real` (sæti 35) sem ber `'median'` eða `'mean'`. **Reiknaður af `valued_at`, ekki geymdur.** Aldamörkin eru mæld en ekki ályktuð: síðasta median-röðin er `2026-08-08 03:33:24,343465+00` og **0 raðir** liggja milli hennar og markanna.
+
+> **⚠ AÐVÖRUN SEM FYLGIR HUGTAKINU.** `base_pct_error`, `extraction_pct_error`, `extraction_gap` og /markadur-vísirinn eru **ósambærileg yfir aldamörkin** — meðaltal yfir blandað mengi er ekki mæling heldur blanda tveggja mælinga. **`GROUP BY midsaekni_old` eða síaðu á hann** áður en bjagi eða MAPE er lesin. `mean`-höfuðið ber auk þess **+1,93 % þekktan OOS-bjaga** (birt mat kerfisbundið undir söluverði; t = −10,74, p = 1,75·10⁻²⁵, cc123) og **sú tala á að fylgja hverri umfjöllun um nákvæmni**.
+
+---
+
 *Bætið við nýjum hugtökum eftir því sem þau koma upp.*

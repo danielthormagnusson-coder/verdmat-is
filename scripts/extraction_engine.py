@@ -10,8 +10,12 @@ extract_and_store is the Haiku half used by forward + lazy).
                                           store content-addressed in listing_extractions.
 
 Parity basis: phase_d3_score_extract.score pins sale_year/month to VALUATION_YEAR/MONTH (2026-04),
-so expected_base reproduces public.predictions (D2 parity 0.0000%); expected_extraction overlays
-the extraction feature columns. Both nominal @ 2026-04, identical basis → gap is clean.
+so expected_base reproduces public.predictions; expected_extraction overlays the extraction
+feature columns. Both nominal @ 2026-04, identical basis → gap is clean.
+
+cc140 (12.08.2026): the frozen column is `real_pred_mean` from that same scoring — NOT
+`real_pred_median` as it was 27.06–12.08. Aldamörk `valued_at >= 2026-08-12 00:00:00+00`;
+older rows stand unrewritten and carry the median age. See value_listings + DECISIONS §5D-4.
 
 Pooler writes open with SET TRANSACTION READ WRITE. The Haiku key is read ONLY from D:\env.local
 (see extract_and_store) — never os.environ.
@@ -367,8 +371,42 @@ def value_listings(pg, models, rows, log=print):
         if fn not in base.index or fn not in full.index:
             skipped += 1
             continue
-        eb = int(round(float(base.loc[fn, "real_pred_median"])))
-        ex = int(round(float(full.loc[fn, "real_pred_median"])))
+        # ── cc140 MIÐSÆKNIN FLUTT Á `real_pred_mean` ────────────────────────
+        # ALDAMÖRK: 2026-08-12. Raðir með `valued_at < 2026-08-12 00:00:00+00`
+        # bera MEDIAN-öldina; raðir frá og með þeim stimpli bera MEAN-öldina.
+        # Mörkin eru ótvíræð af mælingu, ekki af ályktun: síðasta median-röðin
+        # er 2026-08-08 03:33:24.343465+00 og 0 raðir liggja á milli hennar og
+        # aldamarkanna (bakfyllingin er í pásu, --skip-valuation ósnert).
+        # `scraper.v_expected_vs_real_all.midsaekni_old` reiknar öldina af
+        # ÞESSUM sama stimpli — sé mörkunum breytt hér verður migrationin að
+        # fylgja, annars merkir mæliflöturinn raðir á ranga öld.
+        #
+        # HEIMILD: DECISIONS §5D-4 (cc140) sem framkvæmir §5D-1 (cc123,
+        # afstaða borðsins: kostur (a), allt á `real_pred_mean`). Rökin eru
+        # INNBYRÐIS SAMRÆMI, ekki nákvæmni: cc123 mældi engan marktækan
+        # nákvæmnismun á OOS-holdouti (n=949 — MAPE p=0,42, ±10 prósent
+        # p=0,26, MdAPE jafntefli, 0 af 18 hólfum marktæk) meðan 17 af 21
+        # neytanda lásu þegar `mean`. Bilin (lo80/hi80), flokkur A-D og SHAP
+        # eru öll akkeruð á `mean`, svo þessi lína lokar K3 úr cc120: frysta
+        # talan lá utan BIRTA 80 prósenta bilsins á 6.926 eignum af 167.503.
+        #
+        # BJAGINN FYLGIR MEÐ, ÓFALINN: `mean`-höfuðið er +1,93 prósent UNDIR
+        # söluverði OOS (t = -10,74, p = 1,75e-25, cc123 §1). Sú tala á að
+        # fylgja hverri umfjöllun um nákvæmni þessarar töflu.
+        #
+        # GAMLu RAÐIRNAR STANDA. 23.605 raðir haldast óendurritaðar (kostur
+        # (b) felldur, sömu rök og cc116/cc134-b: punktmæling er söguleg
+        # heimild um hvað vélin sagði). Þar með er `base_pct_error` ÓSAMFELLD
+        # TÍMARÖÐ yfir aldamörkin og má ekki lesast sem ein sería.
+        #
+        # D2-PARITY-HLIÐIÐ ER ÓSNERT OG ÞARF EKKI AÐ FYLGJA. cc123 §7 spáði
+        # að hliðið félli „ef aðeins vélin er færð"; kóðalestur fellir þá
+        # spá. `model_quality_eval.run_parity` (l. 873-885) ber saman
+        # ADAPTERINN við `public.predictions.real_pred_median` og les
+        # `listing_valuations` hvergi — það er fidelity-próf á skoraranum,
+        # óháð því hvaða dálk þessi lína frystir.
+        eb = int(round(float(base.loc[fn, "real_pred_mean"])))
+        ex = int(round(float(full.loc[fn, "real_pred_mean"])))
         vals.append((fn, r["source_listing_id"], r["lysing_hash"], eb, ex, True,
                      MODEL_VERSION))
     cur = pg.cursor()

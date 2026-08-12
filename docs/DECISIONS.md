@@ -5780,3 +5780,127 @@ Liðurinn sem stóð opinn í §2 er afgreiddur. Rök borðsins: raðirnar eru m
 **Bókað af ásettu ráði:** stæða 01 í speglinum ber innbyggðan haus draganna með línunni „ÓAPPLÝJUÐ … hefur EKKI verið keyrð" og for-apply tölunum. Sá texti **var hluti af því sem var keyrt** og stendur óbreyttur — að snyrta hann væri að falsa spegilinn. Skráarhausinn ber viðvörun um að hann gildi þar sem þeim ber á milli.
 
 Verðmats-þrepið er **áfram í pásu** (`EXTRACT_VALUE_LIMIT=0`); cc134 breytti því ekki. Heimild: úttekt §7 (`docs/fable_prep/audits/EXCLUDE_VERDMATSLEID_CC134_20260812T0006Z.md`).
+
+
+---
+
+## 2026-08-12 — §5D-4 · cc140 MIÐSÆKNIS-FRAMKVÆMDIN: `expected_base` FLUTT Á `real_pred_mean`; GÖMLU RAÐIRNAR STANDA OG MÆLIFLÖTURINN FÆR ALDAMERKINGU
+
+> *Um staðsetningu:* skráin er viðbætandi og §5D-blokkin hefur legið aftast síðan §5D-1; þessi færsla fylgir þeirri röð frekar en hausreglunni („nýjar efst"), svo §5D-1..4 lesist samfellt.
+
+**Málið**: §5D-1 (cc123, 11.08) kvittaði **kost (a) — allt á `real_pred_mean`** og bókaði í §7 að **framkvæmdin væri EKKI hluti þeirrar ákvörðunar**: hún ætti að vera sér lota með eigin rowcount-sönnun og er **bindandi forsenda** verðmats-bakfyllingarinnar sem cc121 setti á pásu. cc140 er sú lota. **Engin ný afstaða er tekin hér** — cc140 framkvæmir §5D-1 og mælir framkvæmdina.
+
+### 1. FORMÆLING (read-only, á undan hverju skrifi)
+
+**(a) Línan sem valdi miðsæknina** — `scripts/extraction_engine.py`, `value_listings`, línur **370–371** (voru 282–283 þegar cc120 mældi, 316–317 þegar §5D-1 vitnaði; skráin hefur vaxið, línunúmerin í eldri færslum eru úrelt en fallið er það sama):
+
+```python
+eb = int(round(float(base.loc[fn, "real_pred_median"])))
+ex = int(round(float(full.loc[fn, "real_pred_median"])))
+```
+
+**(b) Rowcount-grunnstaða** (12.08 kl. 11:31Z). Nefnari alls staðar **23.605 raðir / 4.494 fastnúmer**, `expected_base` **NULL á 0 röðum**, `valued_at` frá 2026-06-27 22:13:04 til **2026-08-08 03:33:24,343465+00** (engin röð síðan — pásan heldur).
+
+| stimpill × spátafla | raðir á stimpli | tengjast | `= real_pred_median` | `= real_pred_mean` | hvorugt |
+|---|---|---|---|---|---|
+| `iter4_final_v1` × `predictions_2026_04` | 20.642 | 15.714 | **11.766 (74,9 %)** | **0** | 3.948 |
+| `iter4_final_v1` × `predictions` (lifandi) | 20.642 | 15.714 | 0 | **0** | 15.714 |
+| `iter4_final_v1` × `predictions_2026_07_pre_iter4r` | 20.642 | 15.714 | 0 | **0** | 15.714 |
+| `iter4r_20260805_reglaR_strukt` × `predictions` | 2.963 | 2.157 | **2.157 (100,0 %)** | **0** | 0 |
+
+**Tvískiptingin er fullkomlega hrein: `expected_base = real_pred_mean` á NÚLLI raða af 23.605, á öllum þremur spátöflum.** Parity-mengið er **13.923 af 23.605 (59,0 %)** — nákvæmlega tölur cc120 §3.1, endurgerðar. Það sem eftir stendur eru raðir sem festust við annan árgang, ekki raðir á annarri miðsækni. **Mörkin sem cc140 dregur skilja því ekki blandað mengi í sundur; þau merkja mengi sem er einsleitt fyrir.**
+
+**(c) Neytendur `expected_base` — TÆMANDI, úr `pg_depend`/`pg_rewrite` + `pg_proc.prosrc` + grepi á `verdmat-is/` (ekki `.next/`, ekki `prototypes/`, ekki `rollback/`):**
+
+| # | neytandi | tengsl | miðsækni-næmur? |
+|---|---|---|---|
+| 1 | `scraper.v_expected_vs_real_all` | bein á dálkinn (`extraction_gap`, `base_pct_error`, `extraction_pct_error`) | **JÁ** |
+| 2 | `scraper.v_expected_vs_real` | ofan á (1), EXCLUDE-síuð | **JÁ** |
+| 3 | `scripts/extraction_engine.py` | **skrifarinn** | **JÁ** |
+| 4 | `public.ops_scraper_signals()` | les `listing_valuations` en **ekki dálkinn** (teljarar + `valued_at`) | nei |
+| 5 | `/ops` (`app/app/ops/page.js:243`) | ferskleiki á `valued_at` | nei |
+| 6 | `scraper.listing_valuations_pre_cc94b2` | sjálfstætt afrit, ekki lesandi | nei |
+
+**Engin `pg_proc`-skilgreining og enginn framenda-flötur les `expected_base`** — `scraper` er ekki opið PostgREST. Rekursíf `pg_depend`-leit finnur **nákvæmlega tvo** afleidda hluti (liði 1–2) og enga þriðju kynslóð.
+
+### 2. BREYTINGIN
+
+Ein virk breyting, tvær línur (`scripts/extraction_engine.py:370–371` → `real_pred_mean`), auk athugasemdablokkar sem ber heimildina og aldamörkin, og leiðréttingar á móduls-hausnum sem bar úrelta parity-fullyrðingu. **`ATH. ENGIN PRÓSENTUMERKI`-reglan (cc134-gildran) á við SQL-athugasemdir inni í `cur.execute(sql, params)`-strengnum í `fetch_extracted_listings_to_value`** — breytingin hér er í Python-kóða og snertir hvorugt, en textinn er samt skrifaður með orðinu „prósent" svo reglan haldi óháð því hvar hún bítur.
+
+### 3. GÖMLU RAÐIRNAR STANDA — ENGIN ENDURRITUN
+
+**23.605 raðir eru óbreyttar.** Rök borðsins: punktmæling er **söguleg heimild um hvað vélin sagði**, ekki endursögn — sömu rök og cc116 fyrir 20.642 raðirnar og cc134-(b) fyrir 2.372 EXCLUDE-raðirnar.
+
+**Í staðinn fá mæliflötirnir aldamerkingu.** `midsaekni_old` bætt aftast (sæti 35) á **báðar** sýnur, **reiknaður af `valued_at`, ekki geymdur**:
+
+```sql
+CASE WHEN val.valued_at < TIMESTAMPTZ '2026-08-12 00:00:00+00' THEN 'median' ELSE 'mean' END
+```
+
+**Aldamörkin eru mæld, ekki ályktuð:** síðasta median-röðin er `2026-08-08 03:33:24,343465+00`, aldamörkin `2026-08-12 00:00:00+00`, og **0 raðir liggja á milli** — 3,9 sólarhringa bil þar sem verðmats-þrepið var í pásu. Engin röð getur lent á rangri öld.
+
+**Rás: SUPABASE MCP `apply_migration`** (tengt í þessari lotu, ólíkt cc134 sem varð að nota psycopg2). MCP skrifar `schema_migrations`-færsluna sjálfkrafa í sömu txn og stæðuna, svo skilyrði (1) og (2) úr cc134-jafngildinu eru sjálfgefin. Skilyrði (3) — **spegill lesinn orðrétt úr `schema_migrations.statements`** — stendur og var uppfyllt. **Rollback-SQL var skrifað Á UNDAN apply** (`supabase/rollback/20260812113500_cc140_midsaekni_aldamerking_rollback.sql`, sha256[:16] `e38ee587587d7a7f`, sýnarlíkamir afritaðir úr lifandi DB með `pg_get_viewdef` fyrir apply) og er ósnertur síðan.
+
+**⚠ ÁTTA STÆÐUR, EKKI SJÖ, OG VERSION-NÚMERIN ERU EKKI ÞAU SEM DRÖGIN SPÁÐU.** MCP úthlutar version af eigin klukku: raunin er `20260812113529`–`20260812113631`, ekki `20260812113500`–`113506`. Áttunda stæðan (`cc140_03b`) er leiðrétting — stæða 03 var applýjuð með **afmáðum íslenskum stöfum af óþarfa varkárni** (stæður 01–02 báru íslensku athugasemdalaust) og 03b skrifar réttan texta yfir. **Stæða 03 er ekki fjarlægð úr `schema_migrations`; hún var keyrð og á að sjást.** Það er munurinn á spegli og endurritun. Skráarnafnið heldur `20260812113500`-forskeytinu (það er skráarnafn, ekki version) og hausinn ber ósamræmið.
+
+Réttindi mæld á **`pg_class.relacl` + `aclexplode`** (cc105-reglan): báðar sýnur `{postgres=arwdDxtm/postgres}`; **`anon`/`authenticated`/`PUBLIC` bera EKKERT (0 raðir).** `v_expected_vs_real` bar enga skráða `relacl` eftir cc134 (erfði eiganda); `CREATE OR REPLACE` + `REVOKE` efnisgerði hana — **efnislega óbreytt**.
+
+### 4. SÖNNUN — AFMÖRKUÐ KEYRSLA Á FIMM EIGNUM
+
+`--ids`-leiðin **er ekki til** í `run_extraction.py`; afmarkaða leiðin sem er til er `--value-seeded --value-limit 5` og hún var notuð (bókað svo næsta lota leiti ekki að rofa sem er ekki til). Útgáfuhliðið (cc112) heimilaði skrif: adapter `iter4r_20260805_reglaR_strukt` == lifandi.
+
+| valuation_id | fastnum | `expected_base` | `real_pred_mean` | Δ mean | `real_pred_median` | Δ median | `midsaekni_old` |
+|---|---|---|---|---|---|---|---|
+| 24563 | 2537354 | 94.541.396 | 94.541.396 | **0 kr** | 93.213.800 | +1.327.596 | `mean` |
+| 24564 | 2537439 | 154.641.406 | 154.641.406 | **0 kr** | 171.625.872 | −16.984.466 | `mean` |
+| 24565 | 2537391 | 97.929.595 | 97.929.595 | **0 kr** | 97.468.186 | +461.409 | `mean` |
+| 24566 | 2537369 | 68.997.660 | 68.997.660 | **0 kr** | 73.557.045 | −4.559.385 | `mean` |
+| 24567 | 2537431 | 132.379.363 | 132.379.363 | **0 kr** | 138.301.731 | −5.922.368 | `mean` |
+
+**5 af 5 upp á krónu á `real_pred_mean`, og engin þeirra jafngildir `real_pred_median` — svo niðurstaðan er ekki tilviljun tveggja jafnra talna.**
+
+**Rowcount fyrir/eftir + checksum gamla mengisins:**
+
+| | fyrir | eftir |
+|---|---|---|
+| raðir alls | 23.605 | **23.610** (+5, nákvæmlega n) |
+| `sum(expected_base)` | 2.012.081.631.136 | 2.012.630.120.556 |
+| hæsta `valuation_id` | 24.562 | 24.567 |
+| **gamla mengið (`valuation_id ≤ 24562`) — raðir** | 23.605 | **23.605** |
+| **gamla mengið — `sum(expected_base)`** | 2.012.081.631.136 | **2.012.081.631.136** |
+| **gamla mengið — md5 yfir (id : base : extraction)** | `91089f71233ca1d240350c01d3258ecf` | **`91089f71233ca1d240350c01d3258ecf`** |
+
+**Checksum-in er sú sama bæti fyrir bæti: engin gömul röð breyttist.**
+
+**Aldamerkingin á lifandi gögnum eftir keyrslu:**
+
+| flötur | öld | raðir | seldar | bjagi | MAPE |
+|---|---|---|---|---|---|
+| `v_expected_vs_real_all` | `median` | 23.605 | 259 | **+8,67 %** | 14,93 % |
+| `v_expected_vs_real_all` | `mean` | 5 | 0 | — | — |
+| `v_expected_vs_real` | `median` | 21.233 | 252 | **+5,55 %** | 11,98 % |
+| `v_expected_vs_real` | `mean` | 5 | 0 | — | — |
+
+Median-öldin endurgerir eftirmælingu cc134-A **upp á tölu** (21.233 / 252 / +5,55 / 11,98) — sem er sönnun þess að viðbótin er **dálkur en ekki sía**. **Mean-öldin ber 0 seldar raðir og því ENGA mælingu; það er rétta staðan og má ekki fyllt með ágiskun.**
+
+### 5. AÐVÖRUN SEM Á AÐ STANDA (7.9-reglan)
+
+**`/markadur`-vísirinn og allar bjaga-, MAPE- og gap-tölur af blönduðu sýninni eru ÓSAMBÆRILEGAR yfir aldamörkin.** Meðaltal yfir blandað mengi er ekki mæling heldur blanda tveggja mælinga. **Sérhver aðgreining á `base_pct_error` skal bera `GROUP BY midsaekni_old` eða síu á hann.**
+
+**`mean`-höfuðið ber +1,93 % þekktan OOS-bjaga** (birt mat kerfisbundið **undir** söluverði; t = −10,74, p = 1,75·10⁻²⁵, §5D-1 §1) **og sú tala á að fylgja hverri umfjöllun um nákvæmni** — út á við jafnt sem inn á við. Hún hallar á höfuðið sem var valið og var valin með opnum augum: §5D-1 §4 (1). Færsla `/markadur` úr 1,006 í 1,026 er **afhjúpun, ekki versnun** (§5D-1 §4 (2)) og skal orðast þannig.
+
+**`base_pct_error` er þar með ÓSAMFELLD TÍMARÖÐ.** Allar 259 (síað: 252) seldu raðirnar eru median-aldar; fyrsta mean-alda mælingin verður til þegar fyrsta ný röð selst.
+
+### 6. LEIÐRÉTTING Á §5D-1 §7 — D2-PARITY-HLIÐIÐ FELLUR EKKI
+
+§5D-1 §7 spáði: *„`expected_base`/`expected_extraction` → `real_pred_mean` snertir … OG D2-parity-hliðið í `scripts/model_quality_eval.py:557–576 / 874–881` … **hliðið fellur ef aðeins vélin er færð**."* **Kóðalestur fellir þá spá.** `run_parity` (l. 873–885) ber saman **adapterinn** (`_score_iter4(...)["real_pred_median"]`) við **`public.predictions.real_pred_median`** og les `scraper.listing_valuations` **hvergi** — hvorki `fetch_parity_sample` (l. 556–576) né `run_parity` nefnir töfluna. Hliðið er **fidelity-próf á skoraranum gegn spátöflunni**, óháð því hvaða dálk frystingin skrifar. **Þess vegna var `model_quality_eval.py` ekki snert og þarf ekki að snerta.**
+
+**Fyrirvari sem er bókaður sem slíkur:** þetta er **kóðalestur, ekki keyrsla**. Hliðið var **ekki keyrt** í cc140 — `--parity` skrifar í keyrslu-loggtöflurnar og það hefði verið skrif utan þess sem lotan heimilaði. **Fyrsta næturkeyrsla með `--parity` er sannprófunin og hún stendur út af.**
+
+Aðskilinn liður sem cc140 tekur ekki: nú þegar `expected_base` kemur af `mean`-höfðinu er **ekkert hlið sem sannreynir að MEAN-höfuðið endurgeri spátöfluna** — parity-hliðið sannreynir enn `median`-höfuðið eitt. Þau hafa sama skorara og sama `to_kr`, svo áhættan er lítil, en **hún er ómæld og fer á backlog**, ekki í þessa færslu sem fullyrðing.
+
+### 7. BÖNN SEM VORU VIRT
+
+Bakfyllingin var **ekki keyrð** (`--skip-valuation` ósnert; pásan cc121 heldur). **Engin gömul röð endurrituð.** `public.predictions` **ósnert**. **Engin framenda-breyting.** Einu DB-skrifin utan migration eru fimm púls-raðirnar úr §4.
+
+**Heimild**: `scripts/extraction_engine.py` (`value_listings`, l. 370–371 + athugasemdablokk); `supabase/migrations/20260812113500_cc140_midsaekni_aldamerking.sql` (spegill, sha256[:16] `a7b542d3526047e6`); `supabase/rollback/20260812113500_cc140_midsaekni_aldamerking_rollback.sql` (`e38ee587587d7a7f`); DECISIONS §5D-1 (cc123 afstaða + bjagatalan), §5D-2 + viðauki (cc134, mæliflöturinn og rásar-jafngildið); `D:\_audit\cc120_midsaekni\MIDSAEKNI_CC120_20260808.md` §1.1/§2/§3; `D:\_audit\cc123_oos_einvigi\OOS_EINVIGI_CC123_20260808.md` §1.
