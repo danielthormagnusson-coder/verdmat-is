@@ -5724,3 +5724,25 @@ Prod-stikkprufan á **2287817** (ónafngreind sókn, talning á pillunni „Virk
 ### 8. Bannið stóð
 
 Engin eyðing (385.636 raðir fyrir og eftir), engin breyting á brúnni sjálfri, engin skráning í keðjuna, ekkert snert í `run_extraction.py` né `nightly_delta_chain.sh` (aðeins lesnar). **Mælitækin sjálf liggja utan repoins** — `D:\cc136_bakk\cc136_afrit_og_maeling.mjs` og eigin resolve-hook — einmitt svo mælingin krefðist engrar breytingar á vörunni sem hún mælir.
+
+### 9. LOKASTÆÐAN (sama lota, GO borðsins 12.08): mönnuðu 9 raðirnar ENDURVIRKJAÐAR — ástandið er nú for-keyrslu-ástand
+
+Liðurinn sem stóð opinn í §2 er afgreiddur. Rök borðsins: raðirnar eru mannaðar prófanir cc75, þær voru virkar fyrir 11.08, og markmiðið var for-keyrslu-ástand — **„næstum" er ekki það**.
+
+**Afmörkun:** keyrt á **auðkennin níu beint**, ekki á stimpilinn einan — `id IN (423711,423720,423721,423722,423800,423802,423803,423804,423805)` **OG** `superseded_at = '2026-08-11 22:21:23.143147+00'`. Tvöfalt skilyrði svo hvorugt geti eitt og sér hitt of vítt. Fyrir aðgerð staðfest að **nákvæmlega þessar 9 raðir og engar aðrar** bæru brúarstimpilinn, og að endurvirkjunin búi ekki til tvær virkar raðir á neinni `(fastnum, attr_key, source)`-þrenningu (mælt, tómt). **Rowcount: 9 (2 eignir).**
+
+**Ástandið er for-keyrslu-ástand — mælt, ekki fullyrt.** Prófið er ekki raðafjöldinn heldur hvort nokkur röð beri enn ummerki keyrslunnar: **0 raðir** bera `superseded_at = '2026-08-11 22:21:23.143147+00'` (hver röð sem keyrslan felldi er komin til baka), **0 raðir** úr keyrslunni eru virkar (hver röð sem hún bætti við er felld), og **42 af 42** mönnuðum app-leiðar-röðum eru virkar — eins og 11.08 kl. 22:21:22. Endurvirkjanlegar raðir á bakk-stimplinum standa óhreyfðar í **28.703**.
+
+**⚠ Ein breyta utan cc136 lenti í glugganum og VERÐUR að lesast með.** Milli fyrri og seinni hluta lotunnar (00:32Z → 09:5xZ) skrifaðist **ný mönnuð app-leiðar-lota kl. 2026-08-12 07:43:41,62295Z — 11 raðir á fastnum 2522544**. Hún er hvorki frá cc136 né frá brúnni (brúin skrifar 28 þúsund raðir í einu; þetta er 11 raðir á einni eign, sama lögun og hinar mönnuðu loturnar), og engin skrif úr öðrum lindum urðu í glugganum. Eignin **var í brúarmenginu**, svo nýja lotan leggst ofan á bakkað lag.
+
+| Þakmæling (þýði = eignirnar 3.997) | eftir bakk | eftir endurvirkjun | án 12.08-lotunnar |
+|---|---:|---:|---:|
+| Virkar raðir yfir þýðið | 7.214 | 7.234 | 7.223 |
+| Berandi | 1.633 | 1.633 | 1.633 |
+| **Á þaki** | **2** | **3** | **2** |
+| **Þakhlutfall** | **0,12 %** | **0,18 %** | **0,12 %** |
+| Liðir/eign | 1,011 | 1,015 | 1,011 |
+
+**Þriðja eignin á þakinu er 2522544 og hún kemur frá 07:43-lotunni, ekki frá endurvirkjuninni** — hún fór úr **1 lið í 6** og þar með á þakið. **Endurvirkjunin sjálf hreyfði þakfjöldann ekki**: `2013952` stóð í 12 liðum fyrir og eftir (raðirnar fjórar — `annad`, `badherbergi`, `geymsla`, `golfefni` — bera engan lykil sem stuðull virkjast á) og `2230688` fór úr 8 í 9 liði (`thvottahus` er stuðulslykill) en var **þegar á þakinu**. **Spá borðsins stenst því orðrétt: þakið stendur í ~0,12 % og eignirnar tvær sem eftir liggja eru einmitt prófanirnar og voru þar fyrir.**
+
+**Eini munurinn á töflunni og 11.08-myndinni eru þessar 11 raðir frá 12.08 — nýtt verk, ekki leif.** Að telja það sem frávik frá for-keyrslu-ástandi væri að rugla saman „ástandinu sem keyrslan skildi eftir" og „öllu sem hefur gerst síðan".
