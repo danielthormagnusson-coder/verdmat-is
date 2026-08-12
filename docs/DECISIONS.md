@@ -6179,3 +6179,153 @@ Nýi byggjarinn keyrður með gömlu merkingunni, gömlu lindinni og gömlu EXCL
 Hún heimilar **ekkert á framenda** — hógværðarmerkið á akkeriskortið er áfram sér verk (§5D-7 liður 3) og flöggin sem það á að lesa eru nú til og mæld. Hún snertir ekki `predictions`, `comps_index_v2` né leigu. Hún **eyðir engum snapshot**: `valuation_tiers_pre_cc143` STENDUR, ásamt `*_pre_cc131` og `*_pre_cc135`, þar til borðið staðfestir eyðingu sérstaklega.
 
 **Rollback:** `app/scripts/cc143_flip.sql` (neðst) — `prior_*` aftur af `valuation_tiers_pre_cc143`; prior-checksum fyrir cc143 var `2b545c9969460295820221f50f86c3e0`.
+
+---
+
+## 2026-08-12 — §5D-9 · cc145 COMPS-ENDURBYGGINGIN FLIPPUÐ Á cc143-VÍSITÖLUNA: 0,3 %-BILIÐ ER LOKAÐ (3,05 % → 100,00 % AKKERISSAMSTAÐA), KVÖRÐUNIN VERSNAR MÆLT Á HÁLFUM FJÓRÐUNGI OG BER ENDURSKOÐUNARSKILYRÐI
+
+**Afstaða borðsins: KOSTUR (a) — flippa eins og byggt er.** Rök: prior er þegar
+lifandi á Q3-akkerum (69.467 eignir, §5D-8); (b) að hækka `MIN_ANCHOR_PAIRS` og
+endurbyggja rýfur samstöðuna við prior, (c) að halda 2026Q2 báðum megin endurvekur
+frosna endapunktinn sem §5D-8 leysti. **Innbyrðis samræmi ræður þegar nákvæmni sker
+ekki úr** (§5D-1-reglan). Hálfi fjórðungurinn fyllist af sjálfu sér.
+
+Full úttekt: `docs/fable_prep/audits/COMPS_VISITALA_CC145_20260812.md`.
+Flipp: `load_comps_v2.py --phase flip`, postverify PASS, staging hreinsað.
+Snapshot `*_pre_cc145` ×4 STANDA. `predictions` ósnert, leiga ósnert.
+
+### 1. 0,3 %-JAFNAN ER LOKUÐ — MÆLD, EKKI ÁLYKTUÐ
+
+§5D-7 liður 7 bókaði bilið sem „þekkt tímabundið ástand" sem stæði þar til
+comps-endurbyggingin flippaðist. **Hún er flippuð og bilið er 0.**
+
+Jafnan mælist á því hvort hliðarnar beri SAMA verðlags-akkeri per eign:
+
+| | nefnari | `prior_anchor_q = idx_anchor_q` |
+|---|---|---|
+| FYRIR | 77.484 | 2.367 — **3,05 %** |
+| EFTIR | 77.484 | 77.484 — **100,00 %** |
+
+Báðar hliðar lesa nú `D:\cc143\rs_live_kaupskra_v2.pkl` @ AT_Q=2026Q3.
+Stærð bilsins sem lokaðist, á landsvísitölunni: **−1,074 %** = **−0,807 %**
+endurmat á 2026Q2 (frosni endapunkturinn var þunnkusaður: 382,2479 → 379,1632)
++ **−0,270 %** þrepið 2026Q2→2026Q3 (379,1632 → 378,1401). **Það síðarnefnda er
+„0,3 %-bilið" eins og það mælist.** Akkeri comp-hliðarinnar: 2026Q2 98.610 /
+2026Q1 62.575 / 2025Q4 6.318 → **2026Q3 151.641** / 2026Q2 10.604 / 2026Q1 5.258.
+Engin eign situr eftir á 2025Q4. **Bannið í §5D-7 lið 7 — að bera `prior_adj_kr`
+og `comp_wmedian_kr` ekki saman án leiðréttingar — er þar með aflétt.**
+
+### 2. KVÖRÐUNARFYRIRVARINN BERUM ORÐUM — VÆNTINGIN STÓÐST EKKI
+
+Skammtasvörunin var sönnun lotunnar (cc131-fordæmið) og **hún féll**. Sama hólfun,
+sama SQL fyrir og eftir; „fyrir"-dálkurinn endurgerir cc131 upp á fjóra aukastafi:
+
+| hólf | n | fyrir | eftir |
+|---|---|---|---|
+| óbreytt | 109.794 | 0,9921 | 0,9878 |
+| breytt innan fjölskyldu | 30.658 | 0,9848 | 0,9884 |
+| víxlað fjölbýli→sérbýli | 27.036 | 0,9863 | 0,9769 |
+
+**Mengunarbilið 0,58 → 1,09 p.p.** (væntingin var ≤0,6 eða batni).
+**Heildarkvörðun 0,9895 → 0,9867** (frávik frá 1: −1,05 % → −1,33 %, n=153.361).
+
+Sundurgreint þrengist bilið **innan sellu** í fjórum sellum af sex
+(ROW_HOUSE×Capital_sub 0,30→0,06 · ROW_HOUSE×Country 1,30→0,74 ·
+SFH_DETACHED×Capital_sub 0,34→0,21 · SFH_DETACHED×RVK_core 0,94→0,42) og
+**breikkar í tveimur** (ROW_HOUSE×RVK_core 1,17→2,52 · SFH_DETACHED×Country
+2,09→2,34). Heildarbreikkunin er því að stærstum hluta **sellu-samsetning** —
+cc145 hreyfir enga flokkun (canonical 0 ólíkar) svo hólfin eru orðin staðgengill
+fyrir sellu-aðild. **En sundurgreiningin afskrifar ekki fallna væntingu: hún féll.**
+
+**Orsökin er mæld: 2026Q3 er hálfkláraður fjórðungur** (1.7.–11.8. = 6 vikur af
+13; pör í Q3 eru ~45 % af Q2). `MIN_ANCHOR_PAIRS = 10` hleypir seríu með 10 pörum
+í gegn sem akkeri. **90,5 % universis (151.641 eign) akkerast á 2026Q3, þar af
+33.634 eignir (20,1 %) á lagi með færri en 30 pör:**
+
+| sella | lag | eignir | pör í Q3 |
+|---|---|---|---|
+| SFH_DETACHED×Capital_sub | cell | 11.391 | 16 |
+| SUMMERHOUSE×Country | cell | 10.577 | 13 |
+| ROW_HOUSE×Country | cell | 6.218 | 18 |
+| APT_BASEMENT×RVK_core | cell | 2.851 | 17 |
+| SEMI_DETACHED×Capital_sub | family | 2.077 | 27 |
+| SEMI_DETACHED×RVK_core | family | 520 | 13 |
+
+Akkerisreglan sigtar sex af átta villtum sellum burt (APT_BASEMENT×Country +91,8 %
+á 1 pari, ×Capital_sub −28,7 % á 1 pari, o.s.frv.) — **en tvær sleppa og eru
+nafngreindar hér: `SFH_DETACHED×Country` (−5,54 %, n=36, 19.397 eignir) og
+`ROW_HOUSE×Country` (−7,46 %, n=18, 6.218 eignir).** Það eru einmitt aðrar tveggja
+sellnanna sem breikka innan sellu.
+
+**ENDURSKOÐUNARSKILYRÐI (dagsetningarlaust, ekki dagsett):** kvörðunin skal
+endurmæld **sama-við-sama** — sama hólfun, sama SQL, sömu tvær sellur —
+**þegar 2026Q3 er fullur fjórðungur**. Hafi hún ekki jafnað sig fer
+`MIN_ANCHOR_PAIRS` í **eigin mælda ákvörðun**; þröskuldurinn 10 er ekki
+endurskoðaður fyrr en talan liggur fyrir. Skilyrðið fer einnig á
+`docs/PLANNING_BACKLOG.md` með skilyrðinu „þegar Q3 lokar", ekki með dagsetningu.
+Sbr. `feedback_flagg_a_throskuldi_sem_hlid_tryggir`: þröskuldur sem hlið ofar
+tryggir bítur ekki — hér bítur hann ekki á hálfum fjórðungi.
+
+### 3. BLOKKERINN: LOADERINN HEFÐI YFIRSKRIFAÐ `prior_*` OG NULL-AÐ FLÖGGIN ÞÖGULT
+
+`load_comps_v2.py` flippaði `valuation_tiers` með **TRUNCATE + INSERT** og
+dálkalistinn ber tíu `prior_*`-dálka. Óbreyttur hefði flippið **(a)** yfirskrifað
+cc143-flippuðu `prior_*`-dálkana með prior-útreikningi `build_comps_v2` (önnur
+skrift, aðrar reglur en `cc143_prior.py`) og **(b) þaggað nýju sjö cc143-flöggin
+í NULL** — þau eru ekki í dálkalistanum, svo INSERT skilur þau eftir tóm, án
+villu og án ummerkja. Bannið „prior_* ósnertir" hefði fallið í hljóði.
+
+**Lagfæringin er í þremur lögum og öll í `flip_mode="update"`-leiðinni:**
+1. `valuation_tiers` flippast sem **UPDATE á comp-dálkunum einum** (32 dálkar);
+   `PRIOR_FROZEN` (10 gamlir + 7 nýir = 17) kemst aldrei í SET-lista. Hinar
+   þrjár töflurnar halda TRUNCATE+INSERT.
+2. **Hlið á SKRIFLEIÐINNI, ekki á mælingunni:** prior-checksum borin saman við
+   `valuation_tiers_pre_cc145` **í sömu txn** — brot rúllar öllu flippinu til
+   baka. Mengja-jafnræði (hvorug hlið með aukaröð) er hart skilyrði á undan
+   UPDATE-inu. Mælt við flipp: `4b6edaf9f772276ba6d4da9d830a193d` óbreytt.
+3. Postverify undanskilur `prior_*` fyrir `valuation_tiers` — annars væri það
+   falskt fall, því lifandi tafla ber cc143-gildin en CSV-ið sín eigin.
+
+**Almenna reglan:** TRUNCATE+INSERT er ekki „endurhleðsla töflunnar", hún er
+**endurhleðsla ALLRA dálka hennar, líka þeirra sem skriftin þekkir ekki**. Tafla
+sem tvær vélar skrifa í má ekki flippast með TRUNCATE nema dálkalistinn sé
+sannreyndur gegn raunverulegu skema hennar. Sbr.
+`feedback_hlid_a_maelingu_en_ekki_a_skrifleid`.
+
+Í leiðinni: `SCRATCH` í loadernum benti á scratchpad cc131-lotunnar — **dauða slóð
+milli lota**, sama gildra og cc129 lenti í. Fært á `D:\_audit\cc145_comps`.
+
+### 4. PRÓFDÆMIN — EITT GEKK EFTIR, EITT SITUR Á MÆLDRI ÞYNNKU
+
+**Álftamýri 39 (2013952 — fastnúmerið leiðrétt; forskriftin bar 2103763 sem er
+ekki til í universinu, geo né training_data).** Bókaða væntingin gekk eftir:
+comp-akkerið **2025Q4 → 2026Q2**, `comp_wmedian` 145,3 → 135,6 M,
+**gap gegn spá +5,24 % → −1,76 %**, gap gegn prior −4,14 % → +2,70 %.
+
+**Skipasund 35 (2018566): akkerið situr áfram í 2026Q1** — sellan
+`SFH_DETACHED×RVK_core` ber **7 pör í Q3 og 9 í Q2, bæði undir 10**, svo
+akkerisreglan hafnar báðum réttilega. Það sem vinnst er að lagið fer úr
+**fjölskyldu í sellu** (serían ber 670 pör). `comp_wmedian` 124,1 → 121,7 M,
+gap gegn spá −4,39 % → −6,24 %. **Flaggakerfið virkar og brautin er ekki þögul:
+þynnkan er mæld tala (7 og 9 gegn þröskuldi 10), ekki þögult fall.** Eignin liggur
+áfram með sellunni (§5D-8 lið 6: sellumiðgildi −6,00 %) — afgangurinn er sellu-stig.
+
+### 5. HVAÐ ÞESSI FÆRSLA GERIR EKKI — OG FLÖTURINN SEM LES EKKI TÖFLURNAR
+
+`predictions`, `prior_*` og leiga ósnert. Engum snapshot eytt: `*_pre_cc145`,
+`*_pre_cc143`, `*_pre_cc131` og `*_pre_cc135` STANDA þar til borðið staðfestir.
+
+**Mælt við prod-staðfestingu og bókast:** `/eign/[fastnum]` les **`comps_index`
+(gömlu töfluna, 29.05)** og `v_current_predictions` — **`comps_index_v2`,
+`valuation_tiers` og `comps_t5_basis` eru hvergi lesin í appinu**
+(`grep` yfir `app/`, `lib/`, `components/`: 0 tilvik). Báðar prófeignirnar
+birtast rétt á `https://verdmat-is.vercel.app/eign/…` með spátölunum
+(129,8 M og 138,0 M, sömu og `predictions`), console hreint á báðum — **en
+cc145-tölurnar eru ekki sýnilegar þar, því flöturinn les þær ekki.**
+Comps-fjölskyldan er enn bakendaflötur. Að tengja framendann við v2-töflurnar
+er sér verk og bætist á backlog. (`www.verdmat.is` er annað vefsvæði og skilar
+404 á `/eign` og `/markadur` — appið er á Vercel-slóðinni.)
+
+**Rollback:** `app/scripts/comps_v2_rollback_cc145.sql` (TRUNCATE + INSERT úr
+`*_pre_cc145`, replica-mode txn). ATH: sá bakleikur endurheimtir comps-dálkana;
+`prior_*` hreyfðust aldrei og þarfnast einskis.

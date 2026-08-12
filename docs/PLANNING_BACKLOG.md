@@ -1532,3 +1532,53 @@ Beint framhald af **NÝJUM LIÐ ÚR #5** í cc130-viðaukanum hér að ofan. Sá
 - **LEXÍA SEM STENDUR EIN OG Á VIÐ UM ALLAR FRAMTÍÐARMÆLINGAR: HREIN TALA SEM ENGINN HANNAÐI TIL AÐ VERA HREIN ER HEPPNI, EKKI VÖRN.** cc120 §3.2 birti +7,84 % sem gæðatölu líkansins og sú tala **var rétt** — en hún var rétt af því að nefnarinn krafðist tengingar við `public.predictions_2026_04` í ÖÐRUM tilgangi (að endurheimta samfrysta meðaltalið), og spátöflurnar bera 0 EXCLUDE-eignir. **Öll sex seldu EXCLUDE-röðin féllu því út af sjálfum sér** (mælt: 6/6 utan apríl-árgangs). Sá sem spyr sýnina beint — `select avg(base_pct_error) from scraper.v_expected_vs_real` — fékk **+8,22 %**. Þetta er ástæðan fyrir að cc134 (c) setur síuna í **SÝNINA** en ekki í hverja mælingu fyrir sig: **sía sem þarf að MUNA eftir er ekki sía, hún er minnisatriði sem bíður eftir að gleymast.** Sbr. `feedback_bokun_um_vidgerd_er_ekki_vidgerd`.
 
 **UPPFÆRT 12.08 kl. 10:07Z — (c) ER APPLÝJUÐ.** Setningin hér að ofan („ÓAPPLÝJUÐ … verður að fara inn áður en /ops-teljararnir eru lesnir aftur") er þar með uppfyllt og stendur sem söguleg lesning. Applýjað gegnum **psycopg2 á pooler, ekki MCP** (`apply_migration` ótengt í lotunni) gegn þremur skilyrðum sem smíða jafngildið: schema_migrations-færsla í sömu txn, hvert statement sér með `SET TRANSACTION READ WRITE` fyrst, og spegill lesinn orðrétt úr töflunni. Versions `20260812002226`–`002233`, 8/8. **Gólfið 109 er farið** (`unprocessed` 7.794 → 7.684) og allir níu mældu teljarar lentu á forspá sem var reiknuð á ferskum gögnum fyrir apply. **Athugið að nefnararnir hreyfðust milli mælingar og apply** (49 nýjar auglýsingar, 53 nýjar seldar raðir), svo `base_pct_error` fór **8,67 → 5,55** en ekki 8,22 → 6,06 — sama áhrif, annar nefnari. Fjórir liðirnir (A)–(D) hér að ofan **standa óbreyttir og eru enn opnir**; `APT_SENIOR` er fremstur. Sjá DECISIONS §5D-2 viðauka.
+
+### Viðauki cc145 (logged 2026-08-12) — ÞRÍR LIÐIR ÚR COMPS-ENDURBYGGINGUNNI; EINN BER SKILYRÐI, EKKI DAGSETNINGU
+
+Bókun: `docs/DECISIONS.md` §5D-9. Úttekt:
+`docs/fable_prep/audits/COMPS_VISITALA_CC145_20260812.md`.
+
+- **(#1) KVÖRÐUNIN ENDURMÆLD ÞEGAR Q3 LOKAR — SKILYRT, EKKI DAGSETT.**
+  cc145 flippaði comps á `AT_Q = 2026Q3` þegar fjórðungurinn var **hálfnaður**
+  (1.7.–11.8. = 6 vikur af 13). Mælt við flipp: skammtasvörun **0,58 → 1,09 p.p.**
+  og heildarkvörðun **0,9895 → 0,9867**; **33.634 eignir (20,1 % universis)**
+  akkerast á lagi með **færri en 30 pörum** í fjórðungnum, þyngst
+  `SFH_DETACHED×Capital_sub` (11.391 eignir á 16 pörum) og `SUMMERHOUSE×Country`
+  (10.577 á 13). Tvær sellur sleppa gegnum `MIN_ANCHOR_PAIRS = 10` með villtu
+  þrepi: **`SFH_DETACHED×Country`** (−5,54 %, n=36, 19.397 eignir) og
+  **`ROW_HOUSE×Country`** (−7,46 %, n=18, 6.218 eignir) — sömu tvær og breikka
+  innan sellu.
+  **Skilyrðið: ÞEGAR 2026Q3 ER FULLUR FJÓRÐUNGUR** skal kvörðunin endurmæld
+  **sama-við-sama** (sama hólfun, sama SQL, sömu tvær sellur nafngreindar).
+  **Hafi hún ekki jafnað sig fer `MIN_ANCHOR_PAIRS` í eigin mælda ákvörðun** —
+  þröskuldurinn 10 er EKKI endurskoðaður fyrr en sú tala liggur fyrir, því
+  breyting á honum núna rýfur akkerissamstöðuna við prior sem lotan náði
+  (3,05 % → 100,00 %). **Liðurinn ber ekki dagsetningu að ásetningi:** hann
+  opnast þegar keðjan hefur fyllt fjórðunginn, ekki á almanaksdegi.
+
+- **(#2) `geography_features.pkl` ER FRÁ 28.05 — STAÐNAÐUR REGION-ÁS Í COMP-POOLNUM.**
+  Mælt í cc145: comp-poolinn tekur `region_tier` úr `geography_features.pkl`
+  (28.05) en subjects úr lifandi universi. Misræmi: **185 subjects (0,1104 %)**
+  og **44 pool-raðir (0,1695 %)** — 137 RVK_core→Capital_sub, 41 RVK_core→Country,
+  7 hina leiðina. Sex sellur hreyfast, stærst `APT_FLOOR×RVK_core` +34 /
+  `APT_FLOOR×Capital_sub` −34 (0,4 % / 0,5 % af sellunni); sellufjöldi óbreyttur
+  28↔28. **Undir 1 %-þröskuldi og því EKKI lagað í cc145** — bókað sem
+  sjálfstæður **7.8-stöðnunarliður**.
+  **ATH ÖFUGA BÓKUN SEM ÞARF AÐ LEIÐRÉTTAST Í HAUSNUM Á LESANDANUM:** cc131
+  bókaði „`geography_features.pkl` í lagi — region_tier-mismunur við
+  `valuation_tiers` = **0**". Sú mæling var rétt en á **ÖÐRUM fleti**: báðar
+  hliðar hennar lásu sama staðnaða lagið. Mælt gegn **lifandi** universi er
+  mismunurinn 185. Sbr. `feedback_hlid_sem_les_badar_hlidar_ur_somu_heimild_er_daudt`.
+
+- **(#3) COMPS-FJÖLSKYLDAN ER BAKENDAFLÖTUR — FRAMENDINN LES HANA EKKI.**
+  Mælt við prod-staðfestingu cc145: `comps_index_v2`, `valuation_tiers` og
+  `comps_t5_basis` eru **hvergi lesin** í `app/`, `lib/` eða `components/`
+  (0 tilvik). `/eign/[fastnum]` les gömlu `comps_index` (29.05) og
+  `v_current_predictions`. Þrjár lotur (cc131, cc143, cc145) hafa því endurbyggt
+  og flippað töflur sem **enginn notendaflötur sýnir** — þrepin T1–T5, akkerin,
+  `d_log`, flöggin og T5-matsgrunnurinn liggja öll í DB án birtingar.
+  **Umfang næstu lotu er STEFNUSPURNING á undan verki:** á framendinn að lesa
+  v2-fjölskylduna (og þá hvaða flötur fyrst — `/eign` comps-listinn,
+  hógværðarmerkið §5D-7 liður 3, eða T5-grunnurinn), eða er `comps_index`
+  meðvitað látið standa? **Þangað til svarið liggur fyrir má enginn bóka
+  comps-flipp sem „notendaáhrif" — þau eru engin, mælt.**
