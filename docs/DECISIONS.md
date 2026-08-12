@@ -6073,3 +6073,109 @@ Milli-bindja myndin (þriðjungar x, meðaltöl):
 Hún **flippar engu**, mælir ekkert, skilgreinir ekkert flagg og heimilar ekkert í `/eign`- eða akkerisflötunum. Hún bókar **þrennt: röðina (par-lagið fremst), hvar flaggskilgreiningin á heima (cc143), og að hógværðarmerkið er sér verk á eftir henni.** Þrjár af fjórum tölum í kringum þetta eru enn ómældar af bókaðri heimild og eru merktar sem slíkar hér að ofan.
 
 **Heimild**: lotubréf cc144 (afstaða borðsins, endursögn) — **ekki** cc139-úttekt, sem er ekki til á diski. Mælt umhverfi sem röðunin hvílir á: `docs/fable_prep/audits/STODNUD_ARTEFOKT_CC131_20260811.md` (akkerisbilið + sellu-driftin), §5D-6 §6 (51.834 pörin ónothæf innan þjálfunar). Verkið sem mælir: **cc143**, `D:\_audit\cc143_par_lagid\`.
+
+## 2026-08-12 — §5D-8 · cc143 PAR-LAGIÐ FLIPPAÐ Á REGLU R OG ENDAPUNKTURINN LEYSTUR ÚR TVÖFALDRI FRYSTINGU — FLÖGGIN ENDURSKILGREIND MÆLD, SKIPASUNDS-SPÁIN FELLD, SELLU-DRIFTIN ER RAUNBIL SEM VEX
+
+> *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4..7. Þessi færsla svarar §5D-7: hún ber flaggskilgreiningarnar með nefnara, og hún gerir upp 96,26 %-töluna sem §5D-7 bókaði sem BORNA.
+
+**Heimild:** `docs/fable_prep/audits/PAR_LAGID_CC143_20260812.md`. Artifacts `D:\cc143\`, mælitöflur `D:\_audit\cc143_par_lagid\`, flipp-stæða `app/scripts/cc143_flip.sql`, snapshot `valuation_tiers_pre_cc143`. Allar tölur mældar í lotunni gegn lifandi gagnagrunni; ekkert borið.
+
+### 1. HVAÐ VAR FLIPPAÐ — OG HVAÐ EKKI
+
+Flippað: **`prior_*`-dálkar `public.valuation_tiers`** (77.484 raðir) á endurmerkt par-lag. POSTVERIFY í SÖMU transaction: rowcount 167.503 ✓ · checksum ALLRA ekki-prior-dálka `bc0d7061a300e8da072dc0914287ba29` **óbreytt** ✓ · prior-checksum lifandi = staging `02749a0af047d6feb7e7e9c59773bc7a` ✓ · engin röð ber `2025Q4`-akkeri ✓.
+
+Ósnert af ásettu ráði: `predictions`, `comps_index_v2` (subject/comp-hliðin), leiga, allur framendi. Gamla vísitölu-artifactið (`D:\repeat_sale_index*.pkl`) stendur ÓSNERT sem rollback-grunnur; nýja býr í `D:\cc143\`.
+
+### 2. ENDAPUNKTURINN VAR FROSINN TVÖFALT — OG AÐEINS ANNAR HELMINGURINN VAR BÓKAÐUR
+
+`AT_Q = 2026Q2` var harðkóðað í `build_comps_v2.py:75`. **Hinn helmingurinn var `D:\pairs_v1.pkl`, frosin 2026-04-18** (og `listings_v2.pkl` með henni). Mælt gegn ferskri kaupskrá: 2026Q2 bar 2.338 arm's-length sölur en `pairs_v1` bar **389**; 2026Q3 bar 1.100 og `pairs_v1` bar **0**.
+
+**Þar með var liður 3 í cc143-bréfinu óframkvæmanlegur á frosinni lind:** endurmerking getur ekki búið til par úr sölu sem er ekki í lindinni, svo `AT_Q` á líðandi fjórðung hefði sett hverja einustu braut á CPI-þrepið og kallað það „mælda þykkt".
+
+**Ákvörðun (GO borðsins):** par-byggjarinn sækir sölurnar BEINT úr `kaupskra.csv`. `is_new_build` og arm's-length-sían eru reiknaðar nákvæmlega eins og `pairing.py` gerir þær (DECISIONS 2026-04-18): `ONOTHAEFUR_SAMNINGUR != 1` og `(FULLBUID == 0) | (söluár − BYGGAR <= 2)`. Eina sem tapast er `pair_status`, listinga-lýsigagn sem **engin sía les**. Hinn kosturinn — að endurbyggja `pairs_v1.pkl` — lagar ekkert, því listings-hliðin er frosin sama dag og `pair_status` yrði þá rangmerkt á öllum nýju sölunum.
+
+**Frosinn endapunktur lýgur í báðar áttir:** gamla 2026Q2-gildið var fitt á 159 pörum og las landsvísitölu 382,2; á 1.048 pörum les hún **379,2** — ~0,8 % ofmat á verðlagi.
+
+### 3. 96,26 %-TALAN GERÐ UPP (§5D-7 liður 1)
+
+Talan **96,26 %** var borin án nefnara og cc143 gat ekki endurgert hana úr neinni heimild. Það sem MÆLT er, með nefnara `canon_universe` = **167.503 eignir**:
+
+- **96,86 %** (162.245) fá annan **akkerisfjórðung** eftir viðgerðina;
+- **100,00 %** (167.503) fá annaðhvort annað upplausnarlag eða annan akkerisfjórðung;
+- **4,41 %** (7.390) skipta um upplausnarlag;
+- CPI-þrepið bar **0 eignir** fyrir og eftir — þ.e. **hver einasta birt eign hvíldi á seríu byggðri á pre-R pörum**;
+- **98,80 %** (76.554 af 77.484) fá annað `prior_adj_kr`.
+
+Færslan bókar því **96,86 % á 167.503** sem mælda tölu. Hún staðfestir hvorki né hrekur 96,26 % — sú tala á sér enga heimild og ætti ekki að vitna framar.
+
+### 4. FLAGGSKILGREININGARNAR (§5D-7 liður 2) — NEFNARI 77.484 EIGNIR MEÐ BIRT AKKERI
+
+Fjögur flögg. **Þrjú eru ný og eitt var skraut.**
+
+1. **`prior_series_thin_flag` — þröskuldurinn er á DÝPT seríunnar, ekki á akkerisfjórðungnum.** Fyrsta skilgreiningin (< 10 pör í akkerisfjórðungi) er **alltaf fölsk**, því `IndexResolver` VELUR akkeri einmitt með skilyrðinu `n_pairs_in_period >= MIN_ANCHOR_PAIRS (10)`. Flagg á þröskuld sem hlið ofar í keðjunni tryggir er skraut, ekki vörn. Þröskuldurinn er því **`SERIES_THIN_N = 500` pör**, málaður af MÆLDRI dreifingu: n < 500 ⇒ SD fjórðungsbreytinga **0,13–0,56**; n ≥ 1.000 ⇒ **0,021–0,065** (landsheild 0,021). 500 er þar sem ferillinn hnykkist — undir því ber serían meiri fjórðungssuð en raunverulega markaðshreyfingu. **4,08 % → 0,00 %.**
+2. **`prior_anchor_stale_flag` (NÝTT) — miðar við LÍÐANDI fjórðung, ekki `AT_Q`.** Kviknar þegar akkerið er ekki líðandi fjórðungur; `prior_anchor_lag_q` ber lagið í fjórðungum. **36,82 % → 10,35 %.**
+3. **`prior_level_fallback_flag` (NÝTT) — upplausnin féll niður um stiga** (`prior_idx_level != 'cell'`). **5,79 % → 3,83 %.**
+4. **`prior_idx_provisional` (fyrirliggjandi)** **8,07 % → 3,43 %.**
+
+Óbreytt: `prior_suspect` 5,49 % (5,49 %), `prior_old_anchor_flag` 35,96 % → 35,98 %.
+
+**Rökin fylgja röðinni:** `prior_serie_n_pairs`, `prior_serie_sd_dlog` og `prior_anchor_pairs` eru skrifuð sem dálkar í `valuation_tiers`, svo þröskuldurinn sé endurskoðanlegur á eigninni sjálfri en ekki aðeins í þessari færslu.
+
+Akkerisfjórðungar: `2025Q4` 3.161 / `2026Q1` 25.369 / `2026Q2` 48.954 → `2026Q1` 2.367 / `2026Q2` 5.650 / **`2026Q3` 69.467 (89,7 %)**. **Akkerisbilið (cc131-skuldin ~1 %) mælist +1,12 % miðgildi fyrir og 0,000 % eftir** fyrir þær 69.467; efri mörk hinna 8.017 af landsvísitölunni eru −0,29 %.
+
+### 5. SKIPASUND 35 (2018566) — cc139-VÆNTINGIN FELLD, MEÐ TÖLUM
+
+| liður | FYRIR | EFTIR |
+|---|---|---|
+| upplausnarlag | **family** (SERBYLI×RVK_core) | **cell** (SFH_DETACHED×RVK_core) |
+| sería, n_pör | 539 | 670 |
+| akkerisfjórðungur | 2026Q1 | 2026Q1 (lag 1 → **2**) |
+| stuðull | 0,96965 | 0,95092 |
+| **prior_adj_kr** | **150.296.236** | **147.393.221** (−1,93 %) |
+| flögg | öll false | `prior_anchor_stale_flag` **true** |
+
+**Spáð var að akkerið færðist UPP af 150,3 og að fjórðungurinn næði líðandi eða næst-líðandi. Hvorugt gerðist.** Sellan `SFH_DETACHED×RVK_core` verður raunveruleg (222 → 670 pör, 63 þéttir fjórðungar) en hún liggur **undir** fjölskyldunni sem áður bar hana (2026Q1: 349,6 gegn 368,4), og endapunktur hennar er enn of þunnur (9 pör í 2026Q2, 7 í 2026Q3) til að akkerast á líðandi fjórðungi. **Spá um hvert mælt gildi hreyfist er ekki mæling** — sama regla og §5D-7 setti á 96,26 %.
+
+Það sem VANN er hitt: brautin er ekki lengur þögul. `prior_level_fallback_flag` slokknar og `prior_anchor_stale_flag` kviknar — áður sagði engin röð frá hvorugu. **Þetta er nákvæmlega það sem flaggendurskilgreiningin átti að gera og er sterkari niðurstaða en talan sem spáð var.**
+
+Prod staðfest eftir cache-veltu (`/eign/2018566`, www.verdmat.ai): „Framreiknað til dagsins **147,4 M kr**", vissubils-línan endurlesin og rétt („innan 80 % vissubilsins", 147,4 ∈ [114,8 ; 157,6]). 0 console-villur.
+
+### 6. SELLU-DRIFTIN ER RAUNBIL — OG HÚN VEX. INNTAK Í LÍKANAUMFERÐ.
+
+Aðferðin er sönnuð ÁÐUR en hún er notuð: comp-VALIÐ er vísitöluóháð (svipleikinn les stærð/geo/aldur/tíma; hörðu síurnar lesa `kv` á nafnverði), svo `d_log` má endurreikna á sömu comp-röðum með nýjum stuðlum. Gömlu stuðlarnir endurgera `idx_factor` með max|Δ| = 2,2e-16 og **`comp_wmedian_kr` upp á 0 kr** á 1.090.488 comp-röðum / 153.366 eignum.
+
+| sella | n | fyrir | eftir | Δ (p.p.) |
+|---|---|---|---|---|
+| **SFH_DETACHED×RVK_core** | **5.077** | **−4,57 %** | **−6,00 %** | **−1,43** |
+| APT_FLOOR×RVK_core | 43.227 | −2,39 % | −0,12 % | +2,27 |
+| APT_FLOOR×Capital_sub | 32.334 | −0,83 % | −3,49 % | −2,67 |
+| APT_BASEMENT×RVK_core | 2.803 | −0,12 % | −4,99 % | −4,87 |
+| SUMMERHOUSE×Country | 8.943 | +6,96 % | +0,57 % | −6,39 |
+| HEILD | 153.366 | −1,05 % | −1,35 % | −0,30 |
+
+**Ákvörðun:** sellu-driftin var bókuð sem grunuð afleiðing staðnaðs par-lags (cc131). Sú tilgáta er **hrakin**. Driftin lokast ekki við viðgerð par-lagsins — hún **vex** í SFH×RVK og endurdreifist á aðrar sellur. **Hún er raunbil milli comp-verðlags og líkansspár og fer þar með inn í næstu líkanaumferð sem inntak** (segment-halli í iter-hring), ekki í vísitölu- eða comp-vinnu. Skipasund 35 fer −4,39 % → −6,24 % og liggur ÁFRAM MEÐ sellunni (sellumiðgildi −6,00 %) — afgangurinn er sellu-stig, ekki eignarsértækur, eins og cc131 mældi.
+
+### 7. BILIÐ 0,3 % MILLI COMP- OG PRIOR-HLIÐAR ER ÞEKKT TÍMABUNDIÐ ÁSTAND
+
+**Berum orðum:** `build_comps_v2.py:75` ber enn `AT_Q = pd.Period("2026Q2")` harðkóðað. Comp-hliðin (`comp_wmedian_kr`, `d_log`, `price_adj_kr` í `comps_index_v2`) situr því á verðlagi 2026Q2 á meðan prior-hliðin situr á 2026Q3. **Bilið er ~0,3 %** (landsvísitala 379,2 → 378,1 = −0,29 %).
+
+Þetta er **meðvitað, mælt og tímabundið**: það var valið fram yfir að flippa comps-fjölskyldunni aftur í sömu lotu og cc131 flippaði hana, því comps-endurbygging er sér flipp með eigin frystingu og parity. **Ástandið stendur þar til comps-endurbyggingin flippast (næsta lota).** Þangað til má **ekki** bera `prior_adj_kr` og `comp_wmedian_kr` saman sem tölur á sama verðlagi án þess að leiðrétta fyrir bilinu — t.d. í nýjum framenda-fleti eða skýrslu.
+
+### 8. TVÆR TÍMAHÁÐAR HLIÐAR SEM KAUPSKRÁIN OPINBERAR
+
+`single_deed` (skjal ber nákvæmlega eina eign) er **tímaháð sía**: systkina-raðir skjals berast eftir á, svo sala sem stóðst síuna í gær fellur í dag án nokkurrar gagnaleiðréttingar.
+
+- **2145072** missir birt akkeri: eina salan (2026-06-12) situr á `A-002013/2026` sem ber nú **46 eignir**; í cc131-byggingunni bar sama skjal eina. **Staðfest sem vænt, ekki frávik.**
+- **2030571**: 2026-02-27-salan situr nú á skjali með 2 eignum → akkerið fellur réttilega aftur á 2023-03-20 (einnar-eignar skjal).
+
+Af 20 parity-frávikum gegn lifandi töflu voru **19 nýjar sölur 10.–11.08** og **1 var þetta**. **Verklagsregla:** flipp-stæða sem uppfærir af staging VERÐUR að meðhöndla „missir akkeri" beinlínis með `UPDATE ... SET NULL`; hreint `UPDATE FROM staging` skilur þær raðir eftir með gömlu gildi.
+
+### 9. PARITY-HÓLAN — SÖNNUNIN Á AÐ EKKERT ANNAÐ BREYTTIST
+
+Nýi byggjarinn keyrður með gömlu merkingunni, gömlu lindinni og gömlu EXCLUDE-stefnunni endurgerir lifandi artifactið: 56.930 pör, **lyklamismunur 0 báðar áttir**, max|Δ| = **0** á verðum, hlutföllum, `n_pairs_in_period`, `cell_n_pairs` og vísitölustigi (`index_value_real` 4,5e-13 = fleytitölusuð), `data_quality` ójöfn **0**. Sían, BMN-fittið og gæðaflöggin eru því sannanlega óbreytt; það sem breyttist er MERKINGIN og LINDIN, ekkert annað.
+
+### 10. HVAÐ ÞESSI FÆRSLA GERIR EKKI
+
+Hún heimilar **ekkert á framenda** — hógværðarmerkið á akkeriskortið er áfram sér verk (§5D-7 liður 3) og flöggin sem það á að lesa eru nú til og mæld. Hún snertir ekki `predictions`, `comps_index_v2` né leigu. Hún **eyðir engum snapshot**: `valuation_tiers_pre_cc143` STENDUR, ásamt `*_pre_cc131` og `*_pre_cc135`, þar til borðið staðfestir eyðingu sérstaklega.
+
+**Rollback:** `app/scripts/cc143_flip.sql` (neðst) — `prior_*` aftur af `valuation_tiers_pre_cc143`; prior-checksum fyrir cc143 var `2b545c9969460295820221f50f86c3e0`.
