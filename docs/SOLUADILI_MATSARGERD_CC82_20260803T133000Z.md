@@ -412,13 +412,61 @@ stærðargráðunni sem skiptir máli en er ekki nákvæmnismæling.
 
 ---
 
+## VIÐAUKI 3 — LEIGUFLÖTURINN MÆLDUR Á PROD (append-only, eftir push `fde1870`)
+
+Síðasti ósannreyndi flöturinn. `/leiguverd/[fastnum]` notar SAMA `ASoluKort` og söluflæðið
+(kortið heitir bara „Til leigu") og sömu sókn — það átti að fylgja sjálfkrafa. **Það gerir það.**
+
+| Próf | Slóð | Niðurstaða |
+|---|---|---|
+| Söluaðili í leiguflæði | `/leiguverd/2219991` | **PASS** — „Fasteignasala: Leiguskjól · 5340270 · vilhjalmur@leiguskjol.is", Til leigu-kort og „Heimild: mbl.is · fyrst séð 18. okt. 2023" óbreytt |
+| Hljóðlaust hvarf | `/leiguverd/2000275` | **PASS** — 0 tilvik, Til leigu-kortið heilt að öðru leyti |
+| TTFB ×9 | `/leiguverd/2219991` | miðgildi **0,464 s** (0,449–0,558) — jafnt `/eign` (0,463 s) |
+
+### V4.1 ⚠ NEFNARINN Í LEIGUNNI ER ANNAR — og hann er ekki gat í okkar verki
+
+Virkar leiguauglýsingar með fastnúmeri: **1.093**, þar af bera **178 = 16,3%** söluaðila. Sú tala
+lítur út eins og hrun frá 96,9% söluflatarins. Hún er það ekki — sundurliðuð eftir lind:
+
+| Lind | Virkar leiguraðir | Bera söluaðila |
+|---|---|---|
+| mbl | 178 | **178 = 100,0%** |
+| myigloo | 915 | 0 = 0,0% |
+
+**Hver einasta mbl-leiguauglýsing ber söluaðilann.** myigloo-raðirnar geta hann ekki borið — sú
+lind hefur engan mbl-`agency`-reit, og cc82 snerti hana aldrei. Að birta „16,3%" án
+sundurliðunar væri sama tegund af þekjulygi og `feedback_cov_maeling_nan_sem_miss` varar við:
+nefnarinn inniheldur raðir sem gátu aldrei uppfyllt talninguna.
+
+### V4.2 ⚠ AÐFERÐARVILLA SEM ÉG GERÐI OG LEIÐRÉTTI — viðmiðið var ekki viðmið
+
+Fyrsta viðmiðseignin var valin með `WHERE agency_name IS NULL` á **röð** í viewinu. Hún féll:
+síðan BAR söluaðilann. Ástæðan er að **fastanúmer getur borið margar virkar leiguauglýsingar**
+(myigloo og mbl hlið við hlið) og röðunin (`asett_verd_dags desc, listed_at desc`) velur eina
+þeirra — NULL-röðin sem ég valdi var ekki sú sem birtist.
+
+Rétta viðmiðið er á EIGN, ekki röð: `GROUP BY fastnum HAVING count(agency_name) = 0`, að
+undangenginni sömu síun og gagnalagið beitir (verðgólf 50.000 kr. fyrir leigu,
+`er_atvinnuhusnaedi = false`). Með því viðmiði (2000275) féll prófið rétt.
+
+**Lærdómurinn er almennur:** NULL á röð er ekki NULL á eign þegar eignin ber margar raðir og
+birtingin velur eina. Viðmið sem er valið á röðinni prófar ekki það sem yfirborðið sýnir.
+
+*(Aukageta úr sömu mælingu: `2064380` — leiga á 1.390.000 kr/mán — ber ENGIN „Til leigu"-kort.
+Það er rétt hegðun, ekki galli: `saekjaVirkarAuglysingar` sleppir `tenure='rent'` með
+`er_atvinnuhusnaedi = true`, og verðgólfið `ASOLU_VERDGOLF_LEIGA = 50.000` sleppir jafnframt
+þeim mbl-leiguröðum sem bera `price_amount = 1` — 20 af 178. Hvorugt kemur cc82 við.)*
+
+---
+
 ## ÓGERT / OPIÐ
 
 1. ~~**Commit + push**~~ — **GERT** (verdmat-is `1d9a8e2`, `b03d1cb`; verdmat-ai `0f53cd4`).
 2. **Prod-sannreyning** — **GERT, fjögur af fjórum græn** (viðauki 2 + §V3b): báðir fletir bera
    söluaðilann og báðir fela hann hljóðlaust á 2369174; TTFB ×9 óbreytt innan sveiflu.
-   ⚠ EFTIR STENDUR: `/leiguverd/[fastnum]` **ósannreynt** í dev og prod (sama `ASoluKort`,
-   sama cache-gildra — leigulind ber söluaðila á 3.150/3.165 = 99,5% parsed-raða).
+2c. **Leiguflöturinn** — **GERT, prod-grænt í báðar áttir** (viðauki 3). Sex prod-próf alls,
+   öll græn. mbl-leiga ber söluaðila á 178/178 = 100%; myigloo-raðirnar (915) geta hann ekki
+   borið og eru bókaðar sem slíkar.
 2b. **Útgáfa ógildir ekki `saekjaEign`-cache** (§V3) — nýr backlog-liður, hönnunarákvörðun.
 3. ~~**Árgerðaspurningin (skref 0)**~~ — **LEYST** 03.08, sjá viðauka V2B.1 (sönnuð innanhúss).
 4. ~~**Dálkavalið A/B/C**~~ — **ÁKVEÐIÐ**: valkostur C (nýr dálkur + árgerðarmerki), framkvæmt.
