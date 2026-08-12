@@ -5637,3 +5637,90 @@ Migration-skráin er **skrifuð á disk og bókuð, EKKI keyrð** gegnum Supabas
 2. **531 eign / 2.716 raðir í biðröðinni sem eru íbúðarhæfar en bera samt enga spá** — SUMMERHOUSE 16,18 % af flokknum, SFH_DETACHED 8,33 %, APT_FLOOR 2,47 %. Þetta er halinn sem S4 (`EXISTS predictions`) hefði tekið; S4 var ekki valin því hún er hlið á afurð annarrar vélar sem er endurbyggð per flipp.
 3. **`/ops` lyklar backlog á `listings_canonical.category` (AUGLÝSINGAflokk) en verðmatið á `properties.canonical_code` (EIGNAflokk)** — 109 gegn 2.093. Tvær skilgreiningar á „íbúð" á sama spjaldi. (c) gerir teljarana innbyrðis samkvæma en lagar ekki lyklunina sjálfa.
 4. **`v_expected_vs_real` telur á AUGLÝSINGU, ekki eign** (5,25 raðir/eign). Bugðufljót 9 vó þrefalt í sex-raða menginu.
+
+---
+
+## 2026-08-12 — §5D-3 · cc136 BRÚARKEYRSLAN 11.08 BÖKKUÐ: raðirnar voru ekki rangar, þær voru OF SNEMMA
+
+**Málið**: Extraction-brúin (cc75) skrifaði **28.703 raðir á 3.997 eignir** í `public.property_attributes` kl. **2026-08-11 22:21:23,143147Z** — undir frystingu sem stóð. GO-bréf flippsins §7 („Extraction-brúin (cc75) — FROSIN þar til γ-mótpróf") og cc81 §9.2 bönnuðu einmitt þetta. cc133 §7b mældi afleiðinguna á notendafleti: **46,4 % af berandi eignum lágu á margföldunarþakinu**, óklemmd leiðrétting p50 **+23,7 %**, hámark **+64,0 %**. cc133 §7d valdi **kost A: bakka**. cc136 framkvæmdi.
+
+**Heimild**: `D:\_audit\cc136_bakk_bruarkeyrsla\BAKK_BRUARKEYRSLA_CC136_20260812.md` (§0 nefnarar og tæki, §1 afmörkunin, §2 varðveislan, §3 aðgerðin + rowcount per lind, §4a þakmælingin, §4b prod-stikkprufan, §5 lærdómur). Vinnugögn utan git: `D:\cc136_bakk\` (afrit, bakk-SQL, endurvirkjunar-SQL, mælingar, prod-HTML).
+
+### 1. Ákvörðunin sem er BÓKUÐ: keyrslan fór fram undir frystingu — og frysting sem er staðfest eftir á er ekki frysting
+
+Raðirnar sjálfar eru ekki dæmdar rangar. **Þær eru of snemma.** γ-mótprófið er skilyrðið sem GO-bréfið setti á brúna, og það er óafgreitt; keyrsla sem fer fram á undan skilyrðinu ber enga heimild hversu rétt sem hún kann að reynast þegar skilyrðið fellur. Ekkert hlið stóð á skrifleiðinni — bannið bjó í GO-bréfi og bókun, ekki í vélinni. Sama lögun og `feedback_hlid_a_maelingu_en_ekki_a_skrifleid`: **hlið sem ver mælinguna ver ekki skrifleiðina.**
+
+### 2. Afmörkunin var mæld ÁÐUR en nokkuð var snert — og krafan stóðst upp á rað
+
+`min(created_at) = max(created_at) = 2026-08-11 22:21:23.143147+00`: **einn stimpill**, engin sekúndubrots-dreifing, svo `created_at = <stimpill>` er ótvíræð afmörkun en ekki nálgun.
+
+| | krafa borðsins | mælt |
+|---|---|---|
+| Raðir | 28.703 | **28.703** ✅ |
+| Eignir | 3.997 | **3.997** ✅ |
+
+**App-leiðar-raðirnar fjórar (03.08 ×2, 11.08 18:03 og 21:24) telja nákvæmlega 42 og bera ENGIN þeirra stimpil mengisins** — þær eru allar utan `WHERE`-skilyrðisins og voru ekki snertar.
+
+**⚠ EN forsendan „þær standa" var þegar ósönn þegar cc136 hófst.** Brúarkeyrslan sjálf **supersaði 9 af þessum 42 mönnuðu röðum** um leið og hún lagði sínar eigin ofan á — 4 á `2013952` (úr 03.08 11:57-lotunni: `annad`, `badherbergi`, `geymsla`, `golfefni`) og 5 á `2230688` (úr 11.08 18:03-lotunni: `annad`, `badherbergi`, `golfefni`, `herbergi`, `thvottahus`), allar með `superseded_at = 2026-08-11 22:21:23.143147+00`. Þær raðir eru **utan mengisins sem bakkað var og standa því áfram superseraðar**. Ástandið eftir cc136 er þar með **næstum — en ekki nákvæmlega — for-keyrslu-ástandið**. Stæðan sem lagar það er skrifuð í `cc136_endurvirkjun_bruarkeyrsla.sql` en **var EKKI keyrð**: §3 í erindi borðsins afmarkaði aðgerðina við mengið eitt og að endurvekja raðir utan þess er sjálfstæð ákvörðun. **Liggur fyrir borðinu.**
+
+### 3. Rollbackið er `superseded_at`, ekki `DELETE` — og það er ENDURVIRKJANLEGT
+
+```sql
+UPDATE public.property_attributes SET superseded_at = now()
+ WHERE source = 'auglysing' AND created_at = '2026-08-11 22:21:23.143147+00'
+   AND superseded_at IS NULL;   -- rowcount 28.703
+```
+
+**Raðir alls í töflunni: 385.636 fyrir → 385.636 eftir. Engin röð eydd.** Afrit fyrir aðgerð utan git: 28.703 línur, **28.703 einkvæm `id`**, 3.997 eignir, 0 gallaðar (`id, fastnum, attr_key, value, source_date`).
+
+**Bakk-stimpillinn er einn** (`count(distinct superseded_at) = 1`): **`2026-08-12 00:32:44.238331+00`**. Þetta er ekki bókhaldsatriði heldur **lykillinn að endurvirkjuninni**: skilyrt á `superseded_at IS NOT NULL` hefði endurvirkjunin líka vakið raðir sem seinni keyrslur supersera réttilega; skilyrt á þennan stimpil hittir hún mengið og ekkert annað. Þegar γ er afgreitt kveikir **ein stæða** aftur á nákvæmlega þessum 28.703 röðum (`cc136_endurvirkjun_bruarkeyrsla.sql`, skrifuð á disk í sömu lotu).
+
+**Eigindi úr öðrum lindum standa óhreyfð** — mælt per lind, virkar raðir fyrir → eftir: `skraargogn` 356.422 → **356.422**, `extraction` 373 → **373**, `notandi` 34 → **34**, `stadfest` 4 → **4**. Aðeins `auglysing` hreyfðist: 28.736 → **33** á 4 eignum (= mönnuðu prófanirnar 42 − 9 supersaðar).
+
+### 4. Sönnunin sem gildir: þakið fór úr 47,1 % í 0,12 % — og leifin er MÖNNUÐU PRÓFANIRNAR
+
+Mælt með **óbreyttu** `lib/leidretting.js` og **óbreyttu** `lib/attributes-queries.js` yfir lifandi lagið, sama þýði fyrir og eftir (eignirnar 3.997). Vélin er ekki hermd: `getAttributes` er kallað eins og `/api/leidretting/[fastnum]` kallar það, aðeins klientinum skipt út fyrir minnis-klient — uppruna-forgangur, já-hlutdrægnisían og nýbyggingarreglan eru orðrétt þær sem viðmótið keyrir.
+
+| | FYRIR | EFTIR |
+|---|---|---|
+| Virkar raðir yfir þýðið | 35.917 | **7.214** (Δ −28.703) |
+| Berandi (≥1 birtanlegur liður) | 3.823 | 1.633 |
+| **Á margföldunarþaki** | **1.802** | **2** |
+| **Þakhlutfall** (af lagi ≠ null) | **46,23 %** | **0,12 %** |
+| **Liðir/eign, meðaltal** | **5,945** | **1,011** |
+| Óklemmd p50 á þaki | +23,48 % | +35,60 % (n=2) |
+| Óklemmd hámark | +64,04 % | +44,58 % |
+
+**Markmið borðsins (46,4 % → ~0,0 %; 5,9 → ~1,0) stenst.** Eignirnar tvær sem eftir liggja á þaki eru **nákvæmlega** `2013952` og `2230688` — mönnuðu prófanirnar sem áttu að standa. **0,12 % er því ekki leki úr brúnni heldur mengið sem var undanskilið með ásetningi.** Af hinum 1.631 berandi eignunum ber **hver einasta nákvæmlega 1 lið** (`bilskur_staedi` úr `skraargogn`) — sem er einmitt „~1,0" sem cc133 spáði.
+
+**Endurvirkjunin er ÆFÐ gegn rauntöflunni, ekki bara skrifuð** (§5C-15): skilyrði endurvirkjunar-SQL-sins hittir **28.703 raðir / 3.997 eignir, 0 úr annarri lind, 0 úr annarri lotu**.
+
+### 5. Endurgerð cc133 §7b — hlutfallið lendir, en SPEGILLINN og RAUNFALLIÐ eru ekki sama vélin
+
+cc133 notaði nefnarann 3.999 (eignir með ≥1 virka `auglysing`-röð). Hlutfall **46,42 % gegn 46,23 %**, liðir/eign **5,9 gegn 5,945**, miðgildi liða **6 gegn 6**, hámarksliðafjöldi **17 gegn 17**, p50 á þaki **+23,7 % gegn +23,48 %**, hámark **+64,0 % gegn +64,04 %**. **Það sem skeikar er stærð berandi mengisins: 3.962 gegn 3.898 — 64 eignir, 1,6 %** (og þakfjöldinn í sama hlutfalli, 1.839 gegn 1.802). Skekkjan er því ekki í þakreglunni heldur í því **hverjar komast inn í lagið yfirleitt**.
+
+**Rótin er mælitækið, ekki gögnin.** cc133 lýsir sínu tæki svo: „uppruna-forgangur og já-hlutdrægnisían **speglaðar** úr `lib/attributes-queries.js`". cc136 speglar ekki — það **kallar `getAttributes` sjálft**. Gögnin voru óbreytt milli mælinganna, svo tækið er eini frjálsi liðurinn. **Spegill sem hleypir 1,6 % fleiri eignum inn í lagið en raunreglan er nákvæmlega gildran sem `scripts/_alias-loader.mjs` var skrifað gegn** („þá er freistingin að prófa AFRIT af reglunni í stað hennar sjálfrar"). **Bókað sem óuppgerður munur, EKKI jafnað út** — hlutfallið sem ákvörðunin hvíldi á lifði það af, en það var heppni en ekki hönnun.
+
+### 6. Endurtekur brúin sig í nótt? NEI — og rofinn bar viðvörunina sjálfur
+
+`scripts/nightly_delta_chain.sh` (`run_extract()`) sendir `--forward N --confirm` og `--value-limit`/`--skip-valuation` — **hvergi `--bridge` né `--bridge-only`**. Brúin er opt-in rofi í `run_extraction.py` og keðjan dregur hann ekki. **Keyrslan 11.08 var mönnuð `--bridge`-keyrsla, ekki næturvél, og bakkið stendur af sér næstu nótt óbreytt.**
+
+**Og talan sem réttlætti frystinguna stóð skrifuð við rofann.** Athugasemdin við `--bridge` (`run_extraction.py:158-167`) segir orðrétt: *„Að tengja hana inn í `nightly_delta_chain.sh` er SÉR ÁKVÖRÐUN (sjá §8 í audit-skjalinu: 47,4 % lenda á margföldunarþaki leiðréttingarlagsins)."* Afleiðingin var **mæld, spáð og bókuð við rofann á undan keyrslunni** — og hann var samt dreginn. **Viðvörun sem stendur í kóðanum en ekki í skilyrði rofans er skjal, ekki hlið.**
+
+### 7. Aðgerð sem stöðvast við DB-lagið er HÁLF AÐGERÐ
+
+Prod-stikkprufan á **2287817** (ónafngreind sókn, talning á pillunni „Virk auglýsing 2026"): **5 fyrir aðgerð → 5 STRAX eftir hana, HTML bæti-fyrir-bæti eins (77.557 bæti)**. Aðgerðin sást ekki á fletinum. Það er ekki bilun heldur þekkt lag: `/eign/[fastnum]` les gegnum `unstable_cache` (`lib/eign-queries.js`, `EIGN_CACHE_TTL = 3600 s`). Hausarnir sanna að route-cachið er ekki orsökin (`X-Vercel-Cache: MISS`, `Cache-Control: private, no-cache, no-store`) — það er **Data Cache**.
+
+**Merkjastýrða ógildingin er til en var ekki fær**: `POST /api/endurnyja` krefst `ENDURNYJA_LYKILL`, sem er **hvergi til á D:** (leitað yfir alla skrána) — hann býr eingöngu í Vercel-umhverfinu. Cachið var því látið renna út á TTL. **Mælt: 5 → 0 kl. 01:01:30Z, ~29 mínútum eftir commit.** Staðfestingarsókn utan vöktunarinnar: `http=200`, 80.320 bæti, `Eigindi`-blokk til staðar, **0 auglýsinga-pillur, 1 `Skráargögn`-pilla**.
+
+**Aðgreint strax frá „bakkið virkar ekki":** þrjár aðrar eignir úr sama mengi með kaldar cache-færslur (2035839, 2231924, 2529300) báru **0 pillur og 1 `Skráargögn`** þegar við fyrstu sókn. Gagnagrunnsástandið rendraðist því rétt frá og með commit-inu; töfin var heit færsla og ekkert annað.
+
+**Hvað þetta hreyfir EKKI:** leiðrétta viðmiðið sjálft (`/api/leidretting/[fastnum]`) er `force-dynamic`, `revalidate = 0` og les `getAttributes` beint — **greidda talan var rétt frá og með commit-inu**. Það sem lá eftir í ~29 mínútur var birting uppruna-pillnanna.
+
+**Reglan sem þetta staðfestir** (og `lib/eign-queries.js` ber þegar, cc86 c2 / cc93): **DB-breyting undir cachinu er innihaldsbreyting alveg eins og kóðabreyting í því.** Sá sem bakkar undir Data Cache verður að eiga ógildingarleið — og hún var ekki til á þessari vél. **Opinn liður: `ENDURNYJA_LYKILL` er óaðgengilegur rekstrarvélinni sem á að nota hann.**
+
+⚠ *Aðferðarathugasemd sem er bókuð því hún hefði nærri fellt mælinguna*: fyrsta lota kalda-prófsins keyrði `curl`, fékk `Connection was reset` og skrifaði enga skrá — og `grep` á skrá sem er ekki til skilar **0**, sem hefði lesist sem „núll pillur = stenst". **Talning á skrá sem varð aldrei til er ekki mæling.** Sóknirnar voru endurteknar með `http`-kóða og bætafjölda bókuðum við hverja talningu, og fallna sóknin í vöktunarlogginu (00:57:13, `pillur=-1`) er skilin eftir sem villa en ekki umskrifuð í núll.
+
+### 8. Bannið stóð
+
+Engin eyðing (385.636 raðir fyrir og eftir), engin breyting á brúnni sjálfri, engin skráning í keðjuna, ekkert snert í `run_extraction.py` né `nightly_delta_chain.sh` (aðeins lesnar). **Mælitækin sjálf liggja utan repoins** — `D:\cc136_bakk\cc136_afrit_og_maeling.mjs` og eigin resolve-hook — einmitt svo mælingin krefðist engrar breytingar á vörunni sem hún mælir.
