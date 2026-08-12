@@ -6047,3 +6047,29 @@ Milli-bindja myndin (þriðjungar x, meðaltöl):
 **Fyrirvari sem er bókaður sem slíkur:** þessi lögunar-mæling er **lýsandi á 163 röðum**, þrjú bindi með 54–55 röðum hvert. Hún er nógu skýr til að vera tilgáta og **ekki nógu sterk til að velja form**.
 
 **Heimild**: `docs/fable_prep/audits/GAMMA_FORPROF_CC141_20260812.md` (í git frá cc144, með cc144-viðauka aftast sem ber p-gildis-leiðréttinguna í §3 lið 1) · mælitækin `cc141_thydi.py` / `cc141_lag.mjs` / `cc141_loader.mjs` / `cc141_gamma.py` í `precompute` @ **`f20140d`** · útkoman (`cc141_inntak.json`, `cc141_lag.json`, `cc141_punktar.csv`, `cc141_dreifirit.png`, `cc141_gamma.json`) liggur **utan git** í `precompute/data/cc141/` og fer þangað ekki: `cc141_punktar.csv` er raðgögn á eignastigi. Sjá einnig cc81 §9.1/§9.3 (γ-hönnunin og skilyrðin), §5D-2 (cc134-sían sem þýðissían notar), DECISIONS 2026-07-04 („Tveggja laga verðmat" — iter5-áhrifastærðar-próban sem hliðið deilir innviðum með).
+
+## 2026-08-12 — §5D-7 · cc139-AFSTAÐA BORÐSINS BÓKUÐ EFTIR Á: PAR-LAGIÐ FRAM FYRIR RÖÐ, FLÖGGIN ENDURSKILGREIND Í cc143, HÓGVÆRÐARMERKIÐ Á EFTIR FLÖGGUNUM
+
+> *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4..6.
+
+**HEIMILDARFYRIRVARI SEM ER HLUTI FÆRSLUNNAR.** cc139 skildi **enga úttekt eftir á diski** (engin `D:\_audit\cc139*`-mappa), **enga DECISIONS-færslu** og engan bakslag í `PLANNING_BACKLOG`. Afstaðan sem hér er bókuð er því **orðrétt afstaða borðsins eins og hún var endursögð í lotubréfi cc144**, ekki endursögn á mælingu sem cc144 gat lesið. **cc144 var bókunarlota án gagnagrunnstengingar og endurmældi ekkert af þessu.** Færslan er skrifuð svo afstaðan sé í sögunni áður en cc143 skrifar ofan á hana — ekki til að staðfesta tölur.
+
+### 1. RÖÐIN — PAR-LAGIÐ FER FRAM FYRIR
+
+**Par-lagið fer fram fyrir röð.** Umfangið sem borðið bar fyrir þeirri röðun er **96,26 %**. **Þessi tala er BORIN, ekki mæld hér** — cc144 hafði ekkert gagnagrunnsumboð og enga cc139-heimild til að lesa hana úr, og nefnarinn hennar er ekki bókaður. **cc143 er lotan sem mælir par-lagið** (`D:\_audit\cc143_par_lagid\`) og henni ber að bóka töluna með nefnara; **standist hún ekki, er þessi færsla röðunin en ekki talan.**
+
+Það sem áður er mælt og sem röðunin hvílir á: par-lagið ber **akkerisbilið ~1 %** og **sellu-drift −4,7 % á SFH×RVK** (cc131), og **51.834 sögulegu pörin bera 0 nothæf fyrir γ** af því þau liggja öll innan þjálfunar (§5D-6 §6). Par-lagið er þar með **bæði mælt vandamál og forsenda annarra verka** — það er röksemdin fyrir að setja það fremst.
+
+### 2. FLÖGGIN ERU ENDURSKILGREIND Í cc143 — ÞVÍ BÓKAST ENGIN FLAGGSKILGREINING HÉR
+
+**Flöggin eru endurskilgreind í cc143**, sem er í keyrslu samhliða cc144 og er **DB-skrifarinn**. Þess vegna er **engin flaggskilgreining bókuð í þessari færslu**: hún yrði úrelt áður en hún yrði lesin. cc143 ber að bóka skilgreiningarnar sjálf, með fyrir/eftir-nefnara á hverju flaggi.
+
+### 3. HÓGVÆRÐARMERKIÐ Á AKKERISKORT ER SÉR VERK — OG RÖÐIN ER BINDANDI
+
+**Hógværðarmerki á akkeriskortið er sér verk og það kemur Á EFTIR flöggunum.** Röðin er ekki verkstjórn heldur efnisleg: merki sem lýsir vissu er **afleiðing** af flaggskilgreiningunum, svo merki hengt á kortið fyrir endurskilgreininguna myndi lýsa flöggum sem eru að hverfa. Sami lærdómur og §5C-19 (birtingarreglur greininga) og feedback-reglan um að færsla sem lýsir viðgerð er ekki viðgerð: **merkið á að vera lesið af flöggunum, ekki spáð um þau.**
+
+### 4. HVAÐ ÞESSI FÆRSLA GERIR EKKI
+
+Hún **flippar engu**, mælir ekkert, skilgreinir ekkert flagg og heimilar ekkert í `/eign`- eða akkerisflötunum. Hún bókar **þrennt: röðina (par-lagið fremst), hvar flaggskilgreiningin á heima (cc143), og að hógværðarmerkið er sér verk á eftir henni.** Þrjár af fjórum tölum í kringum þetta eru enn ómældar af bókaðri heimild og eru merktar sem slíkar hér að ofan.
+
+**Heimild**: lotubréf cc144 (afstaða borðsins, endursögn) — **ekki** cc139-úttekt, sem er ekki til á diski. Mælt umhverfi sem röðunin hvílir á: `docs/fable_prep/audits/STODNUD_ARTEFOKT_CC131_20260811.md` (akkerisbilið + sellu-driftin), §5D-6 §6 (51.834 pörin ónothæf innan þjálfunar). Verkið sem mælir: **cc143**, `D:\_audit\cc143_par_lagid\`.
