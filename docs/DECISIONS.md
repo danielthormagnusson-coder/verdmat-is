@@ -5904,3 +5904,76 @@ Aðskilinn liður sem cc140 tekur ekki: nú þegar `expected_base` kemur af `mea
 Bakfyllingin var **ekki keyrð** (`--skip-valuation` ósnert; pásan cc121 heldur). **Engin gömul röð endurrituð.** `public.predictions` **ósnert**. **Engin framenda-breyting.** Einu DB-skrifin utan migration eru fimm púls-raðirnar úr §4.
 
 **Heimild**: `scripts/extraction_engine.py` (`value_listings`, l. 370–371 + athugasemdablokk); `supabase/migrations/20260812113500_cc140_midsaekni_aldamerking.sql` (spegill, sha256[:16] `a7b542d3526047e6`); `supabase/rollback/20260812113500_cc140_midsaekni_aldamerking_rollback.sql` (`e38ee587587d7a7f`); DECISIONS §5D-1 (cc123 afstaða + bjagatalan), §5D-2 + viðauki (cc134, mæliflöturinn og rásar-jafngildið); `D:\_audit\cc120_midsaekni\MIDSAEKNI_CC120_20260808.md` §1.1/§2/§3; `D:\_audit\cc123_oos_einvigi\OOS_EINVIGI_CC123_20260808.md` §1.
+
+## 2026-08-12 — §5D-5 · cc142 VERÐMATS-BAKFYLLINGIN KEYRÐ Í EINNI MANNAÐRI KEYRSLU: 19.022 RAÐIR, PÁSAN AFLÉTT — OG ÞAKIÐ 2000 STENDUR
+
+> *Um staðsetningu:* §5D-blokkin hefur legið aftast síðan §5D-1 og skráin er viðbætandi; þessi færsla fylgir þeirri röð frekar en hausreglunni („nýjar efst"), svo §5D-1..7 lesist samfellt. Færslan er bókuð af **cc144** (bókunarlota, engin DB-tenging) á verki **cc142**.
+
+**Málið**: cc121 (08.08) setti `EXTRACT_VALUE_LIMIT=0` — pásu á verðmats-þrepi næturkeðjunnar — með tveimur bókuðum rökum: (1) biðröðin er bakfylling á eldri auglýsingum sem enginn notendaflötur les, og (2) hún á að fara í **EINNI mannaðri keyrslu**, því ellefu skammtar gefa ellefu ósambærilegar frávikadreifingar og ein keyrsla gefur EINA hreina á sama akkeri. Skilyrt GO: miðsæknin (§5D-4, cc140) yrði að lenda fyrst. Hún lenti 12.08. **cc142 er sú eina keyrsla og hún er gerð.**
+
+### 1. ÞURRKEYRSLAN — TALAN VAR MÆLD, EKKI LESIN ÚR DRÖGUM
+
+Mælt 11:58Z gegnum **raunfallið** `extraction_engine.fetch_extracted_listings_to_value` (`limit=None`, cc134-sían virk), ekki gegnum spegil af fyrirspurninni: **19.022 raðir / 4.013 fastnúmer**, EXCLUDE + NULL `canonical_code` = **0**.
+
+**Talan er ekki 18.734 (cc121), ekki 18.177 (cc134-spá), ekki 28.703 (cc136).** Þær voru allar bókaðar á sínum tíma og engin þeirra var viðmið keyrslunnar. Adapter-stimpill af diski == `pipeline_config.model_version` == `iter4r_20260805_reglaR_strukt`, svo útgáfuhliðið (cc112) var opið.
+
+**cc140-checksumman var ekki bókuð sem SQL og varð að endurleitast** — 100 frambjóðendur, 2 treff. Tjáningin er nú bókuð svo næsta lota þurfi þess ekki:
+
+```sql
+SELECT md5(string_agg(valuation_id::text||':'||expected_base::text||':'
+                      ||expected_extraction::text, ',' ORDER BY valuation_id))
+FROM scraper.listing_valuations WHERE valuation_id <= 24562;   -- = 91089f71233ca1d240350c01d3258ecf
+```
+
+### 2. KEYRSLAN OG SÖNNUNIN
+
+`python -u -m scripts.run_extraction --value-seeded --confirm` — án `--forward` (**enginn `anthropic`-klient smíðaður**), án `--bridge` (`bridge: SLEPPT` í logginu), án `--value-limit`. Rás: **psycopg2** á transaction pooler, `SET TRANSACTION READ WRITE` fyrsta stæðan.
+
+| krafa | mæling |
+|---|---|
+| raðir alls | 23.610 → **42.632** (**+19.022** = þurrkeyrslutalan upp á röð) |
+| `valuation_id`-bilið | **24568..43589 SAMFELLT** (43.589 − 24.568 + 1 = 19.022) — engin `ON CONFLICT DO NOTHING`-sleppa |
+| skoruninni sleppt | `skipped 0` |
+| gamla mengið (`≤ 24562`, 23.605 raðir) | md5 `91089f71233ca1d240350c01d3258ecf` **óbreytt**, `sum(expected_base)` 2.012.081.631.136 óbreytt |
+| alt for-keyrslu-mengið (`≤ 24567`, 23.610 raðir) | md5 `0ebcde1c200530aa6f45e9457bf916c3` **óbreytt** |
+| `expected_base = real_pred_mean` | **16.174 af 16.174 (100,0000 %)**, Δ = 0 kr; `= real_pred_median`: **0** |
+| `model_version` á nýju röðunum | `iter4r_20260805_reglaR_strukt` × 19.022, ein og aðeins ein útgáfa |
+| EXCLUDE skrifað | **0** (líka 0 NULL `canonical_code`) — cc134-sían heldur alla leið í töfluna |
+| `midsaekni_old` á nýju röðunum | `mean` × 19.022, **0 median** — §5D-4 heldur á fjöldakeyrslu |
+| kostnaður | `day_total` 2026-08-12 **$3,9684 → $3,9684**, óhreyfður |
+
+Víðara mengið er checksummað LÍKA svo cc140-raðirnar fimm séu inni í vörninni, ekki bara þær 23.605 sem cc140 bókaði. **Engin gömul röð hreyfðist.**
+
+**Nefnarinn er sagður:** 2.848 raðir (543 eignir, 15,0 %) eiga **enga röð í `public.predictions`** og eru ósannreynanlegar gegn spátöflunni. Það er þekja spátöflunnar, ekki frávik í keyrslunni — biðraðar-skilgreiningin krafðist aldrei spátöflu-raðar.
+
+### 3. AFURÐIN — FRÁVIKADREIFINGIN, OG EINHALLINN SEM VAR EKKI HANNAÐUR
+
+`base_pct_error` á nýja menginu: **0 seldar raðir, 0 mælingar.** Það er **skilgreining, ekki gat** — sýnan tengir sölu með `thinglystdags >= valued_at::date` og raðirnar voru verðmetnar í dag. **Fyrsta mean-alda `base_pct_error`-mælingin verður til við fyrstu sölu eftir 12.08** og má aldrei fyllt með median-aldar tölum (§5D-4 §5).
+
+`extraction_gap` yfir mengið: gap=0 á 45 (0,24 %), **gap>0 á 11.947 (62,8 %)**, gap<0 á 7.030 (37,0 %); meðaltal **+1.207.579 kr (+2,3103 %)**, miðgildi +792.218 kr (+1,0088 %). Meðaltalið er tvöfalt miðgildið — dreifingin er **hægri-skekkt**.
+
+Eftir `predictions.confidence_grade`, meðal-gap sem hlutfall: **A 0,807 % · B 0,972 % · C 4,541 % · D 4,409 % · `<NULL>` 7,919 %.** **Því lakari sem vissa líkansins er, því meira hreyfir útdrátturinn matið** — útdrátturinn leggur mest til þar sem grunnlíkanið veit minnst. Sú hegðun var **ekki hönnuð inn** og hún er rétt vegin.
+
+**`<NULL>`-línan er stærsta einstaka niðurstaða dreifingarinnar og hún er ekki flokkur heldur fjarvera:** 2.848 raðir / 543 eignir án `predictions`-raðar bera **fimmfalt** meðal-gap A-flokks. Það eru sömu raðirnar sem stikkprufan gat ekki sannreynt. **Ómælt mengi, ekki mælt — fer á backlog, ekki í þessa færslu sem fullyrðing um orsök.**
+
+### 4. PÁSAN AFLÉTT — OG ÞAKIÐ 2000 STENDUR SEM AFSTAÐA, EKKI SEM MILLIBILSÁSTAND
+
+Biðröðin mæld gegnum **raunfallið** eftir keyrslu: **0 raðir.** Skilyrta GO-ið er þar með uppfyllt og `scripts/nightly_delta_chain.sh` fer **0 → 2000** (commit `6426140`; `bash -n` hreint, rofinn sannreyndur með því að keyra sömu greiningu og skelin ber, `-gt 0`, ekki með lestri). Raunkallið breytist úr `--forward 200 --confirm --skip-valuation` í `--forward 200 --confirm --value-limit 2000`.
+
+**Talan er 2000, ekki „ótakmarkað", og það er ákvörðun.** Rök borðsins:
+
+1. **Þakið er hlutlaust í venjulegri nótt.** Biðröðin vex ~300/nótt < 2000, svo keðjan tekur sína ~300 og þakið bítur ekki. **Þar af leiðandi má ekki meta þakið af því ástandi** — það er einmitt ástandið sem þakið er gagnslaust í.
+2. **Það ver EINA þekkta bilun.** Biðröðin er skilgreind sem „auglýsingar án verðmats **FYRIR ÞETTA `model_version`**". Næsta **líkanaskipti** opnar því allar 42.632 raðirnar í einu vetfangi. Heimildin er mæld, ekki áætluð: **cc113 mældi 3 → 21.354** við endurtenginguna.
+3. **Sú hrina á að vera VALIN eins og þessi var**, ekki afleiðing af ómannaðri nótt. Ein mönnuð keyrsla gefur eina hreina frávikadreifingu á einu akkeri; sjálfvirk hrina á líkanaskiptum gefur ósambærilega dreifingu og enginn valdi hana.
+
+**Fjarlægðu því ekki þakið við það eitt að biðröðin sé tóm.** Rökin fyrir hækkun eða afnámi eru rök um **líkanaskipti**, ekki um daglegt flæði, og þau á að taka við næsta flipp — ekki fyrir hann.
+
+Útdrátturinn (`EXTRACT_FORWARD`, Haiku) er **ósnertur**: hann er ferskleiki, ekki bakfylling.
+
+### 5. BÖNN SEM HELDU · ÚT AF STENDUR
+
+`predictions` aðeins **lesin**. Brúin **ósnert**. Engin gömul röð endurrituð (tvær checksummur; `ON CONFLICT ... DO NOTHING` getur ekki uppfært). Extraction-þrepið ósnert og því **$0,00 kostnaður** — útdrættirnir voru til fyrir.
+
+Út af stendur: (1) **`<NULL>`-flokkurinn** — 2.848 raðir með fimmfalt gap, ómælt; (2) **fyrsta mean-alda `base_pct_error`** bíður fyrstu sölu eftir 12.08; (3) **parity-hliðið vaktar enn `median`-höfuðið eitt** (§5D-4 §6, óbreytt af cc142); (4) **STATE.md** var ekki uppfært — cc144 hafði umboð til viðbóta í DECISIONS eingöngu.
+
+**Heimild**: `docs/fable_prep/audits/CC142_BAKFYLLING_20260812.md` (git-afritið, sama nafn og frumritið, með cc144-viðauka aftast) og frumritið `D:\_audit\cc142_verdmats_bakfylling\CC142_BAKFYLLING_20260812.md` + `SONNUN_OG_DREIFING_CC142.md` + `keyrsla_cc142.log` + `stada_FYRIR/EFTIR.json` í sömu möppu. **Sundurliðunarskráin fylgir EKKI í git**: hún ber 12 raða stikkprufu á eignastigi (per-eign spár) og app-repoið er opið og deploy-tengt — raðgögn úr prod fara ekki þangað, aggregat gerir það. Sjá einnig §5D-4 (miðsæknin, forsenda keyrslunnar), §5D-2 + viðauki (cc134-sían) og `scripts/nightly_delta_chain.sh` (cc121-pásukaflinn stendur óréttur sem saga; „LIFANDI HEGÐUN"-kaflinn ber raunstöðuna).
