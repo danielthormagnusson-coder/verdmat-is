@@ -6667,3 +6667,155 @@ T1–T4 og MIN_LOCAL · `feature_attributions_rent` (áfram tóm, meðvituð úr
 Engin migration. Snapshot `*_pre_cc135` og `*_pre_cc149` standa bæði.
 
 > *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4 til §5D-10.
+
+---
+
+## 2026-08-13 — §5D-12 · cc152 HÓGVÆRÐARMERKIÐ Á AKKERISKORTINU: K0 FELLT SEM MERKI, K8 SETT Í STAÐINN, ÞYNNKUFLAGGIÐ LAGAÐ Í RÓT — OG STÖÐNUÐ SPÁTAFLA LOKUÐ FYRIR ANON
+
+### 1. HVAÐ VAR ÁKVEÐIÐ
+
+`prior_old_anchor_flag` (aldur akkeris > 8 ár) hættir að vera **merki** á
+`/eign`. Það logaði á 35,98 % akkeraðra eigna, jafndreift, og aðgreindi ekkert
+(AUC 0,500 nákvæmlega innan sellu — cc151). Meira en helmingur flöggunarinnar
+lenti á gæðaflokki A. Aldurinn stendur eftir sem **hrein staðreyndarlína** á
+kortinu („Aldur fyrri sölu · 18 ár"), án viðvörunarlitar og án fyrirvara-orðunar.
+
+Hógværðarmerkið er **K8 eitt**: `prior_age_years > 12` **OG**
+`|prior_adj_kr − real_pred_mean| / real_pred_mean > 25 pp`.
+
+| | teljari | nefnari | tíðni |
+|---|---:|---:|---:|
+| K8 (valinn) | **1.957** | **77.484** akkeraðar | **2,53 %** |
+| — af öllum `valuation_tiers` | 1.957 | 167.503 | 1,17 % |
+| K0 (fellt) | 27.877 | 77.484 | 35,98 % |
+
+Dómsskilyrði borðsins var 2–15 % af akkeruðum; 2,53 % stenst. Öfugt við K0 er
+K8 **einhalla eftir gagnagæðum**: flokkur A 1,05 % → D 11,23 %, þrep T1 1,93 %
+→ T5 20,00 % (K0: A 34,00 %, D 34,88 %). Miðgildi bils innan K8 er 36,15 pp
+gegn 6,40 pp utan; miðaldur 16,17 ár gegn 5,72 ár.
+
+**Grunnurinn er BIRTA talan.** `v_current_predictions.real_pred_mean` mældist
+bæti-identísk `valuation_tiers.pred_mean_at_build_kr` á **77.484 af 77.484**
+akkeruðum röðum, svo tíðnin gildir á þeirri tölu sem stendur á skjánum.
+
+**Textinn er stefnulaus.** Innan K8 liggur akkerið **yfir** matinu á 1.015
+eignum (51,87 %) og **undir** á 942 (48,13 %) — nánast jafnt. Textinn segir því
+að bilið sé stórt, aldrei í hvora áttina það hallar.
+
+### 2. 25 pp — BÓKAÐ BERUM ORÐUM
+
+**25 pp er VALIÐ SÝNIGILDI, ekki mældur hnykkur.** Hvorki cc151 né cc152 hefur
+mælt hnykk á þeim ási; ekkert staðfestir að 25 sé betri staður en 20 eða 30.
+Þess vegna stendur talan **hvergi í birtingartexta** — hún ræður hvenær merkið
+logar en er ekki fullyrðing við notandann. Aldursmörkin 12 hvíla hins vegar á
+mældri brekku (hlutfall > 25 pp: 6,59 % við 6–8 ár → 8,37 % við 8–10 →
+12,43 % við 12–15), og sú tala er birt.
+
+**ENDURSKOÐUNARSKILYRÐI:** 25 pp endurmælist að hnykk þegar annaðhvort gerist —
+(1) yield-akkeraða leigan hreyfir akkerisbilin, eða (2) næsta líkanaumferð er
+skoruð.
+
+### 3. ÞYNNKUFLAGGIÐ — RÓTARFIX
+
+`prior_series_thin_flag` var **0/77.484** þrátt fyrir cc143-endurskilgreininguna.
+Rótin er mæld, ekki ályktuð: flaggið las `prior_serie_n_pairs`, sem er dýpt
+þeirrar seríu sem **resolver-inn hafði þegar valið**. `_pick_layer`
+(`index_resolution.py:124-133`) fellir hverja sellu sem ber ekki ≥ 10 pör í
+fjórðungi ≤ 2 fjórðunga frá `at_q`:
+
+| hópur | n sellur | `cell_n_pairs` |
+|---|---:|---|
+| valdar á `level='cell'` | 12 | **min 670** — 0 undir 500 |
+| felldar niður um lag | 17 | **max 485** — 17 af 17 undir 500 |
+
+**485 < 500 ≤ 670.** Þröskuldurinn lá í tómu bili milli hópanna; hliðið tryggði
+hann. 0/77.484 var óhjákvæmileiki, ekki mæling. SD-hnykkjan sem 500 var valið úr
+**stendur** (0–200 pör → SD 0,134–0,561; 20.000+ → 0,021–0,023) — en hún var
+mæld á sellu-seríunum **fyrir** fall og þröskuldurinn borinn á seríuna **eftir**
+fall. Mælingin og beitingin lágu á sitt hvorri kornastærðinni.
+
+**Fixið** færir ásinn á dýpt **eigin sellu** eignarinnar — ásinn sem hliðið les
+ekki. `SERIES_THIN_N` er óbreytt 500. Flippað: **0 → 2.966** (3,83 % akkeraðra),
+`true → false` = 0, og **15/15 aðrir prior-dálkar bæti-identískir**
+(`CHK_ADRIR15 = dd39a15d601a2fb2fcc9cdfabd410f96` fyrir og eftir, mælt bæði
+innan txn og í sérstakri postverify-session).
+
+**VÖKTUNARLIÐUR — bæti-samsemd við `prior_level_fallback_flag`.** Lagaða flaggið
+er í dag eins á öllum 77.484 röðum og `prior_level_fallback_flag` (krosstaflan
+fullkomlega hornalæg: 74.518 / 0 / 0 / 2.966). Samsemdin er **aðstæðubundin, ekki
+byggingarleg**: ung sella með ≥ 10 pör í líðandi fjórðungi en < 500 alls yrði
+þunn án falls, og það mengi er tómt í dag. **Fráviksdagurinn er upplýsing** —
+þegar flöggin skilja sig að hefur skrifleiðin fundið eitthvað sem hún gat ekki
+séð áður. Munurinn á þessu og gamla ástandinu er efnislegur: áður var flaggið
+**ómögulegt**, nú er það **satt en tvítekið**.
+
+**Merkið les EKKI bæði sem sjálfstæð merki.** K8 er eina merkið á fletinum;
+þynnkuflaggið er nú satt mælitæki og bíður eigin hlutverks.
+
+### 4. `predictions_iter3v2` LOKUÐ FYRIR ANON
+
+Liður 0 mældi töfluna sem `/eign` var talin lesa. Hún er **tafla, ekki view** —
+gamla `predictions`, endurnefnd í `import_iter4.py:39`. `model_version='iter3v2'`
+á öllum 110.316 röðum, `predicted_at` **2026-04-01** (einn dagur) gegn
+`iter4r_20260805_reglaR_strukt` / 2026-07-01 í vélinni.
+
+| mæling | tala |
+|---|---:|
+| sameiginlegir fastnum | 110.316 (iter3v2 ⊂ v_current) |
+| nákvæmlega sama tala | **0** |
+| önnur tala en vélin framleiðir | **110.316 = 100,00 %** |
+| \|Δ\| p50 / p90 / max | 4,94 % / **20,49 %** / 1.014,93 % |
+
+**Ekkert birtingaratvik:** `verdmat-ai` ber **núll tilvísun** í töfluna og frosna
+app-repóið les hana aðeins innan `if (showDebug)` (`?mode=debug`), þar sem hún er
+birt merkt sem gamla líkanið hlið við hlið við iter4 — sem er tilgangur hennar
+(`_legacy_migrations/20260506_rls_baseline_audit.sql:57`: *„debug-mode comparison
+surface"*).
+
+**En hún var `anon`-læs.** 110.316 fjögurra mánaða gamlar spár voru sækjanlegar
+um PostgREST án auðkenningar. Fæðingarreglan beitt afturvirkt: `public_read`
+policy felld, `SELECT` afturkallað af `anon` og `authenticated`, RLS stendur á.
+`relacl` fór úr `{…,anon=r/postgres,authenticated=r/postgres}` í
+`{postgres=…,service_role=…}`. **DROP var EKKI heimilt** — frosna repóið vísar í
+töfluna í debug-grein.
+
+**Mótpróf:** `set role anon` → `42501 permission denied`; PostgREST anon →
+**HTTP 401** `42501`; `v_current_predictions` og `valuation_tiers` áfram **200**;
+fjórar lifandi `/eign`-síður á www.verdmat.ai **HTTP 200** með akkeriskortinu og
+engri villu.
+
+### 5. REGLA SEM ÞESSI LOTA BÓKAR
+
+> **„Hvaða flöt les notandinn" mælist á `verdmat-ai`, aldrei á frosna
+> app-speglinum.**
+
+cc151 §5 taldi `app/eign/[fastnum]/page.js` og bókaði að `/eign` læsi gömlu
+`comps_index` og `predictions_iter3v2`, og að hvorki `valuation_tiers` né
+`comps_index_v2` væri lesið af nokkrum framendafleti. **Sú talning var á frosna
+repóinu** (`D:\verdmat-is\app`, millisíðan). Lifandi vefurinn er
+`D:\verdmat-is\verdmat-ai` → www.verdmat.ai, og þar les `lib/eign-queries.js`
+`v_current_predictions` (:194), `valuation_tiers` (:202), `comps_index_v2` með
+harðri `set_role='comp'`-síu (:217) og `comps_t5_basis` (:670). Gamla
+`comps_index` og `predictions_iter3v2` bera **enga tilvísun** í öllu repóinu.
+
+**„V2 eingöngu" var þegar ástand** — frágengið 2026-07-05 (Skref 2). Liður 3 bar
+því enga tengingarvinnu, aðeins merkjavinnu. cc151 §5 er hér með leiðrétt.
+
+### 6. ROLLBACK
+
+* `public.valuation_tiers_thinflag_pre_cc152` (167.503 raðir, RLS on, engin
+  policy) + `D:\cc152\prior_snapshot_pre_cc152.parquet`
+* `D:\cc152\rollback_cc152_flagg.sql` — UPDATE úr snapshot m/ checksum-hliðum á
+  BÁÐUM (flagg og hinir 15)
+* `D:\cc152\rollback_cc152_iter3v2_acl.sql` — GRANT + policy endurreist
+* Bæði rollback-skjölin skrifuð á disk **fyrir** nokkurt skrif.
+
+### 7. ÓSNERT
+
+`predictions` og spá-vélin sjálf (lotan endurreiknar ekkert verðmat) ·
+`predictions_rent*` / `valuation_tiers_rent*` / allir leigu-fletir (`/leiguverd`
+fer í hina greinina í `EignSidaEfni.tsx:176` og rendrar ekki akkeriskortið) ·
+`comps_index_v2` · engin migration · engin Haiku-köll · `predictions_iter3v2`
+sjálf stendur (aðeins aðgangur lokaður).
+
+> *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4 til §5D-11.
