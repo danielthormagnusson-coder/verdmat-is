@@ -58,7 +58,10 @@ EXTRACT_FORWARD=200          # Haiku-hrinan: ný lysingar sem eru útdregnar í 
 # hækka eða fjarlægja að athuguðu máli. Liður (ii) — endurreikningur 953 raðanna —
 # er ÓSNERTUR af þessu: það mengi ber gamla stimpilinn og kemst aldrei í þessa biðröð.
 #
-# cc121 — PÁSA (ákvörðun eiganda 08.08). ÞETTA ER EKKI BILUN.
+# cc121 PÁSA — AFLÉTT 12.08 AF cc142. Kaflinn hér að neðan er SAGAN, ekki lifandi
+# hegðun; hún byrjar aftur við „LIFANDI HEGÐUN" neðst.
+#
+# cc121 setti töluna í 0 (ákvörðun eiganda 08.08) og það var ALDREI BILUN.
 # 0 = PÁSA (verðmats-þrepinu sleppt alveg); >0 = þak á fjölda raða per nótt.
 # Biðröðin var 18.734 raðir við pásu (mælt 08.08, sama tala og cc119).
 # Rökin: biðröðin er BAKFYLLING á eldri auglýsingum sem enginn notendaflötur les
@@ -66,12 +69,29 @@ EXTRACT_FORWARD=200          # Haiku-hrinan: ný lysingar sem eru útdregnar í 
 # EINNI mannaðri keyrslu — ellefu skammtar gefa ellefu ósambærilegar frávikadreifingar,
 # ein keyrsla gefur EINA hreina á sama akkeri. Kostnaður er $0,00 hvort sem er
 # (útdrættirnir eru til, engin Haiku-köll í verðmats-þrepinu).
-# FORSENDA fyrir þeirri keyrslu: cc120 (miðsæknin — expected_base ber real_pred_median
-# meðan /eign og /leit birta real_pred_mean) verður að vera AFGREIDD FYRST, annars
-# frystum við 18.734 raðir á skilgreiningu sem gæti þurft að endurreikna.
-# ENDURRÆSING = ÞESSI EINA TALA (0 -> 2000) og engin önnur breyting.
+# FORSENDA fyrir þeirri keyrslu: cc120/cc123/cc140 (miðsæknin — expected_base bar
+# real_pred_median meðan /eign og /leit birtu real_pred_mean) varð að vera AFGREIDD
+# FYRST, annars hefðum við fryst 18.734 raðir á skilgreiningu sem þyrfti að endurreikna.
+# cc140 (12.08, b557245) lenti þeirri forsendu: allar nýjar raðir fæðast á
+# `real_pred_mean`. (Sögunni lýkur hér.)
+#
+# ── LIFANDI HEGÐUN (cc142, 12.08) ────────────────────────────────────────────
+# MANNAÐA KEYRSLAN ER GERÐ. `--value-seeded --confirm` (engin Haiku, day_total
+# óhreyfður $3,9684) skrifaði 19.022 raðir í einni hrinu: rowcount 23.610 -> 42.632,
+# nákvæmlega þurrkeyrslutalan, id-bilið 24568..43589 SAMFELLT. Biðröðin mæld gegnum
+# `fetch_extracted_listings_to_value` EFTIR keyrslu = 0. Ein hrein frávikadreifing á
+# einu akkeri liggur í D:\_audit\cc142_verdmats_bakfylling\.
+#
+# TALAN ER 2000, EKKI „ÓTAKMARKAД, OG ÞAÐ ER cc113-ÞAKIÐ SEM STENDUR EFTIR.
+# Biðröðin vex ~300/nótt, svo 2000 er HLUTLAUST í venjulegri nótt (biðröð < þak) —
+# keðjan tekur einfaldlega nóttina sína. Þakið ver EINA þekkta bilun: biðröðin er
+# skilgreind sem „auglýsingar án verðmats FYRIR ÞETTA model_version", svo næsta
+# LÍKANASKIPTI opnar allar 42.632 raðirnar í einu vetfangi (mælt í cc113: 3 -> 21.354).
+# Sú hrina á að vera VALIN eins og þessi var, ekki afleiðing af ómannaðri nótt.
+# Fjarlægðu því ekki þakið við það eitt að biðröðin sé tóm — það er einmitt ástandið
+# sem þakið er hlutlaust í og gagnslaust að meta af.
 # Útdrátturinn (EXTRACT_FORWARD, Haiku) er ÓSNERTUR — hann er ferskleiki, ekki bakfylling.
-EXTRACT_VALUE_LIMIT=0
+EXTRACT_VALUE_LIMIT=2000
 
 DRY=0
 [ "$1" = "--dry-run" ] && DRY=1
