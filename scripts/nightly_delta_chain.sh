@@ -305,6 +305,17 @@ run_extract() {
   EXTRACT_REJECTED=$(grep -oE "'rejected': [0-9]+" "$xlog" | tail -1 | grep -oE "[0-9]+")
   : "${EXTRACT_FAILED:=0}" "${EXTRACT_REJECTED:=0}"
   say "extraction: exit=$rc ${summary}failed=$EXTRACT_FAILED rejected=$EXTRACT_REJECTED -> $xlog"
+  # cc156 — SÍA #1 (K2) FÆR SÍNA EIGIN LÍNU, ekki viðhengi við extraction-línuna.
+  # Hún mælir annað: extraction-línan segir hvað var KEYPT, þessi segir hvað var
+  # EKKI keypt af því textinn var þegar til á hreinsuðum lykli. VÆNTING ER ÓSETT —
+  # fyrsta mæling setur viðmiðið (cc156 liður 2). Talan sem hún vaktar er hlutur
+  # VELTUNNAR sem ber óbreytt innihald: cc156 liður 0 mældi ~100 nýja hasha á nóttu
+  # af endurskrifuðum auglýsingum (ekki 15,5 af nýskráningu), og K2 er lykillinn
+  # sem á að fanga þær. Falli talan í 0 margar nætur í röð er annaðhvort veltan
+  # hætt eða sían hætt að bíta — hvort tveggja er frétt. Dómsdagur ~7 nætur.
+  local k2line
+  k2line=$(grep -oE "forward-k2: bidrod_fyrir=[0-9]+ k2_felld=[0-9]+ bidrod_eftir=[0-9]+ keyptir_lyklar=[0-9]+" "$xlog" | tail -1)
+  say "sia1-k2: ${k2line:-<engin k2-lina i loggnum>}"
   if [ $rc -ne 0 ]; then
     say "ABORT extraction (exit $rc) — NO RETRY (abort-not-retry); promote/raw/layers untouched"
     return 1

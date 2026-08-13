@@ -6819,3 +6819,190 @@ fer í hina greinina í `EignSidaEfni.tsx:176` og rendrar ekki akkeriskortið) �
 sjálf stendur (aðeins aðgangur lokaður).
 
 > *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4 til §5D-11.
+
+## 2026-08-13 — §5D-13 · cc156 SÍA #1 (NÆR-EINS) SETT LIFANDI SEM K2 EITT; HREINSUNARREGLAN LÖGUÐ Á TVEIMUR ÁSUM; cc150-TÍMASPÁIN FELLD AF MÆLINGU
+
+> *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4 til §5D-12.
+
+**Heimild**: `docs/fable_prep/audits/NAER_EINS_CC156_20260813.md` (þessi lota) ·
+`NAER_EINS_CC153_20260813.md` (formælingin og kostatafla K0–K6/N0–N2) ·
+`UTDRATTAR_SIUR_CC150_20260812.md` (síur #2/#4 og spáin sem hér er leiðrétt) ·
+mælitæki lotunnar í `D:\_audit\cc156_naer_eins_sia\` (`q01`–`q04`, allar
+`set_session(readonly=True)`). **ENGIN DB-SKRIF. ENGIN HAIKU-KÖLL** — eina
+keyrslan á vélinni var `--forward 5` ÁN `--confirm`.
+
+### 1. AFSTAÐA: K2 EITT — NÁKVÆMUR LYKILL, EKKI ÞRÖSKULDUR
+
+cc153 lagði fjórar spurningar fyrir borðið. Svarið við þeirri fyrstu ræður hinum:
+**nákvæmur jafngildislykill, ekki þröskuldur.** Framkvæmt í
+`fetch_listings_needing_extraction` (`scripts/extraction_engine.py`,
+`_k2_naer_eins_sia`), lykillinn í nýjum módúl `scripts/naer_eins_lykill.py`.
+
+| | felld | $ | mælt tap |
+|---|---:|---:|---|
+| **K2 hreinsaður hash — VALINN** | **185** | **3,83** | **0 á öllum þremur ásum** |
+| K3b fastnum + Jaccard 0,95 | 837 | 17,34 | 17 raunveruleg ástandstöp |
+| K4b `unit_key` + Jaccard 0,95 | 808 | 16,74 | 17 raunveruleg ástandstöp |
+
+**K3b/K4b/K5/N1 eru FELLDAR AF MÆLINGU og enginn á að endurvekja þær án nýrrar.**
+Röksemdin er ekki smekkur: **(b)-tapið er fall af LENGD, ekki af líkindum.** Ein
+viðbætt framkvæmdasetning í meðallöngum texta (3.054 stafir) gefur Jaccard 0,979
+af hreinni reikningsástæðu og situr því hægra megin við hvern þröskuld sem borgar
+sig (cc153 lið 3.4). Þröskuldshækkun kaupir ekki nákvæmni, hún kaupir hlédrægni.
+**N1** (nýbyggingar út) fellur á eigin mælingu: 99,6 prósent þeirra raða bera
+afhendingartíma sem fasteignaskrá ber ekki (cc153 viðauki). **N2** (sér-regla á
+`unit_key`-fjölda per fastnum) flyst á brúarverkið — hún er einingaauðkennismál,
+ekki síumál. **Kostnaðarþráðurinn frá cc127 er þar með tæmdur að sinni:**
+tillögur #2 og #4 komnar inn (cc150), #1 komin inn hér, #3/#5/#6/#7 felldar af
+mælingu í cc130.
+
+### 2. HREINSUNARREGLAN — TVEIR GALLAR, ANNAR ÓBÓKAÐUR
+
+**(a) Latent gallinn sem cc153 bókaði — og forskriftin sem féll.** cc153 lið 4.3
+bókaði að `_OPID` gleypti allt að 120 stafi á eftir „nánari upplýsingar", að það
+fjarlægði ástandsorð úr **77 af 13.652 textum**, og að *„rétta lagfæringin er að
+binda spönnina við setningarlok, ekki við stafafjölda."* **Sú forskrift var prófuð
+og hún fellur:** mælt á sama þýði fer talan úr 77 í **160**. Ástæðan er mæld, ekki
+ályktuð — CTA-setningin er að jafnaði LENGRI en 120 stafir (spannir p50 94, p90
+247, max 729), svo 120-stafa glugginn var í raun að VERJA innihaldið með því að
+stoppa of snemma. Reglan sem stenst er **setningarlok + efnisvörn**: spönnin nær
+að setningarlokum en fellur niður beri hún ástands- eða verðorð. Þá er hún ekki
+CTA heldur innihaldssetning sem byrjar á CTA-orðalagi.
+
+**(b) Gallinn sem cc153 mældi ALDREI — stærðartölurnar.** cc153 sannreyndi K2 á
+hráa mismuninum og fékk „0 raðir bera `ORD_ASTAND`, 0 bera `ORD_VERD`". Sú mæling
+var rétt á þeim tveimur ásum — **en orðalistarnir þekkja enga fermetra.** Mælt hér:
+**4.047 af 13.652 textum (29,64 prósent) tapa aukastafatölu í hreinsun**
+(`_DAGS` 3.718 · `_MILLI` 364 · `_OPID` 129 · `_URL` 5), því `_DAGS` les „80.1 fm"
+sem dagsetninguna 80.1. Afleiðingin var mæld á K2 sjálfum: **2 af 172 K2-röðum
+cc153 fella saman texta sem bera ólíkar stærðartölur** (80,0 gegn 80,1 · 90,2 gegn
+98,0) — kross-einingahrunið úr cc153 lið 3.6, komið inn um bakdyrnar á
+hreinsuninni. Vörnin er á lyklinum í heild (aukastafatölur dulbúnar fyrir
+hreinsun, afhjúpaðar eftir), ekki plástur á hverja reglu: fjórar reglur átu tölur
+og sú fimmta myndi gera það líka.
+
+**Dulbúningurinn einn dugði ekki og það var mælt:** CTA-spönnin gleypti dulbúna
+tökenið í heilu lagi, svo afhjúpunin fann ekkert að skila (279 textar töpuðu enn
+tölu, 241 þeirra fermetratölu). Spönnin ver nú dulbúninginn líka.
+
+| regla | ástandstap | verðtap | stærðartap | K2 | kross-stærð |
+|---|---:|---:|---:|---:|---:|
+| cc153 (gamla) | 77 | 45 | 4.047 | 172 | **2** |
+| + efnisvörn | 0 | 0 | 4.149 | 199 | 4 |
+| + stærðarvörn | 0 | 0 | 279 | 194 | 0 |
+| **+ spönn ver dulbúning (LIFANDI)** | **0** | **0** | **21** | **193** | **0** |
+
+**Lykillinn er í EINU FALLI.** `naer_eins_lykill.lykill()` er eina leiðin að
+honum; cc153-mælitækið (`D:\_audit\cc153_naer_eins\naer_eins_lib.py`) er frosið
+mæliskjal þeirrar lotu og ber gömlu regluna. Sbr.
+`feedback_merki_verdur_ad_lesast_ur_einu_falli`.
+
+### 3. SÖNNUN Á LIFANDI BIÐRÖÐ (13.08, mælidagur bókaður)
+
+Gamla fallið sótt orðrétt úr `git show HEAD:` og keyrt í sama ferli, á sömu
+tengingu, og nýja fallið (cc150-mynstrið).
+
+| | n | $ | nætur á 200/nótt |
+|---|---:|---:|---:|
+| **fyrir** (`@HEAD`) | **7.346** | 152,19 | 36,7 |
+| **eftir** (vinnutré) | **7.161** | 148,35 | 35,8 |
+| **FELLT** | **185** | **3,83** | (2,52 prósent) |
+| **BÆTT VIÐ** | **0** | — | — |
+
+`eftir` er hlutmengi `fyrir`: **satt** · **RÖÐUNIN ÓBREYTT** (gamla röðin síuð ==
+nýja röðin, lið fyrir lið) · fulltrúi/texti breyttist á lifandi röðum: **0**.
+
+**MÓTPRÓF á felldu röðunum (185), á HRÁUM mismun fyrir hreinsun:**
+
+| | mælt | krafa |
+|---|---:|---|
+| m/ástandsorð í mismuninum | **0** | 0 |
+| m/verðorð í mismuninum | **0** | 0 |
+| m/ólíkar stærðartölur | **0** | 0 |
+
+154 af 185 bera **0 tokens mismun** (`n_diff` p50 0, p90 2, max 21). Það sem
+lykillinn hunsar er undantekningarlaust fasteignasalanöfn, símanúmer, bókunar-
+orðalag og mánaðaskipti — sýni í `04_sonnun_lifandi.txt`.
+
+**FRÁVIKIÐ FRÁ 172 ER SKÝRT, EKKI HUNSAÐ.** cc153 mældi 172 á sínu þýði með gömlu
+hreinsuninni; lagfærða reglan gefur 193 á sama þýði; **lifandi mæling gefur 185**.
+Sundurliðun: 184 af 185 voru í cc153-biðröðinni, 1 er ný, og **132 cc153-raðir eru
+horfnar úr biðröðinni** (keyptar eða dánar — sjá lið 5). Talan sem gildir er sú
+sem mælist á lifandi biðröð við framkvæmd, með mælidegi — ekki lesin af
+cc153-töflunni.
+
+**KEYRSLUKOSTNAÐUR BÓKAST:** fallið fer úr 3,8 s í **59,4 s** (+55,6 s). Sían
+verður að bíta á undan `LIMIT`-inu, svo SQL-ið skilar allri biðröðinni og
+hreinsaði lykillinn er reiknaður á báðum hliðum (7.346 + 6.232 textar). Það er
+ásættanlegt í nótt sem tekur þrjár klukkustundir, en það bítur líka á
+`--forward 5` þurrkeyrslum og er ekki ókeypis. **Forreiknaður lykildálkur myndi
+fjarlægja þetta og hann krefst DB-skrifa** — utan umboðs þessarar lotu.
+
+### 4. VÖKTUNARLIÐUR — `sia1-k2` Í NÆTURLOGGINU, VÆNTING ÓSETT
+
+`scripts/nightly_delta_chain.sh` fær **sér línu**, ekki viðhengi við
+extraction-línuna: `sia1-k2: forward-k2: bidrod_fyrir=N k2_felld=M
+bidrod_eftir=K keyptir_lyklar=L`. Línurnar tvær mæla ólíka hluti — extraction
+segir hvað var KEYPT, þessi hvað var EKKI keypt af því textinn var þegar til á
+hreinsuðum lykli.
+
+**Væntingin er ÓSETT með vilja; fyrsta mæling setur viðmiðið.** Ástæðan er liður
+5: biðröðin ber um 100 hasha á nóttu af VELTU (endurskrifaðar auglýsingar), og K2
+er einmitt lykillinn sem á að fanga endurskrifun sem ber óbreytt innihald. Hve
+stór sá hluti veltunnar er hefur enginn mælt. **Dómsdagur eftir um sjö nætur.**
+
+### 5. LEIÐRÉTTING Á cc150-SPÁNNI — SPARNAÐURINN STENDUR, TÍMASPÁIN FELLUR
+
+cc150 §3 bókaði: *„Koma nýrra hasha mæld: 418 á 27 dögum = 15,5/dag"* og af því
+leiddi *„nettó-tæming 184,5/nótt · 40,4 nætur að tæmingu · flýting 8,6 nætur."*
+
+**Mælt með víxlamatrix á cc153-hashamenginu (ekki með mismun tveggja teljara,
+sbr. `feedback_mismunur_tveggja_teljara_er_ekki_hreyfing`):**
+
+| | n |
+|---|---:|
+| cc153-biðröð 12.08 | 7.459 |
+| kyrrt | 7.327 |
+| **farið út** | **132** |
+| **komið inn** | **19** |
+| nettó | **−113** |
+
+Teljaramismunurinn faldi hreyfinguna: **200 köll voru keypt en aðeins 119 komu úr
+cc153-biðröðinni** — 81 voru keypt af textum sem voru alls ekki til í
+15.230-texta þýði cc153. `fresh DESC` étur nýkomna fyrst, svo gamli halinn
+tæmist um 119/nótt. **Koman er um 100 hashar á nóttu, allir óþekktir cc153**, og
+**43 af þeim 100 bera `min(listed_at)` FYRIR 12.08**: auglýsing sem er
+endurskrifuð drepur gamla hashinn og fæðir nýjan sem ber upprunalega
+skráningardaginn. Speglun þess sama: **13 raðir féllu út án útdráttar, allar af
+því textinn hvarf úr `listings`.** Þetta er VELTA, ekki nýskráningarhraði.
+
+**Bókun:**
+1. **$32,69-sparnaður cc150 STENDUR ÓHAGGAÐUR** — hann var mældur á biðröðinni
+   sjálfri, ekki á tæmingarhraða.
+2. **„Flýting 8,6 nætur" er FELLD AF MÆLINGU.** Nettó-tæming mælist ~119/nótt og
+   tæmingin er **~65 nætur**, ekki 40,4.
+3. **Talan 15,5/dag var fyrst-séð-mæling sem fangaði ekki veltuna.** Hún endurgerist
+   hvorki á biðraðarásinni (100/nótt) né á fyrst-séð-ásinum (1.786 nýir textar á 27
+   dögum = 66/dag).
+
+**Reglan sem þetta bókar:** *nettó-hreyfing biðraðar er ekki tæmingarhraði þegar
+röðunin étur nýkomna fyrst — mældu hvað kom ÚR halanum, ekki hvað fór úr summunni.*
+
+### 6. LEIÐRÉTTING Á EIGIN LIÐ 0 — /ops MÆLDIST Á RÖNGU REPÓI
+
+Liður 0(c) var fyrst svaraður af `D:\verdmat-is\app` og það var rangt repó —
+nákvæmlega villan sem §5D-12 lið 5 bókaði. **Mælt aftur á lifandi tré og lifandi
+hýsingu:** `/ops` er **EKKI TIL í `verdmat-ai`** (0 skrár, engin `middleware`) og
+`www.verdmat.ai/ops` skilar **404**. Síðan lifir í frosna speglinum
+(`app/ops/page.js`, sjálfstætt `OPS_PASSWORD`-cookie-hlið í `middleware.js`) og er
+enn í loftinu á **`verdmat-is.vercel.app/ops` (307 → `/ops/login`)**. Ferskleika-
+stimpillinn á `listing_extractions` er þar; **útdráttar-biðraðardýptin og
+`day_total` eru það ekki** — `backlog.unprocessed` þar er verðmats-biðröðin.
+Liðurinn fer á backlog sem eigið verk.
+
+### 7. ÓSNERT
+
+`fetch_extracted_listings_to_value` (cc134-sían óbreytt) · brúin · `predictions*`
+· `valuation_tiers*` · `comps_*` · `listing_extractions` sjálf (engri röð eytt,
+engin snert) · `--forward 200`-þakið · `EXTRACT_VALUE_LIMIT=2000` · engin
+migration · framendinn í hvorugu repói.

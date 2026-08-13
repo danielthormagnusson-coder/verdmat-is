@@ -1692,3 +1692,52 @@ sé endurvakinn á skoðun einni.
 - **`feature_attributions_rent` ER TÓM (0 raðir) — meðvituð úrfelling, bókuð.**
   Enginn flötur les hana. Standi til að birta attributions fyrir leigu þarf
   `score_rent_universe.py` að framleiða þær; hún gerir það ekki í dag.
+
+- **OPS-YFIRLIT: TVÆR TÖLUR Á FLÖT SEM ER ÞEGAR TIL OG VARINN (cc156 liður 0c).**
+  Morgunvaktin á að vera **tíu sekúndna lestur, ekki SQL**. Í dag krefst hún þess
+  að einhver keyri `fetch_listings_needing_extraction` handvirkt og lesi
+  `day_total` úr `scraper_data/logs/extraction_*.log`. Tölurnar tvær sem vantar:
+  **(1) útdráttar-biðraðardýpt** (raunfallið, ekki endurgert SQL) og **(2)
+  `day_total` næturinnar**. **MÆLT ÁÐUR EN VERKIÐ ER SKILGREINT — og fyrsta
+  mælingin var á RÖNGU REPÓI:** `/ops` er **ekki til í `verdmat-ai`** (0 skrár,
+  engin `middleware`; `www.verdmat.ai/ops` = **404**). Síðan lifir í frosna
+  speglinum `D:\verdmat-is\app` (`app/ops/page.js`, sjálfstætt
+  `OPS_PASSWORD`-cookie-hlið í `middleware.js:22-30`, `/ops/login` eina opna
+  leiðin) og er **enn í loftinu á `verdmat-is.vercel.app/ops` (307 →
+  `/ops/login`)**. Þar er þegar ferskleikastimpill á `listing_extractions`
+  (`page.js:242`) — en **`backlog.unprocessed` þar er VERÐMATS-biðröðin**
+  (`extraction→valuation` join), ekki útdráttar-biðröðin, og `page.js:343` bókar
+  berum orðum „$-kostnaður: ekki loggað í DB". **Fyrsta ákvörðun verksins er því
+  HVAR flöturinn á að vera**, ekki hvað á að standa á honum: bæta á frosna
+  spegilinn (ódýrt, en morgunvaktin býr á öðru léni en afurðin) eða smíða
+  ops-flöt á `verdmat-ai` (dýrara, en einn staður). **Ekki byrja á kóða fyrr en
+  sú spurning er svöruð.** Sbr. DECISIONS §5D-13 lið 6 og §5D-12 lið 5
+  („hvaða flöt les notandinn mælist á `verdmat-ai`, aldrei á frosna speglinum").
+
+- **`byggar`-STÖÐNUNIN Í `properties` — HEIMILDIN ER ÞÖGUL UM NÝJUSTU
+  NÝBYGGINGARNAR (cc153 viðauki 5a2).** Óskiptar nýbyggingar bera **enga skráða
+  `byggar` í `public.properties`** því þær eru ekki komnar í fasteignaskrá sem
+  einingar — **719 biðraðarraðir bera ekkert `byggar` á neinu berandi
+  fastnúmeri**. Mælt á stærstu hálíkinda-klösunum: Eskiás 7 (fn 2512844),
+  Vorbraut 14 (2530054), Breiðhöfði 19 (2522235) og 2525915 bera öll
+  `fullbuid=NULL, byggar=NULL` í `properties` **en `byggar=2026` í
+  `scraper.listings`** — og nýbyggingaflaggið, sem les `properties`, gefur **0 á
+  öllum fjórum**. Flaggið er þannig blint á nákvæmlega það sem það á að finna
+  (`feedback_flagg_a_annarri_kornastaerd_en_asinn`). Víðara flagg
+  (`properties` ∪ `scraper.listings.byggar`) bætir við 304 röðum (2.142 → 2.446).
+  **Liðurinn er EKKI „laga flaggið"** — hann er: *hvaða heimild á `byggar` að
+  koma úr þegar fasteignaskrá er þögul, og hvað gerist við þær raðir þegar
+  skráin loks talar?* Snertir nýbyggingarreglu 5 (`DECISIONS.md:886`), comps og
+  hvert líkan sem les `byggar`. **Forsenda: mæla hversu margar eignir skipta um
+  `byggar`-gildi þegar HMS skiptir húsi í einingar** — enginn hefur mælt það.
+
+- **FORREIKNAÐUR HREINSAÐUR LYKILL (cc156 liður 2, keyrslukostnaður).** K2-sían
+  reiknar `naer_eins_lykill.lykill()` á **báðum hliðum við hvert kall** (13.578
+  textar 13.08) og fallið fer úr **3,8 s í 59,4 s**. Það er ásættanlegt í
+  þriggja-klukkustunda nótt en bítur líka á hverri `--forward 5` þurrkeyrslu.
+  Lagfæringin er dálkur (`scraper.listings.lysing_hash_hreinsad` eða sér tafla)
+  sem er reiknaður við `promote_listings_append` — **hún krefst DB-skrifa og
+  migration** og var því utan umboðs cc156. **Skilyrði áður en hún er tekin:
+  lykillinn verður að hafa staðið óbreyttur í a.m.k. eina vöktunarumferð**
+  (§5D-13 lið 4, ~7 nætur), því forreiknaður dálkur á reglu sem enn er að
+  hreyfast er stöðnuð artefakt í bið (sbr. cc131).

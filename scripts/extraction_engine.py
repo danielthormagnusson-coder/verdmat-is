@@ -423,7 +423,7 @@ def value_listings(pg, models, rows, log=print):
 
 
 # ───────────────────────── forward / lazy Haiku half ─────────────────────────
-def fetch_listings_needing_extraction(pg, limit):
+def fetch_listings_needing_extraction(pg, limit, log=print):
     """Distinct mbl lysingar (>=300) with NO extraction yet — one representative listing each."""
     # FRESH FIRST: order distinct lysingar by most-recent listing date so newly-posted listings
     # (highest withdrawal risk) extract before the older backlog (ÞREP 2).
@@ -560,11 +560,86 @@ def fetch_listings_needing_extraction(pg, limit):
              OR count(*) FILTER (WHERE pr.canonical_code IS NOT NULL
                                    AND pr.canonical_code <> 'EXCLUDE') > 0)
       )
-      SELECT h, slid, lysing FROM need ORDER BY fresh DESC NULLS LAST LIMIT {int(limit)}
+      SELECT h, slid, lysing FROM need ORDER BY fresh DESC NULLS LAST
     """
     cur = pg.cursor()
     cur.execute(sql)
-    return [{"lysing_hash": r[0], "source_listing_id": r[1], "lysing": r[2]} for r in cur.fetchall()]
+    rows = [{"lysing_hash": r[0], "source_listing_id": r[1], "lysing": r[2]}
+            for r in cur.fetchall()]
+
+    # cc156 · SÍA #1 — NÆR-EINS (K2). Hún verður að bíta Á UNDAN LIMIT-inu, svo
+    # SQL-ið hér að ofan skilar allri biðröðinni og skerðingin er tekin í Python
+    # eftir síun. Væri LIMIT-ið áfram í SQL-inu myndi sían éta úr þeim 200 sem
+    # nóttin ætlar að kaupa í stað þess að fella úr biðröðinni og fylla upp í.
+    rows = _k2_naer_eins_sia(pg, rows, log=log)
+    # cc128-falsy: BER skerðing, engin `if limit`-grein. limit=0 gefur [] eins og
+    # gamla `LIMIT 0` gerði; limit=10**9 gefur allt. 0 er gildi, ekki fjarvera.
+    return rows[:int(limit)]
+
+
+def _k2_naer_eins_sia(pg, rows, log=print):
+    """SÍA #1 (K2) — fellir raðir sem eiga ÞEGAR KEYPTAN útdrátt á sama HREINSAÐA
+    lykli. Heimild: `docs/fable_prep/audits/NAER_EINS_CC153_20260813.md` lið 4.2/4.3
+    (kostur K2) og `NAER_EINS_CC156_20260813.md` lið 1 (lagfæringarnar tvær).
+
+    ── HVAÐA KOSTUR ÞETTA ER OG HVERJIR VORU FELLDIR ────────────────────────────
+    cc153 mældi níu kosti á biðröðinni (7.459 raðir, 154,53 dalir). Hann er
+    NÁKVÆMUR JAFNGILDISLYKILL, ekki þröskuldur, og það var kjarni dómsins:
+
+      K2  hreinsaður hash          172 raðir · 3,56 dalir · 0 MÆLT TAP
+      K3b fastnum + Jaccard 0,95   837 raðir · 17,34 dalir · 17 raunveruleg ástandstöp
+      K4b unit_key + Jaccard 0,95  808 raðir · 16,74 dalir · 17 raunveruleg ástandstöp
+
+    Þröskuldarnir voru FELLDIR AF MÆLINGU og enginn á að endurvekja þá án nýrrar:
+    (b)-tapið — ástands-/framkvæmdasetning sem BÆTIST VIÐ — er ekki fall af
+    líkindum heldur af LENGD. Ein viðbætt setning í meðallöngum texta (3.054
+    stafir) gefur Jaccard 0,979 af hreinni reikningsástæðu, svo hún situr HÆGRA
+    MEGIN við hvern þröskuld sem borgar sig. K3b/K4b kaupa 17 dali fyrir 17 glötuð
+    ástandstök; K2 kaupir 4 dali fyrir ekkert. Sbr.
+    `feedback_likindathroskuldur_er_fall_af_lengd`.
+
+    ── AF HVERJU LYKILLINN ER REIKNAÐUR ÚR `scraper.listings`, EKKI ÚR TÖFLUNNI ──
+    `listing_extractions` geymir AÐEINS `lysing_hash` (hrátt md5), engan texta og
+    engan hreinsaðan lykil, svo hreinsaði lykillinn keypta megin verður að
+    reiknast úr textanum sjálfum. cc153 mældi um leið blinduna sem af því hlýst:
+    279 keyptir útdrættir bera enga mbl-auglýsingu lengur (4,3 prósent af safninu)
+    og eiga því ENGAN hreinsaðan lykil. Þeir eru ósýnilegir þessari síu og blindan
+    VEX með tíma. Það er þekkt og bókað, ekki gat sem á að laga hér.
+
+    ── SAMA MYNSTUR OG cc150/cc134 ────────────────────────────────────────────
+    Sían er á VERKEFNASKRÁNNI (hvað er keypt í kvöld), ekki á neinni röð sem þegar
+    liggur í `listing_extractions`. Ekkert er eytt. Hún er FRESTUN, ekki
+    brottfelling: breytist textinn birtist röðin aftur næstu nótt af sjálfu sér.
+
+    ── VÖKTUNARLIÐUR (cc156) ──────────────────────────────────────────────────
+    `k2_felld=N` fer í næturloggið sem SÉR LÍNA. Vænting er ÓSETT með vilja —
+    fyrsta mæling setur viðmiðið. Ástæðan er cc156 liður 0: biðröðin ber ~100
+    hasha á nóttu af VELTU (endurskrifaðar auglýsingar), ekki 15,5 af nýskráningu,
+    og K2 er einmitt lykillinn sem á að fanga endurskrifanir. Hve stór sá hluti
+    veltunnar er sem ber ÓBREYTT innihald er ómælt — teljarinn mælir það.
+    Dómsdagur eftir um sjö nætur.
+    """
+    from naer_eins_lykill import lykill
+
+    fyrir = len(rows)
+    cur = pg.cursor()
+    # Keypta hliðin: hver texti sem ber ÞEGAR keyptan útdrátt. Sama forsía og
+    # biðröðin notar (mbl, >=300) svo hliðarnar tvær séu á sama þýði.
+    cur.execute("""
+      SELECT max(l.lysing)
+        FROM scraper.listings l
+        JOIN scraper.listing_extractions e
+          ON e.lysing_hash = substr(md5(l.lysing), 1, 12)
+       WHERE l.source = 'mbl' AND l.lysing IS NOT NULL AND length(l.lysing) >= 300
+       GROUP BY substr(md5(l.lysing), 1, 12)
+    """)
+    keypt_lyklar = {lykill(r[0]) for r in cur.fetchall()}
+
+    eftir = [r for r in rows if lykill(r["lysing"]) not in keypt_lyklar]
+    felld = fyrir - len(eftir)
+    log(f"forward-k2: bidrod_fyrir={fyrir} k2_felld={felld} bidrod_eftir={len(eftir)} "
+        f"keyptir_lyklar={len(keypt_lyklar)}")
+    return eftir
 
 
 def extract_and_store(pg, client, rows, source_trigger, log=print):
