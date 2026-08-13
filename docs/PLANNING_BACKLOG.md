@@ -1714,6 +1714,36 @@ sé endurvakinn á skoðun einni.
   sú spurning er svöruð.** Sbr. DECISIONS §5D-13 lið 6 og §5D-12 lið 5
   („hvaða flöt les notandinn mælist á `verdmat-ai`, aldrei á frosna speglinum").
 
+  **LOKAÐ 13.08.2026 (cc159) — SJÁ DECISIONS §5D-14.** Spurningin sem liðurinn
+  bannaði kóða á undan var svöruð: **flöturinn er `verdmat-ai`**. `/ops` er
+  lifandi á **`www.verdmat.ai/ops`** (deploy `8160fc7`), varinn með sama
+  `OPS_PASSWORD`-kökumynstri og frosni spegillinn bar — mynstrið FLUTT, ekki
+  fundið upp, og lykillinn úr Vercel-env (gildið flutt af `.env.local`, ekki
+  nýtt leyniorð). Flöturinn ber **þrjár tölur** (útdrættir á nýjasta
+  útdráttardegi **201** · **hrá útdráttar-biðröð 7.345** · verðmats-biðröð
+  **7.222** af 11.871) og **fjóra stimpla**; stemmir 7 af 7 við beina
+  SQL-mælingu. Svartímar mældir á undan smíði: RPC-in tvö undir 2 s -> lifandi;
+  biðraðardýptin 1,7–6,5 s -> `unstable_cache` 900 s með mælingartímann úr
+  fallinu. Nýtt `public.ops_utdrattar_bidrod()` (migration `20260813233102`,
+  rollback á disk, spegill orðréttur úr `schema_migrations`, EXECUTE aðeins
+  `service_role`).
+
+  **ÞRÍR LIÐIR LIFA ÁFRAM og eru EKKI lokaðir með þessu:**
+  1. **`day_total` Í KRÓNUM ER ENN EKKI Á NEINUM FLETI.** `/ops` ber
+     **raðafjölda**, ekki upphæð, og segir það berum orðum: taflan geymir engan
+     kostnaðardálk, og loggaða `day_total` telur **köll** (207 í nótt gegn 201
+     röð) þar á meðal misheppnuð. Vilji borðið krónur á flöt þarf **kostnaður að
+     komast í DB**, ekki endurgerð margföldun.
+  2. **SPEGILLINN GETUR REKIÐ ÞEGJANDI.** SQL-ið í fallinu er handritað eftir
+     `fetch_listings_needing_extraction`; breytist Python-sían og ekki fallið
+     sýnir `/ops` ranga tölu án villu. Forreiknaði lykillinn (cc156 liður 2)
+     leysir þetta varanlega með því að gera biðröðina að EINNI skilgreiningu.
+  3. **TVÍFARINN Á `verdmat-is.vercel.app` STENDUR ENN.** Mælt 13.08: ekki bara
+     `/ops` heldur `/` **200**, `/eign/2000473` **200** (heil eignasíða, fótur
+     segir „Uppfært: maí 2026 · 124.835 eignir“) og **ekkert `robots.txt`**.
+     Bókað til niðurtöku í §5D-14 lið 6; aðgerðin er Vercel-stilling eða push á
+     frosna spegilinn og var utan flatar cc159.
+
 - **`byggar`-STÖÐNUNIN Í `properties` — HEIMILDIN ER ÞÖGUL UM NÝJUSTU
   NÝBYGGINGARNAR (cc153 viðauki 5a2).** Óskiptar nýbyggingar bera **enga skráða
   `byggar` í `public.properties`** því þær eru ekki komnar í fasteignaskrá sem

@@ -7006,3 +7006,160 @@ Liðurinn fer á backlog sem eigið verk.
 · `valuation_tiers*` · `comps_*` · `listing_extractions` sjálf (engri röð eytt,
 engin snert) · `--forward 200`-þakið · `EXTRACT_VALUE_LIMIT=2000` · engin
 migration · framendinn í hvorugu repói.
+
+## 2026-08-13 — §5D-14 · cc159 OPS-YFIRLIT LIFANDI Á `verdmat-ai` (ÞRJÁR TÖLUR, FJÓRIR STIMPLAR) + `bil_pp` Á AGENT-VERKFÆRIÐ — OG TVÍFARINN Á `verdmat-is.vercel.app` BÓKAÐUR TIL NIÐURTÖKU
+
+> *Um staðsetningu:* viðbætandi færsla aftast, sbr. §5D-4 til §5D-13.
+
+**Heimild**: mælitæki lotunnar í `D:\_audit\cc159_ops_yfirlit\` (`q01`–`q07`,
+allar `set_session(readonly=True)` nema `q07` sem les `schema_migrations`) ·
+skil `SKIL_CC159_HALT_A.md` í sömu möppu · §5D-13 lið 6 (spurningin „hvar á
+flöturinn að vera“) · §5D-12 lið 5 (of-lesturinn sem `bil_pp` lokar).
+**Pushað:** `verdmat-ai` `7ac52dc..8160fc7` = deploy á www.verdmat.ai.
+**Eina DB-skrifið** er migration `20260813233102` (sjá lið 2); að öðru leyti
+read-only. **Engin Haiku-köll.**
+
+### 1. AFSTAÐA: FLÖTURINN ER `verdmat-ai`, OG HANN BER ÞRJÁR TÖLUR
+
+§5D-13 lagði fyrir borðið eina spurningu á undan öllum kóða: **bæta á frosna
+spegilinn eða smíða á `verdmat-ai`?** Svarið er `verdmat-ai` — sömu rök og
+§5D-12 lið 5: *hvaða flöt notandinn les mælist á `verdmat-ai`, aldrei á frosna
+speglinum*, og morgunvaktin á ekki að búa á öðru léni en afurðin.
+
+`/ops` v1 ber **þrjár tölur og fjóra stimpla og ekkert annað** — engin gröf,
+engin saga, engin sundurliðun:
+
+| tala | mælt 13.08 23:36Z | heimild |
+|---|---:|---|
+| útdrættir á nýjasta útdráttardegi | **201** (13.08) | `ops_scraper_signals().extraction.count_latest_day` |
+| **hrá útdráttar-biðröð** | **7.345** | `ops_utdrattar_bidrod()` — NÝTT |
+| verðmats-biðröð | **7.222** af 11.871 | `ops_scraper_signals().backlog` |
+
+Stimplarnir fjórir: nýjasti útdráttur · nýjasta mbl-auglýsing · nýjasta
+spá-keyrsla · mæling síðunnar sjálfrar. **Ferskleikamörkin ein fluttust** úr
+`OPS_CONFIG` gamla flatarins (28/52 klst dagleg, 35/45 d mánaðarleg); ekkert
+annað var afritað óskoðað.
+
+**Verðmats-biðröðin er á spjaldinu VILJANDI, við hliðina á hinni.** Hún er ekki
+skraut: §5D-2 (C) bókar að hún hefur verið lesin sem útdráttar-biðröðin, og tvær
+biðraðir sem enginn getur ruglað saman eru ódýrari en fótnóta um að rugla þeim
+ekki saman.
+
+### 2. KOSTNAÐUR MÆLDUR ÁÐUR EN NOKKUR LÍNA VAR SKRIFUÐ
+
+Skilyrði borðsins: **undir ~2 s -> beint í síðuna, annars cache-lag og það
+bókast.** Þrjár keyrslur hver, kalt fyrst (`q01`):
+
+| | rás | kalt | heitt | heitt | dómur |
+|---|---|---:|---:|---:|---|
+| `ops_scraper_signals()` | PostgREST | 935 | 589 | 552 ms | **BEINT** |
+| `predictions` (spá-stimpill) | PostgREST | 191 | 137 | 167 ms | **BEINT** |
+| hrá biðraðardýpt (`need`-CTE, án K2) | SQL | **6.470** | 2.105 | 1.727 ms | **CACHE** |
+
+Fyrri tvær eru **lifandi í hverri beiðni** — rekstrarborð sem sýnir cache-að
+ástand lýgur um núið. Biðraðardýptin fékk `unstable_cache` m/**900 s TTL** og
+ber **mælingartímann ÚR fallinu**, ekki rendertíma síðunnar: annars bæri
+cache-uð tala ferskan tímastimpil og flöturinn segði ósatt um hvenær hún var
+mæld.
+
+**Talan komst ekki í síðubeiðni án DB-skrifs.** `scraper.*` er ekki opið
+PostgREST og talan er `GROUP BY … HAVING`. Borðið lyfti „engin DB-skrif“
+skilyrðinu fyrir **nákvæmlega eitt fall** og migration-aginn stóð óskertur:
+rollback-SQL á disk **fyrir** apply, MCP `apply_migration`,
+`schema_migrations`-reconcile, repo-spegill **sóttur orðrétt úr töflunni**
+(`q07`) — **frávik frá drögunum: ENGIN** (keyranlegi hlutinn 1.850 stafir báðum
+megin). Eftirmæling: `f / s / DEFINER`, `search_path=""`, ACL
+`{postgres=X/postgres, service_role=X/postgres}` — **bæti-eins og
+`ops_scraper_signals()`**; `aclexplode` ber ekkert á anon/authenticated/PUBLIC.
+
+**REKSTRARATRIÐI SEM KOSTAÐI EINA UMFERÐ:** nýtt fall er **ekki sýnilegt
+PostgREST fyrr en skemavistin er endurhlaðin.** Síðan sagði „ómælt“ eftir apply
+þar til `NOTIFY pgrst, 'reload schema'` var keyrt. Þetta á að standa í hverjum
+runbook sem bætir við RPC.
+
+### 3. ÞRENNT SEM FLÖTURINN SEGIR BERUM ORÐUM AF ÞVÍ AÐ HANN GETUR EKKI MÆLT ÞAÐ
+
+1. **Dýptin er HRÁ** — báðar cc150-síurnar, EKKI K2. Textinn á síðunni:
+   *„K2-síuð dýpt mælist í næturkeðjunni; sjá `sia1-k2` í logginu.“* Talan er
+   **þakið** á því sem nóttin gæti keypt, ekki það sem hún kaupir.
+2. **„Útdrættir í nótt“ eru RAÐIR sem lentu í töflunni**, þar með taldir
+   `ondemand`-útdrættir utan næturkeyrslunnar — 201 í dag = 200 úr nóttinni + 1
+   kall kl. 20:28 (cc157). **Loggaði `day_total` telur KÖLL** (207 í nótt, líka
+   misheppnuð og endurtekin) og er **eina heimildin um krónur**:
+   `listing_extractions` ber engan kostnaðardálk, svo **flöturinn nefnir enga
+   upphæð**. Endurgerð upphæð væri ágiskun með tveimur nefnurum.
+3. **Biðraðirnar tvær eru ólíkar biðraðir.**
+
+**SPEGILL, OG SPEGLAR REKUR.** SQL-ið í `ops_utdrattar_bidrod()` er handritað
+eftir `fetch_listings_needing_extraction`. Breytist Python-sían og ekki fallið
+sýnir `/ops` **ranga tölu þegjandi** — engin villa, engin viðvörun.
+Krosstilvísun stendur á þremur stöðum (migration, `COMMENT ON FUNCTION`,
+`lib/ops-queries.js`). Varanlega lausnin er forreiknaði lykillinn á
+PLANNING_BACKLOG (§5D-13 lið 2): með honum getur biðröðin orðið **ein**
+skilgreining í stað tveggja.
+
+### 4. `bil_pp` — EIN SKILGREINING, OG HÚN VAR MÆLD
+
+§5D-12 lið 3 bókaði of-lestur á lifandi agent (fastnum 2000473): prósan skýrði
+K8-merkið út frá **aldrinum einum** þótt skilyrðið sé aldur **OG** bil.
+Hreint boolean sem ber enga stærð býður upp á þá einföldun.
+
+Nýtt `akkerisbilPp()` í `config/skyringar.ts`; **`veikurAkkerisStudningur()`
+kallar nú á það** í stað þess að reikna bilið inni í sér. Formúlan er því til á
+**einum stað** og bilið sem agentinn nefnir getur ekki vikið frá bilinu sem
+kveikti merkið. Reiturinn er kæfður á sömu tveimur ásum og `veikur_studningur`
+og `verdmat` (T5 · fjöleining) og er `null` — ekki 0 — vanti akkeri eða mat.
+
+**Mótpróf (`q04`/`q05`, 44 raðir: §5D-12-settið fjögur + 20 K8 + 20 utan K8,
+dregnar á `md5(fastnum)` svo úrtakið veljist ekki eftir aldri):** `bil_pp` og
+`veikur_studningur`, lesin úr **tveimur aðskildum köllum**, eru samræmd í
+**44 af 44**. Dreifing á K8 (`q06`, n=**1.957 = 2,53 %** — lendir upp á tölu á
+§5D-12): p50 **36,1** · p90 **69,5** · p99 **145,5**; 54 raðir (2,8 %) yfir 100 pp.
+
+**Villa í eigin mælitæki, bókuð:** fyrsta útgáfa `q06` skrifaði
+`abs(a-b)/b*100` á tveimur **heiltöludálkum**. Heiltöludeiling gerir prófið að
+„bil >= 100 prósent“ og skilaði K8 = **54** í stað 1.957 — tala sem hefði lesist
+sem raunbreyting frá §5D-12. `::numeric` á báðar hliðar lagar hana.
+
+### 5. RAUNPRÓFUN Á LIFANDI — OG EINN FYRIRVARI SEM STENDUR OPINN
+
+`/ops` óinnskráður **307 → `/ops/login`** · fölsuð kaka **307** · rétt leyniorð
+setur `HttpOnly; Secure; Path=/ops; Max-Age=43200` · innskráður **200** með
+`X-Vercel-Cache: MISS`. Tölurnar þrjár og stimplarnir **stemma 7 af 7** við
+beina SQL-mælingu í sama glugga. `/ops` er í `robots.txt` disallow af sömu
+ástæðu og `/leit`: noindex stöðvar indexun, disallow stöðvar sóknina — og hver
+crawler-sókn ræsir fall og SHA-256 í proxy-inu.
+
+**Agentinn á K8-eign (2000473) — MARKMIÐIÐ NÁÐIST:** *„Þetta framreiknaða verð
+liggur um **52 %** frá núverandi mati … Ástæðan er **tvíþætt**: salan er orðin
+18 ára gömul, **og** bilið milli framreiknaðs verðs og matsins er þetta stórt.“*
+Talan er `bil_pp` = 52,33; báðir liðir nefndir; mörkin (25 pp) hvergi nefnd.
+
+**Agentinn á merkislausri eign (2018566) — EKKI ÓBREYTTUR, OG ÞAÐ ER FUNDUR.**
+Hann nefnir nú bilið líka (þar sem hann þagði áður) **og fyrsta svarið bar
+ranga tölu: 15,8 % þar sem `bil_pp` er 13,54.** Spurður hvaða tvær tölur hann
+bæri saman leiðrétti hann sig sjálfur í **13,5 %** og nefndi réttu tölurnar
+(147,4 M framreiknað gegn 129,8 M mati). **Lærdómurinn: reitur í farmi tryggir
+ekki að talan sem sögð er komi ÚR reitnum.** 15,8 er hvorki `bil_pp` (13,54) né
+hlutfall birtu talnanna (13,56) — hún varð til í reikningi módelsins.
+**ÓLOKIÐ og opið:** herða verkfæralýsinguna í *„nefndu bilið AÐEINS með tölunni
+úr reitnum, reiknaðu hana aldrei sjálf/ur“* og/eða bera forsniðna tölu í
+farminum. Ekki gert í þessari lotu — sér ákvörðun.
+
+### 6. TVÍFARINN BÓKAÐUR TIL NIÐURTÖKU — OG HANN ER STÆRRI EN `/ops`
+
+Nýja síðan er komin, svo tvífarinn má ekki lifa. **Mælt 13.08 á
+`verdmat-is.vercel.app`:** `/ops` 307 → login · `/ops/login` 200 · **`/` 200** ·
+**`/eign/2000473` 200** (heil eignasíða, fótur segir *„Uppfært: maí 2026 ·
+124.835 eignir“*) · `/pro` 307 → login · **`/robots.txt` skilar 404**.
+Tvífarinn er því **ekki bara `/ops`** heldur heil önnur útgáfa af afurðinni á
+öðru léni, með eldri tölum og engar crawler-reglur. Aðgerðin er Vercel-stilling
+eða push á frosna spegilinn og liggur **utan flatar cc159** — hún er bókuð hér
+og valkostirnir liggja fyrir borðinu, ekki framkvæmd.
+
+### 7. ÓSNERT
+
+`docs/fable_prep/` (cc158) · næturvélin og `extraction_engine.py` · K2-sían ·
+`predictions*` · `valuation_tiers*` · `comps_*` · akkeriskortið
+(`components/eign/Akkeri.tsx` — les sama fall, óbreytt hegðun) · frosni
+spegillinn · allar töflur (eina DB-breytingin er nýja fallið).
