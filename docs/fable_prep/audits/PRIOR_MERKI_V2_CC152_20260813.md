@@ -1,6 +1,6 @@
 # PRIOR-MERKIÐ OG V2-FLÖTURINN — cc152
 
-**Dags:** 2026-08-13 · **Lota:** cc152 · **Staða:** LIÐIR 0–3 FRAMKVÆMDIR, **HALT B** (push=deploy)
+**Dags:** 2026-08-13 · **Lota:** cc152 · **Staða:** LOKIÐ — LIVE + PUSHAÐ (verdmat-ai `7ac52dc`, deploy READY)
 **Heimild:** cc151 (`PRIOR_FLAG_CC151_20260812.md`, `D:\_audit\cc151_prior_flag\`), cc145
 **Mælikeyrslur:** `precompute/cc152_iter3v2.py`, `cc152_thynnka_rot.py`,
 `cc152_thynnka_vaenting.py`, `cc152_thynnka_parity.py`, `cc152_k8_grunnur.py`
@@ -660,5 +660,80 @@ breyting þessarar lotu.
 
 ---
 
-**HALT B — bíð go á push = deploy.** Raunprófun á production endurtekst eftir
-deploy á sömu fimm eignum.
+## PUSH + DEPLOY
+
+| repó | ýtt | ath. |
+|---|---|---|
+| `verdmat-is-precompute` | `f863e14..ead94ce` | rótarfix + 9 mælitæki |
+| `verdmat-is` (app) | `486ba2d..e94476d` | **þrjú commit**: `dc4e6c2` (cc153) · **`b533c44` (cc152)** · `e94476d` (cc153 viðauki) |
+| `verdmat-ai` | `316ef09..7ac52dc` | **push = deploy** |
+
+`origin/main..HEAD` tómt í öllum þremur. Pull-before-push á öllum
+(„Already up to date" í öllum þremur).
+
+> **Bókun um app-pushið:** borðið heimilaði að `dc4e6c2` (cc153) fylgdi með. Á
+> meðan HALT B stóð bætti cc153 við **þriðja** commitinu, `e94476d`, sem fór með
+> í sama push. Bæði cc153-commitin snerta **eina skrá**,
+> `docs/fable_prep/audits/NAER_EINS_CC153_20260813.md` — engin skörun við cc152
+> (`comm -12` á skráalistunum tómt). Sjá
+> [[feedback_samhlida_lota_pushar_undir_ther]].
+
+**Deploy:** `dpl_J7vU8MMxpsia7LRtcbEac599RCwt`, target production, region `arn1`,
+**READY**, aliasað á `www.verdmat.ai` · `verdmat.ai` · `verdmat-ai.vercel.app`.
+Commit-SHA staðfest á deploy-inu: `7ac52dc29b477d08c916b360bfebc4750e1c17e5`.
+
+## RAUNPRÓFUN Á LIFANDI (www.verdmat.ai, eftir deploy)
+
+**Cache-agi:** allar fimm síður svöruðu `x-vercel-cache: MISS` — ferskt render af
+nýju útgáfunni, engin ISR-leif frá fyrri deploy. Ekkert frávik þurfti því
+snapshot-samanburð.
+
+| fastnum | HTTP | cache | akkeriskort | aldurslína | **K8-merki** | „eldri en" |
+|---|---|---|---|---|---|---|
+| 2000473 Vesturgata 28 | 200 | MISS | já | **„18 ár"** | **JÁ** | **0** |
+| 2000506 Tryggvagata 4 | 200 | MISS | já | **„18 ár"** | **JÁ** | **0** |
+| 2018566 Skipasund 35 *(viðmið)* | 200 | MISS | já | **„innan við ár"** | nei | **0** |
+| 2058042 *(þynnkuflagg true)* | 200 | MISS | já | **„2 ár"** | nei | **0** |
+| 2005255 Laugavegur 71 *(T5)* | 200 | MISS | ekkert kort | — | nei | **0** |
+
+**Strengurinn „eldri en" finnst hvergi — 0/5.** 2058042 staðfestir á lifandi að
+merkið les **ekki** lagaða þynnkuflaggið, eins og borðið ákvað. Öll fimm svör
+eins og build-prófunin, lína fyrir línu.
+
+### Agentinn á K8-eign (2000473)
+
+Prófnotandi um GoTrue admin-API, cookie-session, `mode:"eign"`, HTTP **200**.
+Svarið (887 stafir) segir orðrétt:
+
+> „Þetta akkeri er **merkt sem veikur stuðningur**: salan er 18,3 ára gömul, og
+> svo langt tímabil þýðir að framreikningurinn ber talsverða óvissu…"
+
+| leitarstrengur | fjöldi |
+|---|---:|
+| „veikur stuðningur" | **1** |
+| **„gamalt akkeri"** | **0** |
+| „gamalt" | **0** |
+| „eldri en" | **0** |
+
+Agentinn las því `veikur_studningur` af nýja verkfærasvarinu og nefnir hvergi
+gamla merkið. **Athugasemd, bókuð hrá:** prósan skýrir merkið út frá **aldrinum
+einum** („svo langt tímabil…"), þótt skilyrðið sé aldur **OG** bil. Það er
+of-lestur módelsins á flaggi sem það fær sem hreint boolean — ekki villa í
+flagginu og ekki stefnugjöf (hún nefnir hvorki „yfir" né „undir"), en það er
+ástæða til að íhuga hvort verkfærasvarið eigi að bera bilið sjálft með, svo
+prósan geti ekki einfaldað skilyrðið. **Ekki lagað í þessari lotu.**
+
+**Þrif prófgagna: `agent_notkun` = 0 · `auth.users` = 0 · `auth.identities` = 0.**
+
+### PostgREST-mótprófið endurtekið á lifandi
+
+| flötur sem `anon` | niðurstaða |
+|---|---|
+| `predictions_iter3v2` | **HTTP 401** `{"code":"42501","message":"permission denied for table predictions_iter3v2"}` |
+| `v_current_predictions` *(viðmið)* | HTTP 200 |
+| `valuation_tiers?prior_series_thin_flag=is.true` | HTTP 200 — `{"fastnum":2058042,"prior_series_thin_flag":true}` |
+
+---
+
+**cc152 LOKIÐ.** DB-breytingar lifandi, kóði pushaður og deployaður, raunprófun
+á production græn á öllum fjórum liðum.
