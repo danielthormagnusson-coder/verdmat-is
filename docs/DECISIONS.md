@@ -7178,6 +7178,46 @@ Tvífarinn er því **ekki bara `/ops`** heldur heil önnur útgáfa af afurðin
 eða push á frosna spegilinn og liggur **utan flatar cc159** — hún er bókuð hér
 og valkostirnir liggja fyrir borðinu, ekki framkvæmd.
 
+**LOKAÐ SAMDÆGURS 14.08 — T1 FELLD Á VERÐI, T2b FRAMKVÆMD.** Borðið valdi fyrst
+**T1** (Vercel Authentication á `deploymentType: "all"`). Hann **féll á tvennu**:
+`update_project_deployment_protection` skilaði **`403 forbidden`** á
+MCP-auðkennið (les stillingar, skrifar þær ekki; Vercel CLI ber enga skipun
+fyrir þetta), og **stillingin sjálf er á bak við $150/mán greiðsluvegg** sem
+borðið hafnaði. Sú útgáfa sem er innifalin — „Standard Protection" — undanskilur
+**einmitt framleiðslulénið** og hefði því gert nákvæmlega ekkert hér. Forkönnun
+sem gerð var á undan stendur samt: `verdmat-is`-verkefnið ber **ekkert sérlén**
+(`www.verdmat.is` er ANNAR vefur, utan reikningsins — `/ops` og `/eign` 404 þar,
+annað efnis-hash), svo aðgerðin snerti tvífarann einan hvor leiðin sem yrði
+farin.
+
+**T2b — ALLSHERJAR-LOKUN Í `middleware.js` FROSNA REPÓSINS** (`cc02837`,
+deploy `dpl_6G3b2jgz…`). Matcher `/:path*` undanskilur **EKKERT** — hvorki
+`_next`-eignir, `favicon.ico` né API-rúturnar þrjár — og hvert svar er
+`404 Not found` með `x-robots-tag: noindex, nofollow` og `cache-control:
+no-store`. Undanskilinn flötur er flötur sem lifir af lokun.
+
+**Þetta er BIRTINGARLOKUN, EKKI EYÐING.** Kóðinn, sagan, migrationirnar og gömlu
+hliðin (`OPS_PASSWORD` á `/ops`, `pro_users` á `/pro`) standa óbreytt í git;
+**ein `git revert` skilar bæði fyrri hegðun og hliðunum**. Frosni spegillinn
+stendur áfram sem kóðaheimild — og GitHub-repóið er opinbert, svo sú heimild er
+áfram læsileg þótt vefurinn birti ekkert.
+
+**Mótpróf á lifandi eftir deploy (14.08):**
+
+| slóð | fyrir | eftir |
+|---|---:|---:|
+| `verdmat-is.vercel.app/` | 200 | **404** |
+| `…/eign/2000473` | 200 | **404** |
+| `…/ops` | 307 → login | **404** |
+| `…/ops/login` | 200 | **404** |
+| `…/markadur` · `…/api/search` · `…/robots.txt` | 200 / 200 / 404 | **404** |
+
+**`www.verdmat.ai` ÓSNERT:** `/` 200 · `/eign/2000473` 200 · `/leit` 200 ·
+`/markadur` 200 · `/ops` 307 (hliðið) — annað verkefni, annað repó, engin
+skörun. Mótprófið var samt keyrt.
+
+**Liður 6 er þar með lokaður.** Tvífarinn lifir ekki eftir að nýja síðan kom.
+
 ### 7. ÓSNERT
 
 `docs/fable_prep/` (cc158) · næturvélin og `extraction_engine.py` · K2-sían ·
