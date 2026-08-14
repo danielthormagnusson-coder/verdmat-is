@@ -7158,7 +7158,8 @@ reikninginn eftir mögulegan** — og það var reikningurinn sem brást, ekki
 skilningurinn. Mótpróf á einingarstigi (`q08`, sömu 44 raðir): **0 ósamræmi,
 0 sniðvillur**; 2000473 -> `„52,3%"`, 2018566 -> `„13,5%"`.
 
-**MÓTPRÓFIÐ Á LIFANDI ER ÓKEYRT OG ÞAÐ ER EKKI Í LAGI ENN.** Skilyrðið var
+**MÓTPRÓFIÐ Á LIFANDI ER KEYRT OG ÞAÐ LENDIR — sjá viðbót neðst í þessum lið.**
+Fyrri lesning þessarar málsgreinar stendur sem saga: Skilyrðið var
 „sama eign spurð aftur, sögð tala == `bil_pp_texti` stafrétt". Það féll á
 ÓSKYLDU: **inneign Anthropic-lykilsins á framleiðslu er uppurin** — `/api/agent`
 skilar `400 invalid_request_error: „Your credit balance is too low"`
@@ -7217,6 +7218,31 @@ stendur áfram sem kóðaheimild — og GitHub-repóið er opinbert, svo sú hei
 skörun. Mótprófið var samt keyrt.
 
 **Liður 6 er þar með lokaður.** Tvífarinn lifir ekki eftir að nýja síðan kom.
+
+### 5b. STAFRÉTTA MÓTPRÓFIÐ — KEYRT 14.08 EFTIR ÁFYLLINGU, OG ÞAÐ LENDIR
+
+Inneignin var fyllt á og prófið keyrt á lifandi vef. Skilyrðið var **stafrétt
+jafngildi**: sagða talan == `bil_pp_texti`, ekki „nálægt".
+
+| eign | `bil_pp_texti` | agentinn sagði | fyrir H3 |
+|---|---|---|---|
+| **2018566** (merkislaus) | `13,5%` | **„13,5%"** ×2 í sama svari | **15,8%** — RÖNG |
+| **2000473** (K8) | `52,3%` | **„52,3%"** | „um 52%" — námunduð |
+
+**Báðar stafréttar.** Á 2000473 nefnir hann ástæðuna áfram **tvíþætta**
+(„annars vegar er salan orðin 18,3 ár gömul, og hins vegar liggur framreiknað
+verð hennar 52,3% frá matinu"), mörkin standa hvergi, og á merkislausu eigninni
+segir hann berum orðum að salan teljist **ekki** veikur stuðningur.
+
+Athugið hvað breyttist á 2000473: talan var **rétt en námunduð** fyrir („um
+52%"). Fullsniðni strengurinn fjarlægir líka þá námundun — agentinn velur ekki
+lengur hversu nákvæmt hann er. **Það sem H3 sannar er ekki að talan hafi verið
+röng heldur að hún hafi verið HANS**; nú er hún flatarins.
+
+**Óskylt en mælt í leiðinni (ÓBÓKAÐ SEM VERK):** agentinn segir aldur akkerisins
+sem `0,96 ára` og `18,3 ár` meðan akkeriskortið birtir „innan við ár" og „18 ár"
+(niðurstýft). `aldur_ara` er hrár í farminum og hefur alltaf verið — sama tegund
+og `bil_pp` var fyrir H3. Ekki lagað hér.
 
 ### 7. ÓSNERT
 
