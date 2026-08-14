@@ -7146,6 +7146,27 @@ hlutfall birtu talnanna (13,56) — hún varð til í reikningi módelsins.
 úr reitnum, reiknaðu hana aldrei sjálf/ur“* og/eða bera forsniðna tölu í
 farminum. Ekki gert í þessari lotu — sér ákvörðun.
 
+**LEYST SAMDÆGURS — KOSTUR H3 (bæði), pushað `03dc7dd`.** Borðið valdi hvorugt
+eitt og sér: `akkerisbilPp` vék fyrir **`akkerisbil()`** sem skilar
+`{ pp, texti }` úr EINNI keyrslu — ein formúla, **eitt snið**, einn staður.
+`bil_pp_texti` er íslenskt tugabrot með einum aukastaf og prósentumerki
+(`„52,3%"`, `„13,5%"`, `„1.263,8%"`), sniðið í SAMA falli og bilið er reiknað
+svo engin önnur sniðleið sé til og ekkert sé eftir að reikna;
+verkfæralýsingin ber regluna um að **afrita strenginn orðrétt**, ekki rúnna
+hann og ekki reikna hann. Rökin fyrir báðum liðum: **H1 án H2 skilur
+reikninginn eftir mögulegan** — og það var reikningurinn sem brást, ekki
+skilningurinn. Mótpróf á einingarstigi (`q08`, sömu 44 raðir): **0 ósamræmi,
+0 sniðvillur**; 2000473 -> `„52,3%"`, 2018566 -> `„13,5%"`.
+
+**MÓTPRÓFIÐ Á LIFANDI ER ÓKEYRT OG ÞAÐ ER EKKI Í LAGI ENN.** Skilyrðið var
+„sama eign spurð aftur, sögð tala == `bil_pp_texti` stafrétt". Það féll á
+ÓSKYLDU: **inneign Anthropic-lykilsins á framleiðslu er uppurin** — `/api/agent`
+skilar `400 invalid_request_error: „Your credit balance is too low"`
+(request `req_011Ce2Hy6HKngn8M3brXGkFF`, 14.08 kl. 08:04Z, workspace
+`wrkspc_01B1voozwwi4gvLd72sWeGbD`) og spjallið á vefnum segir „Spjallið
+svaraði ekki". Sami org-balance ber næturútdráttinn, svo **næsta næturkeyrsla
+stöðvast líka** verði ekkert að gert. Prófið bíður inneignar.
+
 ### 6. TVÍFARINN BÓKAÐUR TIL NIÐURTÖKU — OG HANN ER STÆRRI EN `/ops`
 
 Nýja síðan er komin, svo tvífarinn má ekki lifa. **Mælt 13.08 á
