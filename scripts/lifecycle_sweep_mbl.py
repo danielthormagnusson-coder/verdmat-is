@@ -91,6 +91,8 @@ COMBINED_CAP = 950           # sweep + delta trailing-24h hard margin under the 
 RENT_CADENCE_DAYS = 7        # rent = one full lota per week
 SALE_CADENCE_DAYS = 7        # sale = one full round per week, resumed nightly over ~2 days
 WRITE_BACKOFF_S = (2, 8, 30) # cc43: reconnect delays for write_events; 3 retries then raise
+POR_SENTINEL = 1             # cc170 C2: promote_mbl.PRICE_SENTINEL — verd=0 ("tilboð")
+                             # geymist sem price_amount=1 + is_price_on_request
 
 # slice config mirrors fetch_mbl.MODECFG (roots/pks/price fields), minimal selection.
 SLICES = {
@@ -164,12 +166,23 @@ def load_active_ids(conn, tenure):
     deterministic and spans old..new rather than clustering on newest ids.
     Returns list of (source_listing_id:str, price_amount:int|None, fastnum:int|None).
     """
+    # cc170 C1: sneiðin velst eftir RÓT, ekki tenure einni. DP2-kaskadinn gefur
+    # sölu-borðs tilboðsröðum tenure='rent' en id þeirra er eign_id (fs_fasteign) —
+    # rent-rótin (rentals_property) finnur þau aldrei og tveggja-strikja reglan
+    # myndi falskt úttekta lifandi auglýsingar. Leigu-borðið ber ALLTAF
+    # tegund_raw 'leiga_type_%' (promote_listings_append.build_record), svo það
+    # er rótargreinirinn: rent-sneiðin = tenure rent OG leiga_type_%; allt annað
+    # (þ.m.t. kaskadað) svarar á fs_fasteign-rótinni í sale-sneiðinni.
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT l.source_listing_id, l.price_amount, l.fastnum
             FROM scraper.listings l
-            WHERE l.source='mbl' AND l.tenure=%s AND l.status='active'
+            WHERE l.source='mbl' AND l.status='active'
+              AND CASE WHEN %s = 'rent'
+                       THEN (l.tenure = 'rent' AND l.tegund_raw LIKE 'leiga_type_%%')
+                       ELSE (l.tenure = 'sale' OR l.tegund_raw NOT LIKE 'leiga_type_%%')
+                  END
               AND NOT EXISTS (
                 SELECT 1 FROM scraper.listing_lifecycle_events e
                 WHERE e.source='mbl'
@@ -301,6 +314,12 @@ def classify_batch(cfg, batch, returned, prior_absent, sweep_id, tenure, event_a
         live_price = row.get(pricef)
         lp = int(live_price) if live_price is not None else None
         dp = int(db_price) if db_price is not None else None
+        if dp == POR_SENTINEL and lp == 0:
+            # cc170 C2: POR-jafnstaða. DB ber sentinel 1 (tilboð), mbl ber 0 —
+            # sama ástand, engin verðbreyting; án þessa skrifaðist price_changed
+            # (old=1, new=0) á hverja lifandi POR-röð í hverri einustu sópun.
+            # POR→verðlagt (lp>0) fellur EKKI hér og skilar áfram price_changed.
+            lp = dp
         if lp != dp:
             evidence = {"sweep_id": sweep_id, "slice": tenure, "old": dp, "new": lp}
             if lp == 0:  # verd/price -> 0 = converted to "tilboð"/negotiable; flag for

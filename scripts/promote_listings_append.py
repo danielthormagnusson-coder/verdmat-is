@@ -293,7 +293,9 @@ def run(limit, dry_run=False, log=print):
         staged = []
         max_parse_id = {"sale": 0, "rent": 0}
         for table in ("sale", "rent"):
-            q = (f"SELECT * FROM parsed_mbl_{table} WHERE is_negotiable=0 ORDER BY parse_id"
+            # cc170: báðar sneiðar — tilboðsraðir (is_negotiable=1) promótast nú líka
+            # í Lag 1 (v_eign_virk_auglysing les ÞETTA lag, ekki canonical).
+            q = (f"SELECT * FROM parsed_mbl_{table} WHERE is_negotiable IN (0,1) ORDER BY parse_id"
                  + (f" LIMIT {int(limit)}" if limit else ""))
             parsed = [dict(r) for r in sq.execute(q)]
             for p in parsed:
@@ -306,7 +308,7 @@ def run(limit, dry_run=False, log=print):
                 staged.append((p, c, table))
                 if p["parse_id"] > max_parse_id[table]:
                     max_parse_id[table] = p["parse_id"]
-            log(f"  loaded parsed_mbl_{table} (priced): {len(parsed)}")
+            log(f"  loaded parsed_mbl_{table} (priced+negotiable): {len(parsed)}")
         props = preload_props(pg, postcodes_all, derived_all)
         pg.rollback()  # close preload read-tx so first write-tx SET READ WRITE is first stmt
         log(f"  preloaded props: present={len(props.present)} addr_keys={len(props.by_addr)}")

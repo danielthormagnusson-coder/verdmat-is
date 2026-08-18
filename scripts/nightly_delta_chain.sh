@@ -240,7 +240,7 @@ PY
 # ── v2/v3: parse + promote BOTH layers (BLOKK 6); only after four clean fetch modes ──
 run_promote() {
   if [ $DRY -eq 1 ]; then
-    say "[dry-run] would run: canary_spatial_ref_sys; parse_mbl --confirm; promote_mbl --slice priced --table {sale,rent}; promote_listings_append --confirm"
+    say "[dry-run] would run: canary_spatial_ref_sys; parse_mbl --confirm; promote_mbl --slice {priced,negotiable} --table {sale,rent}; promote_listings_append --confirm"
     return 0
   fi
   local plog=$MODELOGS/promote_${TS}.log
@@ -251,6 +251,12 @@ run_promote() {
     echo "=== parse ===";                  python -m scripts.parse_mbl --confirm                                || exit 11
     echo "=== promote canonical sale ===";  python -m scripts.promote_mbl --confirm --slice priced --table sale  || exit 12
     echo "=== promote canonical rent ===";  python -m scripts.promote_mbl --confirm --slice priced --table rent  || exit 13
+    # cc170: tilboðssneiðin (verd=0) promótast nú líka — gatið sem cc169 fann
+    # (1.854 lifandi tilboðs-söluauglýsingar ósýnilegar af því sneiðin var
+    # fetchuð+parsöð en aldrei promótuð). Röðin skiptir máli: sala á undan
+    # leigu svo leigutilboð foldi í kaskaðaðar atvinnuraðir sölunnar (DP4).
+    echo "=== promote canonical sale-neg ==="; python -m scripts.promote_mbl --confirm --slice negotiable --table sale || exit 15
+    echo "=== promote canonical rent-neg ==="; python -m scripts.promote_mbl --confirm --slice negotiable --table rent || exit 16
     echo "=== append Lag 1 ===";            python -m scripts.promote_listings_append --confirm                  || exit 14
   ) > "$plog" 2>&1
   local rc=$?
@@ -352,8 +358,9 @@ run_mode delta-rent            delta_rent            last_updated_seen  || chain
 run_mode delta-sale-negotiable delta_sale_negotiable last_br_dags_seen  || chain_fail "delta-sale-neg" 1
 run_mode delta-rent-negotiable delta_rent_negotiable last_updated_seen  || chain_fail "delta-rent-neg" 1
 
-# v2/v3: parse + promote BOTH layers (priced sale+rent; negotiable excluded). Gated on the
-# four clean fetch modes above; abort-not-retry. Added BLOKK 6 (2026-06-27).
+# v2/v3: parse + promote BOTH layers (priced + negotiable, sale+rent — cc170 lokaði
+# tilboðsgatinu). Gated on the four clean fetch modes above; abort-not-retry.
+# Added BLOKK 6 (2026-06-27).
 run_promote || chain_fail "promote" 1
 
 # forward extraction + frozen valuation (mbl), after both layers are fresh. Added EXTRACTION ÞREP 5.
