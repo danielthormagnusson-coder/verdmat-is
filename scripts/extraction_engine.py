@@ -425,12 +425,20 @@ def value_listings(pg, models, rows, log=print):
 # ───────────────────────── forward / lazy Haiku half ─────────────────────────
 def fetch_listings_needing_extraction(pg, limit, log=print):
     """Distinct mbl lysingar (>=300) with NO extraction yet — one representative listing each."""
-    # FRESH FIRST: order distinct lysingar by most-recent listing date so newly-posted listings
-    # (highest withdrawal risk) extract before the older backlog (ÞREP 2).
+    # FRESH FIRST (ÞREP 2, ásinn skiptur í cc173 24.08): röðin er nýjast-fyrst á
+    # `first_seen_at` — hvenær SKRAPARINN sá auglýsinguna fyrst — ekki á `listed_at`
+    # (sent_dags frá mbl). mbl ENDUR-DAGSETUR auglýsingar við endurbirtingu: hermun
+    # 24.08 sýndi 3 raðir í topp-20 með listed_at 23.08 en first_seen 18.–19.08, svo
+    # gamli ásinn lyfti endurbirtingum fram fyrir raunverulega nýjar. `discovered_at`
+    # var hinn kosturinn og féll á þekju: NULL á 5.214 af 8.107 í biðröðinni (write-
+    # once frá 02.07); first_seen_at ber 0 NULL. Jafnteflisbrjóturinn `h` í ORDER BY
+    # er ekki skraut: heil nætursópun deilir sama first_seen-stimpli, svo 88-skurður
+    # næturinnar félli annars inni í jafntefli og röðunin væri ekki fall (sbr.
+    # feedback_rodun_an_jafnteflisbrjots_er_ekki_fall).
     sql = f"""
       WITH need AS (
         SELECT substr(md5(l.lysing), 1, 12) AS h, min(l.source_listing_id) AS slid,
-               max(l.lysing) AS lysing, max(l.listed_at) AS fresh
+               max(l.lysing) AS lysing, max(l.first_seen_at) AS fresh
         FROM scraper.listings l
         LEFT JOIN scraper.listing_extractions e ON e.lysing_hash = substr(md5(l.lysing), 1, 12)
         -- cc150: joinið er MARGFELDIS-ÖRUGGT og það var mælt, ekki gefið sér.
@@ -560,7 +568,7 @@ def fetch_listings_needing_extraction(pg, limit, log=print):
              OR count(*) FILTER (WHERE pr.canonical_code IS NOT NULL
                                    AND pr.canonical_code <> 'EXCLUDE') > 0)
       )
-      SELECT h, slid, lysing FROM need ORDER BY fresh DESC NULLS LAST
+      SELECT h, slid, lysing FROM need ORDER BY fresh DESC NULLS LAST, h DESC
     """
     cur = pg.cursor()
     cur.execute(sql)

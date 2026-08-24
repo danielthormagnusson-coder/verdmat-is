@@ -47,8 +47,15 @@ MODELOGS=$DATA/logs
 DELTA_MAX_PAGES=100          # per-mode cap; bounds the night at 4x100 pages worst case
 NIGHT_BUDGET=900             # §6-A.5 margin under the §0.5 <1000 pages/24h cap
 EXTRACT_FORWARD=200          # Haiku-hrinan: ný lysingar sem eru útdregnar í nótt
+# cc173 (24.08) — DAGÞAK HAIKU-HRINUNNAR LÆKKAÐ $10 -> $2. Þakið var aldrei sent
+# héðan og sjálfgefna $10-gildið í run_extraction.py (--daily-cap-usd) gilti; nú
+# er það sent BERUM ORÐUM. Með PER_CALL_USD_EST=0.0225 gefur $2 budget_calls=88,
+# svo nóttin kaupir 88 hasha, ekki EXTRACT_FORWARD=200 — þakið er nú bindandi
+# skerðingin og 200 stendur eftir sem efri vörn. Röðin nýjast-fyrst (first_seen_at,
+# cc173 í extraction_engine) tryggir að ferskasta auglýsingin er alltaf í hrinunni.
+EXTRACT_DAILY_CAP_USD="2.00"
 # cc113 — ÞAK Á VERÐMATS-HRINUNA (ekki Haiku-hrinuna; hún hefur EXTRACT_FORWARD +
-# --max-n + $10/dag). Biðröðin er skilgreind sem „auglýsingar án verðmats FYRIR ÞETTA
+# --max-n + EXTRACT_DAILY_CAP_USD/dag). Biðröðin er skilgreind sem „auglýsingar án verðmats FYRIR ÞETTA
 # model_version", svo endurtengingin við iter4r (cc113, ed2d6d5) opnaði hana úr 3 í
 # 21.354 í einu vetfangi. Það er skilgreiningin, ekki bilun — en fyrsta stóra hrinan á
 # að vera VALIN, ekki afleiðing af fullri biðröð í ómannaðri nótt. Tengingin hafði þá
@@ -273,8 +280,8 @@ run_promote() {
 # ── extraction: forward 108-field condition extract + frozen valuation (EXTRACTION ÞREP 5) ──
 # Runs after promote (both layers fresh). mbl only — valuation needs a fastnum, which only mbl
 # resolves; myigloo (rent, no fastnum) has no valuation path, so it is intentionally not extracted
-# here. Fresh-first ordering + N=200 cap (~57 min, finishes ~02:10, clean before 02:30) + a $10/day
-# hard cost cap (runaway guard if the content-addressed cache ever regresses).
+# here. Fresh-first ordering (first_seen_at, cc173) + N=200 cap + a $2.00/day hard cost cap
+# (cc173; binding at 88 calls/night — runaway guard if the content-addressed cache ever regresses).
 # TVÖ AÐSKILIN ÞÖK, ekki eitt (cc113): EXTRACT_FORWARD þakar HAIKU-hrinuna (kostnað),
 # EXTRACT_VALUE_LIMIT þakar VERÐMATS-hrinuna (skrif í listing_valuations). Þau eru ótengd —
 # verðmats-biðröðin er allt safnið sem á ekki verðmat undir lifandi model_version, ekki bara
@@ -285,7 +292,7 @@ run_extract() {
   # cc113: rökin eru byggð EINU SINNI og notuð af BÁÐUM greinum. Áður var þurrkeyrslu-
   # línan handskrifaður strengur við hliðina á raunkallinu — hún gat því sagt eitt meðan
   # nóttin gerði annað, og þurrkeyrsla sem sannar ekki raunkallið sannar ekki neitt.
-  local xargs=(--forward "$EXTRACT_FORWARD" --confirm)
+  local xargs=(--forward "$EXTRACT_FORWARD" --daily-cap-usd "$EXTRACT_DAILY_CAP_USD" --confirm)
   # cc121 — PÁSAN ER ÞÝDD HÉR, EKKI SEND NIÐUR SEM 0. MÆLT 08.08: `--value-limit 0` er
   # ÓTAKMARKAÐ, ekki ekkert — fetch_extracted_listings_to_value sleppir LIMIT-liðnum á
   # falsy limit (`if limit`, extraction_engine.py:188), svo limit=0 skilaði sömu 18.734
@@ -297,7 +304,7 @@ run_extract() {
     xargs+=(--skip-valuation)
   fi
   if [ $DRY -eq 1 ]; then
-    say "[dry-run] would run: run_extraction ${xargs[*]} (max-n 500, daily-cap \$10)"
+    say "[dry-run] would run: run_extraction ${xargs[*]} (max-n 500 sjálfgefið; dagþak í xargs)"
     return 0
   fi
   local xlog=$MODELOGS/extraction_${TS}.log
