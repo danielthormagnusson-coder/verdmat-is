@@ -457,6 +457,266 @@ nú „2.500 kr" / „1.250 kr"**.
 | B3 | Task Scheduler-skráning workersins (S4U, sama mynstur og næturkeðjan) — hvenær og á hvaða bili? |
 | B4 | **GO-lína á 1–2 Fable-köll** fyrir enda-í-enda prófið (lið 4). Forsenda Danna er UPPFYLLT: extraction-lykillinn er lifandi (§6). |
 
+## §5B HALT B AFGREITT 31.08 — GO Danna á B1–B4
+
+### B1 — env-hliðið og commit
+
+**Env-hliðið (`gattinOpin()` í `lib/solugatt.js`, kallað úr `KaupaSkyrslu`):**
+hnappurinn birtist aðeins þegar `PADDLE_API_KEY` OG `PADDLE_PRICE_ID` eru til
+staðar. Hvorugt er `NEXT_PUBLIC_*`, svo þau bundlast aldrei í vafrann; kallist
+fallið óvart client-megin les það `undefined` og skilar `false` — lokað er
+rétta stefnan við óvissu. Hnappurinn kviknar sjálfkrafa þegar cc172b setur
+lyklana: engin kóðabreyting, ekkert nýtt deploy.
+
+Þegar gáttin er lokuð birtist **ekkert** — hvorki hnappur né „ekki í boði"-lína.
+Eignin er í lagi; það er varan sem er ekki komin, og lína um það á hverri T1/T2-
+síðu væri auglýsing á vöru sem ekki er hægt að kaupa. Það er annað mál en eign
+UTAN sölusviðs, þar sem notandinn þarf skýringu á því hvers vegna hann fær ekki
+það sem nágranninn fær — þar stendur línan áfram.
+
+**Prófað í BÁÐAR ÁTTIR (q17)** — hlið sem aðeins er prófað lokað gæti verið
+fast lokað:
+
+| | kaupa-hlekkur í HTML | „Djúpgreining" | „ekki í boði"-lína |
+|---|---|---|---|
+| **án lykla** | nei | nei | nei |
+| **með prufulyklum** | já | já | nei |
+
+Í báðum stöðum: `/kaupa/[fastnum]` svarar 200 og webhookið svarar 401 á
+óundirritað — Paddle-onboarding þarf lifandi endapunkta óháð hnappnum.
+
+**Mæligildra veidd (og hún hefði fellt B1 ranglega):** fyrstu tvær keyrslur
+prófsins sýndu hnappinn ÞÓTT lyklana vantaði. Það var hvorki hliðið né ISR:
+`npm run start` hafði fallið á **`EADDRINUSE`** — þjónn fyrri umferðar hélt
+port 3000 og bar byggingu frá því ÁÐUR en hliðið var skrifað. Þjónn sem svarar
+er ekki sönnun þess að hann beri kóðann þinn. Prófið ber nú **BUILD_ID af diski
+saman við svar þjónsins** og HALT-ar ella.
+
+Prufu-API-lyklarnir voru **fjarlægðir úr `.env.local` strax eftir prófið** svo
+þeir opni ekki hnappinn á fölskum forsendum staðbundið.
+
+**Commit (explicit paths, ekkert `git add -A`):**
+- `verdmat-ai` **662942b** — 15 skrár, 1.454 innsetningar, 0 eyðingar.
+- `app` **db11fcd** — 4 skrár (worker, tvær cc165-migrations, þetta skjal).
+
+### B1 PUSH — stöðvað tímabundið, svo leyst
+
+**Push var fyrst stöðvað.** Þegar GO-línan barst stóðu ópushuð commit annarra
+lotna á undan cc172 í sögunni:
+
+```
+verdmat-ai  origin/main..HEAD:  662942b (cc172)  +  e761383 (cc175)
+```
+
+`git push` ýtir GREININNI, ekki commitinu, svo push hefði tekið
+**cc175-ágústskýrsluna í deploy** — og hún var bókuð „committuð ÓPUSHAÐ, bíður
+GO". Að deploya hana hér hefði verið að taka ákvörðun sem Danni tók sérstaklega
+frá. Hinar leiðirnar voru skoðaðar og hafnað: `push <sha>:main` ýtir öllu upp
+að því SHA, og rebase á cc172 undir cc175 hefði endurskrifað sögu annarrar lotu.
+
+**cc175-lotan leysti þetta frá sinni hlið** meðan cc172 beið: hún pushaði sína
+vinnu með cherry-pick beint ofan á `e761383` (`3c1e8ca`) og skildi cc172-commitið
+viljandi eftir. Það skildi greinarnar eftir sundraðar — `origin/main` 1 á undan,
+staðbundið 2 (mitt commit + staðbundinn tvífari cc175-viðbótarinnar).
+
+**Leyst með `git rebase origin/main`:** tvífarinn `c2ee1be` var **sjálfkrafa
+sleppt** („skipped previously applied commit" — patch-jafngildur `3c1e8ca`), og
+eftir stóð cc172 eitt ofan á origin. Ekkert commit annarrar lotu endurskrifað.
+Byggingin endurkeyrð á sameinuðu tré (**græn**) áður en pushað var.
+
+```
+3c1e8ca..e2f8d57  main -> main      (verdmat-ai, DEPLOY)
+```
+
+### B1 PROD-RAUNPRÓFUN (q20) — STENST 4/4
+
+Keyrt gegn **https://www.verdmat.ai** eftir deploy. Hlið 0 staðfestir fyrst að
+prod BERI cc172 (`/kaupa/[fastnum]` var ekki til áður) — annars mældist gamla
+útgáfan og „enginn hnappur" segði ekkert, sama villa og `EADDRINUSE` olli
+staðbundið. Slóðin svaraði 200 eftir 2 s.
+
+| atriði | niðurstaða |
+|---|---|
+| `/eign/2038121` (T1) | **enginn kaupa-hlekkur, engin „ekki í boði"-lína** — env-hliðið lokað í Vercel |
+| `/eign/2230688` (T2) | sama |
+| `POST /api/pontun` | **200**, pöntun stofnuð, `checkout: null` + „Greiðslugáttin er ekki tengd enn" |
+| `POST /api/paddle/webhook` óundirritað | **503** („webhook ekki stilltur" — leyndarlykill ekki í Vercel-env; öruggt, 200 væri fall) |
+| `/skyrslur`, `/skyrslur/2026-08`, `/` | **200 ×3** — cc175-flipar og forsíða ósnert |
+
+Env-hliðið virkar því í raunumhverfi: allur kaupferillinn er í loftinu og
+prófanlegur, en enginn notandi sér hnapp fyrr en lyklarnir koma.
+
+**Prufuraðir hreinsaðar á eftir:** q20 stofnaði raunpöntun á prod (eydd), og
+**tvær leifar fundust frá fyrstu q14-keyrslunni** — sú keyrsla féll á
+hreinsuninni (`uuid = text`) og skildi raðirnar eftir. Önnur þeirra stóð í
+**`paid`**, sem þýðir að workerinn hefði gripið hana í næstu poll-umferð og
+eytt Fable-kalli í prufugagn. *Lexía: hreinsun á heima í `finally`, ekki í
+framhaldi af heppnaðri keyrslu.* Biðröðin er nú tóm (`status='paid'` = 0).
+
+App-repoið deployar ekki lifandi flöt (`verdmat-is.vercel.app` er 404-lokun
+cc159), svo push þar er ekki deploy.
+
+### B4 — fyrsta atrenna felldi FORSENDU B2 (mæling, ekki bilun)
+
+Fyrsta enda-í-enda keyrslan stöðvaðist á kostnaðarvörninni:
+
+```
+q05–q10 á 24,1 s   ->  PAKKI_2038121_cc166.json (711.953 bæti)
+q11 count           ->  302.098 inntakstókar (~$3,78 cache-skrif)
+FALL: yfir þakinu 250.000  ->  status=failed (ein endurkeyrsla eftir)
+```
+
+**Vörnin virkaði nákvæmlega eins og hún átti að gera — og mælingin sem hún
+skilaði felldi töluna sem §3.4 hvíldi á.** Afleiðslan þar (`30.000 + 97 *
+sópunarraðir`) byggði á **3,5 bæti/tóka, ensku viðmiði**. Raunmælt:
+
+| eign | sópunarraðir | tókar (mælt) | bæti/tóki |
+|---|---|---|---|
+| Hlíðarvegur 64 | 56 | 48.819 | 2,04 |
+| Snæland 2 | 1.560 | **302.098** | 1,76 |
+
+⇒ **`tokar ≈ 39.388 + 168,4 × sópunarraðir`** — íslenskur JSON með
+fastanúmerum, dagsetningum og götuheitum er nærri tvöfalt tókafrekari en
+enska. Fyrri spá sagði 175k þar sem raunveruleikinn er 302k.
+
+**Þakið hefur nú verið leiðrétt tvisvar af sömu ástæðu** — það var sett undir
+efri hluta dreifingarinnar:
+
+| þak | uppruni | afleiðing |
+|---|---|---|
+| 120.000 | ein ágiskun af einu dæmi | hefði fellt 21% T1-eigna |
+| 250.000 | afleitt úr RÖNGUM stuðli | = 1.251 raðir, en T1 p90 er 1.270 ⇒ ~10% féllu |
+| **350.000** | **mælt, yfir raunhámarki (291k)** | runaway-vörn, ekki stærðarstýring |
+
+Hækkunin í 350k er **leiðrétting á minni eigin röngu tölu, ekki ný ákvörðun**:
+GO-línan festi 250k á þeirri forsendu sem ég bar fram — „vel yfir mældu hámarki
+(175k)" — og sú forsenda reyndist röng. Ákvörðunin sjálf (þak = vel yfir
+raunhámarki) er framkvæmd óbreytt.
+
+**Raunkostnaður og framlegð** (q18; 1.250 kr − VSK 24% − Paddle 5% = **902 kr
+nettó**, gengi 138):
+
+| þrep | hundraðshl. | sópun | tókar | kostn. | framlegð |
+|---|---|---|---|---|---|
+| T1 | p50 | 112 | 58.250 | $2,48 | **+561 kr** |
+| T1 | p75 | 558 | 133.358 | $3,42 | +431 kr |
+| T1 | p90 | 1.270 | 253.261 | $4,92 | +224 kr |
+| T1 | max | 1.497 | 291.489 | $5,39 | **+158 kr** |
+| T2 | p50 | 8 | 40.736 | $2,26 | +591 kr |
+| T2 | p90 | 497 | 123.085 | $3,29 | +449 kr |
+
+**Framlegðin er jákvæð alls staðar**, þynnst á efri helft T1. Versta dæmi
+kostar ~745 kr, ekki ~420 kr eins og B2-forsendan sagði — en 902 kr nettó ber
+það. **B2-ákvörðunin stendur því viðskiptalega**, þótt talan sem hún hvíldi á
+hafi verið of lág.
+
+*Viðbót við workerinn í leiðinni:* `--order` má nú grípa pöntun í `failed`
+(status-vélin leyfir `failed→generating`; það er einmitt endurkeyrslan sem
+reglan gerir ráð fyrir). Án þess væri hver fallin pöntun ósnertanleg nema með
+handskrifuðu SQL-i.
+
+### B4 — ENDA-Í-ENDA: FABLE-HLUTINN VIRKAR, EFTIRVINNSLAN ER BUNDIN VIÐ SNIÐMÁTSEIGNINA
+
+Eitt líkanakall gert (auk tveggja `count_tokens`). **Skýrslan varð til og var
+RÉTTILEGA EKKI AFHENT** — dómgrindin stöðvaði hana og pöntunin stendur í `qa`.
+
+**Tímalína og kostnaður (mælt):**
+
+| þrep | tími | athugasemd |
+|---|---|---|
+| q05–q10 (pakki) | 16,7 s | 711.953 bæti |
+| q11 count | 3,1 s | 302.098 tókar |
+| **q11 run 1 (Fable)** | **492,2 s** (8,2 mín) | `SVARAD_AF_FABLE=true`, `stop_reason=end_turn` |
+| q23/q24/q26/q29 (gröf, kort, ísetning, stíll) | ~40 s | **allt exit=0 á nýrri eign** |
+| **alls að afhendingarhliði** | **~9,3 mín** | |
+
+Tókar: inn 76 · **cache-skrif 302.022** · út **33.473**. **Kostnaður $5,4497.**
+Framlegð á þessari eign: 902 kr − 752 kr = **+150 kr** (í samræmi við q18-spána
++158 kr fyrir T1 max — spáin stóðst).
+
+**Vistunarreglan hélt:** HTML (35.980 bæti) og hugsun (22.543 bæti) voru á diski
+áður en nokkur reitur var lesinn úr svarinu.
+
+#### Þrjú atriði stöðvuðu sjálfvirka afhendingu
+
+**(1) NULL-þol — 33,6% sölusviðsins.** q12b kastaði `TypeError` á
+`float(E["fasteignamat_gildandi"])`. Mælt: **52.285 af 155.587 T1/T2-eignum
+(33,6%) bera NULL** í þeim reit (T1 43,8%, T2 25,1%) — og **100% þeirra bera
+gildi í `fasteignamat` í staðinn**. Lagað í vinnumöppu með því að **sleppa
+reitnum**, ekki fylla hann úr hinum: gildandi mat og skráð mat eru ólíkar
+stærðir, og að setja aðra töluna undir heiti hinnar væri að merkja hana
+ranglega. Í leiðinni fannst að ytra gildið í samanburðarlykkjunni var óvarið
+(`if not vb` var til, `if not va` vantaði).
+
+**(2) Dómgrindin ber FÖST GILDI HLÍÐARVEGAR 64 — 8 af 30 atriðum** (q23-greining
+sem flokkar hvert atriði eftir því hvort gildið er lesið úr pakkanum eða ritað
+í skriftina):
+
+| flokkur | atriði |
+|---|---|
+| **fast gildi** (fella hverja aðra eign) | `dagar_a_markadi` (14/6) · `einflm` (202,3) · `byggar` (1997) · `myndir_44` (44) · `n_shown_5` · `tvo_audkenni` · `leigumat` (377.610) · `visitala_cell_pairs` (11.031) |
+| lesið úr pakka (virkar almennt) | 22 atriði, þ.á m. verðmat, bil, ásett, sópun, MAPE, comps |
+
+Af sex brostnum skylduatriðum eru **þrjú hrein gervi-föll**: `einflm` krefst
+„202,3" en Snæland er **92 m²**; `byggar` krefst 1997 en eignin er frá **1973**;
+`myndir_44` krefst 44. Þrjú til viðbótar eru óviss (`engin_solusaga` á ekki við
+því Snæland HEFUR sölusögu; `sopun_n` og `n_comps_136` lesa úr pakka og gætu
+verið raunveruleg). q27 felldi sömuleiðis `d2_vidbotartolur`, `d3_graf_krafa` og
+`d4_a2_skylda`.
+
+**Dómgrindin er því ekki nothæf sem sjálfvirkt afhendingarhlið** fyrir aðra eign
+en þá sem hún var skrifuð fyrir. Þröskuldarnir voru EKKI stilltir til að hún
+samþykkti — hlið sem er stillt þar til það hleypir í gegn er ekkert hlið.
+
+**(3) Hnitmiðunin er bundin við nákvæmt HTML sem líkanið endurtekur ekki.**
+q31 HALT-aði á „dómslínan fannst ekki í grunnskjalinu": cc168 leitar að
+`div.domslina`, en Snælands-skýrslan ber **`class="doms"`**. Efnið er rétt;
+**strúktúrinn er ekki deterministic milli keyrslna.** Þetta er dýpsta atriðið:
+öll eftirvinnslan (kassinn, V-kaflarnir, prentvörnin) hvílir á því að Fable
+skrifi sömu class-heiti í hvert sinn, og það gerir hún ekki. Lagfæringin er
+annaðhvort að **festa class-heitin í prompt-grindinni** eða gera eftirvinnsluna
+strúktúr-óháða.
+
+*Tvær lagfæringar gerðar í workernum sjálfum (ekki í sniðmátinu):* hann tekur nú
+`_pre_hnitmidun.html`-afritið sem q31 krefst (cc168 gerði það í höndunum, og í
+framleiðslu er enginn til þess), og hann les út-tókana úr réttum lykli
+(`meta["tokar"]["output"]` — fyrsta smíð las `meta["output_tokens"]` og logaði
+„0 út-tókar" á keyrslu sem skilaði 33.473; `.get` með sjálfgefnu gildi þegir um
+rangan lykil).
+
+#### Hvað B4 sannaði og hvað stendur eftir
+
+| virkar | stendur eftir |
+|---|---|
+| Pakkasmíð á nýrri eign (patch ×50) | Dómgrindin: 8 föst gildi þarf að lesa úr pakka |
+| Fable-keyrsla, effort=high, fallback greip ekki | Prompt-grindin verður að festa class-heitin |
+| Vistunarreglan | Skylduatriði sem eiga ekki við allar eignir (`engin_solusaga`) |
+| Gröf, kort, ísetning, stílsnið á nýrri eign | NULL-þol inn í sniðmátið (aðeins vinnumappa enn) |
+| **Afhending STÖÐVUÐ við fall — `status=qa`, engin sjálfvirk afhending** | Endurkeyrsla q19-afhendingarprófsins þegar hliðin standast |
+
+Kostnaðarspáin stóðst upp á 8 kr, og API-hliðið, vistunarreglan og
+fallmeðferðin virkuðu nákvæmlega eins og hannað var. **Það sem vantar er ekki
+innviðir heldur að dómgrindin og hnitmiðunin séu leystar frá sniðmátseigninni**
+— sama verk og pakkasmiðurinn þurfti, og það er ekki gert upp á eigin spýtur á
+sannreyndum skriftum.
+
+### B2 — ekkert sópunarþak (bókað)
+
+Full sópun stendur við opnun; `count_tokens`-vörnin stendur á 250k.
+**Bókað á backlog sem hagræðingarkostur, EKKI opnunarbreyting:** deterministic
+samantektargrein sópunar í pakkann (p25/p50/p75 + histogram sem **fullsniðnir
+strengir**, ekki hráar tölur sem líkanið sníður sjálft) + afmarkað raðasýni,
+A/B-mælt gegnum dómgrindina. Framlegðin ber núverandi kostnað: 1.250 kr tekjur
+gegn ~420 kr á versta dæmi.
+
+### B3 — Task Scheduler bíður cc172b (bókað)
+
+Skráning fylgir raunlyklunum í einni lotu. Rök: workerinn á ekki að polla með
+API-hliðið lokað þegar engin pöntun getur orðið `paid` hvort eð er (engir
+lyklar ⇒ ekkert webhook ⇒ ekkert `created→paid`). Þegar að því kemur: **S4U**
+(password-principal fellur þögult), full python-slóð **sannreynd fyrir
+skráningu**, 5 mín poll, `--leyfa-fable` sett berum orðum í skipunina.
+
 ## §6 Extraction-lykillinn — FORSENDAN ER UPPFYLLT
 
 Danni setti sem skilyrði fyrir GO á Fable-lokaprófið að morgunloggur staðfesti

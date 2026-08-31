@@ -112,11 +112,28 @@ BUCKET = "fable-skyrslur"
 #   T1    112      558     1270     1494     1497     21% eignanna
 #   T2      8      115      497     1479     1493      8%
 #
-# ~97 tókar á sópunarröð + ~30k grunnur  =>  T1 p90 ≈ 153k tókar, max ≈ 175k.
-# Fyrsta smíð setti þakið á 120.000 og hefði því fellt FIMMTUNG T1-eigna sem
-# „bilun" þótt ekkert væri að: þröskuldur undir eðlilegri dreifingu framleiðir
-# gervi-föll. Þakið er hækkað í 250.000 — vel yfir mældu hámarki (175k) en
-# grípur samt keyrslu sem hleypur á sig.
+# TÓKASTUÐULLINN ER MÆLDUR, EKKI AFLEIDDUR (cc172 B4, q18). Tveir punktar úr
+# raunverulegum count_tokens-köllum:
+#     Hlíðarvegur 64:    56 sópunarraðir ->  48.819 tókar (2,04 bæti/tóki)
+#     Snæland 2     : 1.560 sópunarraðir -> 302.098 tókar (1,76 bæti/tóki)
+#   =>  tokar ≈ 39.388 + 168,4 * sópunarraðir
+#
+# Fyrri afleiðsla var `30.000 + 97 * raðir`, byggð á 3,5 bæti/tóka — ENSKU
+# viðmiði. Íslenskur JSON með fastanúmerum, dagsetningum og götuheitum er
+# nærri tvöfalt tókafrekari, svo hún vanmat um ~2x: spáði 175k þar sem
+# raunmælingin gaf 302k.
+#
+# Þakið hefur því verið leiðrétt TVISVAR af sömu ástæðu — það var sett undir
+# efri hluta dreifingarinnar:
+#   120.000  fyrsta ágiskun (eitt dæmi)      -> hefði fellt 21% T1-eigna
+#   250.000  afleitt úr röngum stuðli         -> svarar til 1.251 raða, en
+#                                               T1 p90 er 1.270: felldi ~10%
+#   350.000  MÆLT: yfir raunhámarki (291k)   <- runaway-vörn, ekki stærðarstýring
+#
+# Framlegð á mældum kostnaði (1.250 kr - VSK - Paddle = 902 kr nettó):
+#   T1 p50  $2,48 -> +561 kr      T1 p90  $4,92 -> +224 kr
+#   T1 max  $5,39 -> +158 kr      T2 p50  $2,26 -> +591 kr
+# Jákvæð alls staðar, þynnst á efri helft T1 (B2: full sópun stendur).
 #
 # ÓVALIÐ (á borði Danna, cc172 §4): á að setja ÞAK Á SÓPUNINA sjálfa
 # (t.d. 400 raðir, valdar næst í tíma/stærð)? Það lækkar kostnað efri helftar
@@ -124,7 +141,7 @@ BUCKET = "fable-skyrslur"
 # skýrslunni og eru raktar í pakkann af dómgrindinni, svo þakið breytir
 # efninu, ekki bara stærðinni. Þess vegna er það ekki tekið hér upp á eigin
 # spýtur.
-TOKA_THAK = 250000
+TOKA_THAK = 350000
 
 # Sniðmátsgildin sem patchið skiptir út (mæld í cc166-möppunni).
 SNIDMAT_FASTNUM = "2230688"
@@ -217,8 +234,14 @@ def taka_pontun(conn, order_id=None, dry=False):
             conn.rollback()
             return None
         oid, fastnum, sjonarhorn, attempts, stada = rod
-        if stada != "paid":
-            log("pöntun %s er í stöðu '%s', ekki 'paid' — sleppt" % (oid, stada))
+        # Sjálfvirka biðröðin tekur AÐEINS 'paid'. Handvirkt --order má líka
+        # taka 'failed': status-vélin leyfir failed->generating, og það er
+        # einmitt endurkeyrslan sem reglan gerir ráð fyrir. Án þessa yrði
+        # hver fallin pöntun ósnertanleg nema með handskrifuðu SQL-i.
+        leyfilegar = ("paid", "failed") if order_id else ("paid",)
+        if stada not in leyfilegar:
+            log("pöntun %s er í stöðu '%s', ekki %s — sleppt"
+                % (oid, stada, "/".join(leyfilegar)))
             conn.rollback()
             return None
         if dry:
@@ -228,8 +251,8 @@ def taka_pontun(conn, order_id=None, dry=False):
         cur.execute("""
             UPDATE public.fable_orders
                SET status = 'generating', attempt_count = attempt_count + 1
-             WHERE order_id = %s AND status = 'paid'
-        """, (oid,))
+             WHERE order_id = %s AND status = ANY(%s)
+        """, (oid, list(leyfilegar)))
         if cur.rowcount != 1:
             conn.rollback()
             log("pöntun %s var gripin af öðrum — sleppt" % oid)
@@ -463,8 +486,14 @@ def framleida(conn, pontun, leyfa_fable, dry):
     meta = lesa_json(vinnu, "KEYRSLA_1_meta.json")
     if not meta.get("SVARAD_AF_FABLE"):
         raise Threp("q11 run", "fallback", "SVARAD_AF_FABLE=false — fallback greip inn í")
-    log("   Fable: %s út-tókar, $%s"
-        % (format(meta.get("output_tokens", 0), ","), meta.get("kostnadur_usd", "?")))
+    # Tókarnir liggja í meta["tokar"]["output"], EKKI í meta["output_tokens"] —
+    # fyrsta smíð las rangan lykil og logaði „0 út-tókar" á keyrslu sem
+    # skilaði 33.473. `.get` með sjálfgefnu gildi þegir um rangan lykil.
+    tk = meta.get("tokar", {})
+    log("   Fable: %s út-tókar (inn %s, cache-skrif %s), $%s, %ss"
+        % (format(tk.get("output", 0), ","), format(tk.get("input", 0), ","),
+           format(tk.get("cache_write", 0), ","),
+           meta.get("kostnadur_usd", "?"), meta.get("sekundur", "?")))
 
     # Skýrslan sem keðjan vinnur áfram með.
     skyrsla = vinnu / ("%s_SKYRSLA.html" % heiti)
@@ -494,6 +523,16 @@ def framleida(conn, pontun, leyfa_fable, dry):
     log("   q27: STENST")
 
     # ---- 8. HNITMIÐUN + q32 (assertar sjálf) ----
+    # q31 krefst þess að `<HEITI>_SKYRSLA_pre_hnitmidun.html` sé til og
+    # BÝTA-EINS og skýrslan (`assert cur == pre`) — cc168 bjó það afrit til
+    # í höndunum. Í framleiðslu er enginn til að gera það, svo workerinn
+    # tekur afritið hér, rétt áður en q31 breytir skjalinu. Sé það þegar til
+    # (endurkeyrsla) stendur það: q31 á að bera saman við UPPRUNANN, ekki
+    # við eigið úttak frá fyrri tilraun.
+    pre = vinnu / ("%s_SKYRSLA_pre_hnitmidun.html" % heiti)
+    if not pre.exists():
+        shutil.copyfile(skyrsla, pre)
+        log("   afrit tekið: %s" % pre.name)
     threp.append(keyra(vinnu, "q31_hnitmidun.py"))
     threp.append(keyra(vinnu, "q32_domur.py"))
     d32 = lesa_json(vinnu, "q32_out.json")
