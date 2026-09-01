@@ -4,6 +4,57 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-09-01 — `sales_history` er sjálfleiðréttandi: UPDATE-armur með akkerishliði og breytingaskrá; comps-flaggið á að LESAST, ekki reiknast (cc179)
+
+**Heimild:** `docs/fable_prep/audits/VERDRETTLEIKI_CC179.md` (allar tölur þaðan; mældar í `D:\_audit\cc179_verd\` q01–q08). Skrifalota — gögn leiðrétt, kóði lagaður. Predictions/módel ósnert, comps/tiers ósnert.
+
+**Rótin sem er lokað:** `daily_sales_refresh.py` var NEW-KEYS-ONLY (`new_keys = derived_keys - live_keys`). Röð sem var þegar inni var **aldrei endurleidd**, svo leiðréttingar HMS á kaupskránni bárust aldrei. Hausinn bókaði það sem hönnun („kaupskra mutations are negligible noise"); **mælingin fellir þá forsendu**: 137 raðir af 229.998 (0,0596 %) viku frá ferskri kaupskrá — 1 verð (×10), 3 `onothaefur` 0→1, 94 `is_suspect_comparable`, 134 `suspect_reason`. Ein þeirra var **725.000.000 kr sem HMS skráir sem 72.500.000 og lifandi `/eign/2273049` birti í fjóra mánuði.**
+
+**Ákvarðanir (læstar):**
+
+1. **Daglega leiðin ber tvo arma.** INSERT á nýja lykla **og UPDATE á reiti sem víkja**, í sömu txn, með `rowcount == spá` hliði. Lykillinn er **parið `(faerslunumer, fastnum)`**, ekki `faerslunumer` eitt — 13.692 raðir deila `faerslunumeri`.
+2. **`kaupverd_real` er varinn akkerishliði, ekki reglu.** Dálkurinn er eign `monthly_cpi_reanchor.py`. Hliðið **mælir** hvort geymda taflan sitji á `pipeline_config`-akkerinu (misræmi á rööum þar sem `nominal` er óbreytt) og fellir dálkinn úr skrifmenginu ef mælingin fellur — háværri log-línu, restin gengur samt. Mælt 2026-09-01: **0 af 229.997, hliðið opið.** Án þess hefði daglega leiðin endurakkerað alla töfluna í hljóði um leið og akkerin færu í sundur.
+3. **Hvert skrif fer í breytingaskrá.** `public.sales_history_corrections` — ein lína á **reit** (ekki á röð) með gömlu/nýju gildi, `kaupskra_md5`, `kaupskra_last_modified`, `anchor_ym` og `suspect_ruleset_version`. Sjálfvirk skrif á staðreyndatöflu sem enginn getur rakið eru ekki leyfileg.
+4. **MV-refresh skilyrðið er `inserted + updated > 0`** (var `inserted > 0`). UPDATE breytir sömu heimild og INSERT.
+5. **cc178-nefnararnir 3 / 90 eru úreltir.** Þeir voru mældir gegn **hrárri** kaupskrá; afleiðslukjarninn beitir cc39 ×1000-yfirtakinu, svo réttu tölurnar eru **1 / 94 (+134 ástæður)**. Sérhver framtíðarmæling á `sales_history` skal bera við **kjarnann** (`derive_sales_rows`), aldrei við CSV-skrána beint.
+6. **725-milljóna röðin er EKKI ×1000-arfurinn úr júlí.** Hlutfallið er 10, ekki 1000; hrátt kr/m² var 7,94 M — **undir** cc39-þröskuldinum 20 M, svo vörnin gat aldrei virkjað og hefði ekki lagað ×10 þótt hún hefði séð röðina. Einn aukastafur í HMS-lindinni, leiðréttur þar eftir á.
+
+**Hönnunarbókun — EKKI beitt í cc179:** `precompute/build_comps_v2.py:189` **reiknar** `is_suspect_comparable` sjálft og les aldrei `public.sales_history`. Tveir árgangar sömu staðreyndar reka alltaf í sundur (cc178 mældi 90, cc179 mældi 94 + 134). **Í næstu heilu endurbyggingu á `build_comps_v2` að LESA `sales_history.is_suspect_comparable` / `.suspect_reason`** — ein hlið beri staðreyndina. `sales_history` er rétta lindin: hún er nú sjálfleiðrétt daglega, ber breytingaskrá og er lesin beint af notendafletinum. Sbr. `feedback_afleiddur_eiginleiki_ma_ekki_lesast_af_toflunni`.
+
+**Comps ÓSNERT — bíður GO (HALT A, VERDRETTLEIKI_CC179 §5).** Af því byggingin les ekki `sales_history` breytir viðgerðin `comps_index_v2` engu. Mælt hvað heil endurbygging myndi gera á snerta menginu: 1.882 comp-raðir hyrfu af 1.881 eign, og `≥3`-hliðið færi úr 155.587 í **155.580** (−7 eignir, **−0,0042 pp** af 167.503). Tillaga: **ekkert gert við comps núna** — næsta heila keyrsla sjálfheilar, og skurðaðgerð á `valuation_tiers` fyrir hlutmengi væri önnur lind fyrir sellutölfræðina, nákvæmlega gallinn sem verið er að laga.
+
+**Gallar fundnir í smíðinni, lagaðir:** `execute_values` sendir eina stæðu á síðu og `cur.rowcount` bar **aðeins síðustu síðuna** — fyrsta útgáfa armsins skilaði `rowcount 37` gegn spá 137 og **hliðið felldi keyrsluna**. Lagfært með sjálfhlutun (`UPDATE_PAGE_SIZE = 500`) og samlagningu rowcounts. Án þess hefði hliðið mælt eina síðu og hleypt hinum í gegn ómældum.
+
+**Viðvarandi, ólagað:** R3 (`size_mismatch`) ber sölu-`EINFLM` við **núverandi** HMS-stærð, svo geymt flagg rekur frá reglunni í hvert sinn sem `properties.einflm` hreyfist — án þess að nokkur kaupskrárröð breytist. UPDATE-armurinn eltir það nú daglega (rétt), en það þýðir viðvarandi UPDATE-umferð og þar með MV-refresh sem áður sleppti. Auk þess: `/api/endurnyja`-lykillinn er ekki á vinnuvélinni, svo hver gagnaviðgerð bíður allt að 60 mín eftir `unstable_cache`-veltu (`EIGN_CACHE_TTL = 3600`) áður en notandi sér hana.
+
+---
+
+## 2026-09-01 — „Verðmeta sjálfur" (Beta): fimm valin læst á mælingu, smíði raðsett á eftir textaviðgerð (cc177)
+
+**Heimild:** `docs/fable_prep/audits/VERDMETA_SJALFUR_CC177.md` (§8 BÓKUN; allar tölur þaðan, mældar í `D:\_audit\cc177_verdmeta_sjalfur\` q01–q13, READ-ONLY). Formælingarlotan cc177 (31.08) skilaði kostum; borðið dæmdi 01.09. Ekkert smíðað, ekkert skrifað í DB.
+
+**Fítusinn:** kaupandi á `/eign` metur 4–5 mjög sambærilegar nýseldar eignir eina í einu (myndir → söluyfirlit → ástandsreitir → innsláttur → afhjúpun raunverðs) og fær að lokum verðmat út frá eigin forsendum við hlið verðmats okkar. Markaðstrekt inn í Fable, **ekki undanfari hennar**.
+
+**Ákvarðanir (læstar):**
+
+1. **Hliðsviðmið: ≥4 leikhæfir comps, 18 mán** — 23.789 af 155.587 T1/T2 (15,29 %), **23.636 eftir fjölbreytnireglu**. ≥3 (52.447) hafnað sem of þunnt fyrir 3–5 eigna leik. **Fylgir valinu:** 65,16 % hliðsins á *nákvæmlega* 4 leikhæfa compa — „3–5 eignir" er í reynd 4 fyrir tvo þriðju notenda, og UI má ekki lofa breytilegri lengd sem er ekki til.
+2. **Valregla V2:** similarity-röðun `comps_index_v2` óbreytt + leikhæfnisía + „mest 2 úr sama stigagangi" (kostar 153 eignir á valda hliðinu, 0,64 % — bókunin nefndi 150, sem er ≥3-talan). Engin ný líkindafræði. **Óvarin skekkja:** sían eldir comp-mengið um 193 daga (miðgildi 371 vs 178); V3 aldursjafnvægi ómæld og ekki tekin upp.
+3. **Reikniregla (a) hlutfallsleið** — `miðgildi(notandamat/framreiknað raunverð) × verðmat okkar`. Valin á **núllskekkjuprófi**: skilar verðmatinu okkar nákvæmlega þegar notandi metur hvern comp rétt (0,0 í öllum súlum, 100 % innan ±10 %, n=52.447). **(b) fermetraleið hafnað á mælingu** — óbjöguð að miðgildi (−1,1 %) en dreifð (p10 −10,9 / p90 +15,0; 26,9 % utan ±10 %), og stærð skýrir hana **ekki** (95,9 % compa innan ±10 % af m² viðfangs), svo stærðarleiðrétting hefði ekki lagað neitt. (c) blanda óþörf.
+4. **Geymsla: hreint client-minni í session.** Ekkert vistað í DB, **query-strengur hafnað** (lokamatið því ekki deilanlegt, ekki í vafrasögu né loggum). Engin PII verður til. cc158-bannið á innslög annarra notenda óbreytt og alger. Akkerisvörnin (raunverð ekki í farmi fyrr en eftir innslátt) er UI-**skylda** með lekaprófi á fullsniðnum streng, ekki kurteisi.
+5. **`/stilla`-áreksturinn:** Verðmeta-sjálfur birtir **tvær** tölur (okkar mat + ÞITT mat); `/stilla`-talan kemur **aldrei** á sama skjá. `/stilla` sjálf fer á **sérdóm** — hún er lifandi og framleiðir persónulegt verðmat úr `data/manual_q_effects.json`, stuðlatöflu sem er sjálflýst ókvörðuð („hard-coded for v1.1, data-calibrated in Sprint 3"). Borðið telur það kunna að vera brot sem þegar er úti, ekki nýtt.
+
+**Röð (læst):** smíðin (B1–B4, engin þeirra krefst DB-skrifa) bíður þess að **sölugáttin sé opin** (cc172 HALT B) **og `last_listing_text`-viðgerðin sé lent**. Rökin eru mæld: textinn fellir ≥3-hlutfallið úr 83,87 % í 39,56 % og lindin er frosin frá 2026-04-16 (0 % þekja á öllum sölum frá 2026-05). Mótpróf á valda hliðinu: viðgerðin færir Beta-þýðið úr 23.789 í **~38.930 (+9,73 pp, +63,6 %)**. Að smíða á undan væri að kvikna á 15,3 % og hækka svo í 25,0 %.
+
+**Opið eftir bókun:**
+- **Textaviðgerðin á enga forskrift.** cc177 mældi að gatið er tvíþætt: ~45 % viðgerðarhæft rörgat (sölur eftir frystingu) og ~51 % byggingarlegt (eign aldrei í textalindinni) — auk **mjúks hruns fyrir frystinguna** (79,0 % 2025-06 → 41,8 % 2026-03, með myndaásinn í fylgd), sem bendir á pörunartöf í `augl_id ↔ faerslunumer`, ekki stöðvað skröp. „Kveikja aftur á skrapinu" dugar ekki.
+- **Sérdómur `/stilla`** bíður skráðrar reglu: bókunin vísar í „Grunnreglu 13", verkbeiðni cc177 í „Grunnreglu 11", og **hvorug finnst á diski** (leitað í öllum `.md` undir `D:\verdmat-is`). Efnislega bindandi heimildin sem er til er **Q4-línan** í `COMP_ENGINE_SPEC_fable.md` (ástands-leiðrétting á verði útilokuð; ástand er merki, aldrei innbakað). Sama staða og cc82 fann fyrir „Grunnreglu 8". Dómurinn þarf annaðhvort skráða reglu eða skýra tilvísun í Q4.
+
+**Gallar fundnir í formælingunni, ólagaðir** (VERDMETA_SJALFUR_CC177 §6.5): `v_eign_myndir` les ekki `utilokad_kl` (57 útilokaðar myndir á 55 eignum sýnilegar — og það er nákvæmlega leið fítussins); `v_eign_myndir` er ekki `security_invoker`, þögul réttindabrú frá `anon` að `scraper.listings`; 302 comp-raðir bera `is_suspect_comparable=true` þótt Q1 telji það hart skilyrði; **`comps_index` (v1) sem `/eign` les LIFANDI er stopp á sölu 2026-04-07** meðan `comps_index_v2` nær til 2026-08-11.
+
+**Aðgangur staðfestur lifandi** (`SET LOCAL ROLE anon`): allt sem fítusinn þarf er anon-læsilegt — `comps_index_v2`, `valuation_tiers`, `last_listing_text`, `v_eign_myndir`, `sales_history`, `v_properties`, `v_current_predictions`. **Nema útdrátturinn**: `scraper.listing_extractions` skilar `permission denied`, og þekja hans á comp-pollinum er 3,3 % hvort eð er (biðröðin étur virkar auglýsingar; comp er seld eign). Ástandsreitir eru því auga-fyrst, forfylling er bónus. Fítusinn þarf **enga migration og enga nýja RLS-stefnu**.
+
+---
+
 ## 2026-07-16 — iter5-hringur #1 KEYRÐUR OG FLIPPAÐUR LIVE: iter4r_20260716 (6-mán OOS conformal, ferskt holdout, M5 skrifað) (cc6)
 
 **Heimild:** `docs/fable_prep/audit/RETRAIN_ITER4R_2026-07-16.md` (allar tölur þaðan; artifakt `D:\model_artifacts\iter4r_20260716\`). Fyrsti keyrði hringur RETRAIN_RUNBOOK; GO-A (skilgreining) og GO-B (flipp) frá Danna í lotunni, hvort með sínum skilyrðum.
