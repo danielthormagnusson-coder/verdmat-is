@@ -235,6 +235,39 @@ næturkeyrslan í sundur (`feedback_speglud_regla_er_ekki_reglan`).
 **Rollback-heimildin var til ÁÐUR en skrifað var** — `--apply` neitar að keyra ef
 staging vantar eða ber annan fjölda en drift-mengið (hlið, ekki athugasemd).
 
+### 3.1b RÉTTINDAGALLI SEM SMÍÐIN BJÓ TIL — OG VAR LÆSTUR (q09)
+
+Báðar nýju töflurnar erfðu Supabase-sjálfgildið
+`ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO anon, authenticated`. Mælt með
+`relacl` (eina grantor-mælingin — `role_table_grants` segir ekki hver veitti):
+
+| tafla | `relacl` við sköpun | RLS |
+|---|---|---|
+| `sales_history` (til samanburðar) | `anon=r`, `authenticated=r` | **á** |
+| `sales_history_corrections` | **`anon=arwdDxtm`**, `authenticated=arwdDxtm` | **af** |
+| `sales_history_pre_cc179` | **`anon=arwdDxtm`**, `authenticated=arwdDxtm` | **af** |
+
+Lifandi próf undir `SET LOCAL ROLE anon` **las báðar** (233 og 137 raðir). `d` og `D` í
+þeirri ACL eru `DELETE` og `TRUNCATE`: **anon gat eytt rollback-heimildinni og
+breytingaskránni.** Breytingaskrá og rollback-heimild sem anon getur `TRUNCATE`-að er
+hvorugt.
+
+**Læst samstundis**, í sömu lotu og töflurnar urðu til:
+`REVOKE ALL … FROM PUBLIC, anon, authenticated` + `GRANT SELECT … TO service_role` +
+`ENABLE ROW LEVEL SECURITY` á báðum (og á `_id_seq`). Endurmælt:
+
+```
+sales_history_corrections : relacl {postgres=arwdDxtm, service_role=arwdDxtm}   rls=true
+sales_history_pre_cc179   : relacl {postgres=arwdDxtm, service_role=arwdDxtm}   rls=true
+anon SELECT -> InsufficientPrivilege: permission denied  (báðar)
+```
+
+Reglan er **skjalfest í `CLAUDE.md`** („EVERY new `public` table gets RLS + tight grants in
+the SAME migration it is created — including snapshot / staging / scratch tables", cc9
+2026-07-14). Smíðin braut hana samt, og aðeins **mæling** fann það — ekki lestur á
+reglunni. Læsingin er nú **inni í `cc179_corrections_schema.sql` og inni í `--freeze`**,
+svo hún getur ekki gleymst næst.
+
 ### 3.2 Breytingaskráin
 
 `public.sales_history_corrections`: **233 línur á 137 rööum**, ein lína á **reit**, hver
@@ -505,6 +538,11 @@ fyrir eftirsjá.
    að 60 mín eftir cache-veltu áður en notandi sér hana.
 4. **cc178-tölurnar 3 / 90 eru úreltar** — réttu nefnararnir gegn afleiðslukjarnanum eru
    **1 / 94 (+134 ástæður)**. §1.2.
+5. **Réttindagallinn í §3.1b var lagaður, en hann bendir á kerfisbundna hættu:** hver
+   `CREATE TABLE` í `public` á þessum Supabase-instans kemur með fullt DML til `anon`
+   nema það sé afturkallað í sömu ferð. Reglan er skjalfest í `CLAUDE.md`; hún dugði
+   ekki. **Mældu `relacl` á hverri nýrri töflu áður en lotu lýkur** — `to_regclass`-tékk
+   eða exit 0 á migration segir ekkert um veitingar.
 
 ---
 

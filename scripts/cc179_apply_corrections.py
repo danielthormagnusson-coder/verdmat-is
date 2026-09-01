@@ -192,6 +192,13 @@ def do_freeze():
                         (f"cc179 {datetime.now(timezone.utc).isoformat()}: afrit af "
                          f"{n_frozen} rööum public.sales_history FYRIR leiðréttingarsópun. "
                          f"Rollback-heimild. Má henda eftir staðfesta parity.",))
+            # LÆSING (q09): CREATE TABLE erfir Supabase-sjálfgildið `ALTER DEFAULT
+            # PRIVILEGES ... GRANT ALL ON TABLES TO anon, authenticated` — nýja taflan
+            # kemur með SELECT/INSERT/UPDATE/DELETE/TRUNCATE til anon og RLS slökkt.
+            # Rollback-heimild sem anon getur TRUNCATE-að er engin rollback-heimild.
+            cur.execute(f"REVOKE ALL ON {STAGING} FROM PUBLIC, anon, authenticated")
+            cur.execute(f"GRANT SELECT ON {STAGING} TO service_role")
+            cur.execute(f"ALTER TABLE {STAGING} ENABLE ROW LEVEL SECURITY")
             cur.execute(f"SELECT count(*) FROM {STAGING}")
             n_check = cur.fetchone()[0]
             if n_check != len(keys):

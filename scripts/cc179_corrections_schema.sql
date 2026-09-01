@@ -40,3 +40,17 @@ COMMENT ON TABLE public.sales_history_corrections IS
   'cc179: breytingaskrá — hver reitur í public.sales_history sem UPDATE-armur '
   'daily_sales_refresh (eða cc179-sópunin) skrifaði yfir, með gömlu/nýju gildi og '
   'útgáfu kaupskrárinnar sem leiðréttingin kom úr. Ein lína á reit, ekki á röð.';
+
+-- ----------------------------------------------------------------------------
+-- LÆSING (cc179 q09): Supabase-sjálfgildið `ALTER DEFAULT PRIVILEGES ... GRANT ALL
+-- ON TABLES TO anon, authenticated` gaf ÞESSARI TÖFLU (og staging-afritinu) fullt
+-- DML — SELECT/INSERT/UPDATE/DELETE/TRUNCATE — til `anon`, með RLS SLÖKKT. Mælt með
+-- relacl: `anon=arwdDxtm/postgres`. Til samanburðar ber public.sales_history sjálf
+-- `anon=r` og RLS á. Breytingaskrá og rollback-heimild sem anon getur TRUNCATE-að
+-- er hvorugt. Læst hér, í sömu migration og taflan verður til.
+-- Sbr. feedback_relacl_er_eina_grantor_maelingin.
+-- ----------------------------------------------------------------------------
+REVOKE ALL ON public.sales_history_corrections FROM PUBLIC, anon, authenticated;
+GRANT  SELECT ON public.sales_history_corrections TO service_role;
+ALTER TABLE public.sales_history_corrections ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON SEQUENCE public.sales_history_corrections_id_seq FROM PUBLIC, anon, authenticated;
