@@ -717,6 +717,176 @@ lyklar ⇒ ekkert webhook ⇒ ekkert `created→paid`). Þegar að því kemur: 
 (password-principal fellur þögult), full python-slóð **sannreynd fyrir
 skráningu**, 5 mín poll, `--leyfa-fable` sett berum orðum í skipunina.
 
+## §5C cc172b — EFTIRVINNSLAN LEYST FRÁ SNIÐMÁTSEIGN (1.–3. + 5.)
+
+**HALT eftir lið 3.** Eitt Fable-kall notað af tveimur heimiluðum.
+
+### §5C.1 Liður 1 — föstu gildin úr dómgrindinni
+
+Hver leið staðfest á TVEIMUR pökkum (Hlíðarvegur + Snæland) svo hún sé heimild
+en ekki ágiskun:
+
+| fast gildi (H) | pakkaleið | S |
+|---|---|---|
+| einflm 202,3 | `eign.einflm` | 92,0 |
+| byggar 1997 | `eign.byggar` | 1973 |
+| myndir 44 | `myndir.n_alls` | 33 |
+| n_shown 5 | `naervidmid.n_synd` | 8 |
+| tvo_audkenni 2 | `len(auglysingasaga.mbl_audkenni_2026)` | 1 |
+| leigumat 377.610 | `leigumat.pred.pred_mean` | 327.895 |
+| cell_pairs 11.031 | `visitala_cellu.sidustu_12_fj[0].cell_n_pairs` | 9.322 |
+| dagar 14/6 | `v_units_maeling[0].days_on_market` + lotudagar | 64/85 |
+
+`engin_solusaga` er nú **skilyrt á pakkastöðu** — krafa um að skýrslan segi
+„engin þinglýst sala" er krafa um ósannindi á eign sem hefur sölusögu.
+
+**Hliðið (q26): 8 → 0 föst gildi.** En það hlið las EINA blokk í EINNI skrá og
+dæmdi því þann stað, ekki keðjuna. Víðari leit (q27_fost_gildi_vitt) fann
+**fimm í viðbót**: `q12b` harðkóðaði dagatölur (6/14) sem *afleiddar* — það
+skráði RANGAR tölur sem lögmætar og skildi þær réttu eftir órekjanlegar,
+hljóðlát bjögun sem er verri en fall; `q12` krafðist „44"; `q27` krafðist
+sex nefnara í myndatextum (n=5, 136, 56, n=140, 11.031, 24 pör). Öll rakin í
+pakkareiti. **Víðara hliðið: 13 → 0** (skráarnöfn `PAKKI_<fastnum>` undanskilin —
+patch-lagið meðhöndlar þau; og docstrings strippaðir með `ast`, því fyrsta
+smíðin flaggaði skýringu á fyrri villu sem villuna sjálfa).
+
+**NULL-þolið flutt í sniðmátið** (var aðeins í vinnumöppu): `fasteignamat_gildandi`
+sleppt þegar NULL, aldrei fyllt úr `fasteignamat`.
+
+*Villa sem ég olli sjálfur og lagaði:* PowerShell `Get-Content -Raw` +
+`Set-Content -Encoding utf8` **tvíkóðaði q15.py**, svo íslensku
+samhengis-regexin („ásett|auglýst") urðu að rugli og þrjú skylduatriði sem
+stóðust féllu án þess að skýrslan breyttist. Hvorki cp1252- né latin-1-afkóðun
+skilaði þeim til baka; skráin var endurheimt úr rollback-afriti og breytingarnar
+gerðar aftur með Edit einu. **PowerShell snertir ekki þessar skrár aftur.**
+
+### §5C.2 Liður 2 — strúktúr sem krafa
+
+Prompt-grindin fékk **§6b SKYLDUFORM**: `div.domslina` (eintækt, innan
+`div.bordi`), `section.samantekt`, `section.vidauki`, `section.vkafli`,
+`table.samanburdur`, `p.caption`, og plásshaldararnir fjórir — með þeirri
+skýringu að vanti merki stöðvist vinnslan og skýrslan komist ekki til kaupanda.
+
+- **Nýtt hlið `d6_skylduform`** í q12/q15/q27: mælt STRAX, á sama stað og annað
+  form, í stað þess að koma fram sem HALT í q31 löngu eftir að kallið er greitt.
+- **q31 les nú markera, ekki nákvæmt class-mengi**: `class="[^"]*\bdomslina\b"`
+  (aukaflokkar leyfðir) með bókuðum varaleiðum; þrepsglósan lesin úr pakkanum
+  (var fast „T2" og hefði fellt hverja T1/T3/T4/T5-eign).
+- **V-kaflarnir fundnir á `section.vkafli` með dýptartalningu**, fjöldinn LESINN
+  (var fast 14; nýja skýrslan hefur 15). Bakfærslusönnunin geymir skiptin sem
+  pör og er nákvæm andhverfa þeirra — endurgerð úr reglum laumaði inn `\r\n`
+  sem var ekki í frumskjalinu og felldi byte-jafngildið á réttri umbreytingu.
+- **q32**: lagaskiptingin á `section.vidauki` (var `<!-- ==== LAG B`, athugasemd
+  sem cc166 valdi), fyrirsögn má vera h2–h4, kaflafjöldi lesinn.
+- **Stökkbreytiprófið smíðar brenglanir ÚR KASSANUM.** Það brenglaði áður
+  „143,6", „>14. dagur" og „133,9" — tölur Hlíðarvegar. Á annarri eign hittu þær
+  ekkert, `replace` skilaði kassanum óbreyttum, dómurinn felldi hann réttilega
+  ekki, og prófið las það sem *„hliðið bítur ekki"*. **Sjálfspróf sem
+  stökkbreytir engu mælir ekki hliðið heldur sjálft sig.** Nú er hver brenglun
+  staðfest að hafa breytt kassanum áður en dómur er kallaður.
+
+### §5C.3 Liður 3 — pakkaþakið og A/B
+
+Sópunin fékk `similarity` úr `comps_index_v2` (sama lind og lifandi comp-vélin)
+með jafnteflisbrjót `thinglystdags DESC, fastnum`; hráar raðir þakaðar við **200**.
+**Allar birtar tölur reiknast á FULLA menginu** (1.560) og eru auk þess bornar
+fram sem **fullsniðnir strengir** í `sopun.samantekt_strengir` (14 reitir:
+n, nefnari, p25/50/75/90, min/max, ppm2, histogram, staða ásetts og mats).
+
+*Bókun sem var leiðrétt fyrir keyrslu:* aðeins **8 af 200 röðum bera similarity**
+(comp-vélin þekkir aðeins þær sölur sem hún valdi sjálf). Reglustrengurinn segir
+það nú berum orðum — „þær 8 líkustu og þar á eftir nýjustu sölurnar" — í stað
+þess að lýsa sér sem similarity-röðun alla leið.
+
+**Þak-A/B (q30): STENST.** `sopun.nidurstada` 26 reitir, `histogram` 34,
+`framreikningsstudlar` 37 — **0 munur**. Aðrar greinar: 0 breyttir reitir.
+Raðir 1.560 → 200. Kompakt 527.516 → 133.687 bæti (**−74,7%**).
+
+**Tókar (count_tokens, sami endapunktur fyrir/eftir): 302.098 → 77.721 (−74,3%).**
+
+**Fable-kallið (eitt, effort=high):**
+
+| | B4 (fullur pakki) | cc172b (þakaður) | breyting |
+|---|---|---|---|
+| inntakstókar | 302.022 | 77.787 | **−74,2%** |
+| úttakstókar | 33.473 | 33.139 | −1,0% |
+| **kostnaður** | **$5,4497** | **$2,63** | **−51,7%** |
+| sekúndur | 490,5 | 477,3 | −2,7% |
+| HTML stafir | 33.204 | 36.717 | **+10,6%** |
+| orð í efnistexta | 3.546 | 4.014 | **+13,2%** |
+| myndatextar | 6 | 15 | +150% |
+| hugsunarstafir | 22.031 | 15.874 | −27,9% |
+
+**Skýrslan varð LENGRI og ríkari fyrir helmingi lægra verð** — og
+sópunartölurnar (n 1.560, p25/p50/p75) standa orðréttar í báðum. Framlegð fer
+úr +150 kr í **+529 kr**.
+
+*Ósambærilegt í töflunni:* „V-kaflar 71→15" ber ólíka mælikvarða (textaleit
+gegn class-talningu) og segir ekkert; q27-dómurinn FALL→STENST stafar af
+dómgrindarlagfæringum liðar 1–2, ekki af þakinu.
+
+### §5C.4 FYRSTA FULLA AFHENDING KEÐJUNNAR
+
+Öll hlið á nýju skýrslunni:
+
+```
+q15 (a1)  367 fullyrðingar, 363 BEINT, 4 AFLEITT, 0 ÓREKJANLEGAR  -> STENST
+q15 (a2)  SKYLDA 17/17, brostin: []
+q15       SKYLDUFORM ALLT TIL (domslina=1, vkafli=15, caption=15)
+q27       STENST — d1 61/61, d2 61/61 bókaðar, d3, d5, d4a1, d4a2, d6
+q31       15 details-stök, prentvörn virk, bakfærsla byte-eins
+q32       STENST — stökkbreytiprófið BÍTUR á öllum fjórum (78,8 / 67 dagar / 7,1 / orð)
+```
+
+*Tvær tölur sem dómgrindin veiddi í leiðinni og reyndust réttar:* órekjanlega
+talan **1.206** var `n − n_nadu` (1.560−354), lögmæt afleiðsla sem vantaði í
+rakningarvélina — fyllimengin eru nú nafngreind. Og myndatextaleitin krafðist
+orðsins „graf"; nýja skýrslan ritar „Dreifing framreiknaðra söluverða…".
+**Krafa um orð sem líkanið valdi einu sinni er sama villa og krafa um röð sem
+það valdi einu sinni.**
+
+**Afhending (r11_afhenda.py — les hliðin af diski, endurkeyrir EKKI Fable):**
+
+```
+status delivered · 156.028 bæti · sha cc729bb94393…
+signed URL: HTTP 200, SAMA sha úr bucket og á diski og á röð
+hrá slóð án undirskriftar: HTTP 400
+stöðusíðan: „Tilbúin" + „Opna skýrsluna"
+```
+q19-afhendingarprófið: **STENST**. Skjáskot `04_pontun_stada.png`,
+og hlið-við-hlið `05_skyrsla_B4.png` / `06_skyrsla_cc172b.png`.
+
+*Keyrslutíminn á röðinni (127 mín) er ekki keðjutími* — hann spannar
+þróunarvinnuna milli `generating` og `delivered`. Raunkeðjan: pakki 17 s +
+count 3 s + **Fable 477 s** + gröf/kort/stíll ~40 s + hnitmiðun ~5 s ≈ **9,1 mín**.
+
+### §5C.5 Liður 5 — myndasýnin (BEITT)
+
+`public.v_eign_myndir` las ekki `property_images.utilokad_kl`, svo útilokaðar
+myndir láku á nákvæmlega þeirri lind sem pakkasmiðurinn les OG `/eign/[fastnum]`
+birtir. Rollback smíðað **úr lifandi skilgreiningunni** (`pg_get_viewdef`), ekki
+handskrifað.
+
+| mæling | gildi |
+|---|---|
+| útilokaðar raðir sem láku | 57 á 55 eignum |
+| þar af á sölusviðinu T1/T2 | 49 á 47 eignum |
+| raðir í sýn: fyrir → spá → **mælt** | 2.728.362 → 2.728.305 → **2.728.305** |
+| útilokaðar sem leka enn | **0** |
+| eignir sem urðu myndalausar | **0** |
+| anon/authenticated heimildir | óbreyttar (SELECT) |
+
+Migration `20260831234841_cc172b_v_eign_myndir_utilokad` bókuð í
+`schema_migrations` + repo-spegill.
+
+### §5C.6 Liður 4 — BÍÐUR (Paddle-lyklar ókomnir)
+
+`PADDLE_API_KEY`/`PADDLE_PRICE_ID` eru enn óstillt, svo env-hliðið er lokað og
+enginn hnappur á prod. **`PADDLE_WEBHOOK_SECRET=PRUFA_cc172_ekki_raunlykill`
+stendur enn í `.env.local` og VERÐUR að víkja** áður en nokkuð kviknar.
+Task Scheduler-skráningin fylgir lyklunum í sömu lotu (S4U, python-slóð
+sannreynd fyrir skráningu, 5 mín poll).
+
 ## §6 Extraction-lykillinn — FORSENDAN ER UPPFYLLT
 
 Danni setti sem skilyrði fyrir GO á Fable-lokaprófið að morgunloggur staðfesti
