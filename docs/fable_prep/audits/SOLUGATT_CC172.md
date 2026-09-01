@@ -879,6 +879,97 @@ handskrifað.
 Migration `20260831234841_cc172b_v_eign_myndir_utilokad` bókuð í
 `schema_migrations` + repo-spegill.
 
+### §5C.7 ENV-MISRÆMIÐ — KOSTUR 2 BEITTUR (01.09)
+
+**Vandinn:** Paddle heldur sandbox- og live-lyklum aðskildum. Heimildarskráin
+`D:\env.local` ber fjögur sandbox-gildi með `_SANDBOX`-viðskeyti; kóðinn las
+ósuffixuð nöfn alls staðar, svo sandkassinn var ótengjanlegur.
+
+**Liður 1 — ein hjálparlesning.** `lib/paddle-env.js`: `paddleEnv()`,
+`paddleLykill(grunnheiti)`, `paddleLykilNafn()`, `paddleRekstrarlyklarTil()`.
+`lib/paddle.js` og `app/api/paddle/webhook/route.js` flytja hana inn; engin
+`if`-setning afrituð. Villuskilaboð nefna **nafnið sem vantaði, aldrei gildi**.
+
+*Frávik frá fyrirmælunum, bókað:* `app/api/pontun/[id]/stada/route.js` var í
+listanum en **les engan Paddle-lykil** (flytur aðeins inn `stadaTexti`) — hún
+fékk því enga breytingu. Þriðja skráin sem raunverulega les lykil er
+`lib/paddle.js`.
+
+**Liður 2 — gildin afrituð** (r12, `--confirm`): fjögur `_SANDBOX`-nöfn í
+`verdmat-ai/.env.local`. `D:\env.local` **óbreytt, aðeins lesin**. Skriftan ber
+öryggishlið: hún stöðvast ef ósuffixað Paddle-nafn er þegar í markskránni.
+Afritið sem hún tók var **fært út úr repo-möppunni** í `_audit` (það var
+gitignored gegnum `.env*`, en leyndarmál á ekki heima í vinnutré).
+
+**Liður 3 — ENV-HLIÐSSÖNNUN (q36): STENST.** Tvær óháðar sannanir, því hvorug
+dugir ein: kóði sem lítur rétt út getur verið yfirskyggður, og hegðun sem
+stenst gæti staðist af því lyklana vantar alveg.
+
+**(A) Kóðinn** — línan sem hnappshliðið les env í, orðrétt:
+
+```js
+return Boolean(process.env.PADDLE_API_KEY && process.env.PADDLE_PRICE_ID);
+```
+`lib/solugatt.js` → `gattinOpin()`. Mælt: `les_api_key=True`,
+`les_price_id=True`, **`nefnir_SANDBOX=False`**, **`kallar_paddleLykil=False`**.
+`KaupaSkyrslu.tsx`: `les_env_sjalfur=False`, `kallar_gattinOpin=True` — enginn
+framhjáleið.
+
+**(B) Hegðunin** — þjónn með `PADDLE_ENV=sandbox`, **fjórum sandbox-nöfnum og
+NÚLL live-nöfnum** (BUILD_ID staðfest í svari):
+
+| eign | kaupa-hlekkur í HTML |
+|---|---|
+| T1 Snæland 2 | **False** |
+| T2 Hlíðarvegur 64 | **False** |
+
+**Sandbox-lykill kveikir ekki hnappinn.** Aðgreiningin er líka fest í
+athugasemd í báðum skrám: `paddleLykill()` er fyrir rekstrarlykla og má aldrei
+nota í `gattinOpin()` — „að samræma" þau væri ekki hreinsun heldur galli.
+
+### §5C.8 Liður 4 — ÞRJÁR BLOKKANIR MÆLDAR, ENGU FABLE-KALLI EYTT
+
+Sandbox-API-lykillinn **virkar** (`GET /prices` → HTTP 200). En keflið kemst
+ekki í gegn, og allar þrjár blokkanirnar eru Paddle-dashboard-verk:
+
+**1. Verðið stemmir ekki (alvarlegast).** `GET /prices/pri_01m1fb4mvse14xhj3v0farnp23`:
+
+| | |
+|---|---|
+| status | active |
+| heiti | „Fable-skýrsla — einskiptiskaup EUR" |
+| **upphæð** | **1900 EUR-sent = €19,00** |
+
+Síðan sýnir **1.250 kr** og frystir þá tölu á pöntunarröðina; Paddle myndi
+rukka **€19,00 ≈ 2.850 kr** — meira en tvöfalt kynningarverðið og yfir
+listaverðinu (2.500 kr). Kaupandi sem sér 1.250 kr og er rukkaður um €19
+er ekki verðmisræmi heldur röng verðupplýsing í kaupferli.
+**Þarf ISK-verð í Paddle (eða ákvörðun um að selja í EUR og birta það verð).**
+
+**2. Engin default checkout URL.** `POST /api/pontun` skilar 500; Paddle svarar
+`transaction_default_checkout_url_not_set`: *„Cannot create a transaction or
+open a checkout as no default payment link has been set for this account."*
+Pöntunarröðin varð til (röðin er skrifuð FYRST — hönnunin virkaði), Paddle-kallið
+féll, og röðin var hreinsuð á eftir.
+
+**3. Engin notification-destination.** `GET /notification-settings` → **0
+destinations**, svo **enginn raunverulegur webhook-secret er til**. Aðeins
+`PADDLE_WEBHOOK_SECRET=PRUFA_cc172_ekki_raunlykill` stendur í env, og GO-línan
+bannar það gildi í þessu prófi — réttilega.
+
+**Ekkert Fable-kall var notað.** Keflið stöðvast á blokkun 2 löngu áður en
+`generating` gæti hafist; að greiða $2,63 fyrir keyrslu sem kemst ekki í gegnum
+greiðsluskrefið væri sóun. **GO-heimildin á 1 kall stendur ónotuð.**
+
+**Það sem Danni þarf að gera í Paddle sandbox-dashboard:**
+1. Setja **default payment link** (Checkout → Settings).
+2. Búa til **verð í ISK** á 1.250 kr (eða ákveða EUR-verðlagningu og laga
+   `lib/solugatt.js` + textana í samræmi).
+3. Búa til **notification destination** á webhook-slóð og skila
+   `PADDLE_WEBHOOK_SECRET_SANDBOX`. Athuga: destination þarf **opinbera slóð** —
+   localhost gengur ekki, svo annaðhvort tunnel eða Vercel Preview (Production
+   er ósnert skv. banni).
+
 ### §5C.6 Liður 4 — BÍÐUR (Paddle-lyklar ókomnir)
 
 `PADDLE_API_KEY`/`PADDLE_PRICE_ID` eru enn óstillt, svo env-hliðið er lokað og
