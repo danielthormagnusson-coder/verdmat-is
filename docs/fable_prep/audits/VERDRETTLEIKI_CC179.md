@@ -412,7 +412,14 @@ Full skrá: `D:\_audit\cc179_verd\q07_markeignir.csv` (1.881 raðir).
 
 ---
 
-## 5. HALT A — ÁKVÖRÐUN UM COMPS
+## 5. HALT A — ÁKVÖRÐUN UM COMPS · **LEYST: KOSTUR A (Danni, 2026-09-01)**
+
+> **GO:** *„KOSTUR A. Ekkert gert við comps; næsta heila keyrsla `build_comps_v2`
+> sjálfheilar (−7 eignir, −0,0042 pp af 167.503 — undir öllum aðgerðarmörkum).
+> Hönnunarbókunin stendur: næsta heila endurbygging LES
+> `sales_history.is_suspect_comparable` í stað þess að reikna sitt eigið."*
+>
+> Ekkert comps-skrif framkvæmt í cc179 og ekkert áformað. Kostir B og C **felldir**.
 
 **Ekkert comps-skrif framkvæmt. Ekkert staging-mengi búið til fyrir comps.**
 
@@ -430,11 +437,24 @@ Verkbeiðnin bað um „comps/tiers endurreiknað fyrir snerta mengið eitt í s
 tölfræði `valuation_tiers`. Rétta lagfæringin er hönnunarbókunin í §6 — að byggingin
 **lesi** geymda flaggið — og hún tekur gildi í næstu heilu endurbyggingu hvort eð er.
 
-**Þarf frá eiganda:** GO á A, B eða C.
+**Ákveðið 2026-09-01: A.** −7 eignir og −0,0042 pp eru undir öllum aðgerðarmörkum.
+
+**Hvað A þýðir í reynd — svo næsta lota viti hvað hún erfir:**
+
+1. `comps_index_v2` situr áfram á árgangi **2026-08-12** og ber 1.882 comp-raðir sem
+   REFINED-B á dagsins kaupskrá myndi útiloka. Það er **skjalfest bið, ekki galli** — og
+   það sem meira er, sömu raðir myndu hvort eð er hreyfast við næstu byggingu af öllum
+   hinum kaupskrárbreytingunum síðan 12.08, ekki bara af þessum 15 sölum.
+2. **Ósamræmið milli sölusögu og comp-grids er samt horfið á öllum 137 síðunum**, því
+   yfirborðin þrjú í §1.5 eru aðskilin: sölusagan les `sales_history` (leiðrétt), comp-
+   gridið les `comps_index_v2` (óbreytt). Eina röðin sem bar ósamræmi á SÖMU síðu — 744841
+   með 725,0 í söluferli og 72,5 í comp-gridi — er leiðrétt.
+3. Þegar `build_comps_v2` er næst keyrt heilt **verður hönnunarbókunin í §6 að fara inn í
+   sömu ferð**, annars endurskapar keyrslan tvíárganginn samstundis.
 
 ---
 
-## 6. HÖNNUNARBÓKUN (færist í `DECISIONS.md`, EKKI beitt hér)
+## 6. HÖNNUNARBÓKUN — bókuð í `DECISIONS.md` 2026-09-01, EKKI beitt hér
 
 `build_comps_v2.py:189` endurreiknar staðreynd sem `public.sales_history` geymir. Tveir
 árgangar sömu staðreyndar reka alltaf í sundur — cc178 mældi 90, cc179 mældi 94 flögg og
@@ -546,8 +566,52 @@ fyrir eftirsjá.
 
 ---
 
-*Úttektarskrár: `D:\_audit\cc179_verd\q01–q08` + `q02_diff.pkl`, `q03_misraemi_137.csv`,
+## 10. LOKASKIL
+
+**Lotan er lokuð 2026-09-01. Kostur A ákveðinn (§5). Ekkert bíður ákvörðunar.**
+
+### 10.1 Það sem stendur eftir í DB
+
+| hlutur | staða |
+|---|---|
+| `public.sales_history` | **229.998 raðir, parity 0 á öllum 9 reitum** gegn afleiðslukjarnanum |
+| `public.sales_history_corrections` | 233 línur (`run_id 153`), RLS á, `anon` engin réttindi |
+| `public.sales_history_pre_cc179` | 137 raðir — **rollback-heimild, má henda þegar Danni telur það óhætt** |
+| `public.comps_index_v2` / `valuation_tiers` | **ósnert** (árgangur 2026-08-12) |
+| `public.predictions` / módel | **ósnert** |
+| 12 semantic-MV | endurhlaðin 09:27–09:28 UTC |
+
+### 10.2 Kóði (repo `D:\verdmat-is\app`, `main`)
+
+| commit | efni |
+|---|---|
+| `893423e` | UPDATE-armur + akkerishlið + breytingaskrá + sópunarskrifta + þetta skjal + DECISIONS |
+| `36f7fa8` | læsing nýju taflnanna (`anon=arwdDxtm` → `service_role` eitt, RLS á) |
+| *(lokafærsla)* | GO á kost A bókað í §5 + DECISIONS |
+
+Ekkert pushað. Afrit af upphaflegu skriftunni:
+`scripts/daily_sales_refresh.py.pre_cc179_20260901T091620Z`.
+
+### 10.3 Hvað næsta lota erfir
+
+1. **`build_comps_v2` má ekki keyra heilt án hönnunarbókunarinnar** (§6). Sú keyrsla
+   endurskapar tvíárganginn samstundis ef byggingin heldur áfram að reikna sitt eigið
+   `is_suspect_comparable` í stað þess að lesa geymda flaggið.
+2. **UPDATE-armurinn er nýr í næturkeyrslunni.** Fyrsta lifandi keyrsla er 02:30 í nótt.
+   Ef `D:\daily_sales_refresh.log` sýnir `[3b] !! AKKERISHLIÐ FALLIÐ` er `sales_history` á
+   öðru CPI-akkeri en `pipeline_config` — það er `monthly_cpi_reanchor`-mál, ekki
+   viðgerðarmál, og armurinn heldur áfram án `kaupverd_real`. Ef `DRIFT` fer yfir 5.000
+   stöðvar skriftan sig sjálf (`UPDATE_ABORT_THRESHOLD`) og merkir keyrsluna `failed`.
+3. **`size_mismatch` heldur áfram að reka** (§9.1). Búast má við fáeinum UPDATE-rööum á dag
+   og þar með MV-refresh sem áður sleppti á no-op nóttum.
+4. **Óleyst utan cc179:** R3 (síugalli `build_last_listing_text.py:59`), R1 (afþíðing
+   textalindarinnar), R6 (`fastnum IS NULL`) — allt óhreyft, sjá `GAGNAVIDGERD_CC178.md` §4.
+
+---
+
+*Úttektarskrár: `D:\_audit\cc179_verd\q01–q09` + `q02_diff.pkl`, `q03_misraemi_137.csv`,
 `q07_markeignir.csv`, `cc179_drift.csv`, `cc179_rollback.sql`.
 Beisli falsprófuð: skrifleiðin stökkbreytt og felld (q05 þrep C); `rowcount`-hliðið beit á
-raunverulegum `execute_values`-galla (§2.4); afleiðslukjarninn er fluttur inn, ekki
+raunverulegum `execute_values`-galla (§2.4); réttindin mæld með `relacl` og lifandi
+`anon`-lestri, ekki með exit-kóða (§3.1b); afleiðslukjarninn er fluttur inn, ekki
 speglaður, bæði í mælingu og skrifum.*
