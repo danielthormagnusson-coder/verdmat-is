@@ -146,6 +146,8 @@ TOKA_THAK = 350000
 # Sniðmátsgildin sem patchið skiptir út (mæld í cc166-möppunni).
 SNIDMAT_FASTNUM = "2230688"
 SNIDMAT_HEITI = "HLIDARVEGUR64"
+# Nákvæmlega strengurinn í cc166_hlidarvegur64/q10.py línu 27 (SOTT = "…").
+SNIDMAT_SOTT = "2026-08-14 (cc166, fyrsta raunnotkun — kaupandaskýrsla, ein read-only keyrsla)"
 SNIDMAT_MAPPA = r"D:\_audit\cc166_hlidarvegur64"
 
 # Skriftirnar sem keyrsluröðin snertir — AÐEINS þær eru afritaðar og
@@ -306,6 +308,10 @@ def undirbua_vinnumoppu(order_id, fastnum, heiti):
         (SNIDMAT_MAPPA, str(vinnu)),
         (SNIDMAT_FASTNUM, str(fastnum)),
         (SNIDMAT_HEITI, heiti),
+        # cc182: `meta.sott` var FROSIÐ á sniðmátsdaginn 2026-08-14 — kassinn
+        # sagði „−18. dagur á markaði" á eign auglýstri 1.9. og Fable-textinn
+        # „sótt 2026-08-14" ×29. Keyrsludagur pöntunarinnar í staðinn.
+        (SNIDMAT_SOTT, "%s (pöntun %s)" % (datetime.now(timezone.utc).date().isoformat(), order_id)),
     ]
 
     maeling = {}
@@ -342,13 +348,13 @@ def _stadfesta_patch(vinnu, maeling):
     leifar = []
     for nafn in KEDJA:
         t = (vinnu / nafn).read_text(encoding="utf-8")
-        for merki in (SNIDMAT_FASTNUM, SNIDMAT_HEITI, SNIDMAT_MAPPA):
+        for merki in (SNIDMAT_FASTNUM, SNIDMAT_HEITI, SNIDMAT_MAPPA, SNIDMAT_SOTT):
             if merki in t:
                 leifar.append("%s: leif af '%s'" % (nafn, merki))
     if leifar:
         raise RuntimeError("PATCH-LEIFAR (%d): %s" % (len(leifar), "; ".join(leifar)))
 
-    for merki in (SNIDMAT_FASTNUM, SNIDMAT_HEITI, SNIDMAT_MAPPA):
+    for merki in (SNIDMAT_FASTNUM, SNIDMAT_HEITI, SNIDMAT_MAPPA, SNIDMAT_SOTT):
         alls = sum(per.get(merki, 0) for per in maeling.values())
         if alls == 0:
             raise RuntimeError(
