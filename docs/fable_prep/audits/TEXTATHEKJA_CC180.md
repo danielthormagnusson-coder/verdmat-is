@@ -1,6 +1,6 @@
 # TEXTAÞEKJA `last_listing_text` — R3-SÍUFIXIÐ LENT, R1-B LIFANDI BLÖNDUN ÞURRKEYRÐ (cc180)
 
-**Dags.:** 2026-09-02 (00:05–00:20 UTC) · **Lota:** cc180 · **Eðli:** SKRIFALOTA — ein tafla snert (`public.last_listing_text`), ekkert annað · **Engin LLM-köll** · **Staða: HALT A** (R3 flippað og mælt; R1-b þurrkeyrð, EKKI flippuð).
+**Dags.:** 2026-09-02 (00:05–00:20 UTC) · **Lota:** cc180 · **Eðli:** SKRIFALOTA — ein tafla snert (`public.last_listing_text`), ekkert annað · **Engin LLM-köll** · **Staða: LOKIÐ — HALT A leyst með GO (Danni 02.09), R1-b flippuð 20:15 UTC og mæld (§7).**
 **Grunnur:** `GAGNAVIDGERD_CC178.md` §1.5–1.6 + §4 (R1, R3) · `VERDMETA_SJALFUR_CC177.md` §1.6 (þekjuhrunið) · fordæmi flipps `verdmat-ai/supabase/migrations/20260715_llt_augl_dagur.sql`.
 **Úttekt:** `D:\_audit\cc180_textathekja\` (q00–q04, r3_*.log, r1b_build_dryrun.log, rollback-SQL, afrit júlí-árgangs).
 
@@ -14,8 +14,8 @@
 | 2 | **R3-síufixið** | ✔ **FLIPPAÐ 00:15 UTC** | 60.807 → **66.060 raðir** (+5.253, +8,64 %), 44.418 → **47.721 eignir**; parity 6/6; rollback á diski |
 | 2a | Fable-comp-þekja eftir R3 | ✔ mæld | **47,11 → 52,51 %** (+5,40 pp) — **nákvæmlega cc178-spáin**; eignir m/ ≥3 textaða compa 66,41 → **74,57 %** |
 | 2b | Leikhæfni Verðmeta-sjálfs eftir R3 | ✔ mæld | ≥4: **15,20 → 20,07 %** (23.654 → 31.230); ≥3: 33,58 → 40,59 % |
-| 3 | **R1-b lifandi blöndun** | ⏸ **ÞURRKEYRÐ, bíður HALT A** | **+1.350 lifandi raðir** → 67.379 raðir / 48.695 eignir; 2026-07 = 69,2 %, 2026-08 = 77,9 % sölna fá texta |
-| 4 | Afleiðingamæling R1-b | ⏸ eftir flipp | — |
+| 3 | **R1-b lifandi blöndun** | ✔ **FLIPPUÐ 20:15 UTC** | **+1.350 lifandi raðir** → **67.379 raðir / 48.695 eignir**; parity 6/6; `_old_r1b` rollback |
+| 4 | Afleiðingamæling R1-b | ✔ mæld | Fable-comp-þekja **59,53 %** (+12,42 pp alls); leikhæfni ≥4 **27,76 %** (43.194); sölugluggi 18 mán **53,01 %** |
 | 5 | Skil + commit | ✔ þetta skjal + DECISIONS + commit (ekkert push) | — |
 
 **Frávik frá verkbeiðni, bókuð:** (a) hvítlistinn er á **línu 60**, ekki 59 (lína 59 er athugasemdin); (b) verkbeiðnin nefnir „+9,4 pp" — sú tala finnst hvorki í cc178 né í mælingunum hér; mældu tölurnar eru +8,64 % raðir, +5,40 pp Fable-comp-þekja, +5,60 pp sölugluggi 18 mán, +4,87 pp leikhæfni ≥4; (c) skráin `build_last_listing_text.py` býr á `D:\` (utan repo), ekki í `app/precompute` — patchið er þar, afrit `D:\build_last_listing_text.py.pre_cc180_20260902`.
@@ -230,3 +230,88 @@ Fyrir R1-b þarf **GO/NO-GO** á þessum forsendum, sem allar eru mældar:
 | `…\last_listing_text_pre_cc180_60807.{csv,pkl}` | júlí-árgangurinn |
 | `…\r3_build.log`, `r3_stage.log`, `r3_flip.log`, `r1b_build_dryrun.log` | keyrslusaga |
 | `public.last_listing_text_old_r3` | 60.807 raðir, læst anon/authenticated, felld í frágangi lotu |
+
+---
+
+## 7. R1-b FLIPPUÐ (GO Danni 02.09) — FRAMKVÆMD, EFTIRMÆLING, FRYSTIHÆTTA
+
+### 7.1 Staging + parity + flipp (`r1b_stage.log`, `r1b_flip.log`)
+
+Staging á þurrkeyrslu-CSV frá 00:18 UTC (67.379 raðir, 163,3 MB), COPY 10,7 s. Parity gegn spánni úr §3.3:
+
+| hlið | mæling | spá | |
+|---|---|---|---|
+| [1] rowcount | 67.379 (48.695 eignir) | 67.379 | OK |
+| [2] dreifing | live_listings 1.350 · fresh 54.398 · no_price 2.051 · recent 3.278 · stale 6.302 | sama | OK |
+| [3] sale_rank | 0 / 0 / 0 frávik | 0 | OK |
+| [4] NULL-lyklar / arfur | 0/0/0/0 · NULL-texti 8 (lifandi 8) · <200 23 (23) · HTML 6 (6) | ekki verra | OK |
+| [5] sameiginlegar raðir við lifandi (R3) | 66.047 af 66.060; **0 misræmi** á texta/scraped_at/augl_dagur/pair_status | 0 | OK |
+| [6] lifandi raðir ekki í `_new` | **31** | 31 | OK |
+
+Flipp 20:15:42 UTC: rename-swap í einni txn, `last_listing_text_old_r1b` (66.060) læst anon/authenticated, `NOTIFY pgrst`. Eftir: **67.379 raðir**, `max(thinglyst_dagur)` **2026-08-28**, `max(scraped_at)` 2026-09-01 03:26 (lifandi lindin). Anon-REST: `pair_status=eq.live_listings` → 206, `Content-Range 0-1/1350`, raðir bera `augl_id='mbl:1711616'`, `augl_dagur` 2026-07-21 ≤ `thinglyst_dagur` 2026-08-28; `_old_r1b` → 401. Rollback: `cc180_rollback_r1b.sql` (skrifað fyrir flipp) og `_old_r1b`; heildar-rollback `_old_r3`.
+
+### 7.2 Eftirmæling (q01 `eftir_r1b`, 20:15:53 UTC) — fullar töflur með nefnurum
+
+**Söluþekja eftir mánuði þinglýsingar** (nefnari = nothæfar sölur, teljari = texti ≥200):
+
+| mán. | sölur | m/texta | fyrir | eftir R3 | **eftir R1-b** |
+|---|---:|---:|---:|---:|---:|
+| 2025-12 | 819 | 381 | 33,8 | 46,5 | 46,5 |
+| 2026-01 | 810 | 362 | 30,4 | 44,7 | 44,7 |
+| 2026-02 | 745 | 317 | 29,5 | 42,6 | 42,6 |
+| 2026-03 | 1.086 | 469 | 32,6 | 43,2 | 43,2 |
+| 2026-04 | 730 | 170 | 17,8 | 21,6 | 23,3 |
+| 2026-05 | 771 | 52 | 0,0 | 0,0 | **6,7** |
+| 2026-06 | 838 | 208 | 0,0 | 0,0 | **24,8** |
+| 2026-07 | 894 | 620 | 0,0 | 0,0 | **69,4** |
+| 2026-08 | **649** | 459 | 0,0 | 0,0 | **70,7** |
+
+> **2026-08 les 70,7 %, ekki 77,9 % — nefnarinn hreyfðist, ekki teljarinn.** Þurrkeyrslan (00:17 UTC) sá 589 ágústsölur; `verdmat-daily-sales-refresh` (02:30) bætti **60** við og engin þeirra átti lifandi röð í töflunni sem flippuð var. 459/649 = 70,7 %. Sömu sölur eru það sem runnerinn (§7.3) fann 64 nýjar raðir fyrir kl. 20:18. Þetta er frystihættan **mæld innan sama dags**, ekki spáð.
+
+**Gluggar:**
+
+| gluggi | sölur | m/texta | fyrir | R3 | **R1-b** |
+|---|---:|---:|---:|---:|---:|
+| 18 mán til dagsins | 16.349 | 8.667 | 39,38 | 44,98 | **53,01** |
+| 2025-07-01 → 2026-04-16 (evalue) | 8.822 | 4.627 | 44,23 | 52,45 | 52,45 |
+| 2025-07-01 → dagsins (hrunkúrfan) | 12.365 | 5.991 | 31,86 | 37,79 | **48,45** |
+| 2026-04-17 → dagsins | 3.543 | 1.364 | 0,32 | 0,38 | **38,50** |
+| 2026-06-01 → dagsins | 2.406 | 1.287 | 0,00 | 0,00 | **53,49** |
+
+**Fable-comp-þekja** (sýnt mengi, 1.106.687 raðir):
+
+| | fyrir | R3 | **R1-b** | Δ alls |
+|---|---:|---:|---:|---:|
+| Allt | 47,11 % | 52,51 % | **59,53 %** (658.835) | **+12,42 pp** |
+| S0 | 45,03 | 49,95 | **57,85** | +12,82 |
+| S1p | 61,90 | 69,33 | **71,60** | +9,70 |
+| S2p | 54,79 | 62,35 | **64,30** | +9,51 |
+| S3 | 52,26 | 60,61 | **63,97** | +11,71 |
+| comp-raðir m/ söludag 2026-06 / 07 / 08 | 0,0 / 0,0 / 0,0 | sama | **25,5 / 75,8 / 76,9** | |
+| Eignir m/ ≥3 textaða compa | 103.321 (66,41 %) | 116.018 (74,57 %) | **129.304 (83,11 %)** | +25.983 |
+
+**Leikhæfni Verðmeta-sjálfs** (cc177 q06, 155.587 T1/T2):
+
+| sía | fyrir ≥3 | R1-b ≥3 | fyrir ≥4 | R3 ≥4 | **R1-b ≥4** |
+|---|---:|---:|---:|---:|---:|
+| A·B·C (texti) | 39,44 % | **59,43 %** | 19,63 % | 25,57 % | **38,68 %** |
+| A·B·C·D5 (aðalskilgr.) | 33,58 % (52.253) | **48,41 % (75.317)** | 15,20 % (23.654) | 20,07 % (31.230) | **27,76 % (43.194)** |
+
+Valda hliðið (≥4) fór úr 23.654 í **43.194 (+82,6 %)** — yfir cc177-mótprófinu (~38.930), því cc177 spáði á frosinni lind til 2026-04-16 en R1-b nær til 2026-08-28. Dreifing: 0 leikhæfir 26.857 → **17.761**.
+
+### 7.3 Frystihættan — runner sannreyndur, Task Scheduler TILLAGA (ekki skráð)
+
+`scripts/cc180_llt_refresh.py`: bygging (`cc180_build_llt_live.build()`) → **óháð spá hliðs [6]** (lyklar lifandi töflunnar bornir við blönduna í pandas; SQL-hliðið mælir sömu stærð) → sleppt ef engin breyting → `stage(tag=ref_<ts>)` → parity 6/6 → `flip` → hreinsun `_old_ref_*` (nýjasta stendur; `_old_r3`/`_old_r1b` friðaðar). Log `D:\cc180_llt_refresh.log`. Exit 0/2/3.
+
+**Sannreynt `--no-flip` 20:21–20:22 UTC:** bygging 67.443 raðir (1.414 lifandi, +64 frá morgni: 2026-08 459 → 506, 2026-09 17), óháð spá [6] = **0** (lifandi taflan er R1-b, engin evalue-röð fellur), parity 6/6 OK, `_new` felld. Fyrsta tilraunin féll á pooler-`statement_timeout` (2 mín) í COPY — `SET LOCAL statement_timeout='20min'` í staging-txn; endurtekning COPY 6,6 s (tímamörkin voru tímabundin, ekki stærðin). **Lifandi taflan stendur á 67.379 — 64 nýrri raðir bíða fyrstu skráðu keyrslu.**
+
+**Tillaga (`scripts/register_llt_refresh_task.ps1`, EKKI keyrð):** `verdmat-nightly-llt-refresh`, S4U, `C:\Python314\python.exe` (3.14.3, sannreynd `(Get-Command python).Source`, sama og 8 önnur verdmat-verk), wd `D:\verdmat-is\app`, **03:45 daglega** — eftir `verdmat-nightly-delta` 01:00 (skrifar `scraper.listings`) og `verdmat-daily-sales-refresh` 02:30 (skrifar `sales_history`); vikuútgáfa í athugasemd. `ExecutionTimeLimit` 45 mín, `MultipleInstances IgnoreNew`. Þarf áður: GO, ein handkeyrsla án `--no-flip`, dag/viku-ákvörðun, hækkað PowerShell. Bókað á `PLANNING_BACKLOG.md` með **dagsetningarvörn 2026-09-16**.
+
+### 7.4 Bókað óbreytt
+
+- **Gatið 2026-04-17 → 05-31 er ÓLEYST:** 1.126 sölur, 64 fá texta (5,7 %). Lokast aðeins með evalue-pakka (spurning opin hjá Danna). Bókað á BACKLOG með keðjunni sem þá keyrir.
+- **`load_dashboard_v1.py --tables listing` er dautt og MÁ EKKI endurlífga** (6-dálka COPY á 8-dálka CSV; TRUNCATE+COPY eyddi `augl_dagur`/`pair_status` og lifandi röðum).
+- `components/eign/types.ts:230` skjalfestir aðeins tvö `pair_status`-gildi — skjalarek, önnur lota.
+- `last_listing_text_old_r3` + `_old_r1b` (191 MB samtals) standa til frágangs lotu.
+
+**Bannið haldið alla lotuna:** engin LLM-köll · predictions/comps/tiers ósnert · evalue-hráskrár ósnertar · ekkert `git add -A` · ekkert push.

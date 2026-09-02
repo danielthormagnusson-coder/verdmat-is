@@ -83,7 +83,8 @@ LIVE_SQL = f"""
 """
 
 
-def main():
+def build():
+    """Byggir blönduna, skrifar CSV+pkl, skilar (out, meta). Engin DB-skrif."""
     log(f"Loading evalue (R3) frame {EVALUE_PKL} ...")
     ev = pd.read_pickle(EVALUE_PKL)
     ev = ev[COLS].copy()
@@ -177,6 +178,18 @@ def main():
     log(f"  evalue-raðir sem skipta um sale_rank: {n_rank_shift:,}")
     log(f"  lifandi: HTML-leifar eftir strip {n_live_html}, <200 stafir eftir strip {n_live_lt200}")
     log(f"  per mánuður (lifandi): {out[out.pair_status=='live_listings'].groupby(pd.to_datetime(out.thinglyst_dagur).dt.strftime('%Y-%m')).size().to_dict()}")
+    meta = {
+        "snapshot_ts": str(snapshot_ts), "rowcount": int(len(out)),
+        "fastnum": int(out["fastnum"].nunique()), "status": {k: int(v) for k, v in dist.items()},
+        "n_live": int(len(live)), "n_dedup": n_dedup, "n_ev_wins": n_ev_wins,
+        "n_disp_ev": n_disp_ev, "n_disp_live": n_disp_live, "n_rank_shift": n_rank_shift,
+        "csv": str(OUT_CSV),
+    }
+    return out, meta
+
+
+def main():
+    build()
     return 0
 
 

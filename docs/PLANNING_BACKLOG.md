@@ -1771,3 +1771,26 @@ sé endurvakinn á skoðun einni.
   lykillinn verður að hafa staðið óbreyttur í a.m.k. eina vöktunarumferð**
   (§5D-13 lið 4, ~7 nætur), því forreiknaður dálkur á reglu sem enn er að
   hreyfast er stöðnuð artefakt í bið (sbr. cc131).
+
+- **LIFANDI TEXTALIND `last_listing_text` FRÝS AFTUR ÁN ENDURKEYRSLU (cc180, bókað
+  2026-09-02).** R1-b blöndunin (`scripts/cc180_build_llt_live.py` → `cc180_llt_flip.py`)
+  er handkeyrð; taflan ber snapshot 2026-09-02 00:17 UTC (1.350 lifandi raðir). Mælt sama
+  dag: kl. 20:18 UTC voru **64 nýjar lifandi raðir** tiltækar (1.414) og ágúst-nefnarinn
+  hafði vaxið um 60 þinglýsingar (589 → 649) sem báru engan texta — 2026-08-þekjan las
+  70,7 % í stað 77,9 %. Runnerinn `scripts/cc180_llt_refresh.py` (bygging → staging →
+  parity 6/6 → rename-swap → hreinsun) er sannreyndur með `--no-flip`; tillaga að
+  Task Scheduler-verki liggur í `scripts/register_llt_refresh_task.ps1` (S4U,
+  `C:\Python314\python.exe`, 03:45 daglega eftir delta 01:00 + sales-refresh 02:30),
+  **EKKI skráð**. **Dagsetningarvörn: ef verkið er ekki skráð fyrir 2026-09-16 er
+  lindin þegar orðin tveggja vikna gömul og hver mæling á textaþekju eftir 2026-09
+  (Fable-pakkar, Verðmeta-sjálfur-hliðið) er að mæla frystingu, ekki lindina** —
+  mældu `max(scraped_at) WHERE pair_status='live_listings'` áður en þekjutala er bókuð.
+  Þarf: GO, ein handkeyrsla án `--no-flip`, dag/viku-ákvörðun, hækkað PowerShell.
+- **GATIÐ 2026-04-17 → 2026-05-31 Í `last_listing_text` ER ÓLEYST (cc180).** 1.126
+  nothæfar sölur, 64 fá texta úr mbl (5,7 %) — `scraper.listings` byrjar í reynd um
+  2026-06 (`discovered_at` frá 2026-07-04). Lokast **aðeins** með ferskum evalue-pakka
+  (`D:\Gagnapakkar\*.db`, afhentur einu sinni 2026-04-16) → `parse_all_dbs.py` →
+  `run_pair_and_validate.py` → `build_last_listing_text.py` → `cc180_llt_flip.py`.
+  Spurningin um pakkann er opin hjá Danna. Ef hann berst: R3-hvítlistinn (lína 60) stendur,
+  og blöndunin verður að keyra Á EFTIR svo lifandi raðir hverfi ekki (evalue vinnur á
+  sama (fastnum, dagur), svo raðir sem pakkinn nær þá yfir skipta um lind — mæla fyrst).

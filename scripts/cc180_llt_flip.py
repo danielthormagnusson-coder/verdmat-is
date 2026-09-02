@@ -122,6 +122,7 @@ def stage(args):
     try:
         with c.cursor() as cur:
             cur.execute("SET TRANSACTION READ WRITE")
+            cur.execute("SET LOCAL statement_timeout = '20min'")  # COPY 160 MB; pooler-sjálfgefið féll á 2 mín 02.09
             cur.execute(f"DROP TABLE IF EXISTS public.{NEW}")
             cur.execute(f"""
               CREATE TABLE public.{NEW} (
