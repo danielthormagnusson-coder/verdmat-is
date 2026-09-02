@@ -4,6 +4,21 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-09-02 — `last_listing_text`: R3-síufixið lent (66.060 raðir), R1-b lifandi blöndun þurrkeyrð og bíður HALT A (cc180)
+
+**Heimild:** `docs/fable_prep/audits/TEXTATHEKJA_CC180.md` (allar tölur þaðan; mældar í `D:\_audit\cc180_textathekja\` q00–q04). Skrifalota — ein tafla snert, engin LLM-köll, comps/tiers/predictions ósnert.
+
+**Ákvarðanir (læstar):**
+
+1. **Hvítlisti `build_last_listing_text.py:60` er `[paired_fresh, paired_stale, paired_recent, paired_no_price]`.** `off_market_used` ber byggingarlega aldrei `augl_id` (0/62.837) og var dautt síuatriði; `paired_recent` (gilt, eldri auglýsing) og `paired_no_price` bera `augl_id` 100 %. Mælt: 60.807 → **66.060 raðir** (+8,64 %), Fable-comp-þekja **47,11 → 52,51 %** (+5,40 pp, nákvæmlega cc178-spáin), leikhæfni Verðmeta-sjálfs ≥4 **15,20 → 20,07 %** (23.654 → 31.230).
+2. **Flipp á `last_listing_text` er staging + parity + atómískt rename-swap, aldrei TRUNCATE+COPY.** Síðan les töfluna lifandi; rename-parið læsir í millisekúndur (júlí-fordæmið 20260715). Verkfærið er `scripts/cc180_llt_flip.py` með sex parity-hliðum (rowcount, `pair_status`-dreifing, `sale_rank`-samfella, NULL-lyklar, stafrétt samræmi sameiginlegra raða á md5/`scraped_at`/`augl_dagur`/`pair_status`, ýttar raðir == spá) og rollback-SQL skrifað FYRIR flipp. Gamli árgangurinn stendur sem `last_listing_text_old_<tag>` án anon/authenticated-réttinda þar til lotu lýkur.
+3. **Parity-hlið á arfi mælist gegn lifandi töflunni, ekki gegn núlli.** Hlið [4] felldi fyrstu staging á 6 HTML-leifum sem voru **sömu 6 raðir** og lifandi taflan bar frá júlí (`&lt;br&gt;`-entity eftir tag-strip). Hliðið er „ekki verra en lifandi"; lyklahliðin standa hörð.
+4. **`load_dashboard_v1.py --tables listing` er dautt síðan júlí** (COPY með 6-dálka lista á 8-dálka CSV) og má ekki endurlífga: TRUNCATE+COPY myndi eyða `augl_dagur`/`pair_status` og öllum lifandi röðum. Hleðsla fer um `cc180_llt_flip.py`.
+
+**R1-b — hönnun bókuð, framkvæmd bíður HALT A (Danni):** `scraper.listings` (mbl) verður textalind fyrir sölur þinglýstar **eftir 2026-04-16**, evalue heldur öllu eldra og vinnur á sama `(fastnum, thinglyst_dagur)`. Uppruni á hverja röð: `pair_status='live_listings'`, `augl_id='mbl:<source_listing_id>'`, `scraped_at=last_seen_at`, `augl_dagur=least(listed_at, first_seen_at)`. Dedup á `listing_id`. Þurrkeyrsla: **+1.350 raðir** → 67.379 / 48.695 eignir; 2026-07 = 69,2 %, 2026-08 = 77,9 % sölna fá texta; 2026-04-17 → 05-31 glatað (5,7 %). Falspróf reglunnar á 49 tvípöruðum sölum: miðgildi dagamunar 0. Framendinn sérmeðhöndlar aðeins `paired_stale` — engin kóðabreyting þarf. **Opið:** engin endurkeyrsla er tímasett; lindin frýs aftur við snapshot nema blöndunin sé keyrð reglulega.
+
+---
+
 ## 2026-09-01 — `sales_history` er sjálfleiðréttandi: UPDATE-armur með akkerishliði og breytingaskrá; comps-flaggið á að LESAST, ekki reiknast (cc179)
 
 **Heimild:** `docs/fable_prep/audits/VERDRETTLEIKI_CC179.md` (allar tölur þaðan; mældar í `D:\_audit\cc179_verd\` q01–q08). Skrifalota — gögn leiðrétt, kóði lagaður. Predictions/módel ósnert, comps/tiers ósnert.
