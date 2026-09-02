@@ -75,6 +75,7 @@ deps: stdlib + psycopg2 + requests (öll þegar í notkun í þessu repo).
 from __future__ import annotations
 
 import argparse
+import calendar
 import hashlib
 import json
 import os
@@ -148,6 +149,12 @@ SNIDMAT_FASTNUM = "2230688"
 SNIDMAT_HEITI = "HLIDARVEGUR64"
 # Nákvæmlega strengurinn í cc166_hlidarvegur64/q10.py línu 27 (SOTT = "…").
 SNIDMAT_SOTT = "2026-08-14 (cc166, fyrsta raunnotkun — kaupandaskýrsla, ein read-only keyrsla)"
+# Nákvæmlega línan í cc166_hlidarvegur64/q06.py:13 og q08.py:11 (cc185).
+SNIDMAT_KEYRSLUDAGUR = 'KEYRSLUDAGUR = "2026-08-14"'
+# Nákvæmlega strengurinn í q10.py:243 — sópunarglugginn í prompt-textanum,
+# sem líkanið afritar orðrétt („14.8.2024–14.8.2026" ×5 í skýrslunni). Sama
+# gluggi og q06 §3 reiknar með `dags - interval '24 months'` (cc185).
+SNIDMAT_SOPUNARGLUGGI = "(2024-08-14..2026-08-14)"
 SNIDMAT_MAPPA = r"D:\_audit\cc166_hlidarvegur64"
 
 # Skriftirnar sem keyrsluröðin snertir — AÐEINS þær eru afritaðar og
@@ -304,6 +311,14 @@ def undirbua_vinnumoppu(order_id, fastnum, heiti):
         shutil.rmtree(vinnu)          # endurkeyrsla byrjar á hreinu borði
     vinnu.mkdir(parents=True)
 
+    dagur = datetime.now(timezone.utc).date()
+    keyrsludagur = dagur.isoformat()
+    # Sama og Postgres `dags::date - interval '24 months'` (q06 §2/§3):
+    # mánuðurinn færður, dagurinn klemmdur við mánaðarlengd.
+    m = dagur.month - 24
+    y = dagur.year + (m - 1) // 12
+    m = (m - 1) % 12 + 1
+    gluggi_fra = dagur.replace(year=y, month=m, day=min(dagur.day, calendar.monthrange(y, m)[1])).isoformat()
     skiptingar = [
         (SNIDMAT_MAPPA, str(vinnu)),
         (SNIDMAT_FASTNUM, str(fastnum)),
@@ -311,7 +326,13 @@ def undirbua_vinnumoppu(order_id, fastnum, heiti):
         # cc182: `meta.sott` var FROSIÐ á sniðmátsdaginn 2026-08-14 — kassinn
         # sagði „−18. dagur á markaði" á eign auglýstri 1.9. og Fable-textinn
         # „sótt 2026-08-14" ×29. Keyrsludagur pöntunarinnar í staðinn.
-        (SNIDMAT_SOTT, "%s (pöntun %s)" % (datetime.now(timezone.utc).date().isoformat(), order_id)),
+        (SNIDMAT_SOTT, "%s (pöntun %s)" % (keyrsludagur, order_id)),
+        # cc185: KEYRSLUDAGUR í q06/q08 var líka frosinn á 2026-08-14 —
+        # sópunarglugginn „14.8.2024–14.8.2026" ×5 í texta og sellutölfræðin
+        # miðuð við sniðmátsdaginn. Sami dagur og SOTT, reiknaður einu sinni.
+        (SNIDMAT_KEYRSLUDAGUR, 'KEYRSLUDAGUR = "%s"' % keyrsludagur),
+        # cc185: sami gluggi stóð harðkóðaður í prompt-strengnum í q10 §sopun.
+        (SNIDMAT_SOPUNARGLUGGI, "(%s..%s)" % (gluggi_fra, keyrsludagur)),
     ]
 
     maeling = {}
@@ -348,13 +369,15 @@ def _stadfesta_patch(vinnu, maeling):
     leifar = []
     for nafn in KEDJA:
         t = (vinnu / nafn).read_text(encoding="utf-8")
-        for merki in (SNIDMAT_FASTNUM, SNIDMAT_HEITI, SNIDMAT_MAPPA, SNIDMAT_SOTT):
+        for merki in (SNIDMAT_FASTNUM, SNIDMAT_HEITI, SNIDMAT_MAPPA, SNIDMAT_SOTT,
+                      SNIDMAT_KEYRSLUDAGUR, SNIDMAT_SOPUNARGLUGGI):
             if merki in t:
                 leifar.append("%s: leif af '%s'" % (nafn, merki))
     if leifar:
         raise RuntimeError("PATCH-LEIFAR (%d): %s" % (len(leifar), "; ".join(leifar)))
 
-    for merki in (SNIDMAT_FASTNUM, SNIDMAT_HEITI, SNIDMAT_MAPPA, SNIDMAT_SOTT):
+    for merki in (SNIDMAT_FASTNUM, SNIDMAT_HEITI, SNIDMAT_MAPPA, SNIDMAT_SOTT,
+                      SNIDMAT_KEYRSLUDAGUR, SNIDMAT_SOPUNARGLUGGI):
         alls = sum(per.get(merki, 0) for per in maeling.values())
         if alls == 0:
             raise RuntimeError(
