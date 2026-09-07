@@ -4,6 +4,30 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-09-07 — Workerinn fær STANDANDI Fable-heimild á Task Scheduler; þrjú verk skráð og sannreynd (cc193)
+
+**Heimild:** `D:\_audit\cc193_scheduler\SKIL_CC193.md` (grunnmæling §1, girðingar §3, sannreynsla §5, tillaga §6). Commit `d227011` (pushað 07.09 með GO). Staðfest af Danna í rýni 07.09: „standandi Fable-heimild workersins með girðingunum eins og bókað".
+
+**Ákvörðun (læst):** `verdmat_worker_poll` keyrir `scripts/fable_worker.py --once --leyfa-fable --hamark 3 --adeins-live` á 5 mín fresti allan sólarhringinn (S4U, gegnum `scripts/cc193_keyra_verk.ps1`). cc172-bannið „engin Anthropic-köll án GO-línu" víkur fyrir reglunni **greidd pöntun úr live-farvegi er umboðið** — salan er opin (cc182/cc185/cc186; fyrsta live-keðja ea5e517a 07.09 11:48Z) og handvirkt GO per pöntun væri afhendingartöf upp á klukkustundir.
+
+**Girðingar (ófrávíkjanlegar, í kóða `fable_worker.py`):**
+- (a) sjálfvirka biðröðin tekur AÐEINS `status='paid' AND paddle_env='live'` (`--adeins-live`); sandbox-raðir og `--order`-handkeyrslur óbreyttar;
+- (b) hámark 3 pantanir (= Fable-köll) per poll-keyrslu (`--hamark 3`); umfram raðir standa sem `paid` og bíða næsta polls, bókað „HÁMARK 3 náð — N bíða";
+- (c) kill-switch: sé skráin `D:\verdmat-is\STOPP_FABLE` til grípur workerinn ENGA pöntun (röðin stendur sem `paid`, hvorki generating né failed/BIDUR_GO), bókar „SLEPPT" — pollun og póstumferð keyra áfram; athugað óháð `--leyfa-fable`;
+- (d) póstumferð og idempotens-hliðið `email_sent_at` óbreytt (cc186).
+Runaway-vörnin `count_tokens ≤ 350k` og fallmeðferðin (ein endurkeyrsla → `qa` + tölvupóstur) standa. Afturköllun: kill-switch (sekúndur) eða `Unregister-ScheduledTask verdmat_worker_poll`.
+
+**Samhliða skráð (sama lota, mælt gegn Task Scheduler-atburðaloggi 02.–07.09):**
+- `verdmat_llt_refresh` **05:30** daglega (`cc180_llt_refresh.py --revalidate`) — EKKI 03:45 eins og cc180 lagði til: `verdmat-nightly-delta` lauk 04:14/04:15/04:03/04:55/02:40/02:46 og var í keyrslu kl. 03:45 fjórar nætur af sex. Keyrarinn ber biðhlið (bíður meðan delta er `Running`, ≤90 mín). Parity-hlið [5] í `cc180_llt_flip.py` lagað: lifandi raðir bera `scraped_at = last_seen_at` sem færist FRAM við hverja sópun — hliðið dæmdi ásinn sjálfan (5 raðir, texti eins → exit 2 án flipps). Nú leyft og talið sér.
+- `verdmat_verdvakt_refresh` **06:45 + 18:15** daglega (`cc188_verdvakt_refresh.py --revalidate`): 06:45 eftir scrape+sales (cc188-tillagan stenst), 18:15 eftir `verdmat-daily-lifecycle-sweep` sem er 11–12 klst verk (lýkur 17:18–18:00, 12 klst þak) og skrifar farnar-ásinn.
+- `ENDURNYJA_LYKILL` í `D:\env.local` og Vercel Production (sha256[:12] `8b9b9534dd9c`); keyrarinn hleður `D:\env.local` í process-umhverfið svo verdmat-ai-skriftan les hann án kóðabreytingar. Báðar revalidate-leiðir mældar 401/401/200; `/verdvaktin` ber `byggt <keyrsludagur>` strax eftir refresh (var 1 klst TTL).
+
+**Sannreynt á scheduler 07.09 19:39–19:41Z:** Last Run Result 0x0 × 3 OG START/LOK-línur í `D:\verdmat-is\logs\<verk>.log` (S4U-echo dugar ekki); kill-switch á scheduler bókaði „SLEPPT" og skráin eydd; sjálfvirka 5-mín-keyrslan lifandi frá 19:40Z. Engin Fable-köll í lotunni (0 paid-raðir).
+
+**Hvað breytist EKKI:** `precompute`, `verdmat-ai` (kóði), webhook/checkout, sandbox-farvegur, handvirkt GO fyrir allt utan sjálfvirku biðraðarinnar.
+
+---
+
 ## 2026-09-02 — `last_listing_text`: R3-síufixið lent (66.060 raðir), R1-b lifandi blöndun þurrkeyrð og bíður HALT A (cc180)
 
 **Heimild:** `docs/fable_prep/audits/TEXTATHEKJA_CC180.md` (allar tölur þaðan; mældar í `D:\_audit\cc180_textathekja\` q00–q04). Skrifalota — ein tafla snert, engin LLM-köll, comps/tiers/predictions ósnert.
