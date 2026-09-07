@@ -1,54 +1,65 @@
-# register_llt_refresh_task.ps1 — TILLAGA cc180 (2026-09-02), EKKI KEYRÐ, EKKI SKRÁÐ.
+﻿# register_llt_refresh_task.ps1 — cc180-TILLAGA (02.09) ENDURSKRIFUÐ cc193 (07.09). Keyrist EINU SINNI
+# úr HÆKKUÐU PowerShell (Danni, HALT B). Endurkeyrsla er idempotent. -Thurrt = þurrpróf, skráir ekkert.
 #
-# Skráir Task Scheduler-verkið `verdmat-nightly-llt-refresh` sem keyrir
-# scripts/cc180_llt_refresh.py: R1-b blöndun last_listing_text (evalue-raðir úr
-# frosnu D:\last_listing_text.pkl + lifandi mbl-raðir úr scraper.listings) →
-# staging → 6 parity-hlið → atómískt rename-swap → hreinsun eldri ref-árganga.
+# VERK:  verdmat_llt_refresh — scripts\cc180_llt_refresh.py --revalidate gegnum scripts\cc193_keyra_verk.ps1
+#        -Verk llt_refresh (logg D:\verdmat-is\logs\llt_refresh.log + D:\cc180_llt_refresh.log).
+#        R1-b blöndun last_listing_text: evalue-raðir (frosið D:\last_listing_text.pkl) + lifandi mbl-raðir
+#        úr scraper.listings → staging → 6 parity-hlið → atómískt rename-swap → hreinsun eldri ref-árganga
+#        → POST /api/endurnyja {allt:true} (aðeins eftir FLIPP) svo /eign/[fastnum] beri nýja lind strax.
 #
-# HVERS VEGNA: lindin frýs aftur við snapshot nema blöndunin keyri reglulega.
-# Mælt 02.09: milli 00:17 og 20:18 UTC bættust 60 þinglýstar ágústsölur við
-# nefnarann (589 → 649) og 64 nýjar lifandi raðir urðu tiltækar (1.350 → 1.414);
-# lifandi taflan bar þær ekki, svo 2026-08-þekjan las 70,7 % í stað 77,9 %.
+# TÍMI:  05:30 daglega — EKKI 03:45 eins og cc180 lagði til. Mælt í Task Scheduler-atburðaloggi 02.–07.09:
+#        verdmat-nightly-delta (01:00, skrifar scraper.listings) lauk 04:14 / 04:15 / 04:03 / 04:55 / 02:40 /
+#        02:46 — þ.e. var ENN Í KEYRSLU kl. 03:45 fjórar nætur af sex. sales-refresh (02:30) lýkur á
+#        ~45–110 s, backup 03:00 á ~3 mín, myndasaekjari 04:45 lýkur 05:04–05:23 (snertir ekki
+#        scraper.listings/last_listing_text). Lifecycle-sweep byrjar 06:00. 05:30 liggur því eftir öllum
+#        lindum verksins og á undan sópuninni; keyrarinn ber að auki BIÐHLIÐ (bíður meðan delta er Running,
+#        ≤90 mín) því keðjan hefur 8 klst þak og tímasetning ein er ekki hlið.
 #
-# TÍMASETNING (tillaga): 03:45 daglega — á EFTIR verdmat-nightly-delta (01:00,
-# skrifar scraper.listings) og verdmat-daily-sales-refresh (02:30, skrifar
-# sales_history), á UNDAN verdmat-nightly-backup? Nei — backup er 03:00 og
-# snertir ekki DB-töfluna; 03:45 er laust. Vikukeyrsla dugar líka (sunnud. 03:45)
-# ef nætur-swap á 130 MB töflu þykir of mikil umferð; þinglýsingartöfin (p50 41 d
-# frá auglýsingu) gerir daglega keyrslu að þægindum, ekki nauðsyn.
-#
-# FORSENDUR SANNREYNDAR 02.09:
-#   python:  C:\Python314\python.exe  (3.14.3, sama og hin verdmat-*-verkin)
-#   wd:      D:\verdmat-is\app        (skriftan sys.path-ar scripts\ sjálf)
-#   logon:   S4U (password-principal fellur þögult — CLAUDE.md)
-#   .dbconfig: UTF-8 m/ BOM, lesin með utf-8-sig í cc180_llt_flip.py
-#   runner:  sannreyndur með --no-flip 02.09 20:22 UTC (parity 6/6, _new felld)
-#   log:     D:\cc180_llt_refresh.log (append) — vaktaðu "PARITY FALL" / "VILLA"
-#
-# ÞARF ÁÐUR EN SKRÁÐ: (1) GO frá Danna; (2) ein handkeyrsla án --no-flip sem
-# sannreynir flipp+hreinsun lifandi (fyrsta ref_-árgangurinn verður til);
-# (3) ákvörðun dag/viku; (4) keyra þessa skrá úr HÆKKUÐU PowerShell.
-#
-# Rollback verksins: Unregister-ScheduledTask -TaskName verdmat-nightly-llt-refresh -Confirm:$false
-# Rollback gagna: cc180_llt_flip.py skrifar cc180_rollback_<tag>.sql fyrir hvert flipp.
+# SANNREYNT 07.09 (cc193): full handkeyrsla FLIPPAÐI (ref_20260907_1903, 67.518 raðir, 47 s) eftir að
+#        parity-hlið [5] var lagað — lifandi raðir bera scraped_at = last_seen_at sem færist FRAM við hverja
+#        sópun; hliðið dæmdi ásinn sjálfan sem misræmi (5 raðir, texti eins). Þurrpróf keyrara --no-flip OK.
+# ÞAK:   2 klst (biðhlið ≤90 mín + keyrsla ~1 mín). IgnoreNew. WakeToRun + StartWhenAvailable.
+# LOGON: S4U (Password-principal fellur þögult — CLAUDE.md). RunLevel Limited.
+# ROLLBACK verks: Unregister-ScheduledTask -TaskName verdmat_llt_refresh -Confirm:$false
+# ROLLBACK gagna: cc180_llt_flip.py skrifar D:\_audit\cc180_textathekja\cc180_rollback_<tag>.sql fyrir hvert flipp.
+param([switch]$Thurrt)
+$ErrorActionPreference = 'Stop'
 
-$TaskName = 'verdmat-nightly-llt-refresh'
+$TaskName = 'verdmat_llt_refresh'
+$PS       = 'C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe'
+$Keyrari  = 'D:\verdmat-is\app\scripts\cc193_keyra_verk.ps1'
 $Python   = 'C:\Python314\python.exe'
-$Script   = 'D:\verdmat-is\app\scripts\cc180_llt_refresh.py'
+$Skrift   = 'D:\verdmat-is\app\scripts\cc180_llt_refresh.py'
 $WorkDir  = 'D:\verdmat-is\app'
 
-if (-not (Test-Path $Python)) { throw "python vantar: $Python" }
-if (-not (Test-Path $Script)) { throw "skrifta vantar: $Script" }
+foreach ($p in @($PS, $Keyrari, $Python, $Skrift)) { if (-not (Test-Path $p)) { throw "vantar: $p" } }
 
-$action    = New-ScheduledTaskAction -Execute $Python -Argument "`"$Script`"" -WorkingDirectory $WorkDir
-$trigger   = New-ScheduledTaskTrigger -Daily -At 03:45
-# Vikuútgáfa: $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 03:45
+$action = New-ScheduledTaskAction -Execute $PS `
+    -Argument ('-NoProfile -ExecutionPolicy Bypass -File "' + $Keyrari + '" -Verk llt_refresh') `
+    -WorkingDirectory $WorkDir
+$trigger   = New-ScheduledTaskTrigger -Daily -At 05:30
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType S4U -RunLevel Limited
-$settings  = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 45) `
-               -StartWhenAvailable -WakeToRun -MultipleInstances IgnoreNew
+$settings  = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
+    -MultipleInstances IgnoreNew -StartWhenAvailable -WakeToRun -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
-  -Principal $principal -Settings $settings `
-  -Description 'cc180: last_listing_text R1-b blondun (scraper.listings -> staging -> parity -> rename-swap)'
+"verk:      $TaskName"
+"aðgerð:    $($action.Execute) $($action.Arguments)"
+"vinnum.:   $($action.WorkingDirectory)"
+"trigger:   Daily $($trigger.StartBoundary)"
+"principal: $($principal.UserId) $($principal.LogonType) $($principal.RunLevel)"
+"þak:       $($settings.ExecutionTimeLimit)  instances=$($settings.MultipleInstances)  wake=$($settings.WakeToRun)"
+if ($Thurrt) { "ÞURRPRÓF — ekkert skráð."; exit 0 }
 
-Get-ScheduledTask -TaskName $TaskName | Format-List TaskName, State
+$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if ($existing) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false; "afskráði eldra $TaskName" }
+try {
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings `
+        -Description 'cc180/cc193: last_listing_text R1-b blondun (scraper.listings -> staging -> parity -> rename-swap) + revalidate; 05:30 eftir nightly-delta; logg D:\verdmat-is\logs\llt_refresh.log' `
+        -ErrorAction Stop | Out-Null
+    "SKRÁÐ $TaskName"
+    Get-ScheduledTask -TaskName $TaskName | Format-List TaskName, State
+    "næsta keyrsla: " + (Get-ScheduledTaskInfo -TaskName $TaskName).NextRunTime
+} catch {
+    "SKRÁNING FÉLL: $($_.Exception.Message)"
+    exit 1
+}

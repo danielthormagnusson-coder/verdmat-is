@@ -217,17 +217,27 @@ def stage(args):
               WITH j AS (
                 SELECT l.fastnum, l.thinglyst_dagur, l.augl_id,
                        (md5(coalesce(l.lysing_plain,'')) = md5(coalesce(n.lysing_plain,''))) t_ok,
-                       (l.scraped_at IS NOT DISTINCT FROM n.scraped_at) s_ok,
+                       (l.scraped_at IS NOT DISTINCT FROM n.scraped_at
+                        -- cc193: lifandi röð ber scraped_at = last_seen_at, sem færist
+                        -- FRAM við hverja sópun sem sér auglýsinguna aftur. Það er
+                        -- ásinn sjálfur, ekki misræmi; textinn verður samt að vera eins.
+                        OR (l.pair_status = 'live_listings' AND n.pair_status = 'live_listings'
+                            AND n.scraped_at > l.scraped_at
+                            AND md5(coalesce(l.lysing_plain,'')) = md5(coalesce(n.lysing_plain,'')))) s_ok,
+                       (l.pair_status = 'live_listings' AND n.pair_status = 'live_listings'
+                        AND n.scraped_at > l.scraped_at) s_fram,
                        (l.augl_dagur IS NOT DISTINCT FROM n.augl_dagur) d_ok,
                        (l.pair_status IS NOT DISTINCT FROM n.pair_status) p_ok
                 FROM public.{LIVE} l
                 JOIN public.{NEW} n ON n.fastnum=l.fastnum AND n.thinglyst_dagur=l.thinglyst_dagur AND n.augl_id=l.augl_id)
               SELECT count(*), count(*) FILTER (WHERE NOT t_ok), count(*) FILTER (WHERE NOT s_ok),
-                     count(*) FILTER (WHERE NOT d_ok), count(*) FILTER (WHERE NOT p_ok)
+                     count(*) FILTER (WHERE NOT d_ok), count(*) FILTER (WHERE NOT p_ok),
+                     count(*) FILTER (WHERE s_fram)
               FROM j""")
             n_live = one(cur, f"SELECT count(*) FROM public.{LIVE}")[0]
             log(f"PARITY [5] sameiginlegar (fastnum,thinglyst_dagur,augl_id) við lifandi: {r[0]:,} af {n_live:,} lifandi; "
-                f"misræmi texti={r[1]} scraped_at={r[2]} augl_dagur={r[3]} pair_status={r[4]}: {'OK' if r[1]==0 and r[2]==0 and r[3]==0 and r[4]==0 else 'FALL'}")
+                f"misræmi texti={r[1]} scraped_at={r[2]} (lifandi færð fram, leyft cc193: {r[5]}) "
+                f"augl_dagur={r[3]} pair_status={r[4]}: {'OK' if r[1]==0 and r[2]==0 and r[3]==0 and r[4]==0 else 'FALL'}")
             ok &= r[1] == 0 and r[2] == 0 and r[3] == 0 and r[4] == 0
             miss = one(cur, f"""
               SELECT count(*) FROM public.{LIVE} l

@@ -7,6 +7,7 @@ hreinsun eldri árganga. Þetta er skriftan sem Task Scheduler-verkið á að ka
     python scripts/cc180_llt_refresh.py            # full keyrsla (flipp ef parity OK)
     python scripts/cc180_llt_refresh.py --no-flip  # bygging + staging + parity, fellir _new, EKKERT flipp
     python scripts/cc180_llt_refresh.py --keep-old 2
+    python scripts/cc180_llt_refresh.py --revalidate  # cc193: eftir FLIPP -> POST /api/endurnyja {allt:true}
 
 Skref:
   1. cc180_build_llt_live.build() → CSV + meta (evalue-raðir úr D:\last_listing_text.pkl
@@ -26,8 +27,11 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
+import os
 import sys
 import traceback
+import urllib.request
 from argparse import Namespace
 from pathlib import Path
 
@@ -39,6 +43,10 @@ import cc180_build_llt_live as bl  # noqa: E402
 import cc180_llt_flip as fl  # noqa: E402
 
 LOG = Path(r"D:\cc180_llt_refresh.log")
+# cc193: lykill revalidate-leiðarinnar; umhverfi fyrst (keyrarinn hleður
+# D:\env.local), annars skráin sjálf. Gildið er ALDREI loggað.
+ENV_ROT = Path(r"D:\env.local")
+ENDURNYJA_URL = "https://www.verdmat.ai/api/endurnyja"
 PROTECTED = {"last_listing_text_old_r3", "last_listing_text_old_r1b"}
 
 
@@ -91,10 +99,43 @@ def prune_old(keep):
     return dropped
 
 
+def lesa_lykil(nafn):
+    """Umhverfi fyrst, svo D:/env.local (KEY=value, CRLF, utf-8-sig)."""
+    v = os.environ.get(nafn)
+    if v:
+        return v.strip()
+    if not ENV_ROT.exists():
+        return None
+    for lina in ENV_ROT.read_text(encoding="utf-8-sig").splitlines():
+        k, _, val = lina.strip().partition("=")
+        if k.strip() == nafn:
+            return val.strip().strip('"').strip("'") or None
+    return None
+
+
+def revalidate():
+    """cc193: eftir FLIPP — hendir heildarmerkinu `eign` (cc73-leiðin) svo
+    /eign/[fastnum] beri nýja textalind strax í stað 1 klst TTL. Fall hér
+    fellir ALDREI keyrsluna: flippið stendur, TTL er öryggisnetið."""
+    lykill = lesa_lykil("ENDURNYJA_LYKILL")
+    if not lykill:
+        log("revalidate SLEPPT: ENDURNYJA_LYKILL hvorki í umhverfi né D:\\env.local")
+        return
+    req = urllib.request.Request(ENDURNYJA_URL, data=json.dumps({"allt": True}).encode(), method="POST",
+                                 headers={"content-type": "application/json", "x-endurnyja-lykill": lykill})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            log(f"revalidate /api/endurnyja allt: HTTP {r.status} {r.read(200).decode('utf-8', 'replace')}")
+    except Exception as e:  # noqa: BLE001
+        log(f"revalidate FÉLL (síðan endurnýjast á TTL): {type(e).__name__}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-flip", action="store_true")
     ap.add_argument("--keep-old", type=int, default=1)
+    ap.add_argument("--revalidate", action="store_true",
+                    help="cc193: POST /api/endurnyja {allt:true} eftir FLIPP (ekki við sleppt/fall)")
     args = ap.parse_args()
     tag = "ref_" + dt.datetime.now().strftime("%Y%m%d_%H%M")
     log(f"=== cc180_llt_refresh START tag={tag} no_flip={args.no_flip} ===")
@@ -134,6 +175,8 @@ def main():
         fl.flip(Namespace(flip=True, tag=tag, expect_rows=meta["rowcount"]))
         dropped = prune_old(args.keep_old)
         log(f"FLIPPAÐ tag={tag}; felldar eldri: {dropped or 'engar'}. exit 0")
+        if args.revalidate:
+            revalidate()
         return 0
     except SystemExit as e:
         log(f"HÆTT (SystemExit {e.code}) — sjá ofar. exit 2")

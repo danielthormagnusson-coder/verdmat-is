@@ -71,6 +71,9 @@ CLI (fullar slóðir, engar cd-samsetningar):
       -> FULL KEYRSLA MEÐ API-KÖLLUM (krefst GO-línu Danna)
   python D:\\verdmat-is\\app\\scripts\\fable_worker.py --poll --leyfa-fable
       -> Task Scheduler-hamur: lykkja með --bil sekúndna millibili
+  python D:\\verdmat-is\\app\\scripts\\fable_worker.py --once --leyfa-fable --hamark 3 --adeins-live
+      -> cc193: Task Scheduler-verkið (5 mín); girðingar (a) live-only (b) hámark 3
+      # (c) kill-switch D:\\verdmat-is\\STOPP_FABLE (d) póstur/idempotens óbreytt
 
 deps: stdlib + psycopg2 + requests (öll þegar í notkun í þessu repo).
 """
@@ -106,6 +109,10 @@ ENV_AI = Path(r"D:\verdmat-is\verdmat-ai\.env.local")
 # (RESEND_API_KEY, PADDLE_*_LIVE). Lesin á eftir ENV_AI, aldrei á undan.
 ENV_ROT = Path(r"D:\env.local")
 LOGG = Path(r"D:\_fable_keyrslur\worker.log")
+# cc193 girðing (c): kill-switch standandi Fable-heimildar á scheduler. Sé
+# skráin til grípur workerinn ENGA pöntun (engin Fable-köll); pollun og
+# póstumferð keyra áfram. Fjarlægðu skrána til að opna aftur.
+STOPP_FABLE = Path(r"D:\verdmat-is\STOPP_FABLE")
 
 BUCKET = "fable-skyrslur"
 
@@ -222,7 +229,7 @@ def env_ai(lykill):
 # ══════════════════════════════════════════════════════════════════════════
 # 1. pöntunin
 # ══════════════════════════════════════════════════════════════════════════
-def taka_pontun(conn, order_id=None, dry=False):
+def taka_pontun(conn, order_id=None, dry=False, adeins_live=False):
     """Grípur eina greidda pöntun og færir hana í 'generating'.
 
     Uppfærslan er SKILYRT á status='paid' í WHERE — tveir workerar sem
@@ -244,11 +251,12 @@ def taka_pontun(conn, order_id=None, dry=False):
             cur.execute("""
                 SELECT order_id, fastnum, sjonarhorn, attempt_count, status
                 FROM public.fable_orders
-                WHERE status = 'paid'
+                WHERE status = 'paid' %s
                 ORDER BY paid_at
                 LIMIT 1
                 %s
-            """ % ("" if dry else "FOR UPDATE SKIP LOCKED"))
+            """ % ("AND paddle_env = 'live'" if adeins_live else "",  # cc193 girðing (a)
+                   "" if dry else "FOR UPDATE SKIP LOCKED"))
         rod = cur.fetchone()
         if not rod:
             conn.rollback()
@@ -280,6 +288,16 @@ def taka_pontun(conn, order_id=None, dry=False):
     conn.commit()
     return {"order_id": str(oid), "fastnum": fastnum,
             "sjonarhorn": sjonarhorn, "attempt_count": attempts + 1}
+
+
+def telja_greiddar(conn, adeins_live=False):
+    """Fjöldi greiddra raða í biðröð (cc193) — aðeins til bókunar í logg."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM public.fable_orders WHERE status = 'paid'"
+                    + (" AND paddle_env = 'live'" if adeins_live else ""))
+        n = cur.fetchone()[0]
+    conn.rollback()
+    return n
 
 
 def setja_stodu(conn, order_id, stada, **reitir):
@@ -845,7 +863,8 @@ def _lesa_q15(d):
 # ══════════════════════════════════════════════════════════════════════════
 # 6. ein umferð
 # ══════════════════════════════════════════════════════════════════════════
-def ein_umferd(leyfa_fable, dry, order_id=None, adeins_postur=False, prof_netfang=None):
+def ein_umferd(leyfa_fable, dry, order_id=None, adeins_postur=False, prof_netfang=None,
+               adeins_live=False):
     conn = db()
     try:
         # cc186: póstar á afhentar raðir FYRST — óháð framleiðslu og Fable-hliði.
@@ -857,7 +876,15 @@ def ein_umferd(leyfa_fable, dry, order_id=None, adeins_postur=False, prof_netfan
             log("póstumferð féll:\n%s" % traceback.format_exc()[-1200:])
         if adeins_postur:
             return None
-        pontun = taka_pontun(conn, order_id=order_id, dry=dry)
+        # cc193 girðing (c): kill-switch athugaður ÁÐUR en röð er gripin, svo
+        # greidd röð stendur áfram sem 'paid' (hvorki generating né failed/
+        # BIDUR_GO) þar til skráin er fjarlægð. Gildir óháð --leyfa-fable.
+        if STOPP_FABLE.exists():
+            n = telja_greiddar(conn, adeins_live)
+            log("STOPP_FABLE til (%s) — Fable-köll SLEPPT í þessu polli; %d greidd röð/raðir "
+                "bíða. Pollun og póstumferð keyrðu áfram." % (STOPP_FABLE, n))
+            return {"stada": "STOPP", "bida": n}
+        pontun = taka_pontun(conn, order_id=order_id, dry=dry, adeins_live=adeins_live)
         if not pontun:
             log("engin greidd pöntun í biðröð.")
             return None
@@ -925,6 +952,12 @@ def main():
     ap.add_argument("--prof-netfang", dest="prof_netfang",
                     help="cc186: viðtakandi prófpósts í stað netfangs raðarinnar "
                          "— AÐEINS sandbox-raðir")
+    ap.add_argument("--hamark", type=int, default=1,
+                    help="cc193 girðing (b): hámark pantana (= Fable-kalla) í þessari "
+                         "keyrslu; umfram bíður næsta polls (bókað). Scheduler: 3")
+    ap.add_argument("--adeins-live", action="store_true", dest="adeins_live",
+                    help="cc193 girðing (a): sjálfvirka biðröðin tekur aðeins "
+                         "paddle_env='live'")
     args = ap.parse_args()
 
     if not (args.once or args.poll or args.order or args.adeins_postur):
@@ -933,6 +966,10 @@ def main():
 
     if args.leyfa_fable:
         log("!! API-HLIÐIÐ OPIÐ (--leyfa-fable) — Fable-köll verða gerð.")
+        log("   girðingar cc193: hámark %d pöntun/pantanir í keyrslu; biðröð %s; "
+            "kill-switch %s" % (args.hamark,
+                                "aðeins live" if args.adeins_live else "live+sandbox",
+                                "TIL" if STOPP_FABLE.exists() else "ekki til"))
     else:
         log("API-hliðið lokað (sjálfgefið). Engin Anthropic-köll í þessari keyrslu.")
 
@@ -941,13 +978,33 @@ def main():
         while True:
             try:
                 ein_umferd(args.leyfa_fable, args.dry,
-                           adeins_postur=args.adeins_postur, prof_netfang=args.prof_netfang)
+                           adeins_postur=args.adeins_postur, prof_netfang=args.prof_netfang,
+                           adeins_live=args.adeins_live)
             except Exception:
                 log("umferð féll:\n%s" % traceback.format_exc()[-1500:])
             time.sleep(args.bil)
     else:
-        ein_umferd(args.leyfa_fable, args.dry, order_id=args.order,
-                   adeins_postur=args.adeins_postur, prof_netfang=args.prof_netfang)
+        # cc193 girðing (b): allt að --hamark pantanir í röð, svo hætt. Umfram
+        # raðir standa sem 'paid' og bíða næsta polls — bókað í logg.
+        n_gert = 0
+        while True:
+            nid = ein_umferd(args.leyfa_fable, args.dry, order_id=args.order,
+                             adeins_postur=args.adeins_postur, prof_netfang=args.prof_netfang,
+                             adeins_live=args.adeins_live)
+            if (nid is None or nid.get("stada") == "STOPP" or args.order
+                    or args.adeins_postur or args.dry):
+                break
+            n_gert += 1
+            if n_gert >= args.hamark:
+                conn = db()
+                try:
+                    bida = telja_greiddar(conn, args.adeins_live)
+                finally:
+                    conn.close()
+                if bida:
+                    log("HÁMARK %d náð — %d greidd röð/raðir bíða næsta polls."
+                        % (args.hamark, bida))
+                break
     return 0
 
 
