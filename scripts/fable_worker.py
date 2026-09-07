@@ -50,6 +50,8 @@ KEYRSLURÖÐIN (úr cc166/cc167/cc168)
   7  q27_domur                      q27_out.json — HEILDARDOMUR
   8  q31_hnitmidun -> q32_domur     q32_out.json — DOMUR, assertar
   9  upphleðsla + status='delivered'
+ 10  póstur á kaupanda (cc186) — hlekkur á /pontun/<order_id>; hliðið er
+     email_sent_at á röðinni; póstfall fellir ALDREI delivered
 
 FALLMEÐFERÐ: ein endurkeyrsla (attempt_count). Falli hún aftur ->
 `status='qa'` + tölvupóstlína á Danna. ENGIN sjálfvirk afhending á fallinni
@@ -77,6 +79,7 @@ from __future__ import annotations
 import argparse
 import calendar
 import hashlib
+import html as htmlmod
 import json
 import os
 import re
@@ -99,6 +102,9 @@ DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
 SNIDMAT = Path(r"D:\_audit\cc166_hlidarvegur64")
 VINNURAETUR = Path(r"D:\_fable_keyrslur")
 ENV_AI = Path(r"D:\verdmat-is\verdmat-ai\.env.local")
+# cc186: varalind fyrir lykla sem eru HVERGI í verdmat-ai/.env.local
+# (RESEND_API_KEY, PADDLE_*_LIVE). Lesin á eftir ENV_AI, aldrei á undan.
+ENV_ROT = Path(r"D:\env.local")
 LOGG = Path(r"D:\_fable_keyrslur\worker.log")
 
 BUCKET = "fable-skyrslur"
@@ -195,16 +201,21 @@ def db():
 
 
 def env_ai(lykill):
-    """Les einn lykil úr verdmat-ai/.env.local (KEY=value, hunsar $env:-línur)."""
-    if not ENV_AI.exists():
-        return None
-    for lina in ENV_AI.read_text(encoding="utf-8-sig").splitlines():
-        lina = lina.strip()
-        if lina.startswith("#") or "=" not in lina:
+    """Les einn lykil úr verdmat-ai/.env.local, annars D:/env.local (cc186).
+
+    Röðin skiptir máli: framendalindin fyrst (lykillinn sem verdmat-ai keyrir
+    á), D:/env.local aðeins fyrir lykla sem hún ber ekki. KEY=value;
+    $env:-línur lesnar sem KEY."""
+    for skra in (ENV_AI, ENV_ROT):
+        if not skra.exists():
             continue
-        k, _, v = lina.partition("=")
-        if k.strip().lstrip("$").replace("env:", "") == lykill:
-            return v.strip().strip('"').strip("'")
+        for lina in skra.read_text(encoding="utf-8-sig").splitlines():
+            lina = lina.strip()
+            if lina.startswith("#") or "=" not in lina:
+                continue
+            k, _, v = lina.partition("=")
+            if k.strip().lstrip("$").replace("env:", "") == lykill:
+                return v.strip().strip('"').strip("'")
     return None
 
 
@@ -464,6 +475,242 @@ def tilkynna_danna(efni, texti):
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# 4b. NETFANGSGRIP + PÓSTUR Á KAUPANDA (cc186)
+# ══════════════════════════════════════════════════════════════════════════
+# HVAR: í WORKERNUM, ekki í webhookinu. Webhookið (verdmat-ai/app/api/paddle/
+# webhook/route.js) les `data.customer.email`, en transaction.completed ber
+# `customer_id` og ENGAN customer-hlut — reiturinn er því NULL á hverri
+# greiddri röð (mælt cc186 q04: Hverafold, kaupandi_email NULL, customer_id
+# til). Workerinn á röðina frá 'paid' og áfram, pollar þegar, og breyting hér
+# þarf hvorki deploy né push. Gripið: GET /transactions -> customer_id ->
+# GET /customers -> email, með lykli eftir paddle_env RAÐARINNAR.
+#
+# PÓSTURINN fer aðeins á 'delivered'-raðir þar sem email_sent_at IS NULL —
+# sá dálkur er HLIÐIÐ (migration 20260903111500_cc186_fable_orders_email).
+# Póstfall fellir ALDREI stöðuna: villan bókast í email_villa og næsta poll
+# reynir aftur. Idempotency-Key á Resend-kallið (order_id-bundinn) er önnur
+# vörn skyldu tveir workerar ná sömu röð milli sendingar og bókunar.
+#
+# HLEKKURINN er /pontun/<order_id> — ALDREI signed URL (hún rennur út).
+
+PADDLE_ROT = {"sandbox": "https://sandbox-api.paddle.com",
+              "live": "https://api.paddle.com"}
+POSTUR_FRA = "Verðmat.ai <skyrsla@verdmat.ai>"
+POSTUR_SVAR = "hjalp@verdmat.ai"
+PONTUN_ROT = "https://www.verdmat.ai/pontun/"
+# Raðir afhentar FYRIR póstlögnina (cc186, 03.09.2026) eru sandbox-prófanir
+# cc172–cc185 og fá ekki póst í sjálfvirku polli; þær nást aðeins með --order.
+POSTUR_UPPHAF = "2026-09-03 00:00:00+00"
+POSTUR_REITIR = ("order_id", "fastnum", "paddle_env", "paddle_transaction_id",
+                 "kaupandi_email")
+
+
+def paddle_lykill(env):
+    """API-lykill eftir umhverfi RAÐARINNAR — sama regla og lib/paddle-env.js:
+    live ósuffixað, sandbox með _SANDBOX. *_LIVE er varanafnið í D:\\env.local."""
+    if env == "live":
+        return env_ai("PADDLE_API_KEY") or env_ai("PADDLE_API_KEY_LIVE")
+    return env_ai("PADDLE_API_KEY_SANDBOX")
+
+
+def grima_netfang(nf):
+    a, _, b = (nf or "").partition("@")
+    return (a[:2] + "***@" + b) if b else "***"
+
+
+def saekja_netfang_paddle(env, txn_id):
+    """paddle_transaction_id -> customer_id -> email. None vanti nokkuð."""
+    key = paddle_lykill(env)
+    if not key or not txn_id:
+        log("   netfangsgrip: %s vantar"
+            % ("Paddle-lykil (%s)" % env if not key else "paddle_transaction_id"))
+        return None
+    rot = PADDLE_ROT.get(env)
+    h = {"Authorization": "Bearer %s" % key}
+    try:
+        r = requests.get("%s/transactions/%s" % (rot, txn_id), headers=h, timeout=30)
+        if not r.ok:
+            log("   netfangsgrip: GET /transactions -> HTTP %s" % r.status_code)
+            return None
+        ctm = (r.json().get("data") or {}).get("customer_id")
+        if not ctm:
+            log("   netfangsgrip: færslan ber ekkert customer_id")
+            return None
+        r2 = requests.get("%s/customers/%s" % (rot, ctm), headers=h, timeout=30)
+        if not r2.ok:
+            log("   netfangsgrip: GET /customers -> HTTP %s" % r2.status_code)
+            return None
+        nf = ((r2.json().get("data") or {}).get("email") or "").strip()
+        return nf or None
+    except (requests.RequestException, ValueError) as e:
+        log("   netfangsgrip brást: %s" % e)
+        return None
+
+
+def frysta_netfang(conn, order_id, netfang):
+    """Skrifar kaupandi_email AÐEINS sé hann tómur — fyrsta gripið stendur."""
+    with conn.cursor() as cur:
+        cur.execute("SET TRANSACTION READ WRITE")
+        cur.execute("""UPDATE public.fable_orders SET kaupandi_email = %s
+                        WHERE order_id = %s AND kaupandi_email IS NULL""",
+                    (netfang, order_id))
+        n = cur.rowcount
+    conn.commit()
+    return n == 1
+
+
+def boka_postfall(conn, order_id, villa):
+    """Bókar póstfall á röðina. STATUS ER ÓSNERTUR — delivered stendur."""
+    with conn.cursor() as cur:
+        cur.execute("SET TRANSACTION READ WRITE")
+        cur.execute("UPDATE public.fable_orders SET email_villa = %s WHERE order_id = %s",
+                    (villa[:2000], order_id))
+    conn.commit()
+
+
+def heimilisfang_af_eign(conn, fastnum):
+    with conn.cursor() as cur:
+        cur.execute("SELECT heimilisfang FROM public.properties WHERE fastnum = %s",
+                    (fastnum,))
+        rod = cur.fetchone()
+    conn.rollback()
+    return rod[0] if rod and rod[0] else None
+
+
+def postur_texti(heimilisfang, order_id):
+    """(efni, texti, html). Íslenskur prósi; hlekkur á /pontun/<id>."""
+    slod = PONTUN_ROT + order_id
+    hf = heimilisfang or "eignina"
+    efni = "Skýrslan þín um %s er tilbúin" % hf
+    texti = (
+        "Góðan dag,\n\n"
+        "Verðmatsskýrslan þín um %s er tilbúin.\n\n"
+        "Þú opnar hana hér:\n%s\n\n"
+        "Slóðin er varanleg — hún er kvittunin þín og þú getur opnað hana hvenær "
+        "sem er. Niðurhalshlekkurinn á síðunni endurnýjast við hvern smell, svo "
+        "vistaðu skýrsluna sjálfa viljirðu eiga afrit.\n\n"
+        "Spurningar eða athugasemdir? Svaraðu þessum pósti eða skrifaðu á %s.\n\n"
+        "Kær kveðja,\nVerðmat.ai\n" % (hf, slod, POSTUR_SVAR))
+    e = htmlmod.escape
+    html = (
+        '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;'
+        'font-size:16px;line-height:1.5;color:#1a1a1a;max-width:560px">'
+        "<p>Góðan dag,</p>"
+        "<p>Verðmatsskýrslan þín um <strong>%s</strong> er tilbúin.</p>"
+        '<p><a href="%s" style="display:inline-block;padding:10px 18px;'
+        'background:#1a1a1a;color:#fff;text-decoration:none;border-radius:6px">'
+        "Opna skýrsluna</a></p>"
+        '<p style="font-size:14px;color:#555">Eða afritaðu slóðina: '
+        '<a href="%s">%s</a></p>'
+        "<p>Slóðin er varanleg — hún er kvittunin þín og þú getur opnað hana "
+        "hvenær sem er. Niðurhalshlekkurinn á síðunni endurnýjast við hvern "
+        "smell, svo vistaðu skýrsluna sjálfa viljirðu eiga afrit.</p>"
+        '<p>Spurningar eða athugasemdir? Svaraðu þessum pósti eða skrifaðu á '
+        '<a href="mailto:%s">%s</a>.</p>'
+        "<p>Kær kveðja,<br>Verðmat.ai</p></div>"
+        % (e(hf), e(slod), e(slod), e(slod), e(POSTUR_SVAR), e(POSTUR_SVAR)))
+    return efni, texti, html
+
+
+def senda_kaupandapost(conn, rod, dry=False, prof_netfang=None):
+    """Einn póstur á eina afhenta röð. True aðeins ef sending OG bókun tókust.
+    Fellir aldrei status — hvert fall bókast í email_villa og bíður næsta polls."""
+    oid = rod["order_id"]
+    netfang = rod["kaupandi_email"]
+    if not netfang:
+        netfang = saekja_netfang_paddle(rod["paddle_env"], rod["paddle_transaction_id"])
+        if netfang and not dry:
+            frysta_netfang(conn, oid, netfang)
+            log("   netfang fryst á röðina: %s" % grima_netfang(netfang))
+    if not netfang:
+        if not dry:
+            boka_postfall(conn, oid, "netfang vantar: hvorki á röð né hjá Paddle")
+        log("   póstur %s: netfang vantar — reynt aftur í næsta polli." % oid)
+        return False
+
+    vidtakandi = netfang
+    if prof_netfang:
+        # Prófleið (cc186 lið 5): AÐEINS á sandbox-röð, bókað í logg. Röðin
+        # heldur sínu netfangi; aðeins viðtakandi þessa eina pósts víkur.
+        if rod["paddle_env"] != "sandbox":
+            log("   --prof-netfang HAFNAÐ: röðin er %s, ekki sandbox." % rod["paddle_env"])
+            return False
+        vidtakandi = prof_netfang
+        log("   PRÓF: sent á %s í stað %s (sandbox-röð)"
+            % (grima_netfang(prof_netfang), grima_netfang(netfang)))
+
+    key = env_ai("RESEND_API_KEY")
+    if not key:
+        if not dry:
+            boka_postfall(conn, oid, "RESEND_API_KEY vantar")
+        log("   póstur: RESEND_API_KEY vantar (ENV_AI/ENV_ROT).")
+        return False
+
+    efni, texti, html = postur_texti(heimilisfang_af_eign(conn, rod["fastnum"]), oid)
+    if dry:
+        log("   --dry-run: hefði sent „%s“ á %s" % (efni, grima_netfang(vidtakandi)))
+        return False
+    try:
+        r = requests.post("https://api.resend.com/emails",
+                          headers={"Authorization": "Bearer %s" % key,
+                                   "Content-Type": "application/json",
+                                   "Idempotency-Key": "delivered/%s" % oid},
+                          json={"from": env_ai("POSTUR_FRA") or POSTUR_FRA,
+                                "to": [vidtakandi],
+                                "reply_to": POSTUR_SVAR,
+                                "subject": efni, "text": texti, "html": html},
+                          timeout=30)
+    except requests.RequestException as e:
+        boka_postfall(conn, oid, "Resend: %s" % e)
+        log("   póstur %s brást: %s — bókað, reynt aftur." % (oid, e))
+        return False
+    if not r.ok:
+        boka_postfall(conn, oid, "Resend HTTP %s: %s" % (r.status_code, r.text[:300]))
+        log("   póstur %s: Resend HTTP %s — bókað, reynt aftur." % (oid, r.status_code))
+        return False
+    try:
+        rid = (r.json() or {}).get("id") or "?"
+    except ValueError:
+        rid = "?"
+    with conn.cursor() as cur:
+        cur.execute("SET TRANSACTION READ WRITE")
+        cur.execute("""UPDATE public.fable_orders
+                          SET email_sent_at = now(), email_resend_id = %s, email_villa = NULL
+                        WHERE order_id = %s AND email_sent_at IS NULL""", (rid, oid))
+        n = cur.rowcount
+    conn.commit()
+    log("   PÓSTUR SENDUR á %s (resend %s, bókun %s)"
+        % (grima_netfang(vidtakandi), rid, "ok" if n == 1 else "ENGIN RÖÐ — þegar bókað?"))
+    return n == 1
+
+
+def posta_afhentar(conn, order_id=None, dry=False, prof_netfang=None):
+    """Pollflötur póstsins: delivered AND email_sent_at IS NULL
+    (fable_orders_postur_bidrod_idx). Ein tilraun per röð per umferð.
+    Án order_id gildir POSTUR_UPPHAF; með order_id er röðin tekin óháð dagsetningu."""
+    with conn.cursor() as cur:
+        cur.execute("""SELECT order_id::text, fastnum, paddle_env, paddle_transaction_id,
+                              kaupandi_email
+                         FROM public.fable_orders
+                        WHERE status = 'delivered' AND email_sent_at IS NULL
+                          AND ((%s::uuid IS NULL AND delivered_at >= %s::timestamptz)
+                               OR order_id = %s::uuid)
+                        ORDER BY delivered_at
+                        LIMIT 20""", (order_id, POSTUR_UPPHAF, order_id))
+        radir = [dict(zip(POSTUR_REITIR, r)) for r in cur.fetchall()]
+    conn.rollback()
+    if not radir:
+        log("póstur: engin afhent röð bíður pósts.")
+        return 0
+    send = 0
+    for rod in radir:
+        log("PÓSTUR á pöntun %s" % rod["order_id"])
+        if senda_kaupandapost(conn, rod, dry=dry, prof_netfang=prof_netfang):
+            send += 1
+    return send
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # 5. keðjan sjálf
 # ══════════════════════════════════════════════════════════════════════════
 def framleida(conn, pontun, leyfa_fable, dry):
@@ -598,9 +845,18 @@ def _lesa_q15(d):
 # ══════════════════════════════════════════════════════════════════════════
 # 6. ein umferð
 # ══════════════════════════════════════════════════════════════════════════
-def ein_umferd(leyfa_fable, dry, order_id=None):
+def ein_umferd(leyfa_fable, dry, order_id=None, adeins_postur=False, prof_netfang=None):
     conn = db()
     try:
+        # cc186: póstar á afhentar raðir FYRST — óháð framleiðslu og Fable-hliði.
+        # Fall hér má ekki stöðva framleiðsluna: bókað á röðina, umferðin heldur áfram.
+        try:
+            posta_afhentar(conn, order_id=order_id, dry=dry, prof_netfang=prof_netfang)
+        except Exception:
+            conn.rollback()
+            log("póstumferð féll:\n%s" % traceback.format_exc()[-1200:])
+        if adeins_postur:
+            return None
         pontun = taka_pontun(conn, order_id=order_id, dry=dry)
         if not pontun:
             log("engin greidd pöntun í biðröð.")
@@ -636,6 +892,12 @@ def ein_umferd(leyfa_fable, dry, order_id=None):
                         fable_model=nid["meta"].get("model"),
                         kostnadur_usd=nid["meta"].get("kostnadur_usd"))
             log("PÖNTUN %s AFHENT." % oid)
+            # cc186: pósturinn strax — bregðist hann bókast það og næsta poll reynir.
+            try:
+                posta_afhentar(conn, order_id=oid)
+            except Exception:
+                conn.rollback()
+                log("póstur eftir afhendingu féll:\n%s" % traceback.format_exc()[-1200:])
         elif nid["stada"] == "BIDUR_GO" and not dry:
             # Ekkert brást — hliðið var lokað. Röðin fer aftur í biðröðina.
             setja_stodu(conn, oid, "failed",
@@ -657,9 +919,15 @@ def main():
                     help="OPNAR API-HLIÐIÐ — krefst GO-línu Danna")
     ap.add_argument("--dry-run", action="store_true", dest="dry",
                     help="engin DB-skrif, engin API-köll")
+    ap.add_argument("--adeins-postur", action="store_true", dest="adeins_postur",
+                    help="cc186: aðeins póstumferðin (delivered án email_sent_at), "
+                         "engin framleiðsla")
+    ap.add_argument("--prof-netfang", dest="prof_netfang",
+                    help="cc186: viðtakandi prófpósts í stað netfangs raðarinnar "
+                         "— AÐEINS sandbox-raðir")
     args = ap.parse_args()
 
-    if not (args.once or args.poll or args.order):
+    if not (args.once or args.poll or args.order or args.adeins_postur):
         print(__doc__)
         return 0
 
@@ -672,12 +940,14 @@ def main():
         log("poll-hamur, bil %ds. Ctrl+C til að stöðva." % args.bil)
         while True:
             try:
-                ein_umferd(args.leyfa_fable, args.dry)
+                ein_umferd(args.leyfa_fable, args.dry,
+                           adeins_postur=args.adeins_postur, prof_netfang=args.prof_netfang)
             except Exception:
                 log("umferð féll:\n%s" % traceback.format_exc()[-1500:])
             time.sleep(args.bil)
     else:
-        ein_umferd(args.leyfa_fable, args.dry, order_id=args.order)
+        ein_umferd(args.leyfa_fable, args.dry, order_id=args.order,
+                   adeins_postur=args.adeins_postur, prof_netfang=args.prof_netfang)
     return 0
 
 
