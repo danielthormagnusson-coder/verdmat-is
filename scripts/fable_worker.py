@@ -48,6 +48,8 @@ KEYRSLURÖÐIN (úr cc166/cc167/cc168)
   5  q15 (+q12, q12b)               q15_out.json — LESIÐ, kastar ekki
   6  q23_svg + q24_kort -> q26_setja_inn -> q29_stilsnid
   7  q27_domur                      q27_out.json — HEILDARDOMUR
+  7b q30_umgjord (cc192)            markup-umgjörð (td.tala, kafla-akkeri,
+                                    V-hlekkir) — eigin bakfærslu-/textasönnun
   8  q31_hnitmidun -> q32_domur     q32_out.json — DOMUR, assertar
   9  upphleðsla + status='delivered'
  10  póstur á kaupanda (cc186) — hlekkur á /pontun/<order_id>; hliðið er
@@ -177,7 +179,7 @@ KEDJA = [
     "q05.py", "q06.py", "q08.py", "q09.py", "q10.py", "q11.py",
     "q12.py", "q12b.py", "q15.py",
     "q23_svg.py", "q24_kort.py", "q26_setja_inn.py", "q29_stilsnid.py",
-    "q27_domur.py", "q31_hnitmidun.py", "q32_domur.py",
+    "q27_domur.py", "q30_umgjord.py", "q31_hnitmidun.py", "q32_domur.py",
 ]
 FYLGISKRAR = ["PROMPT_GRIND_cc166.md"]
 
@@ -815,6 +817,13 @@ def framleida(conn, pontun, leyfa_fable, dry):
         raise Threp("q27_domur", "domur", "HEILDARDOMUR=%s  domar=%s"
                     % (d27.get("HEILDARDOMUR"), d27.get("domar")))
     log("   q27: STENST")
+
+    # ---- 7b. UMGJÖRÐ (cc192) — markup-merki sem CSS ræður ekki við ----
+    # Keyrð EFTIR q27 (d5 krefst byte-jafngildis við _pre_graf þegar brot og
+    # stíll eru bakfærð) og FYRIR pre_hnitmidun-afritið, svo q31/q32 dæmi
+    # gegn skjalinu MEÐ umgjörðinni. Skriftin sannar sjálf að enginn stafur
+    # efnistexta hreyfist og að bakfærslan er byte-eins (assert -> exit != 0).
+    threp.append(keyra(vinnu, "q30_umgjord.py"))
 
     # ---- 8. HNITMIÐUN + q32 (assertar sjálf) ----
     # q31 krefst þess að `<HEITI>_SKYRSLA_pre_hnitmidun.html` sé til og
