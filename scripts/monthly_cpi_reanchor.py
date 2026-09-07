@@ -141,21 +141,30 @@ def main() -> int:
     try:
         # ---- Step 0: refresh_cpi (diagnostic only) ----
         sid = start_step(conn_log, run_id, "fetch_cpi", 1)
+        fetch_cpi_status = "ok"
         if not args.test_anchor:
             log("[0] running refresh_cpi.py ...")
+            # timeout 900: refresh_cpi endurtekur sókn ×3 með bakstigi (cc195 B1) — 60+120+240 s
             res = subprocess.run([sys.executable, str(REFRESH_CPI)],
-                                 capture_output=True, text=True, timeout=300)
+                                 capture_output=True, text=True, timeout=900)
             if res.returncode != 0:
-                log(f"[0] ERROR refresh_cpi exit={res.returncode}; "
-                    f"stderr tail: {(res.stderr or '')[-400:]}")
-                finish_step(conn_log, sid, res.returncode, notes="refresh_cpi failed")
-                finish_run(conn_log, run_id, "failed",
-                           {"step": "fetch_cpi", "exit_code": res.returncode,
-                            "dryrun": args.dryrun})
-                return 1
-            tail = (res.stdout or "").strip().splitlines()[-3:]
-            log(f"[0] refresh_cpi tail: {' | '.join(tail)}")
-            finish_step(conn_log, sid, 0, notes="refresh_cpi ok")
+                # cc195 B2: step 0 er „diagnostic only" (sjá docstring). Sóknarfall (30.08 og
+                # 06.09: Hagstofa 429) á ekki að fella endurfestinguna þegar CSV á disk ber
+                # þegar mánuðina — gate-ið [2] les max(csv) og dæmir sjálft hvort eitthvað er
+                # að gera. WARN-braut, bókuð í pipeline_runs; villan býr á STDOUT skriftunnar
+                # (hún prentar og skrifar D:\refresh_cpi_log_<dags>.txt), stderr er tómt.
+                out_tail = " | ".join((res.stdout or "").strip().splitlines()[-3:])
+                err_tail = (res.stderr or "").strip()[-200:]
+                log(f"[0] WARN refresh_cpi exit={res.returncode} — CSV á disk notað "
+                    f"(D:\\refresh_cpi_log_<dags>.txt ber villuna). stdout tail: {out_tail}"
+                    f"{' | stderr: ' + err_tail if err_tail else ''}")
+                fetch_cpi_status = f"warn: exit={res.returncode}; {out_tail[-160:]}"
+                finish_step(conn_log, sid, 0,
+                            notes=f"refresh_cpi failed exit={res.returncode} — WARN, CSV on disk used")
+            else:
+                tail = (res.stdout or "").strip().splitlines()[-3:]
+                log(f"[0] refresh_cpi tail: {' | '.join(tail)}")
+                finish_step(conn_log, sid, 0, notes="refresh_cpi ok")
         else:
             log("[0] --test-anchor set — skipping refresh_cpi (using CSV on disk)")
             finish_step(conn_log, sid, 0, notes="skipped (--test-anchor)")
@@ -206,7 +215,7 @@ def main() -> int:
             finish_run(conn_log, run_id, "success",
                        {"noop": True, "reason": "anchor unchanged",
                         "anchor": cur_anchor, "dryrun": args.dryrun,
-                        "anchor_guard": anchor_guard})
+                        "anchor_guard": anchor_guard, "fetch_cpi": fetch_cpi_status})
             return 0
 
         # ---- Step 3: re-derive at the new anchor (Python parity) ----
@@ -450,7 +459,8 @@ def main() -> int:
         finish_run(conn_log, run_id, "success",
                    {"noop": False, "old_anchor": cur_anchor, "new_anchor": new_anchor,
                     "rows_updated": updated, "rows_changed": n_changed,
-                    "backup_table": backup_table, "anchor_guard": anchor_guard})
+                    "backup_table": backup_table, "anchor_guard": anchor_guard,
+                    "fetch_cpi": fetch_cpi_status})
         return 0
     except Exception as e:
         log(f"*** CRASH: {type(e).__name__}: {e}")
