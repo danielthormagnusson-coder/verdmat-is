@@ -180,6 +180,57 @@ def head_size(url):
         return None, "HEAD_ERR: %s" % e
 
 
+def head_stamp(url):
+    """cc195 A2: (content_length:int|None, last_modified:str|None, err:str|None) via HEAD."""
+    try:
+        r = session.head(url, timeout=TIMEOUT, allow_redirects=True)
+        cl = r.headers.get("content-length")
+        return (int(cl) if cl is not None else None), r.headers.get("last-modified"), None
+    except Exception as e:
+        return None, None, "HEAD_ERR: %s" % e
+
+
+def _parse_http_date(s):
+    try:
+        from email.utils import parsedate_to_datetime
+        d = parsedate_to_datetime(s)
+        return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
+    except Exception:
+        return None
+
+
+def upstream_changed(existing, file_url):
+    """cc195 A2: dæmir hvort upstream-skráin hefur breyst síðan manifestið bókaði hana.
+    Returns (changed:bool, why:str). Conservative: HEAD-villa eða engir hausar → (False, ...)
+    = gamla skip-hegðunin, en bókað hvers vegna."""
+    if not file_url:
+        return False, "no file_url"
+    cl, lm, err = head_stamp(file_url)
+    if err:
+        return False, err
+    known_bytes = existing.get("upstream_bytes", existing.get("bytes"))
+    if cl is not None and known_bytes is not None and cl != known_bytes:
+        return True, "Content-Length %s != %s" % (cl, known_bytes)
+    known_lm = existing.get("upstream_last_modified")
+    if lm:
+        lm_dt = _parse_http_date(lm)
+        if known_lm:
+            if lm != known_lm:
+                return True, "Last-Modified %s != %s" % (lm, known_lm)
+        else:
+            # fyrsta HEAD-mæling: berum við fetched_at manifestsins
+            fa = existing.get("fetched_at")
+            try:
+                fa_dt = dt.datetime.strptime(fa, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
+            except Exception:
+                fa_dt = None
+            if lm_dt and fa_dt and lm_dt > fa_dt:
+                return True, "Last-Modified %s > fetched_at %s" % (lm, fa)
+    if cl is None and not lm:
+        return False, "no Content-Length/Last-Modified"
+    return False, "unchanged (%s, %s)" % (cl, lm)
+
+
 def fmt_of(name):
     n = name.lower()
     for ext in (".csv", ".zip", ".json", ".px", ".xlsx", ".gdb"):
@@ -229,14 +280,22 @@ def harvest_file(man, *, name, landing_url, file_url, subdir, fname, source,
     if is_csv is None:
         is_csv = fmt == "csv"
 
-    # Idempotency: existing entry + file present + sha matches -> skip
+    # Idempotency: existing entry + file present + sha matches -> skip ...
+    # cc195 A2: ... NEMA upstream beri annan stimpil. Sha-samanburðurinn hér mældi aðeins
+    # STAÐBUNDNU skrána gegn eigin manifesti og kallaði aldrei upstream — leiguvísitalan sat
+    # á 2026-05 (29.06) meðan HMS bar 2026-06/07 (02.09). Nú: HEAD á file_url; ef
+    # Content-Length eða Last-Modified víkur frá því sem manifestið bókaði → sækja.
+    # HEAD-villa eða hausar vantar → gamla hegðunin (skip), bókað í loggi.
     existing = man.get(name)
     if (not force and existing and existing.get("sha256")
             and os.path.exists(dest)):
         cur = sha256_file(dest)
         if cur == existing["sha256"]:
-            log("  SKIP (unchanged): %s" % name)
-            return existing
+            changed, why = upstream_changed(existing, file_url)
+            if not changed:
+                log("  SKIP (unchanged; upstream %s): %s" % (why, name))
+                return existing
+            log("  REFETCH (upstream %s): %s" % (why, name))
 
     log("  GET  %s  <- %s" % (name, file_url))
     try:
@@ -268,11 +327,13 @@ def harvest_file(man, *, name, landing_url, file_url, subdir, fname, source,
         except Exception as e:
             notes = (notes + " | csv_profile error: %s" % e).strip(" |")
 
+    up_cl, up_lm, _ = head_stamp(file_url)   # cc195 A2: upstream-stimpill bókaður fyrir næsta samanburð
     entry = dict(
         name=name, source=source, landing_url=landing_url, file_url=file_url,
         local_path=dest, fetched_at=utcnow(), bytes=nbytes, sha256=sha,
         format=fmt, encoding=encoding, n_rows=n_rows, columns=columns,
         delimiter=delim, license=license_, cadence=cadence, notes=notes,
+        upstream_bytes=up_cl, upstream_last_modified=up_lm,
     )
     upsert(man, entry)
     log("    ok  bytes=%s enc=%s n_rows=%s" % (nbytes, encoding, n_rows))

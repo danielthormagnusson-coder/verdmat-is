@@ -61,7 +61,7 @@ LEIGUVISITALA = Path(r"D:\verdmat-is\data\raw\opin_gogn\hms\visitolur\leiguvisit
 LEIGUVERDSJA = Path(r"D:\verdmat-is\data\raw\opin_gogn\hms\leiguverdsja\leiguverdsja.csv")
 PROXY_CSV = Path(r"D:\verdmat-is\data\ops\rent_stock_proxy_fastnums.csv")
 
-MODEL_VERSION = "rent_v1_nan"
+MODEL_VERSION = "rent_v1_reglaR_20260812"   # cc195 A1: cc149-flippið 12.08 (var rent_v1_nan; vörðurinn felldi 16.08–06.09)
 F_MIN, F_MAX = 0.94, 1.06          # stuðuls-vörður (margra mánaða skref rúmast)
 # Hlutlausi punktur drift-mælisins: verðsjáin (birgðamæling) liggur mælt ~3,8 %
 # undir fersku markaðsstigi — eldingin, cc58 KROSSVIDMID §3 (vegið 1,0384,
@@ -101,6 +101,18 @@ def fetch_hms_files() -> bool:
     """Endurnýta harvest-resolverinn (pipelines/opin_gogn/harvest.py) fyrir
     leiguvísitölu + leiguverðsjá EINGÖNGU. False = sótt mistókst (WARN-braut:
     gengið á diskinn; cc19-hash-vöktunin er varnarrásin ef hlekkir hverfa)."""
+    import shutil  # noqa: PLC0415
+    # cc195 A2-vörn: leiguvísitalan er forsenda stigfærslunnar — afrit fyrir sókn, endurheimt
+    # ef nýja skráin les ekki eða ber færri mánuði en sú gamla.
+    vt_backup = None
+    old_max = None
+    if LEIGUVISITALA.exists():
+        try:
+            old_max = str(read_visitala().index.max())
+            vt_backup = LEIGUVISITALA.with_suffix(".csv.pre_fetch")
+            shutil.copy2(LEIGUVISITALA, vt_backup)
+        except Exception as e:
+            log(f"[0] WARN afrit/lestur gömlu leiguvísitölu féll: {type(e).__name__}: {e}")
     try:
         import harvest  # noqa: PLC0415
         man = harvest.load_manifest()
@@ -113,19 +125,41 @@ def fetch_hms_files() -> bool:
                                                     "blob.core.windows.net"])
             url = harvest.pick(cands, hint)
             if not url:
-                log(f"[0] WARN resolver fann engan hlekk fyrir {name} (cc19-mynstrið)")
-                ok = False
-                continue
+                # cc195 A3: hlekkurinn hverfur af HMS-síðunni (cc19-mynstrið, leiguverðsjá
+                # síðan 02.08) — varabraut: síðasti bókaði file_url úr manifestinu ef hann
+                # svarar enn HEAD 200. Bókað sem WARN svo hvarfið sjáist áfram í loggi.
+                prev = (man.get(name) or {}).get("file_url")
+                cl, lm, err = harvest.head_stamp(prev) if prev else (None, None, "no url")
+                if prev and not err:
+                    log(f"[0] WARN resolver fann engan hlekk fyrir {name} (cc19-mynstrið) — "
+                        f"varabraut: manifest-hlekkur svarar (bytes={cl}, Last-Modified={lm})")
+                    url = prev
+                else:
+                    log(f"[0] WARN resolver fann engan hlekk fyrir {name} (cc19-mynstrið); "
+                        f"manifest-hlekkur ónothæfur ({err})")
+                    ok = False
+                    continue
             e = harvest.harvest_file(man, name=name, landing_url=landing, file_url=url,
                                      subdir=subdir, fname=fname, source=source,
                                      cadence=cadence, license_=harvest.HMS_LICENSE)
             if not e.get("local_path"):
                 ok = False
         harvest.save_manifest(man)
-        return ok
     except Exception as e:
         log(f"[0] WARN sótt féll: {type(e).__name__}: {e} — geng á disk-skrárnar")
-        return False
+        ok = False
+    # Vörn: nýja leiguvísitalan verður að lesast og ekki tapa mánuðum
+    if vt_backup is not None:
+        try:
+            new_max = str(read_visitala().index.max())
+            if old_max and new_max < old_max:
+                raise ValueError(f"nýjast {new_max} < áður {old_max}")
+            log(f"[0] leiguvísitala á disk: nýjast {new_max} (áður {old_max})")
+        except Exception as e:
+            log(f"[0] WARN ný leiguvísitala hafnað ({type(e).__name__}: {e}) — gamla endurheimt")
+            shutil.copy2(vt_backup, LEIGUVISITALA)
+            ok = False
+    return ok
 
 
 def read_visitala() -> pd.Series:
