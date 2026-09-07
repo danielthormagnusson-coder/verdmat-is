@@ -88,6 +88,8 @@ DEFAULT_SPACING = 120.0      # seconds between queries (delta-chain politeness)
 STATE_PATH = get_scraper_data_dir() / "lifecycle_sweep_state.json"
 SWEEP_DAILY_BUDGET = 700     # sweep's own trailing-24h request cap (leaves ~300 for delta under §0.5)
 COMBINED_CAP = 950           # sweep + delta trailing-24h hard margin under the §0.5 <1000/24h rule
+RUN_TIME_LIMIT_S = 12 * 3600 # Task Scheduler ExecutionTimeLimit PT12H á verdmat-daily-lifecycle-sweep
+RUN_TIME_MARGIN_S = 600      # cc195 C1: hætta ~10 mín fyrir þakið svo verkið endi með RC 0, ekki 0x8007050B
 RENT_CADENCE_DAYS = 7        # rent = one full lota per week
 SALE_CADENCE_DAYS = 7        # sale = one full round per week, resumed nightly over ~2 days
 WRITE_BACKOFF_S = (2, 8, 30) # cc43: reconnect delays for write_events; 3 retries then raise
@@ -530,6 +532,16 @@ def run_scheduled(conn, dry_run, log=print):
     log("=== scheduled run @ %s | dry_run=%s ===" % (_iso(now), dry_run))
     log("budget=%d requests (sweep_used_24h=%d, delta_24h=%d; caps sweep=%d combined=%d)"
         % (budget, used, delta, SWEEP_DAILY_BUDGET, COMBINED_CAP))
+    # cc195 C1: fjárhagurinn (700) rúmast ekki í 12 klst þakinu á 120 s bili (360) → fyrsta
+    # dag hvers hrings eftir no-op-dag drap Task Scheduler ferlið (0x8007050B). Klippum við
+    # það sem þakið rúmar (mínus svigrúm) svo keyrslan endi sjálf með RC 0; hringurinn heldur
+    # áfram næsta dag eins og áður (ríki vistað per lotu).
+    spacing_eff = max(MIN_SPACING_FLOOR, DEFAULT_SPACING)
+    time_cap = int((RUN_TIME_LIMIT_S - RUN_TIME_MARGIN_S) / spacing_eff)
+    if budget > time_cap:
+        log("budget clipped %d -> %d by run-time cap (%ds limit - %ds margin at %.0fs spacing)"
+            % (budget, time_cap, RUN_TIME_LIMIT_S, RUN_TIME_MARGIN_S, spacing_eff))
+        budget = time_cap
     transport = Transport(spacing=DEFAULT_SPACING)   # clamps up to the 60s floor
 
     def record():
