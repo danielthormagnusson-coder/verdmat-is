@@ -25,9 +25,12 @@
 #
 # Morning report: scraper_data/night_logs/night_YYYYMMDD.log (timestamped, append-only):
 # per mode pages/listings/new high-water/halt_reason + totals. A mode that hits
-# DELTA_MAX_PAGES gets a WARNING line — _delta advances the high-water past unswept
-# pages when capped (pk-desc ordering), so a cap-hit means possible skipped changes
-# that need a manual follow-up run.
+# DELTA_MAX_PAGES gets a FRAMHALD line — since cc201 A1 (2026-09-09) _delta pages by
+# keyset (delta_field asc, pk asc) and the high-water is the LAST FETCHED row, so a
+# cap-hit is a carry-over that the next night resumes from exactly (the fetcher's own
+# "framhald í nótt: síðasta br_dags=X, eign_id=Y, N raðir eftir" line is copied here).
+# Before cc201 the pk-desc ordering + max() high-water SKIPPED everything past the cap
+# (cc199, Akurgerði 37). Automatic re-run on cap (A3) is deliberately not implemented.
 #
 # Exit codes: 0 clean, 1 chain abort (mode failure/halt), 2 pre-flight refusal —
 # readable as Task Scheduler last-result.
@@ -210,11 +213,15 @@ run_mode() {                  # $1 mode, $2 state key, $3 since key
     say "ABORT chain at $mode (halt_reason set) — NO RETRY"
     return 1
   }
-  # cap-hit warning: _delta advances high-water past unswept pages when capped
+  # cap-hit (cc201 A1): the fetcher's cursor already points at the carry-over; copy its
+  # "framhald í nótt" line (last br_dags/eign_id + remaining rows per aggregate) into the
+  # night-log. No manual re-run is needed — the next night resumes from the cursor.
   local pages
   pages=$(echo "$summary" | grep -oE "[0-9]+ pages" | grep -oE "[0-9]+")
   if [ -n "$pages" ] && [ "$pages" -ge $DELTA_MAX_PAGES ]; then
-    say "WARNING: $mode hit the $DELTA_MAX_PAGES-page cap — possible skipped changes past the cap; run the mode again manually and investigate"
+    local carry
+    carry=$(grep -E "framhald í nótt" "$mlog" | tail -1 | sed 's/^ *//')
+    say "FRAMHALD: $mode hit the $DELTA_MAX_PAGES-page cap — ${carry:-<no framhald line in $mlog>}"
   fi
   return 0
 }

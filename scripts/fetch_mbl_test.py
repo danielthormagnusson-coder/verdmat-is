@@ -449,16 +449,17 @@ class TestDeltaNegotiableAndPrime(unittest.TestCase):
         st["delta_sale"]["last_br_dags_seen"] = "2026-06-01T00:00:00+00:00"   # must stay untouched
 
         def handler(q, idx):
-            off = _offset(q)
-            rows = sale_rows([5, 4]) if off == 0 else []
+            # cc201: keyset pages carry no offset — first call serves the page, second is empty
+            rows = sale_rows([4, 5]) if idx == 0 else []
             return FakeResp(200, body({"data": {"fs_fasteign": rows}}))
         conn = mem_conn()
         f = fetcher(FakeSession(handler), conn, state=st, mode="delta-sale-negotiable")
         f.run()
-        # own high-water advanced; plain delta-sale untouched
-        self.assertEqual(st["delta_sale_negotiable"]["last_br_dags_seen"],
-                         max(r["br_dags"] for r in sale_rows([5, 4])))
+        # own high-water advanced to the LAST fetched row (cc201 A1); plain delta-sale untouched
+        self.assertEqual(st["delta_sale_negotiable"]["last_br_dags_seen"], sale_rows([4, 5])[-1]["br_dags"])
+        self.assertEqual(st["delta_sale_negotiable"]["cursor_pk"], 5)
         self.assertEqual(st["delta_sale"]["last_br_dags_seen"], "2026-06-01T00:00:00+00:00")
+        self.assertIsNone(st["delta_sale"]["cursor_pk"])
         # new fetch_kind discriminator, still under the list_page_ prefix (parser-compatible)
         kinds = {r[0] for r in conn.execute("SELECT fetch_kind FROM raw_fetches")}
         self.assertEqual(kinds, {"list_page_sale_negotiable_delta"})
@@ -560,6 +561,143 @@ class TestDeltaNegotiableAndPrime(unittest.TestCase):
         # modes that were NOT previously set get no history entry
         self.assertNotIn("delta_rent_history", loaded)
         os.remove(p)
+
+
+# ── cc201 (2026-09-09): A2 domestic-postfang predicate + A1 keyset cursor in _delta ──
+def _cursor(q):
+    """(since, pk_after) the fetcher put in the where-object (mock stands in for Hasura)."""
+    m = re.search(r'_or:\[\{(\w+):\{_gt:"([^"]+)"\}\},\{\1:\{_eq:"\2"\}, (\w+):\{_gt:(\d+)\}\}\]', q)
+    return m.group(2), int(m.group(4))
+
+
+class HasuraLike:
+    """Keyset-faithful mock of fs_fasteign / fs_fasteign_aggregate over a fixed dataset:
+    rows strictly after (br_dags, eign_id) cursor, ordered (br_dags asc, eign_id asc), 16/page."""
+    def __init__(self, rows):
+        self.rows = sorted(rows, key=lambda r: (r["br_dags"], r["eign_id"]))
+        self.served = []                       # every row served, in order (dup detection)
+        self.agg_calls = 0
+
+    def __call__(self, q, idx):
+        since, pk = _cursor(q)
+        after = [r for r in self.rows if (r["br_dags"], r["eign_id"]) > (since, pk)]
+        if "_aggregate" in q:
+            self.agg_calls += 1
+            return FakeResp(200, body({"data": {"fs_fasteign_aggregate": {"aggregate": {"count": len(after)}}}}))
+        page = after[:fm.PAGE]
+        self.served.extend(page)
+        return FakeResp(200, body({"data": {"fs_fasteign": page}}))
+
+
+def rows_distinct(n, start=1000, day="2026-09-10"):
+    return [{"eign_id": start + i, "verd": 5, "fermetrar": 50, "postfang": 101,
+             "br_dags": "%sT%02d:%02d:00+00:00" % (day, i // 60, i % 60)} for i in range(n)]
+
+
+class TestCc201DeltaCursor(unittest.TestCase):
+
+    def _run(self, mock, state, max_pages, logs=None):
+        conn = mem_conn()
+        f = fm.MblFetcher(FakeSession(mock), conn, state, tmp_state(), mode="delta-sale",
+                          max_pages=max_pages, min_spacing=0, log=(logs.append if logs is not None else silent))
+        f._sleep = lambda *a, **k: None
+        f.run()
+        return f, conn
+
+    # 1) cap: 3-page cap over 5 pages of data -> high-water = last row of page 3, next run
+    #    starts at the first row of page 4; nothing skipped, nothing fetched twice.
+    def test_c1_cap_is_delay_not_loss(self):
+        data = rows_distinct(80)                                   # 5 pages exactly
+        mock = HasuraLike(data)
+        st = fm.default_state()
+        st["delta_sale"]["last_br_dags_seen"] = "2026-09-09T00:00:00+00:00"
+        logs = []
+        f1, c1 = self._run(mock, st, 3, logs)
+        self.assertEqual(f1.stats.pages, 3)
+        self.assertEqual(st["delta_sale"]["last_br_dags_seen"], data[47]["br_dags"])   # last row of page 3
+        self.assertEqual(st["delta_sale"]["cursor_pk"], data[47]["eign_id"])
+        self.assertEqual(st["delta_sale"]["cursor_ts"], data[47]["br_dags"])
+        # cap-hit line names the cursor and the aggregate-sized carry-over (32 rows = pages 4-5)
+        carry = [l for l in logs if "framhald í nótt" in l]
+        self.assertEqual(len(carry), 1)
+        self.assertIn("br_dags=%s, eign_id=%d, 32 raðir eftir" % (data[47]["br_dags"], data[47]["eign_id"]), carry[0])
+        self.assertEqual(mock.agg_calls, 1)
+        self.assertEqual(len(mock.served), 48)
+        # next run (same state on disk semantics: same dict) resumes at row 48
+        f2, c2 = self._run(mock, st, 100)
+        self.assertEqual(f2.stats.pages, 2)
+        self.assertEqual(mock.served[48]["eign_id"], data[48]["eign_id"])
+        self.assertEqual([r["eign_id"] for r in mock.served], [r["eign_id"] for r in data])   # exact, once each
+        self.assertEqual(st["delta_sale"]["last_br_dags_seen"], data[-1]["br_dags"])
+        self.assertEqual(mock.agg_calls, 1)                        # no cap on run 2 -> no aggregate
+
+    # 2) ties: >=16 rows sharing one br_dags across page boundaries -> cursor swallows none, repeats none
+    def test_c2_tied_br_dags_across_pages(self):
+        tie = "2026-09-10T12:00:00+00:00"
+        data = rows_distinct(10) \
+            + [{"eign_id": 5000 + i, "verd": 5, "fermetrar": 50, "postfang": 101, "br_dags": tie} for i in range(40)] \
+            + rows_distinct(7, start=9000, day="2026-09-11")
+        mock = HasuraLike(data)
+        st = fm.default_state()
+        st["delta_sale"]["last_br_dags_seen"] = "2026-09-09T00:00:00+00:00"
+        f, _ = self._run(mock, st, 100)
+        self.assertEqual(f.stats.pages, 4)                                            # 57 rows -> 16,16,16,9
+        self.assertEqual([r["eign_id"] for r in mock.served], [r["eign_id"] for r in mock.rows])
+        self.assertEqual(len({r["eign_id"] for r in mock.served}), 57)
+        # and a cap INSIDE the tie run resumes mid-tie via the pk tie-breaker
+        mock2 = HasuraLike(data)
+        st2 = fm.default_state()
+        st2["delta_sale"]["last_br_dags_seen"] = "2026-09-09T00:00:00+00:00"
+        self._run(mock2, st2, 2)                                                       # stops after row 32 (mid-tie)
+        self.assertEqual(st2["delta_sale"]["last_br_dags_seen"], tie)
+        self.assertEqual(st2["delta_sale"]["cursor_pk"], 5021)
+        self._run(mock2, st2, 100)
+        self.assertEqual([r["eign_id"] for r in mock2.served], [r["eign_id"] for r in mock2.rows])
+
+    # 2b) a re-primed since_key invalidates a stale cursor_pk (cursor_ts mismatch -> pk 0)
+    def test_c2b_stale_cursor_pk_ignored_after_reprime(self):
+        st = fm.default_state()
+        st["delta_sale"].update({"last_br_dags_seen": "2026-09-09T00:00:00+00:00",
+                                 "cursor_pk": 777, "cursor_ts": "2026-09-01T00:00:00+00:00"})
+        sess = FakeSession(lambda q, i: FakeResp(200, body({"data": {"fs_fasteign": []}})))
+        f = fm.MblFetcher(sess, mem_conn(), st, tmp_state(), mode="delta-sale", min_spacing=0, log=silent)
+        f._sleep = lambda *a, **k: None
+        f.run()
+        self.assertEqual(_cursor(sess.queries[0]), ("2026-09-09T00:00:00+00:00", 0))
+        self.assertEqual(st["delta_sale"]["last_br_dags_seen"], "2026-09-09T00:00:00+00:00")   # empty run: unchanged
+
+    # 3) A2: domestic predicate keeps NULL postfang; only the three priced-sale slices carry it;
+    #    the cursor's _or is _and-wrapped so the where-object has ONE top-level _or.
+    def test_c3_a2_domestic_predicate_keeps_null(self):
+        for mode in ("delta-sale", "delta-sale-negotiable"):
+            q = fm.delta_query(fm.MODECFG[mode], "2026-09-09T00:00:00+00:00", 0)
+            self.assertIn("postfang:{_lt:1000}", q)
+            self.assertIn("postfang:{_is_null:true}", q)
+            self.assertIn('_and:[{_or:[{br_dags:{_gt:"2026-09-09T00:00:00+00:00"}}', q)
+            self.assertEqual(q.count("_or:["), 2)                       # cursor (_and-wrapped) + SALE_DOMESTIC
+            self.assertEqual(q.count(", _or:["), 1)                     # exactly ONE top-level _or
+            self.assertIn("order_by:[{br_dags:asc},{eign_id:asc}]", q)
+            self.assertNotIn("offset:", q)
+        qs = fm.seed_query(fm.MODECFG["seed-sale"], 500, 16)
+        self.assertIn("postfang:{_lt:1000}", qs)
+        self.assertIn("postfang:{_is_null:true}", qs)
+        for mode in ("seed-rent", "delta-rent", "delta-rent-negotiable", "seed-sale-negotiable", "seed-rent-negotiable"):
+            cfg = fm.MODECFG[mode]
+            q = fm.delta_query(cfg, "x", 0) if "delta_field" in cfg else fm.seed_query(cfg, 9, 0)
+            self.assertNotIn("postfang:{", q)                            # (field list still selects postfang)
+        # the remaining-count aggregate carries the same where-object
+        qa = fm.delta_remaining_query(fm.MODECFG["delta-sale"], "2026-09-09T00:00:00+00:00", 42)
+        self.assertIn("fs_fasteign_aggregate(where:{_and:[{_or:[{br_dags:{_gt:", qa)
+        self.assertIn("eign_id:{_gt:42}", qa)
+        self.assertIn("postfang:{_is_null:true}", qa)
+        # dry-run delta: no HTTP, no DB, no state
+        conn = mem_conn()
+        sess = FakeSession(lambda q, i: FakeResp(200, b"{}"))
+        f = fetcher(sess, conn, mode="delta-sale", dry_run=True)
+        f.run()
+        self.assertEqual(sess.queries, [])
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM raw_fetches").fetchone()[0], 0)
+        self.assertFalse(os.path.isfile(f.state_path))
 
 
 if __name__ == "__main__":

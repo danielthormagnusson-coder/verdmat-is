@@ -90,11 +90,22 @@ RENT_FIELDS = ("id address normalized_address zipcode title type_id size price r
                "postal_code { postnr baer baer_thgf hverfi landshluti } "
                "promo { seckey }")
 
+# cc201 A2 (2026-09-09): domestic-postfang predicate for the PRICED sale slices (seed-sale,
+# delta-sale, delta-sale-negotiable). Foreign batch listings (postfang >= 1000; 2.504 live on
+# 09.09, a 1.384-row Spanish batch filled the 100-page delta cap on 09.09) are dropped by
+# promote (is_foreign) anyway, so excluding them IN THE QUERY costs nothing downstream and
+# keeps the cap for domestic rows. NULL postfang is kept explicitly (regla 10: NULL never
+# drops silently) — the 09.09 pre-probe measured 0 live NULL-postfang rows, so this branch
+# is a guard, not a population. NOTE: this is a top-level `_or`; any other predicate joined
+# into the same where-object must NOT add a second top-level `_or` (duplicate input-object
+# key = "not a valid graphql query" from Hasura) — see delta_query's `_and` wrapper.
+SALE_DOMESTIC = "_or:[{postfang:{_lt:1000}},{postfang:{_is_null:true}}]"
+
 # mode -> config. draft = the publishable/non-draft predicate (excluded from aggregate).
 MODECFG = {
     "seed-sale":  {"key": "seed_sale", "root": "fs_fasteign", "pk": "eign_id", "fields": SALE_FIELDS,
-                   "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}", "kind": "list_page_sale",
-                   "op": "list_sale"},
+                   "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC,
+                   "kind": "list_page_sale", "op": "list_sale"},
     "seed-rent":  {"key": "seed_rent", "root": "rentals_property", "pk": "id", "fields": RENT_FIELDS,
                    "draft": "price:{_gt:0}, size:{_gt:0}", "kind": "list_page_rent", "op": "list_rent"},
     # supplementary "negotiable" slices: inverted price predicate (price/verd _eq:0). Each
@@ -108,7 +119,8 @@ MODECFG = {
                    "fields": RENT_FIELDS, "draft": "price:{_eq:0}, size:{_gt:0}",
                    "kind": "list_page_rent_negotiable", "op": "seed_rent_negotiable"},
     "delta-sale": {"key": "delta_sale", "root": "fs_fasteign", "pk": "eign_id", "fields": SALE_FIELDS,
-                   "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}", "kind": "list_page_sale",
+                   "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC,
+                   "kind": "list_page_sale",
                    "op": "delta_check_sale", "delta_field": "br_dags", "since_key": "last_br_dags_seen"},
     "delta-rent": {"key": "delta_rent", "root": "rentals_property", "pk": "id", "fields": RENT_FIELDS,
                    "draft": "price:{_gt:0}, size:{_gt:0}", "kind": "list_page_rent",
@@ -119,7 +131,8 @@ MODECFG = {
     # parse_mbl's kind->root mapping picks the blobs up unchanged, with a _delta discriminator
     # so the ledger separates delta pages from seed/re-sweep pages.
     "delta-sale-negotiable": {"key": "delta_sale_negotiable", "root": "fs_fasteign", "pk": "eign_id",
-                   "fields": SALE_FIELDS, "draft": "syna:{_eq:true}, verd:{_eq:0}, fermetrar:{_gt:0}",
+                   "fields": SALE_FIELDS,
+                   "draft": "syna:{_eq:true}, verd:{_eq:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC,
                    "kind": "list_page_sale_negotiable_delta", "op": "delta_check_sale_negotiable",
                    "delta_field": "br_dags", "since_key": "last_br_dags_seen"},
     "delta-rent-negotiable": {"key": "delta_rent_negotiable", "root": "rentals_property", "pk": "id",
@@ -180,10 +193,17 @@ def default_state() -> dict:
         "seed_rent_negotiable": {"frozen_max_id": None, "last_offset": 0, "total_fetched": 0,
                       "completed": False, "universe_pages": None, "last_run_at": None,
                       "last_page_at": None, "halt_reason": None},
-        "delta_sale": {"last_br_dags_seen": None, "last_run_at": None, "halt_reason": None},
-        "delta_rent": {"last_updated_seen": None, "last_run_at": None, "halt_reason": None},
-        "delta_sale_negotiable": {"last_br_dags_seen": None, "last_run_at": None, "halt_reason": None},
-        "delta_rent_negotiable": {"last_updated_seen": None, "last_run_at": None, "halt_reason": None},
+        # cc201 A1: cursor_pk = pk of the LAST fetched row, cursor_ts = the since value it belongs
+        # to. Read only when cursor_ts == the current since_key value (a re-primed since_key
+        # silently invalidates the pk). since_keys themselves are untouched (§6-A.1 rule).
+        "delta_sale": {"last_br_dags_seen": None, "cursor_pk": None, "cursor_ts": None,
+                       "last_run_at": None, "halt_reason": None},
+        "delta_rent": {"last_updated_seen": None, "cursor_pk": None, "cursor_ts": None,
+                       "last_run_at": None, "halt_reason": None},
+        "delta_sale_negotiable": {"last_br_dags_seen": None, "cursor_pk": None, "cursor_ts": None,
+                                  "last_run_at": None, "halt_reason": None},
+        "delta_rent_negotiable": {"last_updated_seen": None, "cursor_pk": None, "cursor_ts": None,
+                                  "last_run_at": None, "halt_reason": None},
         "session_request_count": 0,
     }
 
@@ -232,9 +252,29 @@ def seed_query(cfg, frozen, offset):
             % (cfg["root"], cfg["pk"], frozen, cfg["draft"], cfg["pk"], PAGE, offset, cfg["fields"]))
 
 
-def delta_query(cfg, since, offset):
-    return ('query { %s(where:{%s:{_gt:"%s"}, %s}, order_by:{%s:desc}, limit:%d, offset:%d) { %s } }'
-            % (cfg["root"], cfg["delta_field"], since, cfg["draft"], cfg["pk"], PAGE, offset, cfg["fields"]))
+def delta_where(cfg, since, pk_after):
+    """cc201 A1 keyset cursor: rows strictly after (since, pk_after) in (delta_field, pk) order.
+    pk_after=0 is the run start (every row with delta_field > since; ties AT since with a
+    higher pk are included too — that is the cap-hit-mid-tie safety, never a loss). Wrapped
+    in `_and` because the draft predicate may already carry a top-level `_or` (SALE_DOMESTIC)
+    and a duplicate input-object key is invalid GraphQL."""
+    f, pk = cfg["delta_field"], cfg["pk"]
+    return ('_and:[{_or:[{%s:{_gt:"%s"}},{%s:{_eq:"%s"}, %s:{_gt:%d}}]}], %s'
+            % (f, since, f, since, pk, int(pk_after or 0), cfg["draft"]))
+
+
+def delta_query(cfg, since, pk_after=0):
+    # order_by is the LIST form (Hasura guarantees column precedence only for a list);
+    # asc on the delta field so a page cap leaves a resumable tail, not a skipped head.
+    return ('query { %s(where:{%s}, order_by:[{%s:asc},{%s:asc}], limit:%d) { %s } }'
+            % (cfg["root"], delta_where(cfg, since, pk_after), cfg["delta_field"], cfg["pk"],
+               PAGE, cfg["fields"]))
+
+
+def delta_remaining_query(cfg, since, pk_after):
+    # 1 aggregate request, used ONLY on a cap-hit to size the carry-over in the night-log.
+    return ("query { %s_aggregate(where:{%s}){aggregate{count}} }"
+            % (cfg["root"], delta_where(cfg, since, pk_after)))
 
 
 def max_id_query(cfg):
@@ -415,33 +455,58 @@ class MblFetcher:
         self._active_key = key
         st = self.state[key]
         since = st.get(cfg["since_key"]) or "1970-01-01T00:00:00+00:00"
-        self.log("=== %s (since %s) ===" % (mode, since))
-        offset, pages = 0, 0
-        high = since
-        while pages < self.max_pages:
-            q = delta_query(cfg, since, offset)
+        # cc201 A1: keyset pagination on (delta_field asc, pk asc). The high-water is the
+        # delta_field of the LAST FETCHED row (plus its pk as tie-breaker) — so a page cap is a
+        # DELAY (next run resumes exactly there), not a LOSS (the old pk-desc + max() form
+        # advanced past everything the cap left behind: cc199, Akurgerði 37). The persisted pk
+        # is honoured only if it was written against the current since value.
+        pk_after = st.get("cursor_pk") if st.get("cursor_ts") == since else None
+        cur_ts, cur_pk = since, int(pk_after or 0)
+        self.log("=== %s (since %s, cursor %s=%s) ===" % (mode, since, cfg["pk"], cur_pk))
+        pages, capped = 0, False
+        while True:
+            if pages >= self.max_pages:
+                capped = True
+                break
+            q = delta_query(cfg, cur_ts, cur_pk)
             if self.dry_run:
                 self.log("  [dry-run] %s  ::  %s" % (synthetic_url(cfg["op"], since=since), q[:90] + "..."))
                 break
             if pages > 0:
                 self._sleep(self.min_spacing)
-            status, body, ctype, data = self._gql(q, ctx="%s offset=%d" % (cfg["op"], offset))
+            status, body, ctype, data = self._gql(
+                q, ctx="%s page=%d after=(%s,%s)" % (cfg["op"], pages, cur_ts, cur_pk))
             rows = data["data"][cfg["root"]]
             if not rows:
                 break
             self._record_page(body, ctype, status, cfg["kind"],
                               synthetic_url(cfg["op"], since=since), len(rows))
-            for rrow in rows:
-                v = rrow.get(cfg["delta_field"])
-                if v and (high is None or str(v) > str(high)):
-                    high = v
-            offset += PAGE
             pages += 1
-        st[cfg["since_key"]] = high
+            last = rows[-1]
+            nxt_ts, nxt_pk = last.get(cfg["delta_field"]), last.get(cfg["pk"])
+            if not nxt_ts or nxt_pk is None:
+                # cannot paginate past a NULL key (the where-predicate excludes NULLs, so this
+                # is a schema surprise, not a data case) — keep the last good cursor, stop.
+                self.log("  !! last row of page %d has no (%s, %s) — cursor held at (%s, %s)"
+                         % (pages, cfg["delta_field"], cfg["pk"], cur_ts, cur_pk))
+                break
+            cur_ts, cur_pk = str(nxt_ts), int(nxt_pk)
+        if pages:
+            st[cfg["since_key"]] = cur_ts
+            st["cursor_pk"], st["cursor_ts"] = cur_pk, cur_ts
         st["last_run_at"] = now_iso()
         st["halt_reason"] = None          # clean close clears any stale kill-switch flag —
         self._save()                      # the chain gate trusts this field, so it must tell the truth
-        self.log("  delta done — %d pages, new high-water %s = %s" % (pages, cfg["delta_field"], high))
+        self.log("  delta done — %d pages, new high-water %s = %s" % (pages, cfg["delta_field"], cur_ts))
+        if capped:
+            # A3 (automatic re-run) is deliberately NOT here; the chain logs this line as-is.
+            # State is already saved, so a kill-switch on this one aggregate propagates like
+            # any other (halt_reason set by run(), chain aborts) without losing the cursor.
+            self._sleep(self.min_spacing)
+            _, _, _, dr = self._gql(delta_remaining_query(cfg, cur_ts, cur_pk), ctx="remaining")
+            remaining = dr["data"][cfg["root"] + "_aggregate"]["aggregate"]["count"]
+            self.log("  framhald í nótt: síðasta %s=%s, %s=%s, %s raðir eftir skv. aggregate"
+                     % (cfg["delta_field"], cur_ts, cfg["pk"], cur_pk, remaining))
 
     # ── aggregate-check (1 request, no writes) ──
     def aggregate_check(self):
