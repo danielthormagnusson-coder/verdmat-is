@@ -25,6 +25,8 @@ CLI:
   python fetch_mbl.py --mode seed-rent | delta-sale | delta-rent
   python fetch_mbl.py --mode delta-sale-negotiable | delta-rent-negotiable   # Tilboð slices
   python fetch_mbl.py --mode resume                          # continue in-flight seed/delta
+  python fetch_mbl.py --mode resync-sale --since X --until Y --max-pk Z   # cc204 A4: bounded re-fetch
+                                                             # of a cap-skipped window (own state key)
 
 deps: stdlib + requests + canonicalize_mbl.
 """
@@ -139,12 +141,21 @@ MODECFG = {
                    "fields": RENT_FIELDS, "draft": "price:{_eq:0}, size:{_gt:0}",
                    "kind": "list_page_rent_negotiable_delta", "op": "delta_check_rent_negotiable",
                    "delta_field": "updated", "since_key": "last_updated_seen"},
+    # cc204 A4 (2026-09-10): ONE-OFF bounded re-fetch of a window the pre-cc201 delta cap skipped
+    # (pk-desc + max() high-water, cc199). Same predicate + keyset paging as delta-sale, plus
+    # `br_dags <= until` and `eign_id < max_pk` (everything the cap left BELOW the lowest fetched
+    # pk of that night). OWN state key (resync_sale, per-window cursor) — it NEVER reads or writes
+    # delta_sale.since/cursor. fetch_kind is suffixed so parse/promote/ledger can trace origin
+    # (parse_mbl maps by the list_page_sale prefix, so the blobs flow through unchanged).
+    "resync-sale": {"key": "resync_sale", "root": "fs_fasteign", "pk": "eign_id", "fields": SALE_FIELDS,
+                   "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC,
+                   "kind": "list_page_sale_resync", "op": "resync_sale", "delta_field": "br_dags"},
 }
 
 # --mode choices (kept module-level so tests assert on it without invoking main()/the DB).
 MODE_CHOICES = ["seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable",
                 "delta-sale", "delta-rent", "delta-sale-negotiable", "delta-rent-negotiable",
-                "aggregate-check", "resume"]
+                "aggregate-check", "resume", "resync-sale"]
 
 
 class KillSwitch(RuntimeError):
@@ -204,6 +215,9 @@ def default_state() -> dict:
                                   "last_run_at": None, "halt_reason": None},
         "delta_rent_negotiable": {"last_updated_seen": None, "cursor_pk": None, "cursor_ts": None,
                                   "last_run_at": None, "halt_reason": None},
+        # cc204 A4: per-window resync cursors, keyed "since|until|max_pk". Never consulted by the
+        # delta modes, the chain preflight, prime_delta_since or resume().
+        "resync_sale": {"windows": {}, "last_run_at": None, "halt_reason": None},
         "session_request_count": 0,
     }
 
@@ -234,7 +248,7 @@ def verify_schema(conn) -> bool:
     return {"raw_blobs", "raw_fetches"}.issubset(rows)
 
 
-def synthetic_url(op, offset=None, since=None) -> str:
+def synthetic_url(op, offset=None, since=None, extra=None) -> str:
     # &fields=v2 = selection-generation marker (FIELDS_VERSION) so the enriched/scalar-only
     # blob generation boundary is visible in the raw_fetches ledger (P3 querystring-intent pattern).
     if offset is not None:
@@ -243,6 +257,8 @@ def synthetic_url(op, offset=None, since=None) -> str:
         base = "%s?op=%s&since=%s" % (ENDPOINT, op, since)
     else:
         base = "%s?op=%s" % (ENDPOINT, op)
+    if extra:                             # cc204: window bounds of a resync page (ledger/replay)
+        base += "&" + extra
     return base + "&fields=v2"
 
 
@@ -277,6 +293,39 @@ def delta_remaining_query(cfg, since, pk_after):
             % (cfg["root"], delta_where(cfg, since, pk_after)))
 
 
+def resync_where(cfg, since, pk_after, until, max_pk):
+    """cc204 A4: delta_where (A1 keyset cursor) bounded ABOVE by `delta_field <= until` and
+    `pk < max_pk`. Both bounds are plain top-level keys (delta_where's cursor sits inside `_and`,
+    the draft's `_or` is the only top-level `_or`), so the where-object stays valid Hasura input."""
+    return '%s, %s:{_lte:"%s"}, %s:{_lt:%d}' % (delta_where(cfg, since, pk_after),
+                                                  cfg["delta_field"], until, cfg["pk"], int(max_pk))
+
+
+def resync_query(cfg, since, pk_after, until, max_pk):
+    return ('query { %s(where:{%s}, order_by:[{%s:asc},{%s:asc}], limit:%d) { %s } }'
+            % (cfg["root"], resync_where(cfg, since, pk_after, until, max_pk),
+               cfg["delta_field"], cfg["pk"], PAGE, cfg["fields"]))
+
+
+def resync_window_key(since, until, max_pk):
+    return "%s|%s|%d" % (since, until, int(max_pk))
+
+
+def validate_resync_args(mode, since, until, max_pk):
+    """Pure (no I/O) so tests cover the refusal branches. Returns None or an error string."""
+    if mode != "resync-sale":
+        if since or until or max_pk is not None:
+            return "--since/--until/--max-pk are only valid with --mode resync-sale"
+        return None
+    if not since or not until or max_pk is None:
+        return "--mode resync-sale requires --since, --until and --max-pk"
+    if not (until > since):
+        return "--until must be after --since (ISO-8601 strings compare lexically)"
+    if int(max_pk) <= 0:
+        return "--max-pk must be a positive pk"
+    return None
+
+
 def max_id_query(cfg):
     return ("query { %s(where:{%s}, order_by:{%s:desc}, limit:1) { %s } }"
             % (cfg["root"], cfg["draft"], cfg["pk"], cfg["pk"]))
@@ -288,12 +337,14 @@ AGG_QUERY = ("query { fs_fasteign_aggregate(where:{syna:{_eq:true}}){aggregate{c
 
 class MblFetcher:
     def __init__(self, session, conn, state, state_path, *, mode=None, max_pages=DEFAULT_MAX_PAGES,
-                 min_spacing=DEFAULT_SPACING, dry_run=False, force_restart=False, log=print):
+                 min_spacing=DEFAULT_SPACING, dry_run=False, force_restart=False, log=print,
+                 resync_since=None, resync_until=None, resync_max_pk=None):
         self.s = session
         self.conn = conn
         self.state = state
         self.state_path = state_path
         self.mode = mode
+        self.resync_since, self.resync_until, self.resync_max_pk = resync_since, resync_until, resync_max_pk
         self.max_pages = max_pages
         self.min_spacing = max(MIN_SPACING_FLOOR, float(min_spacing))
         self.dry_run = dry_run
@@ -508,6 +559,77 @@ class MblFetcher:
             self.log("  framhald í nótt: síðasta %s=%s, %s=%s, %s raðir eftir skv. aggregate"
                      % (cfg["delta_field"], cur_ts, cfg["pk"], cur_pk, remaining))
 
+    # ── resync (cc204 A4): bounded keyset walk of ONE cap-skipped window, own state ──
+    def _resync(self, mode):
+        cfg = MODECFG[mode]
+        key = cfg["key"]
+        self._active_key = key
+        since, until, max_pk = self.resync_since, self.resync_until, self.resync_max_pk
+        err = validate_resync_args(mode, since, until, max_pk)
+        if err:
+            raise ValueError(err)
+        max_pk = int(max_pk)
+        top = self.state.setdefault(key, default_state()[key])
+        top.setdefault("windows", {})
+        wkey = resync_window_key(since, until, max_pk)
+        w = top["windows"].setdefault(wkey, {"since": since, "until": until, "max_pk": max_pk,
+                                             "cursor_ts": None, "cursor_pk": None, "pages": 0,
+                                             "rows": 0, "completed": False, "last_run_at": None})
+        if w["completed"] and not self.force_restart:
+            self.log("  resync window %s already completed (%d pages, %d rows) — --force-restart to walk again"
+                     % (wkey, w["pages"], w["rows"]))
+            return
+        if self.force_restart:
+            w.update({"cursor_ts": None, "cursor_pk": None, "pages": 0, "rows": 0, "completed": False})
+        # resume-safe: the persisted cursor is the last fetched row OF THIS WINDOW (same keyset
+        # semantics as _delta); a fresh window starts at (since, 0).
+        cur_ts, cur_pk = (w["cursor_ts"], int(w["cursor_pk"])) if w["cursor_ts"] else (since, 0)
+        extra = "until=%s&maxpk=%d" % (until, max_pk)
+        self.log("=== %s (window %s, cursor %s=%s) ===" % (mode, wkey, cfg["pk"], cur_pk))
+        pages, capped, exhausted = 0, False, False
+        while True:
+            if pages >= self.max_pages:
+                capped = True
+                break
+            q = resync_query(cfg, cur_ts, cur_pk, until, max_pk)
+            if self.dry_run:
+                self.log("  [dry-run] %s  ::  %s" % (synthetic_url(cfg["op"], since=since, extra=extra), q[:90] + "..."))
+                break
+            if pages > 0:
+                self._sleep(self.min_spacing)
+            status, body, ctype, data = self._gql(
+                q, ctx="%s page=%d after=(%s,%s)" % (cfg["op"], pages, cur_ts, cur_pk))
+            rows = data["data"][cfg["root"]]
+            if not rows:
+                exhausted = True
+                break
+            self._record_page(body, ctype, status, cfg["kind"],
+                              synthetic_url(cfg["op"], since=since, extra=extra), len(rows))
+            pages += 1
+            last = rows[-1]
+            nxt_ts, nxt_pk = last.get(cfg["delta_field"]), last.get(cfg["pk"])
+            if not nxt_ts or nxt_pk is None:
+                self.log("  !! last row of page %d has no (%s, %s) — cursor held at (%s, %s)"
+                         % (pages, cfg["delta_field"], cfg["pk"], cur_ts, cur_pk))
+                break
+            cur_ts, cur_pk = str(nxt_ts), int(nxt_pk)
+            w["cursor_ts"], w["cursor_pk"] = cur_ts, cur_pk
+            w["pages"] += 1
+            w["rows"] += len(rows)
+            w["last_run_at"] = now_iso()
+            self._save()                  # per page, like the seed: a kill mid-window loses nothing
+        if exhausted and not self.dry_run:
+            w["completed"] = True
+        w["last_run_at"] = now_iso()
+        top["last_run_at"] = now_iso()
+        top["halt_reason"] = None
+        self._save()
+        self.log("  resync done — %d pages this run (%d total, %d rows), window %s, cursor (%s, %s)"
+                 % (pages, w["pages"], w["rows"], "EXHAUSTED" if exhausted else ("CAPPED" if capped else "stopped"),
+                    cur_ts, cur_pk))
+        if capped:
+            self.log("  framhald: re-run the same --since/--until/--max-pk to continue from the cursor")
+
     # ── aggregate-check (1 request, no writes) ──
     def aggregate_check(self):
         self.log("=== aggregate-check (1 request, no writes) ===")
@@ -554,6 +676,8 @@ class MblFetcher:
             return self._delta(mode)
         if mode == "aggregate-check":
             return self.aggregate_check()
+        if mode == "resync-sale":
+            return self._resync(mode)
         raise ValueError("unknown mode %r" % mode)
 
     def run(self):
@@ -579,7 +703,16 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force-restart", action="store_true")
     ap.add_argument("--state-file", default=DEFAULT_STATE_PATH)
+    # cc204 A4 — resync-sale window bounds (ISO-8601 with offset, as in the night-log high-water
+    # lines; max-pk = lowest pk the capped night fetched, read from its raw blobs).
+    ap.add_argument("--since", default=None)
+    ap.add_argument("--until", default=None)
+    ap.add_argument("--max-pk", type=int, default=None)
     args = ap.parse_args()
+    err = validate_resync_args(args.mode, args.since, args.until, args.max_pk)
+    if err:
+        print("ERROR: " + err)
+        return 1
 
     state = load_state(args.state_file)
     conn = sqlite3.connect(str(get_raw_db_path("mbl")))
@@ -588,7 +721,8 @@ def main():
     session.headers.update({"User-Agent": UA})
     f = MblFetcher(session, conn, state, args.state_file, mode=args.mode, max_pages=args.max_pages,
                    min_spacing=args.min_spacing_sec, dry_run=args.dry_run,
-                   force_restart=args.force_restart)
+                   force_restart=args.force_restart,
+                   resync_since=args.since, resync_until=args.until, resync_max_pk=args.max_pk)
     print("mbl_fetch %s  mode=%s  dry_run=%s  spacing=%.0fs  max_pages=%d"
           % (FETCHER_VERSION, args.mode, args.dry_run, f.min_spacing, args.max_pages))
     try:

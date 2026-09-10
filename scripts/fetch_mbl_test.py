@@ -700,5 +700,163 @@ class TestCc201DeltaCursor(unittest.TestCase):
         self.assertFalse(os.path.isfile(f.state_path))
 
 
+class ResyncHasura(HasuraLike):
+    """HasuraLike that also honours the cc204 resync bounds (br_dags <= until, eign_id < max_pk)."""
+    def __call__(self, q, idx):
+        since, pk = _cursor(q)
+        until = re.search(r'br_dags:\{_lte:"([^"]+)"\}', q).group(1)
+        max_pk = int(re.search(r"eign_id:\{_lt:(\d+)\}", q).group(1))
+        after = [r for r in self.rows if (r["br_dags"], r["eign_id"]) > (since, pk)
+                 and r["br_dags"] <= until and r["eign_id"] < max_pk]
+        page = after[:fm.PAGE]
+        self.served.extend(page)
+        return FakeResp(200, body({"data": {"fs_fasteign": page}}))
+
+
+class TestCc204ResyncSale(unittest.TestCase):
+    SINCE = "2026-09-08T23:00:00+00:00"
+    UNTIL = "2026-09-09T00:39:00+00:00"          # == br_dags of the last in-window row (inclusive bound)
+    MAX_PK = 1500
+
+    def _data(self):
+        inside = rows_distinct(40, start=1000, day="2026-09-09")                     # eign_id 1000..1039, in window
+        above_pk = [dict(r, eign_id=2000 + i) for i, r in enumerate(rows_distinct(5, start=0, day="2026-09-09"))]
+        after_until = rows_distinct(5, start=3000, day="2026-09-10")                 # br_dags past until
+        return inside, inside + above_pk + after_until
+
+    def _state(self):
+        st = fm.default_state()
+        st["delta_sale"].update({"last_br_dags_seen": "2026-09-09T23:37:32.219596+00:00",
+                                 "cursor_pk": 1784700, "cursor_ts": "2026-09-09T23:37:32.219596+00:00"})
+        return st
+
+    def _run(self, mock, state, max_pages, conn=None, logs=None, dry_run=False, force=False):
+        conn = conn or mem_conn()
+        f = fm.MblFetcher(FakeSession(mock), conn, state, tmp_state(), mode="resync-sale", max_pages=max_pages,
+                          min_spacing=0, dry_run=dry_run, force_restart=force,
+                          log=(logs.append if logs is not None else silent),
+                          resync_since=self.SINCE, resync_until=self.UNTIL, resync_max_pk=self.MAX_PK)
+        f._sleep = lambda *a, **k: None
+        f.run()
+        return f, conn
+
+    # r1) bounded window: only rows with since < br_dags <= until AND eign_id < max_pk are served,
+    #     once each; delta_sale state is byte-identical before/after; own state key records the walk;
+    #     ledger rows carry the resync fetch_kind + window bounds in the synthetic url.
+    def test_r1_window_bounds_and_delta_state_untouched(self):
+        inside, data = self._data()
+        mock = ResyncHasura(data)
+        st = self._state()
+        before = json.dumps(st["delta_sale"], sort_keys=True)
+        logs = []
+        f, conn = self._run(mock, st, 100, logs=logs)
+        self.assertEqual([r["eign_id"] for r in mock.served], [r["eign_id"] for r in inside])
+        self.assertEqual(f.stats.pages, 3)                                              # 16+16+8, then an empty page
+        self.assertEqual(json.dumps(st["delta_sale"], sort_keys=True), before)
+        wkey = fm.resync_window_key(self.SINCE, self.UNTIL, self.MAX_PK)
+        w = st["resync_sale"]["windows"][wkey]
+        self.assertTrue(w["completed"])
+        self.assertEqual((w["pages"], w["rows"]), (3, 40))
+        self.assertEqual((w["cursor_ts"], w["cursor_pk"]), (inside[-1]["br_dags"], inside[-1]["eign_id"]))
+        self.assertIsNone(st["resync_sale"]["halt_reason"])
+        kinds = conn.execute("SELECT DISTINCT fetch_kind FROM raw_fetches").fetchall()
+        self.assertEqual(kinds, [("list_page_sale_resync",)])
+        url = conn.execute("SELECT url FROM raw_fetches LIMIT 1").fetchone()[0]
+        self.assertIn("op=resync_sale&since=%s&until=%s&maxpk=%d&fields=v2" % (self.SINCE, self.UNTIL, self.MAX_PK), url)
+        self.assertTrue(any("EXHAUSTED" in l for l in logs))
+        # a second invocation of a completed window makes NO request
+        n = len(mock.served)
+        self._run(mock, st, 100, conn=conn)
+        self.assertEqual(len(mock.served), n)
+
+    # r2) cap inside the window = delay, not loss: re-running the same bounds resumes at the cursor;
+    #     every in-window row exactly once across runs; delta_sale still untouched.
+    def test_r2_cap_then_resume_same_window(self):
+        inside, data = self._data()
+        mock = ResyncHasura(data)
+        st = self._state()
+        before = json.dumps(st["delta_sale"], sort_keys=True)
+        logs = []
+        self._run(mock, st, 2, logs=logs)
+        wkey = fm.resync_window_key(self.SINCE, self.UNTIL, self.MAX_PK)
+        w = st["resync_sale"]["windows"][wkey]
+        self.assertFalse(w["completed"])
+        self.assertEqual((w["pages"], w["rows"], w["cursor_pk"]), (2, 32, inside[31]["eign_id"]))
+        self.assertTrue(any("CAPPED" in l for l in logs) and any("framhald" in l for l in logs))
+        f2, _ = self._run(mock, st, 100)
+        self.assertEqual(f2.stats.pages, 1)
+        self.assertEqual([r["eign_id"] for r in mock.served], [r["eign_id"] for r in inside])
+        self.assertTrue(w["completed"])
+        self.assertEqual((w["pages"], w["rows"]), (3, 40))
+        self.assertEqual(json.dumps(st["delta_sale"], sort_keys=True), before)
+
+    # r3) query shape + argument validation (pure)
+    def test_r3_query_shape_and_arg_validation(self):
+        cfg = fm.MODECFG["resync-sale"]
+        self.assertIn("resync-sale", fm.MODE_CHOICES)
+        self.assertEqual(cfg["kind"], "list_page_sale_resync")
+        self.assertEqual(cfg["draft"], fm.MODECFG["delta-sale"]["draft"])                 # same A2 predicate
+        q = fm.resync_query(cfg, self.SINCE, 0, self.UNTIL, self.MAX_PK)
+        self.assertIn('_and:[{_or:[{br_dags:{_gt:"%s"}}' % self.SINCE, q)
+        self.assertIn('br_dags:{_lte:"%s"}' % self.UNTIL, q)
+        self.assertIn("eign_id:{_lt:%d}" % self.MAX_PK, q)
+        self.assertIn("postfang:{_lt:1000}", q)
+        self.assertEqual(q.count(", _or:["), 1)                                            # ONE top-level _or
+        self.assertIn("order_by:[{br_dags:asc},{eign_id:asc}]", q)
+        self.assertNotIn("offset:", q)
+        self.assertEqual(_cursor(fm.resync_query(cfg, self.SINCE, 1234, self.UNTIL, self.MAX_PK)), (self.SINCE, 1234))
+        v = fm.validate_resync_args
+        self.assertIsNone(v("resync-sale", self.SINCE, self.UNTIL, self.MAX_PK))
+        self.assertIsNotNone(v("resync-sale", None, self.UNTIL, self.MAX_PK))
+        self.assertIsNotNone(v("resync-sale", self.SINCE, None, self.MAX_PK))
+        self.assertIsNotNone(v("resync-sale", self.SINCE, self.UNTIL, None))
+        self.assertIsNotNone(v("resync-sale", self.UNTIL, self.SINCE, self.MAX_PK))          # reversed window
+        self.assertIsNotNone(v("resync-sale", self.SINCE, self.UNTIL, 0))
+        self.assertIsNotNone(v("delta-sale", self.SINCE, None, None))                       # bounds on the wrong mode
+        self.assertIsNone(v("delta-sale", None, None, None))
+
+    # r4) dry-run: no HTTP, no ledger rows, no state file; and forward-compat/in_flight isolation
+    def test_r4_dry_run_and_state_isolation(self):
+        inside, data = self._data()
+        mock = ResyncHasura(data)
+        st = self._state()
+        f, conn = self._run(mock, st, 100, dry_run=True)
+        self.assertEqual(mock.served, [])
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM raw_fetches").fetchone()[0], 0)
+        self.assertFalse(os.path.isfile(f.state_path))
+        # an on-disk state written BEFORE cc204 gains the key on load, since_keys untouched
+        p = tmp_state()
+        old = fm.default_state(); old.pop("resync_sale")
+        old["delta_sale"]["last_br_dags_seen"] = "2026-09-09T23:37:32.219596+00:00"
+        fm.save_state(p, old)
+        loaded = fm.load_state(p)
+        self.assertEqual(loaded["resync_sale"], {"windows": {}, "last_run_at": None, "halt_reason": None})
+        self.assertEqual(loaded["delta_sale"]["last_br_dags_seen"], "2026-09-09T23:37:32.219596+00:00")
+        os.remove(p)
+        # a halted resync never shows up as an in-flight delta/seed mode (resume() ignores it)
+        st2 = fm.default_state()
+        st2["resync_sale"]["halt_reason"] = "HTTP 429"
+        f2 = fetcher(FakeSession(lambda q, i: None), mem_conn(), state=st2, mode="resume")
+        self.assertEqual(f2.in_flight(), [])
+        # kill-switch mid-window: halt_reason lands on resync_sale, delta_sale untouched, cursor kept
+        st3 = self._state()
+        before = json.dumps(st3["delta_sale"], sort_keys=True)
+        calls = {"n": 0}
+        mock2 = ResyncHasura(data)
+        def flaky(q, i):
+            calls["n"] += 1
+            return mock2(q, i) if calls["n"] == 1 else FakeResp(429, b"slow down")
+        f3 = fm.MblFetcher(FakeSession(flaky), mem_conn(), st3, tmp_state(), mode="resync-sale", min_spacing=0,
+                           log=silent, resync_since=self.SINCE, resync_until=self.UNTIL, resync_max_pk=self.MAX_PK)
+        f3._sleep = lambda *a, **k: None
+        with self.assertRaises(fm.KillSwitch):
+            f3.run()
+        self.assertEqual(st3["resync_sale"]["halt_reason"], "HTTP 429")
+        wkey = fm.resync_window_key(self.SINCE, self.UNTIL, self.MAX_PK)
+        self.assertEqual(st3["resync_sale"]["windows"][wkey]["cursor_pk"], inside[15]["eign_id"])
+        self.assertEqual(json.dumps(st3["delta_sale"], sort_keys=True), before)
+        os.remove(f3.state_path)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
