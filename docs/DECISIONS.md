@@ -4,6 +4,41 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-09-27 — Fasteignasölu-röðun: gagnalag LIFANDI (cc213 fasi 1); auglýsingagatið 2025-08…2026-02 er STAÐREYND um safnið (cc212/cc212b)
+
+**Heimildir:** `D:\_audit\cc212_fasteignasalar\SKIL_CC212.md` (próba), `D:\_audit\cc212b_auglysingagat\SKIL_CC212B.md` (gatið + sala-þekja), `D:\_audit\cc213_fasteignasalar\SKIL_CC213.md` (bygging). Ákvarðanir Danna 27.09 eftir rýni cc212 og cc212b.
+
+**1. Auglýsingagatið er raunverulegt og verður ekki fyllt (læst sem staðreynd).** Auglýsinga-id evalue.is eru sama raðnúmer og `eign_id` mbl.is (hæsta id 2025-07: 1.500.946 í báðum). mbl bjó til 17–21 þús. sölu-id á mánuði allt tímabilið. Allar lindir okkar samanlagt (Gagnapakkar/evalue apríl 2026, evalue-endursókn maí 2026 `stage_a`, `scraper.listings`, `parsed_mbl.db`) geyma:
+
+| stofnmánuður auglýsinga | hlutfall mbl-id í safni |
+|---|---|
+| 2024-06 … 2025-04 | 57,0–69,2 % |
+| 2025-05 / 2025-06 | 45,0 / 44,8 % |
+| 2025-07 | 9,8 % |
+| **2025-08 … 2026-02** | **0,5 · 1,0 · 1,4 · 1,4 · 2,5 · 3,4 · 4,7 %** |
+| 2026-03 / 04 / 05 / 06 | 11,6 / 23,7 / 30,8 / 80,9 % |
+| 2026-07 | 94,0 % |
+
+Orsök: evalue hætti að taka inn nýjar mbl-auglýsingar um mitt ár 2025 (aðeins 5,6 % evalue-birtinga dagsettra 2025-08 eru ný id; hitt eru eldri id endurdagsett). Endapunkturinn (`POST evalue.is/fastnum/{fastnum}?/get_fasteign_augl`) er skjalasafn aftur til 2010, ekki lifandi sýn. mbl hard-eyðir afskráðum auglýsingum, svo tímabilið verður ekki endursótt. **Afleiðing:** hver mælir sem parar auglýsingar við sölur 2025-08…2026-05 ber þetta gat í nefnara sínum; pörun sölna per mánuð fer úr 74–75 % (2025-03…06) í 6,8–46,6 % (2025-08…2026-02) og aftur í 77,9–83,8 % (2026-07/08). Mælar sem lesa úr tímabilinu eru taldir upp í SKIL_CC212B §3 (list-to-sale og endurkomur á /markadur, `last_listing_text` paired_stale, `properties.list_price_latest`). Stöðumerki á list-to-sale og paired_stale er sér-örlota **cc214** (verdmat-ai).
+
+**2. Fasteignasölu-röðun — skilgreiningar (regla_version `cc213-v1`):**
+- **eining** = samningur (`FAERSLUNUMER`) í `D:\kaupskra.csv`; íbúð = einhver lína Fjölbýli/Einbýli/Sérbýli; `ONOTHAEFUR_SAMNINGUR = 0`; kaupsamningsdagur = `UTGDAG` (sales_history ber hann ekki); velta = kaupverð samnings óskipt.
+- **nýbygging** = regla 5 (FULLBUID=0 ∨ BYGGAR ≥ ár(UTGDAG)−2); röðun geymd með og án (nýbyggingarofi).
+- **eignun** = auglýsing á fastnum samnings sem skarast [K−180, K+30]: **virk á K fyrst** → síðasta sem hófst ≤ K → fyrsta í (K, K+30]. Lind = `scraper.listings` eingöngu.
+- **stofa** = `scraper.fasteignasala_vorumerki.lykill` — viðhaldin tafla, **sala_id er ekki stofulykill** (Miklaborg 617+844 → einn lykill; lagaheiti ≠ vörumerki).
+- **sali** = nafn úr auglýsingatexta (`scripts/sali_utdrattur.py`, útgáfa `sali_v3`: mynstur + nafnaskrárhlið + netfangsstaðfesting), lykill **nafn + stofa** → `semantic.sali_kort`. **Fjöldi óskiptur** (hver skráður sali fær söluna); **velta skipt jafnt** milli skráðra sala; „þar af sameiginlegar" geymt.
+- **sæti** = deilt (rank: 1, 1, 3).
+- **gólf:** stofa-listi birtist ef ≥ 70 % samninga eru eignaðir stofu og áætluð fullnusta ≥ 90 %, annars `ohaeft`. Sala-listi birtist ef **N / eignaðar-stofu ≥ 0,80**, annars `undir_golfi` (ATH: 0,80 á N / M með M = allir samningar myndi aldrei standast — 70,5 % og 66,8 % — sjá SKIL_CC213 §1; bíður staðfestingar).
+- **fyrirvaralína:** „Salar eru taldir þar sem nafn er skráð í auglýsingu — N af M sölum mánaðarins", M = allir íbúðarsamningar mánaðarins, N = með lesið nafn.
+- **birting:** bráðabirgða 16. M+1 (15. M+1 fullnusta 91,8–97,8 %), endanlegt 1. M+3 (≥ 97,4 %). Ársgluggi = **„síðan júlí 2026"**; mánuðir fyrir 2026-07 eru `ohaeft` til frambúðar (liður 1).
+- **nafnlausar stofur:** Kasa, Hvammur, Fasteignamarkaðurinn og Byggð nefna aldrei sala í auglýsingum (Byggð gefur aðeins netföng). Salar þeirra geta ekki birst; þetta á að standa nafngreint í aðferðafræði.
+
+**3. Gagnalag beitt 27.09** (migration `20260927180000_cc213_fasteignasala_manudur`, rollback prófaður á prod): `scraper.fasteignasala_vorumerki`, `semantic.sali_kort`, `semantic.sali_samheiti`, `scraper.fasteignasala_eignun` (læstar) + `semantic.fasteignasala_nefnarar`, `semantic.fasteignasala_manudur` (anon SELECT; sala-raðir aðeins ef gólfið stenst, með RLS-stefnu). Fyrsta keyrsla 2026-07 og 2026-08: M 764/593, eignað stofu 571/487 (74,7/82,1 %), N 510/418 (89,3/85,8 % af eignuðum). Rás: psycopg2 eins og cc188/cc210 (ekki MCP `apply_migration`), bókað í `schema_migrations`. Keyrsluáætlun 16. kl. 04:30 skrifuð (`scripts/register_fasteignasala_task.ps1`), bíður skráningar úr hækkaðri skel.
+
+**Hvað breytist EKKI:** enginn framendi les töflurnar (fasi 2), evalue-lindin er ekki notuð í röðun, engar eldri töflur snertar.
+
+---
+
 ## 2026-09-07 — Workerinn fær STANDANDI Fable-heimild á Task Scheduler; þrjú verk skráð og sannreynd (cc193)
 
 **Heimild:** `D:\_audit\cc193_scheduler\SKIL_CC193.md` (grunnmæling §1, girðingar §3, sannreynsla §5, tillaga §6). Commit `d227011` (pushað 07.09 með GO). Staðfest af Danna í rýni 07.09: „standandi Fable-heimild workersins með girðingunum eins og bókað".

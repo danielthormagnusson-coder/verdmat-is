@@ -24,7 +24,7 @@
 #   (d) póstumferð/idempotens (email_sent_at) óbreytt.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla')]
+    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur')]
     [string]$Verk,
     [switch]$Thurrt
 )
@@ -68,6 +68,15 @@ $Verkin = @{
         WD      = 'D:\verdmat-is\app'
         Bida    = $true
         BidVerk = 'verdmat-nightly-myndasaekjari'
+    }
+    # cc213: manadarleg rodun fasteignasala (16. hvers manadar). Les kaupskra (sales-refresh 02:30) og
+    # scraper.listings -> bidur naeturkedjunnar. --sjalfvirkt = 2026-07 ... sidasti manudur m/ fullnustu >= 90 %.
+    fasteignasala_manudur = @{
+        Skrift = 'D:\verdmat-is\app\scripts\cc213_fasteignasala_manudur.py'
+        Rok    = @('--sjalfvirkt')
+        Thurr  = @('--sjalfvirkt', '--dry-run')
+        WD     = 'D:\verdmat-is\app'
+        Bida   = $true
     }
 }
 $V = $Verkin[$Verk]

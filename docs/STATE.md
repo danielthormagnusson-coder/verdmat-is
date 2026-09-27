@@ -2558,3 +2558,20 @@ Scraper-merki gegnum `public.ops_scraper_signals()` RPC (LEIÐ 2, sjá DECISIONS
 **Leiðrétting á §5D-1 §7:** spáin „D2-parity-hliðið fellur ef aðeins vélin er færð" **stenst ekki kóðalestur** — `run_parity` ber adapterinn við `public.predictions.real_pred_median` og les `listing_valuations` hvergi. `model_quality_eval.py` var því **ekki snert og þarf ekki að snerta**. Fyrirvari bókaður: hliðið var ekki KEYRT (það skrifar í loggtöflur), svo fyrsta næturkeyrsla með `--parity` er sannprófunin. **Nýtt á backlog:** ekkert hlið sannreynir að **mean**-höfuðið endurgeri spátöfluna — parity-hliðið vaktar enn `median` eitt.
 
 **Bakfyllingin er ÁFRAM Í PÁSU** (`--skip-valuation` ósnert, cc121). Hún fær sér go-blokk. Sjá DECISIONS §5D-4 og GLOSSARY („Miðsækni frystra verðmata").
+
+### VIÐAUKI cc212–cc213 (27.09) — FASTEIGNASÖLU-RÖÐUN: GAGNALAG LIFANDI; AUGLÝSINGAGATIÐ BÓKAÐ SEM STAÐREYND
+
+**Heimildir:** DECISIONS 2026-09-27 (sama dag) + `D:\_audit\cc212_fasteignasalar\SKIL_CC212.md`, `D:\_audit\cc212b_auglysingagat\SKIL_CC212B.md`, `D:\_audit\cc213_fasteignasalar\SKIL_CC213.md`.
+
+**Auglýsingasafnið ber gat sem verður ekki fyllt.** Hlutfall mbl-sölu-id í safni eftir stofnmánuði: 57–69 % (2024-06…2025-04) · **0,5–4,7 % (2025-08…2026-02)** · 94 % (2026-07). Orsök: evalue.is hætti inntöku nýrra mbl-auglýsinga um mitt ár 2025 (id-greining: evalue-id = mbl `eign_id`); mbl hard-eyðir, svo ekki er hægt að endursækja. Pörun þinglýstra íbúðarsamninga við auglýsingu: 74–75 % (2025-03…06) → 6,8–46,6 % (2025-08…2026-02) → 77,9 / 83,8 % (2026-07 / 08). Mælar sem lesa úr tímabilinu: list-to-sale 2025Q3/Q4 á /markadur (traust=true á bjöguðu úrtaki), endurkomur, `last_listing_text` (sölur 2026: 788 paired_stale / 162 paired_fresh), `properties.list_price_latest`. Stöðumerki = **cc214** (sér-örlota, verdmat-ai).
+
+**Gagnalag röðunar beitt og keyrt** (app, migration `20260927180000`): sex töflur (fjórar læstar, `semantic.fasteignasala_nefnarar` + `semantic.fasteignasala_manudur` anon-læsilegar, sala-raðir á bak við gólf með RLS). `scripts/cc213_fasteignasala_manudur.py` + `scripts/sali_utdrattur.py` (+ 12 unittest-próf). Keyrt 2026-07 og 2026-08, idempotent sannreynt:
+
+| M | samningar | eignað stofu | salar lesnir (af eignuðum) | fullnusta | staða |
+|---|---|---|---|---|---|
+| 2026-07 | 764 | 571 (74,7 %) | 510 (89,3 %) | 99,5 % | bráðabirgða |
+| 2026-08 | 593 | 487 (82,1 %) | 418 (85,8 %) | 98,3 % | bráðabirgða |
+
+Top 5 stofur 2026-08 (fjöldi, deilt sæti): Lind 50 · RE/MAX 50 · TORG 28 · Miklaborg 18 · Kasa 14. Vörumerkjakortið sameinaði Miklaborg 617+844 og færði hana úr jafntefli á 14 í 4. sæti.
+
+**OPIÐ:** (1) staðfesta að sala-gólfið sé N / eignaðar-stofu (ekki N / M); (2) skrá `verdmat_fasteignasala_manudur` (16. kl. 04:30) úr hækkaðri skel; (3) 4 salar með `uppruni='netfang_ovarpad'` í `semantic.sali_kort` — einn í 2. sæti veltu 2026-07 — þarf handvirka vörpun fyrir fasa 2; (4) vörumerkjakortið er allt óstaðfest (`stadfest_af` NULL, 134 raðir), m.a. Fasteignalausnir/Heima; (5) fasi 2: kassi á forsíðu, sér-síða per mánuð, aðferðafræði með fjórum nafnlausum stofum.
