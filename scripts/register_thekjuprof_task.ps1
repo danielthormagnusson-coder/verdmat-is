@@ -1,4 +1,4 @@
-# Register-ScheduledTask for verdmat-daily-thekjuprof (cc210 C1). Run from an ELEVATED
+﻿# Register-ScheduledTask for verdmat-daily-thekjuprof (cc210 C1). Run from an ELEVATED
 # PowerShell (admin) if S4U registration is refused. Re-running is idempotent.
 #
 # Schedule:    DAILY 07:15 local (== GMT/UTC on this box) — after the night chain (01:00,

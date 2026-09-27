@@ -24,7 +24,7 @@
 #   (d) póstumferð/idempotens (email_sent_at) óbreytt.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh')]
+    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla')]
     [string]$Verk,
     [switch]$Thurrt
 )
@@ -58,6 +58,16 @@ $Verkin = @{
         Thurr  = @('--dry-run')
         WD     = 'D:\verdmat-is\verdmat-ai'
         Bida   = $true
+    }
+    # cc210: R2-manifest -> scraper.auglysingamyndir (cc117 þrep 4, áður aðeins handkeyrt 11.08).
+    # Bíður myndasækisins (04:45), ekki næturkeðjunnar. Jöfnuður innbyggður í --skrifa (rc 2 = ROLLBACK).
+    myndahledsla = @{
+        Skrift  = 'D:\verdmat-is\app\scripts\hlada_auglysingamyndir.py'
+        Rok     = @('--skrifa')
+        Thurr   = @('--thurrkeyrsla')
+        WD      = 'D:\verdmat-is\app'
+        Bida    = $true
+        BidVerk = 'verdmat-nightly-myndasaekjari'
     }
 }
 $V = $Verkin[$Verk]
@@ -98,6 +108,7 @@ $hefurLykil = -not [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable
 Skrifa ('env: ' + $nEnv + ' lyklar hlaðnir úr ' + $EnvRot + '; ENDURNYJA_LYKILL: ' + $(if ($hefurLykil) { 'til' } else { 'VANTAR' }))
 
 # ── 3. biðhlið á næturkeðjuna ───────────────────────────────────────────────
+if ($V.ContainsKey('BidVerk')) { $BidVerk = $V.BidVerk }   # cc210: biðhlið per verk
 if ($V.Bida) {
     $t0 = Get-Date
     while ($true) {

@@ -146,7 +146,7 @@ def tengja(skrifa: bool):
 # eina umferð á LOTU. `%s` hér að neðan er raða-sniðmátið sem execute_values
 # fyllir — ekki venjuleg stika.
 SQL_INNSETNING = """
-insert into scraper.auglysingamyndir
+insert into scraper.auglysingamyndir as a
   (lind, source_listing_id, image_nr, afbrigdi, listing_id, fastnum,
    agency_name, sha256, r2_lykill, byte_len, breidd, haed, sott_kl)
 values %s
@@ -160,7 +160,15 @@ on conflict (lind, source_listing_id, image_nr, afbrigdi) do update set
   breidd      = excluded.breidd,
   haed        = excluded.haed,
   sott_kl     = excluded.sott_kl
+where (a.listing_id, a.fastnum, a.agency_name, a.sha256, a.r2_lykill, a.byte_len,
+       a.breidd, a.haed, a.sott_kl)
+      is distinct from
+      (excluded.listing_id, excluded.fastnum, excluded.agency_name, excluded.sha256,
+       excluded.r2_lykill, excluded.byte_len, excluded.breidd, excluded.haed, excluded.sott_kl)
 -- utilokad_kl / utilokun_astaeda ERU EKKI HÉR. Sjá reglu 2 í hausnum.
+-- cc210: no-op-vörður — vélin keyrir nú DAGLEGA (verdmat-nightly-myndahledsla) á
+-- öllu manifestinu (~1,1 M slot); án varðarins endurskrifaði hver nótt hverja röð
+-- (WAL/bloat). Jöfnuðurinn (rowcount == einkvæm slot) er óháður verðinum.
 """
 
 

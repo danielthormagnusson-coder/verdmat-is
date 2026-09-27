@@ -45,6 +45,10 @@ import psycopg2.extras
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
 AUDIT = Path(r"D:\_audit\cc180_textathekja")
 LIVE = "last_listing_text"
+# cc210: hámark lifandi raða sem mega bera NÝJAN texta (endursóttar, scraped_at fram) í einu
+# flippi. Mælt 08.–27.09: 1–2 per flipp, s_fram 14. Stærri tala = byggingin sjálf
+# endurskrifaði texta (hreinsun/kóðun) -> FALL, skoða áður en flippað er.
+TEXTI_UPPF_THAK = 50
 NEW = "last_listing_text_new"
 COLS = ("fastnum", "sale_rank", "thinglyst_dagur", "augl_id",
         "lysing_plain", "scraped_at", "augl_dagur", "pair_status")
@@ -216,14 +220,20 @@ def stage(args):
             r = one(cur, f"""
               WITH j AS (
                 SELECT l.fastnum, l.thinglyst_dagur, l.augl_id,
-                       (md5(coalesce(l.lysing_plain,'')) = md5(coalesce(n.lysing_plain,''))) t_ok,
+                       -- cc210: lifandi mbl-röð sem var ENDURSÓTT (scraped_at fram) má bera
+                       -- NÝJAN texta — fasteignasali breytti auglýsingunni á mbl og nýi textinn
+                       -- er rétti textinn (08.09–27.09 felldi ein slík breyting hvert flipp).
+                       -- Breytingin er talin sér (texti_uppf) og þökuð (TEXTI_UPPF_THAK) svo
+                       -- fjöldaendurskrift úr byggingunni sjálfri fellir enn hliðið.
+                       (md5(coalesce(l.lysing_plain,'')) = md5(coalesce(n.lysing_plain,''))
+                        OR (l.pair_status = 'live_listings' AND n.pair_status = 'live_listings'
+                            AND n.scraped_at > l.scraped_at)) t_ok,
+                       (md5(coalesce(l.lysing_plain,'')) <> md5(coalesce(n.lysing_plain,''))) t_breytt,
                        (l.scraped_at IS NOT DISTINCT FROM n.scraped_at
                         -- cc193: lifandi röð ber scraped_at = last_seen_at, sem færist
-                        -- FRAM við hverja sópun sem sér auglýsinguna aftur. Það er
-                        -- ásinn sjálfur, ekki misræmi; textinn verður samt að vera eins.
+                        -- FRAM við hverja sópun sem sér auglýsinguna aftur. Það er ásinn sjálfur.
                         OR (l.pair_status = 'live_listings' AND n.pair_status = 'live_listings'
-                            AND n.scraped_at > l.scraped_at
-                            AND md5(coalesce(l.lysing_plain,'')) = md5(coalesce(n.lysing_plain,'')))) s_ok,
+                            AND n.scraped_at > l.scraped_at)) s_ok,
                        (l.pair_status = 'live_listings' AND n.pair_status = 'live_listings'
                         AND n.scraped_at > l.scraped_at) s_fram,
                        (l.augl_dagur IS NOT DISTINCT FROM n.augl_dagur) d_ok,
@@ -232,13 +242,17 @@ def stage(args):
                 JOIN public.{NEW} n ON n.fastnum=l.fastnum AND n.thinglyst_dagur=l.thinglyst_dagur AND n.augl_id=l.augl_id)
               SELECT count(*), count(*) FILTER (WHERE NOT t_ok), count(*) FILTER (WHERE NOT s_ok),
                      count(*) FILTER (WHERE NOT d_ok), count(*) FILTER (WHERE NOT p_ok),
-                     count(*) FILTER (WHERE s_fram)
+                     count(*) FILTER (WHERE s_fram),
+                     count(*) FILTER (WHERE s_fram AND t_breytt)
               FROM j""")
             n_live = one(cur, f"SELECT count(*) FROM public.{LIVE}")[0]
+            texti_ok = r[6] <= TEXTI_UPPF_THAK
+            p5 = r[1] == 0 and r[2] == 0 and r[3] == 0 and r[4] == 0 and texti_ok
             log(f"PARITY [5] sameiginlegar (fastnum,thinglyst_dagur,augl_id) við lifandi: {r[0]:,} af {n_live:,} lifandi; "
-                f"misræmi texti={r[1]} scraped_at={r[2]} (lifandi færð fram, leyft cc193: {r[5]}) "
-                f"augl_dagur={r[3]} pair_status={r[4]}: {'OK' if r[1]==0 and r[2]==0 and r[3]==0 and r[4]==0 else 'FALL'}")
-            ok &= r[1] == 0 and r[2] == 0 and r[3] == 0 and r[4] == 0
+                f"misræmi texti={r[1]} scraped_at={r[2]} (lifandi færð fram, leyft cc193: {r[5]}; "
+                f"þar af texti uppfærður á mbl, leyft cc210: {r[6]} ≤ þak {TEXTI_UPPF_THAK}) "
+                f"augl_dagur={r[3]} pair_status={r[4]}: {'OK' if p5 else 'FALL'}")
+            ok &= p5
             miss = one(cur, f"""
               SELECT count(*) FROM public.{LIVE} l
               WHERE NOT EXISTS (SELECT 1 FROM public.{NEW} n
