@@ -93,6 +93,10 @@ RUN_TIME_MARGIN_S = 600      # cc195 C1: hætta ~10 mín fyrir þakið svo verki
 RENT_CADENCE_DAYS = 7        # rent = one full lota per week
 SALE_CADENCE_DAYS = 7        # sale = one full round per week, resumed nightly over ~2 days
 WRITE_BACKOFF_S = (2, 8, 30) # cc43: reconnect delays for write_events; 3 retries then raise
+# --- cc210 D2: kort-lota (auðkenni sem BERA „Á sölu"-kort sópuð daglega, á undan restinni) ---
+CARD_MIN_AGE_H = 24          # endurathuga kort-auðkenni aðeins ef síðasta staðfesting (delta last_seen_at
+                             # eða kort-lota) er eldri en þetta — sparar beiðnir á nýstaðfestum
+CARD_ROUND_RESERVE = 120     # beiðnir/dag fráteknar fyrir sölu-hring í gangi/á gjalddaga (rest -> kort)
 POR_SENTINEL = 1             # cc170 C2: promote_mbl.PRICE_SENTINEL — verd=0 ("tilboð")
                              # geymist sem price_amount=1 + is_price_on_request
 
@@ -195,6 +199,24 @@ def load_active_ids(conn, tenure):
             (tenure,),
         )
         return [(str(r[0]), r[1], r[2]) for r in cur.fetchall()]
+
+
+def load_card_ids(conn):
+    """cc210 D2: sölu-rótar auðkenni sem BERA „Á sölu"-kort núna = raðir í
+    scraper.v_eign_virk_auglysing (active, ekki withdrawn, ENGIN confirmed_absent_1, ekki
+    „seld"-heimilisfang) með fastnum (kortið birtist aðeins á /eign/<fastnum>).
+    Returns list of (source_listing_id:str, price_amount, fastnum, last_seen_at), röðuð eftir listing_id."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT l.source_listing_id, l.price_amount, l.fastnum, l.last_seen_at
+            FROM scraper.v_eign_virk_auglysing v
+            JOIN scraper.listings l ON l.listing_id = v.listing_id
+            WHERE v.source = 'mbl' AND v.fastnum IS NOT NULL
+              AND (l.tenure = 'sale' OR l.tegund_raw NOT LIKE 'leiga_type_%%')
+            ORDER BY l.listing_id
+            """)
+        return [(str(r[0]), r[1], r[2], r[3]) for r in cur.fetchall()]
 
 
 def load_prior_absent_set(conn, tenure, before=None):
@@ -547,6 +569,23 @@ def run_scheduled(conn, dry_run, log=print):
     def record():
         state["request_log"].append(_iso(now_utc()))
 
+    # ---- cc210 D2: KORT-LOTA fyrst. Frátekið: leigu-lota ef á gjalddaga (atómísk) + sölu-hringur
+    # í gangi/á gjalddaga (CARD_ROUND_RESERVE). Afgangurinn fer í kort-auðkenni, elsta staðfesting
+    # fyrst. Tveggja-strika reglan er ÓBREYTT: kort-auðkenni bera enga confirmed_absent_1 (skv.
+    # skilgreiningu viewsins), svo kort-lotan skrifar aðeins fyrsta strik eða price_changed;
+    # annað strikið kemur úr næsta sölu-hring eins og áður.
+    reserve = 0
+    if _due(state["rent"].get("last_completed_at"), now, RENT_CADENCE_DAYS):
+        reserve += -(-len(load_active_ids(conn, "rent")) // PAGE)
+    sale_st = state["sale"]
+    if sale_st.get("enabled") and (
+            (sale_st.get("round_file") and sale_st.get("cursor", 0) < sale_st.get("round_total", 0))
+            or _due(sale_st.get("last_completed_at"), now, SALE_CADENCE_DAYS)):
+        reserve += CARD_ROUND_RESERVE
+    card_budget = max(0, budget - reserve)
+    log("[card] budget=%d (heild %d - frátekið %d)" % (card_budget, budget, reserve))
+    budget -= _card_pass(conn, transport, state, card_budget, record, log, dry_run)
+
     # ---- RENT: atomic full lota, weekly ----
     rent = state["rent"]
     if not _due(rent.get("last_completed_at"), now, RENT_CADENCE_DAYS):
@@ -592,6 +631,8 @@ def run_scheduled(conn, dry_run, log=print):
                 log("[sale] round IN FLIGHT — would resume cursor %d/%d, budget=%d"
                     % (sale["cursor"], sale["round_total"], budget))
             else:
+                if not sale.get("card_excluded"):
+                    _exclude_cards_from_round(conn, state, log)
                 log("[sale] resuming round: cursor %d/%d" % (sale["cursor"], sale["round_total"]))
                 _process_sale_chunk(conn, transport, state, budget, record, log)
         elif _due(sale.get("last_completed_at"), now, SALE_CADENCE_DAYS):
@@ -601,12 +642,18 @@ def run_scheduled(conn, dry_run, log=print):
                 log("[sale] round DUE — would freeze %d ids (%d requests, ~%.1f days at %d/day)"
                     % (len(active), need, need / float(SWEEP_DAILY_BUDGET), SWEEP_DAILY_BUDGET))
             else:
+                # cc210 D2: kort-auðkenni eru sópuð daglega í kort-lotunni — hringurinn ber restina
+                # (fastnum-NULL, absent_1-læst sem bíða annars striks, „seld"-heimilisföng).
+                card_set = {r[0] for r in load_card_ids(conn)}
+                n_all = len(active)
+                active = [a for a in active if a[0] not in card_set]
                 rf = get_scraper_data_dir() / ("lifecycle_sale_round_%s.json" % now.strftime("%Y%m%dT%H%M%SZ"))
                 rf.write_text(json.dumps(active), encoding="utf-8")
                 sale.update({"round_file": str(rf), "round_started_at": _iso(now),
-                             "cursor": 0, "round_total": len(active)})
+                             "cursor": 0, "round_total": len(active), "card_excluded": True})
                 save_sweep_state(state)
-                log("[sale] new round: %d ids frozen -> %s" % (len(active), rf.name))
+                log("[sale] new round: %d ids frozen (%d kort-auðkenni í kort-lotu) -> %s"
+                    % (len(active), n_all - len(active), rf.name))
                 _process_sale_chunk(conn, transport, state, budget, record, log)
         else:
             log("[sale] round not due (last=%s)" % sale.get("last_completed_at"))
@@ -615,6 +662,78 @@ def run_scheduled(conn, dry_run, log=print):
         save_sweep_state(state)
     log("requests_this_run=%d" % transport.request_count)
     return 0
+
+
+def _exclude_cards_from_round(conn, state, log):
+    """cc210 D2, einskiptis fyrir hring sem var frystur FYRIR kort-lotuna: óunninn hluti
+    hringsins (frá cursor) er síaður um núverandi kort-auðkenni; unni hlutinn og cursor standa.
+    Ný hringskrá (…_cardx.json) — gamla skráin er ósnert."""
+    sale = state["sale"]
+    rf = Path(sale["round_file"])
+    ids = json.loads(rf.read_text(encoding="utf-8"))
+    cur = sale["cursor"]
+    card_set = {r[0] for r in load_card_ids(conn)}
+    rest = [x for x in ids[cur:] if str(x[0]) not in card_set]
+    new = ids[:cur] + rest
+    nf = rf.with_name(rf.stem + "_cardx.json")
+    nf.write_text(json.dumps(new), encoding="utf-8")
+    log("[sale] cc210: hringur %s síaður um kort-auðkenni: óunnið %d -> %d (total %d -> %d) -> %s"
+        % (rf.name, len(ids) - cur, len(rest), sale["round_total"], len(new), nf.name))
+    sale.update({"round_file": str(nf), "round_total": len(new), "card_excluded": True})
+    save_sweep_state(state)
+
+
+def _card_pass(conn, transport, state, budget, record, log, dry_run):
+    """cc210 D2: sópa kort-berandi auðkenni, elsta staðfesting fyrst, innan `budget` beiðna.
+    Staðfesting = max(listings.last_seen_at [delta sá hana lifandi; syna=true er í forsögninni],
+    síðasta kort-lotu-athugun [state card.checked]). Aðeins auðkenni eldri en CARD_MIN_AGE_H.
+    Vistar ríki per lotu (WU-dráp tapar mest einni lotu). Skilar fjölda beiðna."""
+    card = state.setdefault("card", {"checked": {}})
+    rows = load_card_ids(conn)
+    now = now_utc()
+    live = {r[0] for r in rows}
+    checked = {k: v for k, v in card.get("checked", {}).items() if k in live}
+    card["checked"] = checked
+    floor = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+    def conf(r):
+        c = max([t for t in (r[3], _parse(checked.get(r[0]))) if t is not None], default=None)
+        return c or floor
+
+    min_age = timedelta(hours=CARD_MIN_AGE_H)
+    due = sorted((r for r in rows if now - conf(r) >= min_age), key=conf)
+    ages = sorted((now - conf(r)).total_seconds() / 86400.0 for r in rows if conf(r) > floor)
+    med = ages[len(ages) // 2] if ages else None
+    n_req = min(max(0, budget), -(-len(due) // PAGE))
+    log("[card] kort-auðkenni=%d, á gjalddaga (>%dh)=%d, óstaðfest=%d, miðgildi aldurs staðf.=%s d -> %d beiðnir"
+        % (len(rows), CARD_MIN_AGE_H, len(due), sum(1 for r in rows if conf(r) == floor),
+           ("%.1f" % med) if med is not None else "-", n_req))
+    if dry_run or n_req == 0:
+        return 0
+    prior = load_prior_absent_set(conn, "sale", now)
+    sid = "%s_card_%s" % (SWEEP_VERSION, now.strftime("%Y%m%dT%H%M%SZ"))
+    n_abs = n_pc = 0
+    for b in range(n_req):
+        batch = [(r[0], r[1], r[2]) for r in due[b * PAGE:(b + 1) * PAGE]]
+        obs = now_utc()
+        data = transport.gql(in_query(SLICES["sale"], [x[0] for x in batch])); record()
+        returned = {str(r[SLICES["sale"]["pk"]]): r for r in data["data"][SLICES["sale"]["root"]]}
+        res = classify_batch(SLICES["sale"], batch, returned, prior, sid, "sale", obs)
+        events = results_to_events(res, obs)
+        if events:
+            write_events(conn, events, log=lambda *_a, **_k: None)
+        n_abs += sum(1 for r in res if r["status"] == "absent")
+        n_pc += sum(1 for r in res if r["status"] == "price_changed")
+        for x in batch:
+            checked[x[0]] = _iso(obs)
+        save_sweep_state(state)
+    card["last_run_at"] = _iso(now_utc())
+    card["last_run"] = {"requests": n_req, "ids": min(len(due), n_req * PAGE), "absent": n_abs,
+                        "price_changed": n_pc, "card_n": len(rows), "due_n": len(due)}
+    save_sweep_state(state)
+    log("[card] lokið: %d beiðnir, %d auðkenni, %d horfin (confirmed_absent_1), %d verðbreytingar"
+        % (n_req, card["last_run"]["ids"], n_abs, n_pc))
+    return n_req
 
 
 def _process_sale_chunk(conn, transport, state, budget, record, log):

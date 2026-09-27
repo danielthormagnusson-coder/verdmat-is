@@ -75,6 +75,7 @@ DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
 PROMOTER_VERSION = "listings_append_v2"
 SIZE_TOL = 0.02
 STATE_FILE = "mbl_promote_append_state.json"
+CHANGED_FILE = "mbl_promote_changed_fastnums.json"   # cc210: revalidate-listinn
 
 # íb.nr extractor (BLOKK 4, widened for "- NNN" without grabbing street ranges like "2-4")
 _IBRX = re.compile(r"(?:íb\.?\s*|íbúð\s*|\()\s*(\d{1,4})|\s-\s+(\d{3,4})\b", re.IGNORECASE)
@@ -241,6 +242,19 @@ def save_watermarks(max_ids, n_written):
     tmp.replace(p)
 
 
+def save_changed_fastnums(fastnums):
+    """cc210: fastnum þeirra raða sem þessi keyrsla SETTI INN eða BREYTTI í scraper.listings
+    (RETURNING undir no-op-verðinum). endurnyja_eftir_promote.py les skrána og ógildir
+    /eign-cache-ið (cc207). Yfirskrifuð í hverri keyrslu (atomic) — listinn er ALLTAF síðasta
+    promote, svo gömul skrá getur aldrei borist í nýtt kall án nýs stimpils."""
+    p = get_scraper_data_dir() / CHANGED_FILE
+    d = {"written_at": datetime.now(timezone.utc).isoformat(), "promoter_version": PROMOTER_VERSION,
+         "n": len(fastnums), "fastnums": sorted(fastnums)}
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d), encoding="utf-8")
+    tmp.replace(p)
+
+
 def write_batch(pg, records, log=print):
     # discovered_at: write-once system-discovery stamp = now() at first INSERT.
     # One run timestamp for the whole batch (honest "when WE first recorded it",
@@ -265,10 +279,13 @@ def write_batch(pg, records, log=print):
     # no-op guard: content-identical rows are not physically rewritten (no TOAST/WAL churn)
     guard_l = ", ".join(f"l.{c}" for c in _UPDATE_COLS)
     guard_e = ", ".join(f"EXCLUDED.{c}" for c in _UPDATE_COLS)
-    execute_values(cur,
+    # cc210: RETURNING skilar AÐEINS raunverulega settum/breyttum röðum (no-op-vörðurinn
+    # sleppir hinum) — fetch=True safnar yfir ALLAR síður, ólíkt cur.rowcount.
+    changed = execute_values(cur,
         f"INSERT INTO scraper.listings AS l ({cols}) VALUES %s "
         f"ON CONFLICT (source, source_listing_id) DO UPDATE SET {upd} "
-        f"WHERE ({guard_l}) IS DISTINCT FROM ({guard_e})", rows, page_size=1000)
+        f"WHERE ({guard_l}) IS DISTINCT FROM ({guard_e}) RETURNING l.fastnum", rows,
+        page_size=1000, fetch=True)
     # price history: one observed price per listing (observed_at = listed_at), append-idempotent
     ph = [(r["source"], r["source_listing_id"], r["listed_at"], r["price_amount"], "ISK")
           for r in records if r["listed_at"] is not None and r["price_amount"] is not None]
@@ -278,7 +295,9 @@ def write_batch(pg, records, log=print):
         "ON CONFLICT (source, source_listing_id, observed_at, price_amount) DO NOTHING", ph,
         page_size=1000)
     pg.commit()
-    return len(rows), len(ph)  # rows attempted (cur.rowcount only reflects the last page)
+    changed_fastnums = {int(r[0]) for r in changed if r[0] is not None}
+    # rows attempted (cur.rowcount only reflects the last page) + fastnum raunbreyttra raða
+    return len(rows), len(ph), changed_fastnums
 
 
 def run(limit, dry_run=False, log=print):
@@ -358,11 +377,12 @@ def run(limit, dry_run=False, log=print):
 
         # write in chunks, per-batch progress (a timeout now names its batch)
         nL = nP = 0
+        changed = set()
         n_batches = (len(write_recs) + 1999) // 2000
         for bi, i in enumerate(range(0, len(write_recs), 2000), start=1):
             tb = time.perf_counter()
-            a, b = write_batch(pg, write_recs[i:i + 2000])
-            nL += a; nP += b
+            a, b, fns = write_batch(pg, write_recs[i:i + 2000])
+            nL += a; nP += b; changed |= fns
             log(f"  batch {bi}/{n_batches}: listings={a} price_history={b} "
                 f"({time.perf_counter() - tb:.1f}s)")
         if limit is None:
@@ -371,6 +391,8 @@ def run(limit, dry_run=False, log=print):
                 f"-> {state_path().name}")
         else:
             log("  --limit run: watermark NOT advanced")
+        save_changed_fastnums(changed)
+        log(f"  changed fastnums={len(changed)} -> {CHANGED_FILE} (cc210 revalidate)")
         log(f"  wrote listings rows={nL}, price_history rows={nP} ({time.perf_counter()-t0:.1f}s)")
         return nL, nP, n_units
     finally:

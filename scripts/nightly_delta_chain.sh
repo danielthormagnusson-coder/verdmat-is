@@ -284,6 +284,16 @@ run_promote() {
   return 0
 }
 
+# ── cc210: revalidate eftir promote (best-effort, aldrei fall) ────────────────
+run_revalidate() {
+  local rargs=(--eftir "$CHAIN_START")
+  [ $DRY -eq 1 ] && rargs+=(--dry-run)
+  local out
+  out=$( cd "$APP" && timeout 120 python -m scripts.endurnyja_eftir_promote "${rargs[@]}" 2>&1 | tail -1 )
+  say "${out:-revalidate: <ekkert úttak>}"
+  return 0
+}
+
 # ── extraction: forward 108-field condition extract + frozen valuation (EXTRACTION ÞREP 5) ──
 # Runs after promote (both layers fresh). mbl only — valuation needs a fastnum, which only mbl
 # resolves; myigloo (rent, no fastnum) has no valuation path, so it is intentionally not extracted
@@ -376,6 +386,11 @@ run_mode delta-rent-negotiable delta_rent_negotiable last_updated_seen  || chain
 # tilboðsgatinu). Gated on the four clean fetch modes above; abort-not-retry.
 # Added BLOKK 6 (2026-06-27).
 run_promote || chain_fail "promote" 1
+
+# cc210 (cc207-tillagan): ógilda /eign-cache-ið fyrir fastnum sem promote BREYTTI í nótt
+# (Data Cache TTL 3600 + SWR sýndi annars gamla stöðu í fyrstu heimsókn). BEST-EFFORT:
+# skriftan skilar alltaf 0 og `|| true` ver keðjuna samt — ógilding fellir ALDREI nóttina.
+run_revalidate || true
 
 # forward extraction + frozen valuation (mbl), after both layers are fresh. Added EXTRACTION ÞREP 5.
 run_extract || chain_fail "extraction" 1
