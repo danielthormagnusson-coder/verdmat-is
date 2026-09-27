@@ -1794,3 +1794,10 @@ sé endurvakinn á skoðun einni.
   Spurningin um pakkann er opin hjá Danna. Ef hann berst: R3-hvítlistinn (lína 60) stendur,
   og blöndunin verður að keyra Á EFTIR svo lifandi raðir hverfi ekki (evalue vinnur á
   sama (fastnum, dagur), svo raðir sem pakkinn nær þá yfir skipta um lind — mæla fyrst).
+
+- **FASTEIGNASALA-RÖÐUN (bókað 27.09, cc208):** mánaðarleg röðun (a) fasteignasölustofa og
+  (b) einstakra fasteignasala eftir fjölda þinglýstra sala, veltu (summa kaupverðs),
+  og afleiddum mælum (miðgildi ásett→sölu, TOM). Gagnalind: pörun þinglýstrar sölu
+  við auglýsingu (unit_key + tímagluggi) → sölustofa/sali úr auglýsingalagi;
+  kaupskráin ber ekki fasteignasöluna. Nefnari skylda: hlutfall þinglýstra sala sem
+  pöruðust við auglýsingu í mánuðinum. Framkvæmd EFTIR skýrslukefli.
