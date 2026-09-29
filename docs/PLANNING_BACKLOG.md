@@ -1801,3 +1801,9 @@ sé endurvakinn á skoðun einni.
   við auglýsingu (unit_key + tímagluggi) → sölustofa/sali úr auglýsingalagi;
   kaupskráin ber ekki fasteignasöluna. Nefnari skylda: hlutfall þinglýstra sala sem
   pöruðust við auglýsingu í mánuðinum. Framkvæmd EFTIR skýrslukefli.
+
+- **EIGIÐ KORTAUNDIRLAG ÍSLAND (bókað 29.09, cc215):** Eigið kortaundirlag Ísland
+  (pmtiles á R2) — fjarlægir háð utanaðkomandi flísastefnu; sér-lota. Tilefni: CARTO
+  `light_all` fór að skila „API KEY REQUIRED"-vatnsmerki (Verðvakt 07.09, cc190;
+  nærþjónustukort 29.09, cc215) og öll kort verdmat-ai lesa nú `tile.openstreetmap.org`,
+  sem ber eigin notkunarstefnu (engin SLA, þungri notkun má loka).
