@@ -269,6 +269,7 @@ def main() -> int:
     ap.add_argument("--man", action="append", help="YYYY-MM (má endurtaka)")
     ap.add_argument("--sjalfvirkt", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--prenta", action="store_true", help="prenta Top 10 (fjöldi, með nýb.) stofa og sala per mánuð")
     args = ap.parse_args()
 
     k, data_through, kaupskra_sott = lesa_kaupskra()
@@ -407,6 +408,15 @@ def main() -> int:
                     [key + (r["adili_tegund"], r["adili_lykill"], r["adili_nafn"], r["stofa_lykill"], r["stofa_nafn"],
                             r["maelikvardi"], r["med_nybyggingum"], r["saeti"], r["fjoldi"], r["fjoldi_sameiginl"],
                             r["velta"], r["nyb_fjoldi"], r["nyb_velta"], data_through.date()) for r in rows])
+            if args.prenta and gluggi == "manudur":
+                for teg in ("stofa", "sali"):
+                    r_ = sorted((r for r in rows if r["adili_tegund"] == teg and r["maelikvardi"] == "fjoldi" and r["med_nybyggingum"]),
+                                key=lambda r: (r["saeti"], r["adili_nafn"]))
+                    print()
+                    print(f"  {til} — Top 10 {'stofur' if teg == 'stofa' else 'salar'} (fjöldi, með nýb.):")
+                    for r in r_:
+                        print(f"    {r['saeti']:>2}. {r['adili_nafn']:<34} {r['fjoldi']:>3}  {r['velta']/1e6:>7,.0f} m.kr" +
+                              (f"  ({r['stofa_nafn']})" if teg == "sali" else "") + (f"  [{r['nyb_fjoldi']} nýb.]" if r['nyb_fjoldi'] else ""))
             yfirlit.append(f"  {gluggi:<14} {fra}..{til}: M={n_M} paraðar={n_par} stofa={len(eig)} ({100*len(eig)/max(n_M,1):.1f} %) "
                            f"sali={n_sal} ({100*n_sal/max(len(eig),1):.1f} % af eignuðum; {100*n_sal/max(n_M,1):.1f} % af M) "
                            f"sameig={n_sam} fullnusta={fulln} stada_stofa={stada_stofa} stada_sali={stada_sali} raðir={len(rows)}")
