@@ -3,7 +3,7 @@
 Forskrift: D:\\_audit\\cc212_fasteignasalar\\SKIL_CC212.md §5, cc212b §4–5, ákvarðanir Danna 27.09.
 Keyrsla: 16. hvers mánaðar (kaupskrá 15. dags lesin 02:30). Idempotent per (tímabil, gluggi, regla_version).
 
-Skilgreiningar (regla_version cc213-v1):
+Skilgreiningar (regla_version cc213-v2; v1 + handvirk útilokun sala með sali_kort.virkt = false):
   samningur   = FAERSLUNUMER í D:\\kaupskra.csv; íbúð = einhver lína TEGUND ∈ {Fjölbýli, Einbýli, Sérbýli};
                 ONOTHAEFUR_SAMNINGUR = 0 á öllum línum; kaupsamningsdagur K = UTGDAG; velta = KAUPVERD×1000 óskipt.
   nýbygging   = regla 5: FULLBUID=0 ∨ BYGGAR ≥ ár(K)−2 á einhverri línu.
@@ -45,7 +45,7 @@ import psycopg2.extras
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sali_utdrattur import UTGAFA, Nafnaskra, candidates, extract, fold, personal_emails, same_person  # noqa: E402
 
-REGLA_VERSION = "cc213-v1"
+REGLA_VERSION = "cc213-v2"   # v2 (29.09): handvirk útilokun sala (sali_kort.virkt=false) + staðfest vörumerkjakort
 KAUPSKRA = Path(r"D:\kaupskra.csv")
 PARSED_MBL = Path(r"D:\verdmat-is\scraper_data\parsed_mbl.db")
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
@@ -173,10 +173,13 @@ class SaliKort:
 
     def __init__(self, cur):
         self.cur = cur
-        cur.execute("select sali_id, stofa_lykill, nafn from semantic.sali_kort")
+        cur.execute("select sali_id, stofa_lykill, nafn, virkt from semantic.sali_kort")
         self.kort: dict[str, list[tuple[int, str]]] = {}
-        for sid, st, n in cur.fetchall():
+        self.ovirkir: set[int] = set()     # handvirkt útilokaðir (rýni): sölur telja hjá stofu, ekki á sala-lista
+        for sid, st, n, virkt in cur.fetchall():
             self.kort.setdefault(st, []).append((sid, n))
+            if not virkt:
+                self.ovirkir.add(sid)
         cur.execute("select stofa_lykill, tegund, samheiti, sali_id from semantic.sali_samheiti")
         self.sam = {(r[0], r[1], r[2]): r[3] for r in cur.fetchall()}
         self.n_nyir = self.n_sam = 0
@@ -287,6 +290,7 @@ def main() -> int:
     cur = conn.cursor()
     try:
         cur.execute("SET TRANSACTION READ WRITE")
+        cur.execute("SET LOCAL statement_timeout = '15min'")   # pooler-sjálfgildið féll á listings-lestri undir álagi (29.09)
         a = lesa_listings(cur)
         listings_snapshot = a.updated_at.max()
         vm, n_vm = vorumerki(cur, a)
@@ -325,6 +329,11 @@ def main() -> int:
                     salar.append([sk.id_netfang(st, a_ix.at[int(lid), "dealer_email"], skra)]); upp.append("dealer_email")
                 else:
                     salar.append([]); upp.append(None)
+            n_util = sum(1 for l in salar if any(x in sk.ovirkir for x in l))
+            salar = [[x for x in l if x not in sk.ovirkir] for l in salar]
+            upp = [u if l else None for u, l in zip(upp, salar)]
+            if n_util:
+                print(f"  {M}: {n_util} eignaðar sölur báru útilokaðan sala (telja hjá stofu)")
             e["salar"] = salar; e["sali_uppruni"] = upp
             e["fullnusta"] = fullnusta(c_all, M, data_through)
             eignad_man[M] = e
