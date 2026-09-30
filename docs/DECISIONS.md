@@ -4,6 +4,26 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-09-30 — Stöðumerki í stað tölu þar sem nefnari hélt ekki; bráðabirgðaregla vísitölunnar er GÖGN; dagsetning innan-breytinga með id-röð (cc218 fasi A)
+
+**Heimildir:** `D:\_audit\cc218_september\SKIL_CC218_A.md` (allar tölur þaðan; skriftur og úttak í sömu möppu). Ákvarðanir Danna 30.09.2026. verdmat-ai commit `46f39c9` (ópushað við bókun).
+
+**1. Auglýsingagatið fær STÖÐUMERKI, ekki tölu (áður bókað sem cc214).** Traustreglan n ≥ 300 á pörunarröð /markadur mældi fjölda en ekki þekju: 2025Q3 bar 1.374 pör (þekja 52 %, á viðmiði) og var samt úrtak sem hallar, því loturnar „enduðu" þegar inntaka evalue hætti. Hver röð í `content/markadur/fastgreiningar.ts` ber nú `stada` (`traust` / `fa_por` / `urtak_hallar`) og `thekja`; kaupverð/ásett frá **2025Q3** og endurkomur frá **2025** eru `urtak_hallar` og birtast hvergi sem tala (graf, skoðun, Púls, agent-verkfæri). Reglan er í `scripts/reikna_markadsgreiningar.mjs`; orðalag á einum stað, `config/auglysingagat.ts`. Söluyfirlit eignar merkir snapshot-verð (`list_price_latest`, apríl 2026) og `paired_stale`-spjöld berum orðum (6.301 raðir / 5.781 eign; 1.781 raðir með sölu á veika bilinu 2025-07…2026-05).
+
+**2. Bráðabirgðaregla endursöluvísitölunnar (regla_version `cc218-v1`):** `bradabirgda = NOT (fullnusta ≥ 90 % OG fjórðungur liðinn)`. Staðan er skrifuð við hleðslu í `public.repeat_sale_index_stada` (migration `20260930140000_cc218_visitala_stada`, beitt 30.09, additiv: ný tafla + dálkurinn `bradabirgda` aftast í `repeat_sale_index_main_pooled` og `v_repeat_sale_index`) og lesin á EINUM stað í framenda (`visitalaBradabirgda`). Fyrri regla (pör < 300) stendur sem seinni hluti. Rök: með ferskri kaupskrá ber 2026Q3 950 pör 30.09 þótt áætluð fullnusta fjórðungsins sé 87,4 % og september 65,2 % (bil 52,2–76,8 %). Fullnusta = aðferð cc212/cc213 (miðgildi 12 þroskaðra mánaða á sama fjarlægðarpunkti).
+
+**3. Mánaðarhleðsla vísitölunnar = `build_repeat_sale_index_cc143.py --labels live --sales kaupskra` → `verdmat-ai/scripts/cc218_visitala_flip.py`** (sex hlið, afrit `repeat_sale_index_pre_<tag>`, rollback). Lifandi taflan stóð á byggingu 29.05 (frosin pör til 18.04, merking fyrir reglu R). Nýja serían víkur +0,49 % að stigi að meðaltali (hámark 1,03 %), ársbreyting ±0,3 pp; 2026Q2 les −2,99 % á 962 pörum (var −1,99 % á 145). **Hleðslan fer ALDREI á undan framenda sem les `bradabirgda`.** Hún snertir líka /eign T5 („Verðþróun svæðis") og `/api/backproj`; APT_STANDARD-hólfin hverfa af segment-lista (13 pör undir reglu R). **F2-akkerið er óháð:** `valuation_tiers.prior_*` og comps lesa `D:\cc143\`-artifactið, ekki þessa töflu.
+
+**4. Verðbreytingar INNAN auglýsingar dagsetjast með id-röð `listing_price_history`.** Fyrsta verðsöguröð auglýsingar er sett inn í sama promote og `listings.created_at`, svo `id` er einhalla í innsetningartíma og seinni raðir svigast milli nágranna. Falspróf: 209/209 innan 1 dags gegn athuganaskrá; 93 % innan 3 daga gegn sópunaratburðum. Gefur 499 innan-breytingar á móti 252 í `semantic.v_verdvakt_breytingar`. **Ákvörðun:** greining mánaðarskýrslunnar notar aðferðina; lifandi /verdvaktin ber stöðulínuna „Mæling í endurskoðun — telur hluta breytinga" (`config/verdvakt.ts` `VERDVAKT_STODULINA`) þar til **cc219** flytur aðferðina í MV-ið.
+
+**5. Lækkunartíðni í kohortgreiningu: afskráning er ÚTKOMA, ekki ritskoðun.** Þrjár útkomur (lækkun / útganga án lækkunar / enn á sölu); fyrirsagnartala = 60 daga hlutfall á einingum sem náðu 60 dögum (n = 1.066); Aalen–Johansen gefur nákvæmlega sömu tölu á því mengi. Kaplan–Meier með útgöngu ritskoðaða svarar annarri spurningu („ef eignin er enn á sölu") og fer ekki í fyrirsögn. Engin 90 daga fyrirsagnartala (56 í áhættu).
+
+**6. Fasteignasölur:** mánuður sem er hafinn en ekki birtur ber stöðumerki með birtingardegi (16. M+1), ekki tölur.
+
+**Hvað breytist EKKI:** verðmatslíkan, predictions, valuation_tiers, comps, F2-akkeri, gagnalag Verðvaktarinnar (MV-in óbreytt), fasteignasölu-gagnalagið.
+
+---
+
 ## 2026-09-27 — Fasteignasölu-röðun: gagnalag LIFANDI (cc213 fasi 1); auglýsingagatið 2025-08…2026-02 er STAÐREYND um safnið (cc212/cc212b)
 
 **Heimildir:** `D:\_audit\cc212_fasteignasalar\SKIL_CC212.md` (próba), `D:\_audit\cc212b_auglysingagat\SKIL_CC212B.md` (gatið + sala-þekja), `D:\_audit\cc213_fasteignasalar\SKIL_CC213.md` (bygging). Ákvarðanir Danna 27.09 eftir rýni cc212 og cc212b.
