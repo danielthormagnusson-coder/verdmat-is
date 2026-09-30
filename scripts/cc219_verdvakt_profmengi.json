@@ -1,0 +1,10 @@
+{
+  "lysing": "cc219: fimm breytingar sem AÐEINS Verðvaktin v1 taldi (SKIL_CC219_1 §3). Nýja verðið sást aldrei í okkar eigin hrá-sóknum (4) eða dagsetningin var 10 d frá athugun (1). v2 dagsetur aðeins breytingar sem eru í verðsögunni; væntanleg útkoma skráð per tilvik.",
+  "tilvik": [
+    {"source_listing_id": "1699332", "fyrra_verd": 89000000, "nytt_verd": 79000000, "v1": "innan (sópun)", "v2_vaent": "ekki talin — nýja verðið hvorki í verðsögu né hrá-sóknum"},
+    {"source_listing_id": "1695243", "fyrra_verd": 40900000, "nytt_verd": 37900000, "v1": "innan (sópun)", "v2_vaent": "ekki talin — nýja verðið hvorki í verðsögu né hrá-sóknum"},
+    {"source_listing_id": "1696130", "fyrra_verd": 112000000, "nytt_verd": 11200000, "v1": "innan (sópun), grunur_villa", "v2_vaent": "ekki talin — tugfaldavilla, ekki í verðsögu"},
+    {"source_listing_id": "1657233", "fyrra_verd": 30500000, "nytt_verd": 29900000, "v1": "innan (sópun)", "v2_vaent": "ekki talin — nýja verðið hvorki í verðsögu né hrá-sóknum"},
+    {"source_listing_id": "1722075", "fyrra_verd": 62500000, "nytt_verd": 59900000, "v1": "innan, dags. 24.08", "v2_vaent": "talin EF verðsagan ber parið samliggjandi, annars ekki; nýja verðið sást fyrst 14.08"}
+  ]
+}
