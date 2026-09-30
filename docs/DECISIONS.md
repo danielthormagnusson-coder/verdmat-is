@@ -22,6 +22,12 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 **Hvað breytist EKKI:** verðmatslíkan, predictions, valuation_tiers, comps, F2-akkeri, gagnalag Verðvaktarinnar (MV-in óbreytt), fasteignasölu-gagnalagið.
 
+**VIÐBÓT 2026-09-30 (GO Danni) — PUSHAÐ OG FLIPPAÐ.** verdmat-ai `c0d6706..46f39c9` (ber cc217 `b0ee528`), Vercel `dpl_CR4U4Zn549c5xQFG8mJouoKg7kW9` READY; app `f13613b..02d454d`. Flipp keyrt eftir deploy kl. 13:49 UTC: 2.378 raðir, 4 stöðuraðir, hlið 6/6, afrit `public.repeat_sale_index_pre_cc218` (2.673 raðir, anon 401). Live: höfuðtala vísitölunnar **−3,0 % til 2026Q2** (962 pör, endanlegur); **2026Q3 −3,5 % á 950 pörum er BRÁÐABIRGÐA** (fullnusta 87,4 %, fjórðungur ekki liðinn) og birtist aðeins sem stöðulína.
+
+**T5-breytingin er AÐFERÐ, ekki markaður (bókað að ákvörðun Danna).** Línan „Verðþróun svæðis" á eignasíðum án verðmats les hólf vísitölunnar beint. Við flippið hreyfðust hólfatölurnar af þremur aðferðaástæðum, engri markaðsástæðu: (1) hólfin eru nú merkt með lifandi tegundaflokkun (regla R) í stað flokkunar frá því fyrir 06.08; (2) sölulindin er fersk kaupskrá í stað para sem voru frosin 18.04, svo samanburðarfjórðungurinn færðist úr 2025F1→2026F1 í 2025F2→2026F2; (3) bráðabirgðafjórðungur er aldrei notaður. Mælt fyrir og eftir á lifandi síðum (9 hólf, `s03_live_t5_*.json`, öll == forspá `a2_04_t5_spa.json`): einbýli á landsbyggð −4,0 % → +0,8 % · íbúð á hæð á landsbyggð +0,3 % → −3,4 % · einbýli hbsv-nágrenni +1,3 % → −0,4 % · parhús hbsv-nágrenni −7,5 % → −8,3 % · íbúð á hæð Reykjavík −4,4 % → −3,3 % · raðhús á landsbyggð og einbýli í Reykjavík fá tölu í fyrsta sinn (+1,9 % / −3,6 %) · APT_STANDARD-hólf missa tölu (13 pör undir reglu R). T5-eignir með tölu: 950 → 1.120 af 2.970. **Þetta eru þunn hólf; hreyfinguna má hvergi lesa sem verðþróun milli mælinga.** F1-merkið („Framreiknað til …"), comps-neðanmál og verðmöt óbreytt á fjórum prófeignum — F2-akkerið les ekki þessa töflu. Dagsett lína á aðferðafræðisíðu (verdmat-ai, bíður push).
+
+**Ákvarðanir fyrir fasa C (Danni 30.09):** lækkun→sala fer inn með BÁÐUM myndum (til 31.08 og til 29.09 með bráðabirgðamerki), engin fyrirsögn; stofutaflan fer EKKI í skýrslu (SKIL eingöngu); Verðvaktar-kaflinn les úr cc219-laginu þegar það er komið — fasi C bíður cc219 fasa 2.
+
 ---
 
 ## 2026-09-27 — Fasteignasölu-röðun: gagnalag LIFANDI (cc213 fasi 1); auglýsingagatið 2025-08…2026-02 er STAÐREYND um safnið (cc212/cc212b)
