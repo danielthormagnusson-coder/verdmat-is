@@ -4,6 +4,24 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-09 — /nybyggingar gagnalag: verkefni = landeign (+ staðfest slóð), nýbygging = regla 5 ∨ cc219-v2, Y/X með nefnurum (cc224 fasi 1)
+
+**Heimildir:** `D:\_audit\cc224_nybyggingar\SKIL_CC224_0.md` (§7) og `SKIL_CC224_1.md` (ákvarðanir Danna 09.10, tölur fasa 1). Engin Fable-/API-köll.
+
+**1. Skilgreining (cc224-v1) — sú sem cc223-backlog segir að Verðvaktin og röðunin samræmist við.** Eining er nýbygging = íbúð skv. reglu 7 (hvítlisti tegunda, ekki sumarhús) ∧ (FULLBUID=0 ∨ BYGGAR ≥ ár−2 ∨ (byggingarstig B0–B3 ∧ matsstig 0–6)). Aðferðafræðitexti: „nýbygging = fullbúin innan tveggja ára EÐA í byggingu skv. auglýsingu/HMS".
+
+**2. Verkefni = landeign, sameinuð aðeins um STAÐFESTA verkefnisslóð ∧ sameiginlega götu** (`semantic.nybygging_slodir`, handstaðfest af Danna). Óstaðfest slóð birtist aldrei og sameinar aldrei. `verkefni_id` = lægsta landeign_nr hópsins.
+
+**3. Y = íbúðir á landeignum verkefnisins byggðar ≥ ár−3 (2023) eða innan skilgreiningar; eldri hús á sömu lóð ekki talin.** Óskipt fastnúmer (≥3 ólíkar auglýstar stærðir ∧ HMS-flatarmál ≥ 2× miðgildi auglýstrar stærðar) telur max(1, auglýstar einingar).
+
+**4. X = þinglýstur samningur ONOTHAEFUR=0 (regla 2, eingöngu) frá 2021-01-01; magnsala (samningur > 1 fastnr) talin í X, merkt, utan kr/m².** kr/m² undir 100 þús. og ásett verð undir 1 m.kr. = villa/leiga, utan tölfræði.
+
+**5. Auglýsingar, stofur, lækkanir og „síðasta virkni" telja aðeins á óseldri einingu eða fyrir fyrstu sölu hennar** — endursala er ekki virkni verkefnisins. Röðun: uppselt neðst, síðasta virkni, verkefni_id.
+
+**6. Gólf: Y ≥ 4 ∧ (X ≥ 1 ∨ virk auglýsing) ∧ ≥ 1 eining innan skilgreiningar.** Fyrsta keyrsla (09.10): 322 verkefni, ΣY 7.484, ΣX 3.975. Endurskoðunarslóð: `semantic.nybygging_keyrslur` (nefnarar + md5, endurtekjanleg).
+
+---
+
 ## 2026-10-09 — Nýbyggingarofi þrístaða (Allt / Án / Aðeins) á /verdvaktin og /fasteignasolur; gólf per stað; tvær skilgreiningar halda sér (cc223)
 
 **Heimildir:** `D:\_audit\cc223_nybyggingarofi\SKIL_CC223.md` (allar tölur þaðan). Ákvarðanir Danna 09.10.2026.
