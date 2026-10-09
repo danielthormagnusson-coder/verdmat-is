@@ -1,15 +1,21 @@
-"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v1).
+"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v2).
 
   python scripts/cc224_nybygging_verkefni.py --dryrun [--ut DIR] [--slodir-tillaga CSV]
   python scripts/cc224_nybygging_verkefni.py --skrifa [--ut DIR]
+  python scripts/cc224_nybygging_verkefni.py --lesa-slodir CSV [--nei slod,slod] [--athugasemd TEXTI]
 
 --dryrun   reiknar og skrifar verkefni.csv/einingar.csv/samantekt.txt í --ut; ekkert skrifað í gagnagrunn.
 --skrifa   sama + skrifar útgáfuna í einni færslu (DELETE útgáfu → INSERT) og eina röð í nybygging_keyrslur.
 --slodir-tillaga  (aðeins --dryrun) les slodir_ryni.csv og notar tillaga = já sem staðfest — SPÁ um áhrif
            staðfestingar, aldrei skrifuð.
+--lesa-slodir  les slodir_ryni.csv inn í semantic.nybygging_slodir (stadfest-dálkur ef fylltur, annars tillaga;
+           --nei snýr tilteknum slóðum í nei). Já-slóð fer á allar landeignir þar sem hún stendur í auglýsingatexta
+           (utvikka_slodir); nei-slóð á landeign CSV-raðarinnar. Endurkeyrsla skiptir töflunni út í heild.
 
-Skilgreining (ákvörðun Danna 09.10.2026, SKIL_CC224_1.md §3):
-  eining innan skilgreiningar = íbúð (regla 7) ∧ (FULLBUID=0 ∨ BYGGAR ≥ ár−2 ∨ (byggingarstig B0–B3 ∧ matsstig 0–6))
+Skilgreining (ákvörðun Danna 09.10.2026, SKIL_CC224_1.md §3 + §5 aldursvörn):
+  eining innan skilgreiningar = íbúð (regla 7) ∧ ((FULLBUID=0 ∧ (BYGGAR ≥ ár−3 ∨ BYGGAR óskráð)) ∨ BYGGAR ≥ ár−2
+                                ∨ (byggingarstig B0–B3 ∧ matsstig 0–6))
+  (cc224-v1 dæmdi FULLBUID=0 óháð aldri → 27 gólfverkefni eingöngu úr eldri húsum; v2 = aldursvörn)
   Y = íbúðir á landeignum verkefnisins byggðar ≥ ár−3 eða innan skilgreiningar (eldri hús á sömu lóð ekki talin);
       óskipt fastnúmer (≥3 ólíkar auglýstar stærðir) telur max(1, auglýstar einingar)
   X = einingar með þinglýstum samningi ONOTHAEFUR=0 (regla 2, eingöngu) frá SALA_FRA; magnsala = samningur > 1 fastnr,
@@ -35,13 +41,13 @@ from psycopg2.extras import execute_values
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-UTGAFA = "cc224-v1"
+UTGAFA = "cc224-v2"
 SALA_FRA = dt.date(2021, 1, 1)
 AR = dt.date.today().year
 BYGGAR_SKILGR = AR - 2          # „fullbúin innan tveggja ára"
 BYGGAR_Y = AR - 3               # Y: byggð ≥ 2023 (2026)
 IBUD = ('Íbúð', 'Íbúð á hæð', 'Íbúð í kjallara', 'Íbúð í risi', 'Einbýlishús', 'Raðhús', 'Parhús')  # regla 7 (hvítlisti)
-SKILGREINING = (f"íbúð (regla 7: {', '.join(IBUD)}; ekki sumarhús) ∧ (FULLBUID=0 ∨ BYGGAR ≥ {BYGGAR_SKILGR} ∨ "
+SKILGREINING = (f"íbúð (regla 7: {', '.join(IBUD)}; ekki sumarhús) ∧ ((FULLBUID=0 ∧ (BYGGAR ≥ {BYGGAR_Y} ∨ BYGGAR óskráð)) ∨ BYGGAR ≥ {BYGGAR_SKILGR} ∨ "
                 f"(byggingarstig B0–B3 ∧ matsstig 0–6)); Y = byggð ≥ {BYGGAR_Y} ∨ innan skilgr.; "
                 f"X = ONOTHAEFUR=0 frá {SALA_FRA}; magnsala = samningur > 1 fastnr; "
                 f"gólf Y ≥ 4 ∧ (X ≥ 1 ∨ virk augl.); sameining = staðfest slóð ∧ sameiginleg gata")
@@ -70,7 +76,8 @@ def lesa(c):
     cur = c.cursor()
     cur.execute("SET TRANSACTION READ ONLY")
     cur.execute("SET LOCAL statement_timeout = '600s'")
-    skilgr_sql = (f"(p.fullbuid = 0 or p.byggar >= {BYGGAR_SKILGR} "
+    # aldursvörn (Danni 09.10): FULLBUID=0 telur aðeins ef byggár ≥ ár−3 eða óskráð (NULL/0)
+    skilgr_sql = (f"((p.fullbuid = 0 and coalesce(nullif(p.byggar, 0), 9999) >= {BYGGAR_Y}) or p.byggar >= {BYGGAR_SKILGR} "
                   f"or (p.byggingarstig in ('B0','B1','B2','B3') and p.matsstig ~ '^[0-6]$'))")
     ibud_sql = "(p.tegund_raw = any(%(ibud)s) and coalesce(p.unit_family,'') <> 'summerhouse' and not coalesce(p.deregistered,false))"
     prm = dict(ibud=list(IBUD))
@@ -102,7 +109,7 @@ def lesa(c):
          where fastnum = any(%(fn)s) and not coalesce(grunsamleg,false) and not coalesce(grunur_villa,false)""",
                      c, params=dict(fn=fn))
     VM = pd.read_sql("select sala_id, lykill, birtingarheiti from scraper.fasteignasala_vorumerki", c)
-    SL = pd.read_sql("select landeign_nr, slod from semantic.nybygging_slodir where stadfest", c)
+    SL = pd.read_sql("select landeign_nr, slod from semantic.nybygging_slodir where stadfest order by landeign_nr, slod", c)
     cur.execute("select max(thinglystdags) from public.sales_history"); data_through = cur.fetchone()[0]
     cur.execute("select max(last_seen_at) from scraper.listings where tenure='sale'"); snap = cur.fetchone()[0]
     c.rollback()
@@ -313,8 +320,11 @@ def reikna(D):
     n_hopar = len(V)
     V = V[V.golf].drop(columns='golf').copy()
     V['slug'] = [f"{v}-{slugify(h)}" for v, h in zip(V.verkefni_id, V.heiti)]
-    SL = D['SL'].groupby('landeign_nr').slod.first()
-    V['slod'] = V.landeignir.map(lambda les: next((SL[x] for x in les if x in SL.index), None))
+    # slóð verkefnis = staðfest slóð sem nær yfir flestar landeignir þess (jafntefli: stafrófsröð)
+    def slod_verkefnis(les):
+        c = Counter(D['SL'][D['SL'].landeign_nr.isin(les)].slod)
+        return min(c.items(), key=lambda kv: (-kv[1], kv[0]))[0] if c else None
+    V['slod'] = V.landeignir.map(slod_verkefnis)
     V = V.sort_values(['uppselt', 'sidasta_virkni', 'verkefni_id'], ascending=[True, False, True]).reset_index(drop=True)
 
     E = U[U.verkefni_id.isin(V.verkefni_id)].copy()
@@ -341,7 +351,8 @@ def utvikka_slodir(slodir, D):
     txt = lf.lysing.str.lower()
     ut = []
     for s in slodir:
-        m = txt.str.contains(re.escape(s.lower()), regex=True)
+        # heil slóð: ekki hluti af lengra léni (g1.is ≠ teig1.is) og ekki forskeyti lengri slóðarliðar
+        m = txt.str.contains(r'(?<![\w.\-])(?:www\.)?' + re.escape(s.lower()) + r'(?![\w\-])', regex=True)
         for le in sorted(lf[m].landeign_nr.unique()):
             ut.append(dict(landeign_nr=le, slod=s))
     return pd.DataFrame(ut, columns=['landeign_nr', 'slod'])
@@ -405,13 +416,54 @@ def skrifa(c, V, E, D, auk, hofst):
     return kid, nv, ne
 
 
+def lesa_slodir(c, D, csv, nei, athugasemd, stadfest_af='Danni'):
+    """slodir_ryni.csv → semantic.nybygging_slodir (skipt út í heild, ein færsla). Skilar (n_ja_rada, n_nei_rada, n_csv_ja)."""
+    t = pd.read_csv(csv, dtype=str, encoding='utf-8-sig').fillna('')
+    t['ákv'] = np.where(t.stadfest.str.strip() != '', t.stadfest.str.strip().str.lower(), t.tillaga.str.strip().str.lower())
+    t.loc[t.slod.isin(nei), 'ákv'] = 'nei'
+    assert t['ákv'].isin(['já', 'nei']).all(), t[~t['ákv'].isin(['já', 'nei'])]
+    ja = utvikka_slodir(sorted(t[t['ákv'] == 'já'].slod.unique()), D)
+    # já-slóð sem finnst ekki í texta á Y-landeign fær að minnsta kosti landeign CSV-raðarinnar
+    vantar = t[(t['ákv'] == 'já') & ~t.slod.isin(ja.slod)]
+    ja = pd.concat([ja, pd.DataFrame(dict(landeign_nr=vantar.verkefni_id, slod=vantar.slod))]).drop_duplicates()
+    neir = t[t['ákv'] == 'nei'][['verkefni_id', 'slod']].rename(columns=dict(verkefni_id='landeign_nr')).drop_duplicates()
+    neir = neir[~neir.set_index(['landeign_nr', 'slod']).index.isin(ja.set_index(['landeign_nr', 'slod']).index)]
+    rows = ([(r.landeign_nr, r.slod.lower(), True, stadfest_af, dt.date.today(), athugasemd) for r in ja.itertuples()]
+            + [(r.landeign_nr, r.slod.lower(), False, stadfest_af, dt.date.today(), athugasemd) for r in neir.itertuples()])
+    cur = c.cursor()
+    cur.execute("SET TRANSACTION READ WRITE")
+    cur.execute("SET LOCAL lock_timeout = '10s'")
+    cur.execute("SET LOCAL statement_timeout = '120s'")
+    cur.execute("delete from semantic.nybygging_slodir")
+    execute_values(cur, "insert into semantic.nybygging_slodir (landeign_nr, slod, stadfest, stadfest_af, stadfest_dags, athugasemd) values %s",
+                   rows, page_size=1000)
+    cur.execute("select count(*) filter (where stadfest), count(*) filter (where not stadfest) from semantic.nybygging_slodir")
+    n = cur.fetchone()
+    assert n == (len(ja), len(neir)), (n, len(ja), len(neir))
+    c.commit()
+    return len(ja), len(neir), int((t['ákv'] == 'já').sum()), int((t['ákv'] == 'nei').sum())
+
+
 def main():
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument('--dryrun', action='store_true'); g.add_argument('--skrifa', action='store_true')
+    g.add_argument('--lesa-slodir', metavar='CSV')
+    ap.add_argument('--nei', default='', help='slóðir (komma) sem Danni hafnaði þvert á tillögu')
+    ap.add_argument('--athugasemd', default=None)
     ap.add_argument('--ut', default=r'D:\_audit\cc224_nybyggingar\keyrsla')
     ap.add_argument('--slodir-tillaga')
     a = ap.parse_args()
+    if a.lesa_slodir:
+        c = tengja()
+        try:
+            D = lesa(c)
+            nei = [x.strip().lower() for x in a.nei.split(',') if x.strip()]
+            r = lesa_slodir(c, D, a.lesa_slodir, nei, a.athugasemd)
+            print(f"[OK] nybygging_slodir: {r[0]} já-raðir (landeign × slóð) úr {r[2]} já-verkefnum · {r[1]} nei-raðir úr {r[3]} nei-verkefnum")
+            return 0
+        finally:
+            c.close()
     if a.slodir_tillaga and a.skrifa:
         print('[STOPP] --slodir-tillaga er aðeins spá (--dryrun)'); return 3
     hofst = dt.datetime.now(dt.timezone.utc)

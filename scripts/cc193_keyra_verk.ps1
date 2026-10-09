@@ -24,7 +24,7 @@
 #   (d) póstumferð/idempotens (email_sent_at) óbreytt.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur')]
+    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni')]
     [string]$Verk,
     [switch]$Thurrt
 )
@@ -75,6 +75,16 @@ $Verkin = @{
         Skrift = 'D:\verdmat-is\app\scripts\cc213_fasteignasala_manudur.py'
         Rok    = @('--sjalfvirkt')
         Thurr  = @('--sjalfvirkt', '--dry-run')
+        WD     = 'D:\verdmat-is\app'
+        Bida   = $true
+    }
+    # cc224: /nybyggingar — semantic.nybygging_verkefni/einingar (útgáfa í skriftunni). Les kaupskrá (sales-refresh
+    # 02:30), scraper.listings (næturkeðjan) og Verðvakt v2 (verdvakt_refresh 06:45) -> keyrir 07:00, bíður keðjunnar.
+    # CSV-úttak í logs-möppu, ekki audit-möppu. Ein færsla; teljaraathugun gegn DataFrame fyrir COMMIT.
+    nybygging_verkefni = @{
+        Skrift = 'D:\verdmat-is\app\scripts\cc224_nybygging_verkefni.py'
+        Rok    = @('--skrifa', '--ut', 'D:\verdmat-is\logs\nybygging_verkefni')
+        Thurr  = @('--dryrun', '--ut', 'D:\verdmat-is\logs\nybygging_verkefni_thurrt')
         WD     = 'D:\verdmat-is\app'
         Bida   = $true
     }

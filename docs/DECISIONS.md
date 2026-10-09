@@ -6,6 +6,8 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ## 2026-10-09 — /nybyggingar gagnalag: verkefni = landeign (+ staðfest slóð), nýbygging = regla 5 ∨ cc219-v2, Y/X með nefnurum (cc224 fasi 1)
 
+**LEIÐRÉTTING SAMA KVÖLD — útgáfa `cc224-v2` leysir v1 af (ákvörðun Danna 09.10):** liður 1 fær ALDURSVÖRN. Nýbygging = íbúð ∧ ((FULLBUID=0 ∧ (BYGGAR ≥ ár−3 ∨ óskráð)) ∨ BYGGAR ≥ ár−2 ∨ (B0–B3 ∧ matsstig 0–6)). v1 tók inn 27 verkefni eingöngu úr eldri húsum sem aldrei voru skráð fullbúin. Íbúðum innan skilgreiningar á landsvísu fækkar um 1.403 (10.706 → 9.303). v1-raðir eru fjarlægðar; keyrslur 1–6 standa í `nybygging_keyrslur`. Slóðir eru lesnar inn: tillögur lotunnar eru samþykktar í heild af Danna 09.10, nema karsnes.is, nr5.is, ggverk.is, ashamar.is og artunshofdinn.is, sem verða nei. Það gefur 49 slóðir, 10 sameiningar úr 34 landeignum og **295 verkefni** (keyrsla 7). Fasteignasöluröðun cc223 ber sama FULLBUID=0-galla — bókað í backlog, ekki lagað hér. Áætluð keyrsla: `verdmat_nybygging_verkefni` daglega 07:00 (S4U, biðhlið á nightly-delta).
+
 **Heimildir:** `D:\_audit\cc224_nybyggingar\SKIL_CC224_0.md` (§7) og `SKIL_CC224_1.md` (ákvarðanir Danna 09.10, tölur fasa 1). Engin Fable-/API-köll.
 
 **1. Skilgreining (cc224-v1) — sú sem cc223-backlog segir að Verðvaktin og röðunin samræmist við.** Eining er nýbygging = íbúð skv. reglu 7 (hvítlisti tegunda, ekki sumarhús) ∧ (FULLBUID=0 ∨ BYGGAR ≥ ár−2 ∨ (byggingarstig B0–B3 ∧ matsstig 0–6)). Aðferðafræðitexti: „nýbygging = fullbúin innan tveggja ára EÐA í byggingu skv. auglýsingu/HMS".
