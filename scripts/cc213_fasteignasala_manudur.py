@@ -20,9 +20,17 @@ Skilgreiningar (regla_version cc213-v2; v1 + handvirk útilokun sala með sali_k
   gluggar     = 'manudur' (M) og 'fra_juli_2026' (2026-07 … M; ársgluggi „síðan júlí 2026").
   sæti        = deilt: rank() (1, 1, 3). Vistað sæti ≤ TOPP (10), með jafntefli.
 
+cc223 (regla_version cc223-v1 = cc213-v2 + nýbyggingarstaðir): þrír staðir per tímabil — med (allar sölur),
+  an (nýbyggingar út), adeins (aðeins nýbyggingar). Hver staður ber eigin röðunarlínur (fasteignasala_manudur.nybyggingar)
+  og eigin nefnara + gólf (semantic.fasteignasala_nyb_stadir): eignunargólf per mánuð staðarins, sala-gólf á stað-tölum.
+  med = nefnarar-röðin óbreytt. cc213-v2 (lifandi framendi fram að flippi FS_REGLA) er skrifuð samhliða úr sömu
+  útreikningum, aðeins med/an og án stað-raða — eldri RLS-regla gildir um hana.
+
 Notkun:
   python scripts/cc213_fasteignasala_manudur.py --man 2026-08 [--man 2026-07] [--dry-run]
   python scripts/cc213_fasteignasala_manudur.py --sjalfvirkt          # 2026-07 … síðasti mánuður m/ fullnustu ≥ 90 %
+  --reglur cc223-v1                    # skrifa aðeins tilgreindar útgáfur (sjálfgefið: cc213-v2 og cc223-v1 til og með
+                                       # 16.10.2026, eftir það aðeins cc223-v1)
 DB: les á pooler read-only; skrif í einni færslu (SET TRANSACTION READ WRITE fyrst). --dry-run rúllar til baka.
 Exit: 0 í lagi · 3 villa.
 """
@@ -45,7 +53,13 @@ import psycopg2.extras
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sali_utdrattur import UTGAFA, Nafnaskra, candidates, extract, fold, personal_emails, same_person  # noqa: E402
 
-REGLA_VERSION = "cc213-v2"   # v2 (29.09): handvirk útilokun sala (sali_kort.virkt=false) + staðfest vörumerkjakort
+REGLA_VERSION = "cc223-v1"   # cc223 (09.10): cc213-v2 + þrír nýbyggingarstaðir (med/an/adeins) með eigin gólfum
+ELDRI_REGLA = "cc213-v2"     # v2 (29.09): handvirk útilokun sala + staðfest vörumerkjakort — lifandi framendi fram að flippi
+ELDRI_REGLA_TIL = dt.date(2026, 10, 16)   # ákvörðun Danna 09.10: cc213-v2 skrifuð til og með keyrslunni 16.10, svo hætt
+REGLUR = (ELDRI_REGLA, REGLA_VERSION)
+SJALFGEFNAR_REGLUR = REGLUR if dt.date.today() <= ELDRI_REGLA_TIL else (REGLA_VERSION,)
+# Staðirnir: síur á eignaðar sölur (dálkurinn nyb = regla 5). med = engin sía.
+STADIR = {"med": lambda d: d, "an": lambda d: d[~d.nyb], "adeins": lambda d: d[d.nyb]}
 KAUPSKRA = Path(r"D:\kaupskra.csv")
 PARSED_MBL = Path(r"D:\verdmat-is\scraper_data\parsed_mbl.db")
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
@@ -241,26 +255,28 @@ def eigna(c: pd.DataFrame, k: pd.DataFrame, a: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------- samantekt
-def rodun(e: pd.DataFrame, tegund: str, lykill: str, nafn_af, stofa_af, velta_col: str, sameig: pd.Series | None):
+def rodun(e: pd.DataFrame, tegund: str, lykill: str, nafn_af, stofa_af, velta_col: str, sameig: bool):
+    """Röðunarlínur allra staða (med/an/adeins) — hver staður raðaður sjálfstætt, ekki afleiddur af öðrum."""
     rows = []
-    for med_nyb in (True, False):
-        d = e if med_nyb else e[~e.nyb]
+    for stad, sia in STADIR.items():
+        d = sia(e)
         if d.empty:
             continue
         g = d.groupby(lykill).agg(fjoldi=("faerslunumer", "size"), velta=(velta_col, "sum"),
                                   nyb_fjoldi=("nyb", "sum"),
                                   nyb_velta=("nyb_velta", "sum"))
         g["fjoldi_sameiginl"] = (d[d.sameig].groupby(lykill).size().reindex(g.index).fillna(0).astype(int)
-                                 if sameig is not None else 0)
+                                 if sameig else 0)
         for maeli in ("fjoldi", "velta"):
             s = g[maeli].rank(method="min", ascending=False).astype(int)
             for lyk, row in g[s <= TOPP].iterrows():
                 rows.append(dict(adili_tegund=tegund, adili_lykill=str(lyk), adili_nafn=nafn_af(lyk),
                                  stofa_lykill=stofa_af(lyk)[0], stofa_nafn=stofa_af(lyk)[1], maelikvardi=maeli,
-                                 med_nybyggingum=med_nyb, saeti=int(s[lyk]), fjoldi=int(row.fjoldi),
-                                 fjoldi_sameiginl=int(row.fjoldi_sameiginl), velta=int(round(row.velta)),
-                                 nyb_fjoldi=int(row.nyb_fjoldi) if med_nyb else 0,
-                                 nyb_velta=int(round(row.nyb_velta)) if med_nyb else 0))
+                                 nybyggingar=stad, med_nybyggingum=stad != "an", saeti=int(s[lyk]),
+                                 fjoldi=int(row.fjoldi), fjoldi_sameiginl=int(row.fjoldi_sameiginl),
+                                 velta=int(round(row.velta)),
+                                 nyb_fjoldi=int(row.nyb_fjoldi) if stad != "an" else 0,
+                                 nyb_velta=int(round(row.nyb_velta)) if stad != "an" else 0))
     return rows
 
 
@@ -270,7 +286,13 @@ def main() -> int:
     ap.add_argument("--sjalfvirkt", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--prenta", action="store_true", help="prenta Top 10 (fjöldi, með nýb.) stofa og sala per mánuð")
+    ap.add_argument("--reglur", default=",".join(SJALFGEFNAR_REGLUR),
+                    help=f"útgáfur sem skrifaðar eru, kommuaðskilið (sjálfgefið {','.join(SJALFGEFNAR_REGLUR)}; "
+                         f"{ELDRI_REGLA} aðeins til og með {ELDRI_REGLA_TIL})")
     args = ap.parse_args()
+    reglur = [r.strip() for r in args.reglur.split(",") if r.strip()]
+    if not reglur or any(r not in REGLUR for r in reglur):
+        print(f"[VILLA] --reglur verður að vera úr {REGLUR}"); return 3
 
     k, data_through, kaupskra_sott = lesa_kaupskra()
     c_all = samningar(k)
@@ -341,16 +363,17 @@ def main() -> int:
 
         # skrif: eignun
         allar = pd.concat([eignad_man[M] for M in eignad_man])
-        cur.execute("delete from scraper.fasteignasala_eignun where regla_version = %s and faerslunumer = any(%s)",
-                    (REGLA_VERSION, list(map(int, allar.faerslunumer))))
-        psycopg2.extras.execute_values(cur, """insert into scraper.fasteignasala_eignun
-            (faerslunumer, regla_version, utgdag, thinglyst, kaupverd, n_fastnum, nybygging, regla, listing_id, sala_id,
-             stofa_lykill, n_stofur_i_glugga, salar, sali_uppruni) values %s""",
-            [(int(r.faerslunumer), REGLA_VERSION, r.utg.date(), r.thgl.to_pydatetime(), int(r.kaupverd), int(r.n_fastnum),
-              bool(r.nyb), r.regla, None if pd.isna(r.listing_id) else int(r.listing_id),
-              None if pd.isna(r.sala_id) else int(r.sala_id), r.stofa_lykill if isinstance(r.stofa_lykill, str) else None,
-              int(r.n_stofur_i_glugga), list(map(int, r.salar)),
-              r.sali_uppruni if isinstance(r.sali_uppruni, str) else None) for r in allar.itertuples()], page_size=1000)
+        for regla in reglur:
+            cur.execute("delete from scraper.fasteignasala_eignun where regla_version = %s and faerslunumer = any(%s)",
+                        (regla, list(map(int, allar.faerslunumer))))
+            psycopg2.extras.execute_values(cur, """insert into scraper.fasteignasala_eignun
+                (faerslunumer, regla_version, utgdag, thinglyst, kaupverd, n_fastnum, nybygging, regla, listing_id, sala_id,
+                 stofa_lykill, n_stofur_i_glugga, salar, sali_uppruni) values %s""",
+                [(int(r.faerslunumer), regla, r.utg.date(), r.thgl.to_pydatetime(), int(r.kaupverd), int(r.n_fastnum),
+                  bool(r.nyb), r.regla, None if pd.isna(r.listing_id) else int(r.listing_id),
+                  None if pd.isna(r.sala_id) else int(r.sala_id), r.stofa_lykill if isinstance(r.stofa_lykill, str) else None,
+                  int(r.n_stofur_i_glugga), list(map(int, r.salar)),
+                  r.sali_uppruni if isinstance(r.sali_uppruni, str) else None) for r in allar.itertuples()], page_size=1000)
 
         kort_nafn = {}
         cur.execute("select sali_id, nafn, stofa_lykill from semantic.sali_kort")
@@ -361,36 +384,41 @@ def main() -> int:
         tima = [(M, M, "manudur") for M in manudir] + [(GLUGGI_UPPHAF, M, "fra_juli_2026") for M in manudir]
         yfirlit = []
         for fra, til, gluggi in tima:
-            e = pd.concat([eignad_man[M] for M in pd.period_range(fra, til, freq="M")])
-            n_M, eig = len(e), e[e.stofa_lykill.notna()].copy()
+            man_i = list(pd.period_range(fra, til, freq="M"))
+            e = pd.concat([eignad_man[M] for M in man_i])
+            n_M = len(e)
             n_par = int(e.listing_id.notna().sum())
-            eig["nyb_velta"] = np.where(eig.nyb, eig.kaupverd, 0)
-            n_sal = int((eig.salar.str.len() > 0).sum())
-            n_sam = int((eig.salar.str.len() > 1).sum())
-            fulln = min(float(eignad_man[M].fullnusta.iat[0]) if len(eignad_man[M]) else 0.0
-                        for M in pd.period_range(fra, til, freq="M"))
+            fulln = min(float(eignad_man[M].fullnusta.iat[0]) if len(eignad_man[M]) else 0.0 for M in man_i)
             lok = (til + 3).start_time
-            timabil_ohaeft = any(
-                (len(eignad_man[M]) == 0) or (eignad_man[M].stofa_lykill.notna().mean() < EIGNUN_GOLF)
-                for M in pd.period_range(fra, til, freq="M"))
-            stada_stofa = ("ohaeft" if timabil_ohaeft or fulln < FULLNUSTA_GOLF or n_M == 0
-                           else ("endanlegt" if idag >= lok else "bradabirgda"))
-            stada_sali = ("ohaeft" if stada_stofa == "ohaeft"
-                          else ("undir_golfi" if len(eig) == 0 or n_sal / len(eig) < SALI_GOLF else stada_stofa))
-            fyrirvari = f"Salar eru taldir þar sem nafn er skráð í auglýsingu — {n_sal} af {n_M} sölum " + \
-                        ("mánaðarins." if gluggi == "manudur" else "tímabilsins.")
-            key = (fra.start_time.date(), til.end_time.date(), gluggi, REGLA_VERSION)
-            cur.execute("delete from semantic.fasteignasala_nefnarar where timabil_fra=%s and timabil_til=%s and gluggi=%s and regla_version=%s", key)
-            cur.execute("""insert into semantic.fasteignasala_nefnarar (timabil_fra, timabil_til, gluggi, regla_version,
-                  n_samningar, velta_samninga, n_nybygging, n_paradar, n_eignadar_stofu, velta_eignud_stofu, n_med_sala,
-                  n_salar_sameiginl, fullnusta_aaetlud, stada_stofa, stada_sali, sali_golf, eignun_golf, fyrirvari_sali,
-                  data_through, kaupskra_sott, listings_snapshot)
-                  values (%s,%s,%s,%s, %s,%s,%s,%s,%s,%s,%s, %s,%s,%s,%s,%s,%s,%s, %s,%s,%s)""",
-                key + (n_M, int(e.kaupverd.sum()), int(e.nyb.sum()), n_par, len(eig), int(eig.kaupverd.sum()), n_sal, n_sam,
-                       fulln, stada_stofa, stada_sali, SALI_GOLF, EIGNUN_GOLF, fyrirvari, data_through.date(),
-                       kaupskra_sott.to_pydatetime(), listings_snapshot.to_pydatetime()))
-            # stofur
-            rows = rodun(eig, "stofa", "stofa_lykill", lambda l: heiti.get(l, l), lambda l: (l, heiti.get(l, l)), "kaupverd", None)
+
+            # stöður per stað (cc223): eignunargólf per MÁNUÐ staðarins (tímabil óhæft ef einhver mánuður fellur),
+            # fullnusta sameiginleg, sala-gólf á tölum staðarins. med = cc213-reglan óbreytt.
+            stadir = {}
+            for stad, sia in STADIR.items():
+                es = sia(e)
+                eig = es[es.stofa_lykill.notna()].copy()
+                eig["nyb_velta"] = np.where(eig.nyb, eig.kaupverd, 0)
+                hlutf = [sia(eignad_man[M]).stofa_lykill.notna().mean() if len(sia(eignad_man[M])) else 0.0 for M in man_i]
+                laegst = float(min(hlutf)) if hlutf else 0.0
+                n_sal = int((eig.salar.str.len() > 0).sum())
+                n_sam = int((eig.salar.str.len() > 1).sum())
+                stada_stofa = ("ohaeft" if laegst < EIGNUN_GOLF or fulln < FULLNUSTA_GOLF or len(es) == 0
+                               else ("endanlegt" if idag >= lok else "bradabirgda"))
+                stada_sali = ("ohaeft" if stada_stofa == "ohaeft"
+                              else ("undir_golfi" if len(eig) == 0 or n_sal / len(eig) < SALI_GOLF else stada_stofa))
+                fyrirvari = f"Salar eru taldir þar sem nafn er skráð í auglýsingu — {n_sal} af {len(es)} sölum " + \
+                            ("mánaðarins." if gluggi == "manudur" else "tímabilsins.")
+                stadir[stad] = dict(es=es, eig=eig, n_sal=n_sal, n_sam=n_sam, laegst=laegst, stada_stofa=stada_stofa,
+                                    stada_sali=stada_sali, fyrirvari=fyrirvari)
+            # Allt = Án + Aðeins (fjöldi og velta) — vörn í skriftunni sjálfri
+            for k_ in ("es", "eig"):
+                a_, b_, c_ = (stadir[s][k_] for s in ("med", "an", "adeins"))
+                assert len(a_) == len(b_) + len(c_) and int(a_.kaupverd.sum()) == int(b_.kaupverd.sum()) + int(c_.kaupverd.sum()), \
+                    f"{gluggi} {fra}..{til}: Allt ≠ Án + Aðeins ({k_})"
+
+            # röðunarlínur allra staða (stofur + salar)
+            eig = stadir["med"]["eig"]
+            rows = rodun(eig, "stofa", "stofa_lykill", lambda l: heiti.get(l, l), lambda l: (l, heiti.get(l, l)), "kaupverd", False)
             # salar: ein röð per (sala, sali); fjöldi óskiptur, velta skipt jafnt
             x = eig[eig.salar.str.len() > 0].explode("salar").rename(columns={"salar": "sali_id"})
             if not x.empty:
@@ -400,26 +428,53 @@ def main() -> int:
                 x["sameig"] = x.n_s > 1
                 rows += rodun(x, "sali", "sali_id", lambda s: kort_nafn[int(s)][0],
                               lambda s: (kort_nafn[int(s)][1], heiti.get(kort_nafn[int(s)][1], kort_nafn[int(s)][1])),
-                              "velta_skipt", x.sameig)
-            if rows:
-                psycopg2.extras.execute_values(cur, """insert into semantic.fasteignasala_manudur (timabil_fra, timabil_til,
-                    gluggi, regla_version, adili_tegund, adili_lykill, adili_nafn, stofa_lykill, stofa_nafn, maelikvardi,
-                    med_nybyggingum, saeti, fjoldi, fjoldi_sameiginl, velta, nyb_fjoldi, nyb_velta, data_through) values %s""",
-                    [key + (r["adili_tegund"], r["adili_lykill"], r["adili_nafn"], r["stofa_lykill"], r["stofa_nafn"],
-                            r["maelikvardi"], r["med_nybyggingum"], r["saeti"], r["fjoldi"], r["fjoldi_sameiginl"],
-                            r["velta"], r["nyb_fjoldi"], r["nyb_velta"], data_through.date()) for r in rows])
+                              "velta_skipt", True)
+
+            m = stadir["med"]
+            for regla in reglur:
+                key = (fra.start_time.date(), til.end_time.date(), gluggi, regla)
+                cur.execute("delete from semantic.fasteignasala_nefnarar where timabil_fra=%s and timabil_til=%s and gluggi=%s and regla_version=%s", key)
+                cur.execute("""insert into semantic.fasteignasala_nefnarar (timabil_fra, timabil_til, gluggi, regla_version,
+                      n_samningar, velta_samninga, n_nybygging, n_paradar, n_eignadar_stofu, velta_eignud_stofu, n_med_sala,
+                      n_salar_sameiginl, fullnusta_aaetlud, stada_stofa, stada_sali, sali_golf, eignun_golf, fyrirvari_sali,
+                      data_through, kaupskra_sott, listings_snapshot)
+                      values (%s,%s,%s,%s, %s,%s,%s,%s,%s,%s,%s, %s,%s,%s,%s,%s,%s,%s, %s,%s,%s)""",
+                    key + (n_M, int(e.kaupverd.sum()), int(e.nyb.sum()), n_par, len(m["eig"]), int(m["eig"].kaupverd.sum()),
+                           m["n_sal"], m["n_sam"], fulln, m["stada_stofa"], m["stada_sali"], SALI_GOLF, EIGNUN_GOLF,
+                           m["fyrirvari"], data_through.date(), kaupskra_sott.to_pydatetime(), listings_snapshot.to_pydatetime()))
+                eldri = regla == ELDRI_REGLA
+                if not eldri:
+                    psycopg2.extras.execute_values(cur, """insert into semantic.fasteignasala_nyb_stadir (timabil_fra, timabil_til,
+                        gluggi, regla_version, nybyggingar, n_samningar, velta_samninga, n_eignadar_stofu, velta_eignud_stofu,
+                        n_med_sala, n_salar_sameiginl, eignun_laegst_man, stada_stofa, stada_sali, fyrirvari_sali) values %s""",
+                        [key + (s, len(d["es"]), int(d["es"].kaupverd.sum()), len(d["eig"]), int(d["eig"].kaupverd.sum()),
+                                d["n_sal"], d["n_sam"], round(d["laegst"], 4), d["stada_stofa"], d["stada_sali"], d["fyrirvari"])
+                         for s, d in stadir.items()])
+                rr = [r for r in rows if not (eldri and r["nybyggingar"] == "adeins")]
+                if rr:
+                    psycopg2.extras.execute_values(cur, """insert into semantic.fasteignasala_manudur (timabil_fra, timabil_til,
+                        gluggi, regla_version, adili_tegund, adili_lykill, adili_nafn, stofa_lykill, stofa_nafn, maelikvardi,
+                        nybyggingar, med_nybyggingum, saeti, fjoldi, fjoldi_sameiginl, velta, nyb_fjoldi, nyb_velta, data_through)
+                        values %s""",
+                        [key + (r["adili_tegund"], r["adili_lykill"], r["adili_nafn"], r["stofa_lykill"], r["stofa_nafn"],
+                                r["maelikvardi"], r["nybyggingar"], r["med_nybyggingum"], r["saeti"], r["fjoldi"],
+                                r["fjoldi_sameiginl"], r["velta"], r["nyb_fjoldi"], r["nyb_velta"], data_through.date())
+                         for r in rr], page_size=1000)
             if args.prenta and gluggi == "manudur":
                 for teg in ("stofa", "sali"):
-                    r_ = sorted((r for r in rows if r["adili_tegund"] == teg and r["maelikvardi"] == "fjoldi" and r["med_nybyggingum"]),
+                    r_ = sorted((r for r in rows if r["adili_tegund"] == teg and r["maelikvardi"] == "fjoldi" and r["nybyggingar"] == "med"),
                                 key=lambda r: (r["saeti"], r["adili_nafn"]))
                     print()
                     print(f"  {til} — Top 10 {'stofur' if teg == 'stofa' else 'salar'} (fjöldi, með nýb.):")
                     for r in r_:
                         print(f"    {r['saeti']:>2}. {r['adili_nafn']:<34} {r['fjoldi']:>3}  {r['velta']/1e6:>7,.0f} m.kr" +
                               (f"  ({r['stofa_nafn']})" if teg == "sali" else "") + (f"  [{r['nyb_fjoldi']} nýb.]" if r['nyb_fjoldi'] else ""))
-            yfirlit.append(f"  {gluggi:<14} {fra}..{til}: M={n_M} paraðar={n_par} stofa={len(eig)} ({100*len(eig)/max(n_M,1):.1f} %) "
-                           f"sali={n_sal} ({100*n_sal/max(len(eig),1):.1f} % af eignuðum; {100*n_sal/max(n_M,1):.1f} % af M) "
-                           f"sameig={n_sam} fullnusta={fulln} stada_stofa={stada_stofa} stada_sali={stada_sali} raðir={len(rows)}")
+            for s, d in stadir.items():
+                yfirlit.append(f"  {gluggi:<14} {fra}..{til} {s:<6}: M={len(d['es'])} stofa={len(d['eig'])} "
+                               f"({100*len(d['eig'])/max(len(d['es']),1):.1f} %; lægsti mán. {100*d['laegst']:.1f} %) "
+                               f"sali={d['n_sal']} ({100*d['n_sal']/max(len(d['eig']),1):.1f} % af eignuðum) sameig={d['n_sam']} "
+                               f"fullnusta={fulln} stada_stofa={d['stada_stofa']} stada_sali={d['stada_sali']} "
+                               f"raðir={sum(1 for r in rows if r['nybyggingar'] == s)}")
         print("\n".join(yfirlit))
         print(f"salakort: +{sk.n_nyir} salar, +{sk.n_sam} samheiti")
         if args.dry_run:

@@ -4,6 +4,24 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-09 — Nýbyggingarofi þrístaða (Allt / Án / Aðeins) á /verdvaktin og /fasteignasolur; gólf per stað; tvær skilgreiningar halda sér (cc223)
+
+**Heimildir:** `D:\_audit\cc223_nybyggingarofi\SKIL_CC223.md` (allar tölur þaðan). Ákvarðanir Danna 09.10.2026.
+
+**1. Hver staður er sín eigin röðun, ekki afleidd í framenda.** `semantic.fasteignasala_manudur.nybyggingar ∈ {med, an, adeins}` (PK ber hann) og ný tafla `semantic.fasteignasala_nyb_stadir` (nefnarar + stöðumerki per stað); `regla_version cc223-v1`. Migration `20261009120000_cc223_nybyggingarofi` (beitt með psycopg2 eftir að MCP `apply_migration` hékk; rollback prófaður fyrst). Skriftan stöðvast ef Allt ≠ Án + Aðeins (fjöldi, velta).
+
+**2. Gólf per birta töflu, óbreytt.** „Aðeins nýbyggingar" ber sömu gólf og heildin, reiknuð á staðnum sjálfum: eignun ≥ 70 % í HVERJUM mánuði tímabilsins, sali ≥ 80 %. Júlí 2026 fellur (96/138 = 69,6 %) og „síðan júlí" þar með líka (70,3 % í heild). RLS felur raðir staðar undir gólfi.
+
+**3. Skilgreiningar EKKI samræmdar nú — hvor síða segir sína.** Verðvaktin: byggingarár ≥ ár−1 ∨ HMS B0–B3 (auglýsing, í dag). Röðunin: regla 5, FULLBUID=0 ∨ BYGGAR ≥ ár(UTGDAG)−2 (kaupskrá, söludagur). Sammála 982/1.013 (96,9 %) á sölum í báðum; 26/31 frávika byggð 2024. Báðir aðferðartextar segja muninn. Samræmt verður á cc224-skilgreininguna eftir /nybyggingar (backlog).
+
+**4. Verðvakt: NULL-nýbygging = Án alls staðar.** Aðalsíða og sér-síður töldu 4+9 NULL-raðir ólíkt (JS `!r.nybygging` vs `.eq(false)`); nú `nybSia()` / `not.is.true`. Nefnari per stað (`n_virkar_nyb`) fer í cc219 fasa 3; þangað til segir textinn að nefnarinn sé allar eignir á sölu.
+
+**5. cc213-v2 skrifuð samhliða til og með keyrslunni 16.10.2026, svo hætt** (`ELDRI_REGLA_TIL` í skriftunni) — áætluð keyrsla les skrána á disknum, og lifandi síða átti að fá september óháð push-tíma.
+
+**6. Forsíðukassar fá ekki rofa** — báðir sýna Allt og hvorugur sýnir nýbyggingarflokkun.
+
+---
+
 ## 2026-09-30 — Stöðumerki í stað tölu þar sem nefnari hélt ekki; bráðabirgðaregla vísitölunnar er GÖGN; dagsetning innan-breytinga með id-röð (cc218 fasi A)
 
 **Heimildir:** `D:\_audit\cc218_september\SKIL_CC218_A.md` (allar tölur þaðan; skriftur og úttak í sömu möppu). Ákvarðanir Danna 30.09.2026. verdmat-ai commit `46f39c9` (ópushað við bókun).
