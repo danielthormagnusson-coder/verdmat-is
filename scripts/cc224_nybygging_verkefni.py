@@ -14,7 +14,7 @@
            --nei snýr tilteknum slóðum í nei). Já-slóð fer á allar landeignir þar sem hún stendur í auglýsingatexta
            (utvikka_slodir); nei-slóð á landeign CSV-raðarinnar. Endurkeyrsla skiptir töflunni út í heild.
 
---hlada-myndir  (aðeins --skrifa) rclone-fjarlægð OPINBERS myndahýsils (t.d. `myndir:verdmat-myndir`) sem nýjar
+--hlada-myndir  (aðeins --skrifa) rclone-áfangi OPINBERS myndahýsils (`r2backup:verdmat-myndir`, borin á myndir.verdmat.ai) sem nýjar
            minnkaðar myndir eru afritaðar á; án hennar eru þær smíðaðar og skráðar en ekki hlaðnar (hladid_kl NULL).
            Afritafatan r2backup:verdmat-backups er LOKUÐ og aldrei áfangastaður birtingarmynda (cc117 §0).
 
@@ -24,8 +24,9 @@ Skilgreining (ákvörðun Danna 09.10.2026, SKIL_CC224_1.md §3 + §5 aldursvör
   (cc224-v1 dæmdi FULLBUID=0 óháð aldri → 27 gólfverkefni eingöngu úr eldri húsum; v2 = aldursvörn á FULLBUID-greininni;
    v3 = sama aldursvörn á byggingarstigs-greininni — almenn regla, Digranesheiði 45 bar hús frá 1955 á B1)
   virkt verkefni (framendi) = n_virkar > 0 = ≥ 1 virk söluauglýsing á óseldri einingu (D3, SKIL §8.1)
-  forsíðumynd = mynd nr. 0 nýjustu söluauglýsingar verkefnisins (sama auglýsingamengi og söluaðilar) sem á sótta mynd í
-      scraper.auglysingamyndir; minnkuð EINU SINNI í 720 px WebP (semantic.nybygging_myndir), engin safnmynd
+  forsíðumynd = HANDVALIN útlitsmynd (ljósmynd/3D að utan; aldrei grunnmynd/innimynd/útsýni/kort/lógó) úr
+      scripts/nybyggingar_myndaval.csv (cc224_myndaval_lesa.py, §10); „engin" eða ekkert val → engin mynd (hlutlaus flötur);
+      minnkuð EINU SINNI í 720 px WebP (semantic.nybygging_myndir), engin safnmynd
   augl_id = nýjasta VIRKA mbl-söluauglýsing einingarinnar (eignarstig, v_eign_virk_auglysing); augl_endursala = eining seld
   Y = íbúðir á landeignum verkefnisins byggðar ≥ ár−3 eða innan skilgreiningar (eldri hús á sömu lóð ekki talin);
       óskipt fastnúmer (≥3 ólíkar auglýstar stærðir) telur max(1, auglýstar einingar)
@@ -65,6 +66,7 @@ SKILGREINING = (f"íbúð (regla 7: {', '.join(IBUD)}; ekki sumarhús) ∧ (((FU
                 f"X = ONOTHAEFUR=0 frá {SALA_FRA}; magnsala = samningur > 1 fastnr; "
                 f"gólf Y ≥ 4 ∧ (X ≥ 1 ∨ virk augl.); sameining = staðfest slóð ∧ sameiginleg gata")
 DSN = Path(r"D:\verdmat-is\.dbconfig")
+MYNDAVAL = Path(__file__).resolve().parent / 'nybyggingar_myndaval.csv'   # handval útlitsmynda (cc224b §10)
 
 # byggingaraðili úr auglýsingatexta (regex, cc224 fasi 0)
 BA = re.compile(r'(?:byggingara[ðd]ili(?:nn)?(?: er| verkefnisins er|:)?|byggt af|verktaki(?:nn)?(?: er|:)|byggjandi(?: er|:)?)\s+'
@@ -76,6 +78,7 @@ BA_SAMHEITI = {'Skugga': 'Skuggi', 'Þ.G': 'ÞG Verk', 'ÞG Verk. Útveggir': '�
 BA_MIN_AUGL = 2                 # byggingaraðili birtist aðeins ef hann finnst í ≥ 2 auglýsingum verkefnisins
 KR_M2_GOLF = 100_000            # kr/m² undir þessu = villa í verði/stærð (t.d. 43 þús./m²) → utan tölfræði
 ASETT_GOLF = 1_000_000          # ásett verð undir 1 m.kr. = leiga/villa → utan tölfræði
+ENDURSALA_DAGAR = 180           # „endursala" ef auglýst > 180 d eftir þinglýsta sölu (eða önnur stofa) — Danni 10.10
 HEIMILISFANG = re.compile(r'^(.*?)\s+(\d+)\s*([A-Za-zÁÐÉÍÓÚÝÞÆÖáðéíóúýþæö]?)\b')
 
 
@@ -117,12 +120,9 @@ def lesa(c):
                exists (select 1 from scraper.v_eign_virk_auglysing v where v.listing_id = l.listing_id) virk
           from scraper.listings l
          where l.tenure = 'sale' and l.category = 'residential' and l.fastnum = any(%(fn)s)""", c, params=dict(fn=fn))
-    # forsíðumyndir: mynd nr. 0 hverrar söluauglýsingar sem á sótta, óútilokaða mynd (regular á undan direct)
-    M = pd.read_sql("""
-        select distinct on (a.listing_id) a.listing_id, a.sha256, a.r2_lykill, a.breidd, a.haed, a.byte_len
-          from scraper.auglysingamyndir a
-         where a.listing_id = any(%(li)s) and a.image_nr = 0 and a.utilokad_kl is null and a.r2_lykill is not null
-         order by a.listing_id, (a.afbrigdi = 'regular') desc, a.sott_kl desc""", c, params=dict(li=[int(x) for x in L.listing_id]))
+    # forsíðumyndir: handval (cc224_myndaval_lesa.py → nybyggingar_myndaval.csv)
+    import csv as _csv
+    MV = {r['verkefni_id']: r for r in _csv.DictReader(open(MYNDAVAL, encoding='utf-8'))} if MYNDAVAL.exists() else {}
     MY = pd.read_sql("select sha256, lykill, breidd, haed, baeti, hladid_kl from semantic.nybygging_myndir", c)
     VV = pd.read_sql("""
         select listing_id, fastnum, stefna, nytt_verd, nytt_sast from semantic.v_verdvakt_breytingar_v2
@@ -133,7 +133,7 @@ def lesa(c):
     cur.execute("select max(thinglystdags) from public.sales_history"); data_through = cur.fetchone()[0]
     cur.execute("select max(last_seen_at) from scraper.listings where tenure='sale'"); snap = cur.fetchone()[0]
     c.rollback()
-    return dict(P=P, S=S, L=L, M=M, MY=MY, VV=VV, VM=VM, SL=SL, n_skilgr_land=n_skilgr_land, data_through=data_through, snap=snap)
+    return dict(P=P, S=S, L=L, MV=MV, MY=MY, VV=VV, VM=VM, SL=SL, n_skilgr_land=n_skilgr_land, data_through=data_through, snap=snap)
 
 
 def ba_ur_texta(t):
@@ -250,6 +250,8 @@ def reikna(D):
     # (endursala seldrar íbúðar er ekki virkni verkefnisins og stofa endursölunnar ekki söluaðili þess)
     L['t0'] = pd.to_datetime(L.first_seen_at, utc=True).dt.tz_localize(None)
     L['birt'] = pd.to_datetime(L.birt, utc=True).dt.tz_localize(None)
+    vm = VM.set_index('sala_id')
+    L['stofa_lykill'] = L.agency_source_id.map(vm.lykill).fillna(L.agency_name.fillna('').str.strip().str.lower())
     Lallar = L.copy()                    # allar söluauglýsingar einingarinnar, líka endursala (auglýsingahlekkur)
     L = L[~(L.t0 > L.fastnum.map(U.set_index('fastnum').sala_dags))].copy()
 
@@ -281,10 +283,30 @@ def reikna(D):
     la_virk = Lallar[Lallar.virk & (Lallar.source == 'mbl') & Lallar.source_listing_id.notna()]
     augl = la_virk.sort_values(['birt', 'listing_id']).groupby('fastnum').last()
     U['augl_id'] = U.fastnum.map(augl.source_listing_id)
-    t0_augl = U.fastnum.map(augl.t0)
-    U['augl_endursala'] = np.where(U.augl_id.notna(), U.seld & (t0_augl > U.sala_dags), None)
+    U['augl_t0'] = U.fastnum.map(augl.t0)
+    U['augl_stofa'] = U.fastnum.map(augl.stofa_lykill)
 
     U['verkefni_id'], n_sameinad = verkefnalykill(U, D['SL'])
+
+    # flokkur auglýsingahlekks (ákvörðun Danna 10.10, cc224b §9.6): seld eining með auglýsingu sem sást fyrst EFTIR
+    # þinglýsingu = „endursala" aðeins ef > ENDURSALA_DAGAR frá sölu EÐA önnur stofa en auglýsti eininguna fyrir sölu
+    # (engin slík → söluaðilar verkefnisins fyrir sölu); annars „eftir_solu". Auglýsing frá því fyrir sölu = „fyrir_solu".
+    sd = U.set_index('fastnum').sala_dags
+    fyrir = Lallar[(Lallar.t0 <= Lallar.fastnum.map(sd)) & (Lallar.stofa_lykill != '')]
+    stofur_einingar = fyrir.groupby('fastnum').stofa_lykill.agg(set)
+    stofur_verkefnis = fyrir.assign(v=fyrir.fastnum.map(U.set_index('fastnum').verkefni_id)).groupby('v').stofa_lykill.agg(set)
+    def augl_flokkur(r):
+        if pd.isna(r.augl_id):
+            return None
+        if not r.seld:
+            return 'fyrsta_sala'
+        if not (pd.notna(r.augl_t0) and r.augl_t0 > r.sala_dags):
+            return 'fyrir_solu'
+        vidmid = stofur_einingar.get(r.fastnum) or stofur_verkefnis.get(r.verkefni_id) or set()
+        onnur = r.augl_stofa not in vidmid
+        return 'endursala' if (r.augl_t0 - r.sala_dags).days > ENDURSALA_DAGAR or onnur else 'eftir_solu'
+    U['augl_flokkur'] = U.apply(augl_flokkur, axis=1)
+    U['augl_endursala'] = np.where(U.augl_id.notna(), U.augl_flokkur == 'endursala', None)
 
     # stofa: vörumerki (sala_id) ef til, annars agency_name
     vm = VM.set_index('sala_id')
@@ -327,16 +349,15 @@ def reikna(D):
         virkni = [g.sala_dags.max(), g.sidasta_verdbr.max(), g.sidasta_ny_augl.max()]
         virkni = max([v for v in virkni if pd.notna(v)])
         seld_d = g[g.seld].sala_dags
-        # forsíðumynd: nýjasta auglýsing verkefnisins sem á sótta mynd nr. 0
-        lm = la.merge(D['M'], on='listing_id').sort_values(['birt', 'listing_id'])
-        mynd = lm.iloc[-1] if len(lm) else None
+        # forsíðumynd: HANDVALIN útlitsmynd (scripts/nybyggingar_myndaval.csv, cc224b §10); ekkert val eða „engin" → engin mynd
+        mv = D['MV'].get(vid)
+        mynd = mv if mv and mv['sha256'] else None
         rows.append(dict(
-            mynd_sha256=mynd.sha256.strip() if mynd is not None else None,
-            mynd_lykill_frumrit=mynd.r2_lykill if mynd is not None else None,
-            mynd_stofa=(mynd.stofa_nafn.strip() if mynd is not None and isinstance(mynd.stofa_nafn, str) and mynd.stofa_nafn.strip()
-                        else None),
-            mynd_dags=mynd.birt.date() if mynd is not None and pd.notna(mynd.birt) else None,
-            mynd_listing_id=int(mynd.listing_id) if mynd is not None else None,
+            mynd_sha256=mynd['sha256'] if mynd else None,
+            mynd_lykill_frumrit=mynd['r2_lykill'] if mynd else None,
+            mynd_stofa=(mynd['stofa'].strip() or None) if mynd else None,
+            mynd_dags=dt.date.fromisoformat(mynd['birt']) if mynd and mynd['birt'] else None,
+            mynd_listing_id=int(mynd['listing_id']) if mynd else None,
             verkefni_id=vid, golf=True, heiti=heiti, heiti_uppruni=uppruni, gotur=gotur or [],
             postnr=int(g.postnr.mode().iloc[0]) if g.postnr.notna().any() else None,
             postheiti=g.postheiti.mode().iloc[0] if g.postheiti.notna().any() else None,
@@ -377,7 +398,7 @@ def reikna(D):
         sala_dags=E.sala_dags.dt.date, kaupverd=np.where(E.stada == 'seld', E.kaupverd, np.nan),
         kr_m2=np.where((E.stada == 'seld') & E.kr_m2.notna(), E.kr_m2.round(), np.nan),
         asett_verd=E.asett_verd, asett_flm=E.asett_flm, n_laekkanir=E.n_laekkanir,
-        augl_id=E.augl_id, augl_endursala=E.augl_endursala))
+        augl_id=E.augl_id, augl_endursala=E.augl_endursala, augl_flokkur=E.augl_flokkur))
     E['sala_dags'] = E.sala_dags.where(E.stada.isin(['seld', 'magnsala']))
     E = E.sort_values(['verkefni_id', 'fastnum']).reset_index(drop=True)   # föst röð → endurtekjanlegt md5
     return V, E, dict(n_hopar=n_hopar, n_sameinad=n_sameinad, U=U)
@@ -421,7 +442,7 @@ def smida_myndir(c, V, MY, hlada_remote=None):
     """Minnkar forsíðumyndir sem vantar í semantic.nybygging_myndir EINU SINNI (720 px WebP) og skráir stærðina.
     Með hlada_remote: afritar óhlaðnar útgáfur á opinbera myndahýsilinn, sannprófar (rclone check) og merkir hladid_kl."""
     from PIL import Image, ImageOps
-    if hlada_remote and hlada_remote.split(':')[0] == FRUMRIT_REMOTE.split(':')[0]:
+    if hlada_remote and hlada_remote.rstrip('/').split('/')[0] == FRUMRIT_REMOTE:
         raise SystemExit(f"NEITA: {hlada_remote} er afritafatan — birtingarmyndir fara aldrei þangað")
     vantar = V.dropna(subset=['mynd_sha256'])
     vantar = vantar[~vantar.mynd_sha256.isin(MY.sha256)].drop_duplicates('mynd_sha256')
@@ -456,7 +477,9 @@ def smida_myndir(c, V, MY, hlada_remote=None):
                                  frumrit_breidd, frumrit_haed, frumrit_baeti) values %s on conflict (sha256) do nothing""", nyjar)
     n_hladid = 0
     if hlada_remote:
-        cur.execute("select lykill from semantic.nybygging_myndir where hladid_kl is null")
+        # aðeins myndir sem verkefni þessarar keyrslu vísa í (ónotað eldra val fer aldrei á opinbera hýsilinn)
+        cur.execute("select lykill from semantic.nybygging_myndir where hladid_kl is null and sha256 = any(%s)",
+                    (list(V.mynd_sha256.dropna()),))
         oh = [r[0] for r in cur.fetchall()]
         if oh:
             ff = MYNDA_STORE / 'hlada_files_from.txt'
@@ -508,7 +531,7 @@ VCOLS = ['verkefni_id', 'slug', 'heiti', 'heiti_uppruni', 'gotur', 'postnr', 'po
          'mynd_dags', 'mynd_listing_id']
 ECOLS = ['fastnum', 'verkefni_id', 'heimilisfang', 'merking', 'einflm', 'fjherb', 'byggar', 'byggingarstig', 'innan_skilgr',
          'heildareining', 'n_undireiningar', 'stada', 'sala_dags', 'kaupverd', 'kr_m2', 'asett_verd', 'asett_flm', 'n_laekkanir',
-         'augl_id', 'augl_endursala']
+         'augl_id', 'augl_endursala', 'augl_flokkur']
 
 
 def skrifa(c, V, E, D, auk, hofst):
@@ -637,8 +660,8 @@ def main():
                f" + ekki auglýst {int(((V.n_virkar == 0) & ~V.uppselt.astype(bool)).sum())}",
                f"forsíðumynd valin {int(V.mynd_sha256.notna().sum())}/{len(V)} | smíðuð (720 px WebP) {int(V.mynd_lykill.notna().sum())}"
                f" | nýjar í þessari keyrslu {n_nyjar} | hlaðnar á hýsil {n_hladid}",
-               f"einingar m/ virka mbl-auglýsingu {int(E.augl_id.notna().sum())} | þar af endursala {int((E.augl_endursala == True).sum())}"
-               f" | seldar m/ auglýsingu frá því fyrir sölu {int(((E.augl_endursala == False) & E.stada.isin(['seld', 'magnsala'])).sum())}"]
+               f"einingar m/ virka mbl-auglýsingu {int(E.augl_id.notna().sum())} | flokkar "
+               + ' · '.join(f"{k} {n}" for k, n in E.augl_flokkur.value_counts().items())]
         for l in lin:
             print(l)
         (ut / 'samantekt.txt').write_text('\n'.join(lin) + '\n', encoding='utf-8')

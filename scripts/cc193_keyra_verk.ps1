@@ -82,9 +82,10 @@ $Verkin = @{
     # 02:30), scraper.listings (næturkeðjan) og Verðvakt v2 (verdvakt_refresh 06:45) -> keyrir 07:00, bíður keðjunnar.
     # CSV-úttak í logs-möppu, ekki audit-möppu. Ein færsla; teljaraathugun gegn DataFrame fyrir COMMIT.
     # --revalidate (cc224 fasi 2): POST á /api/nybyggingar/endurnyja eftir COMMIT; fall þar = rc 0, síðan á TTL.
+# --hlada-myndir (cc224b): nýjar handvaldar forsíðumyndir (720 px WebP) á opinbera fötu verdmat-myndir (myndir.verdmat.ai).
     nybygging_verkefni = @{
         Skrift = 'D:\verdmat-is\app\scripts\cc224_nybygging_verkefni.py'
-        Rok    = @('--skrifa', '--ut', 'D:\verdmat-is\logs\nybygging_verkefni', '--revalidate')
+        Rok    = @('--skrifa', '--ut', 'D:\verdmat-is\logs\nybygging_verkefni', '--revalidate', '--hlada-myndir', 'r2backup:verdmat-myndir')
         Thurr  = @('--dryrun', '--ut', 'D:\verdmat-is\logs\nybygging_verkefni_thurrt')
         WD     = 'D:\verdmat-is\app'
         Bida   = $true

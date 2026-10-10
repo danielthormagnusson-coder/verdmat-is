@@ -60,7 +60,21 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
    - `augl_endursala` = eining þinglýst seld ÁÐUR en auglýsingin sást fyrst (221). Seld eining með auglýsingu frá því fyrir sölu er merkt „auglýst fyrir sölu" (82).
 7. **Útgáfa `cc224-v3`:**
    - Migration 20261010120000 (psycopg2, rollback prófaður fyrst). Næturkeyrslan skrifar v3 og v2 stendur óhreyfð.
-   - Framendi les `NYB_UTGAFA` cc224-v3, cache-útgáfa `cc224b`.
+   - Framendi les `NYB_UTGAFA` cc224-v3, cache-útgáfa `cc224b2`.
+8. **Endursölumerki (Danni, síðar 10.10):** gagnalagið flokkar hlekkinn í `augl_flokkur` (migration 20261010180000).
+   - **endursala** = seld eining, auglýsing sást fyrst EFTIR þinglýsingu OG (> 180 d EÐA önnur stofa en auglýsti eininguna fyrir sölu; engin slík → söluaðilar verkefnisins).
+   - **eftir_solu** („auglýst eftir sölu") = ≤ 180 d og sama stofa.
+   - **fyrir_solu** („auglýst fyrir sölu") = auglýsingin sást fyrir þinglýsingu.
+   - Fjöldi: fyrsta sala 1.857 · endursala 165 · auglýst eftir sölu 55 · auglýst fyrir sölu 82 (alls 2.159).
+   - Aðferðafræðin segir: „hlekkir á auglýsingar uppfærast á nóttunni og geta verið allt að sólarhring á eftir."
+9. **Forsíðumynd = HANDVALIN útlitsmynd (Danni, síðar 10.10; liður 5 hér að ofan fellur):**
+   - Myndafata `verdmat-myndir` er opin á myndir.verdmat.ai.
+   - Hvert verkefni fékk yfirlitsblað með allt að 12 fyrstu myndum allra söluauglýsinga sinna. CC valdi útlitsmynd (ljósmynd eða 3D að utan; aldrei grunnmynd, innimynd, útsýni, kort eða lógó) eða „engin".
+   - Niðurstaða: **203** með mynd (148 ljósmyndir, 55 3D), **15** „engin" (aðeins innimyndir, teikningar eða kort), 75 verkefni án nokkurrar auglýsingamyndar.
+   - Handrýni á 20 slembivölum: 20/20 rétt tegund, 1 með þungu söluaðilayfirlagi (eina útlitsmyndin).
+   - Valið býr í `scripts/nybyggingar_myndaval.csv`, sem `scripts/cc224_myndaval_lesa.py` les úr myndaval.csv (Danni má leiðrétta) og kandidatar.csv.
+   - Næturkeyrslan hleður nýjum völdum myndum á `r2backup:verdmat-myndir` (`--hlada-myndir`). Ónotað eldra val fer aldrei á opinbera hýsilinn; 136 slíkar voru fjarlægðar.
+   - 203 myndir, allar 720×480 WebP, miðgildi 44,6 KB, samtals 9,7 MB.
 
 **Heimildir:** `D:\_audit\cc224_nybyggingar\SKIL_CC224_1.md` §8–§9.
 
