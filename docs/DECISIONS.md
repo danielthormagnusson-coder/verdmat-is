@@ -4,6 +4,25 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-11 — Forsíðukassi /nybyggingar (cc224c liður 4)
+
+Forskrift Danna 10.10; hafinn eftir push cc221 (verdmat-ai af911b8). Aðeins framendi (verdmat-ai), ekkert gagnalag; HALT fyrir push.
+
+1. **Staðsetning:**
+   - Fullbreiður kassi (`vm-box-wide`, spannar báða dálka ristarinnar), beint FYRIR OFAN Djúpgreiningar-kassann (SkyrslaKassi „Fable-greining á fasteignamarkaðnum"), undir röðinni Markaðurinn · Verðvaktin.
+   - Á mjóum skjá er ristin einn dálkur og smámyndirnar fara undir tölurnar.
+2. **Tölur:** „N verkefni á sölu · X íbúðir · M íbúðir lækkuðu verð síðustu 30 daga" = SÖMU teljarar og sjálfgefið yfirlit /nybyggingar.
+   - Einingin er nefnd berum orðum (Danni við GO). Styttri gerðin „M verðlækkanir" var leyfð ef línan brotnaði, en hún er EKKI notuð: M telur ÍBÚÐIR með lækkun, ekki lækkanir.
+   - Í staðinn fær tölulínan alla breidd kassans og hver tala er `nowrap` í heild. Línan brotnar aðeins við „ · ", og þriðja talan stendur óbrotin á 1280 og 380 (mælt).
+   - N = virk verkefni (n_virkar > 0), X = Σ n_virkar („á sölu núna"), M = Σ n_laekkad_30 (íbúðir, lækkunarmerkið).
+   - 10.10: 156 · 1.939 · 68. Sannreynt jafnt samtölum /nybyggingar.
+3. **Smámyndir:** 3 virkustu verkefnin = flestar íbúðir á sölu núna (n_virkar ↓; jafntefli röð lagsins), aðeins með handvalda mynd.
+   - Beint af myndir.verdmat.ai (720 px WebP, lazy, width/height), sýndar 56 px. Ekkert /_next/image, engin ný myndastærð.
+4. **Hæð:** á breiðum skjá er tvídálka grind — myndirnar við titil og undirtexta, tölulínan undir yfir alla breidd. Kassinn er 189 px á móti 174 px skýrslukassans á 1280. Með 64 px myndum fór undirtextinn í 3 línur.
+5. **Bilun:** bregðist gagnalagið birtist kassinn án talna og mynda — forsíðan fellur aldrei vegna nýbygginga.
+   - Forsíðan er áfram ISR með 1 klst endurnýjun.
+   - Lighthouse mobile á forsíðu: LCP 4,25 → 4,10 s, CLS 0 → 0, perf 85 → 86 (innan suðs).
+
 ## 2026-10-11 — /nybyggingar: lækkunarmerki (Verðvakt v2), síðuskipting, svæðarofi og sveitarfélagasía (cc224c)
 
 Forskrift Danna 10.10 (cc224c liðir 1–3; liður 4 forsíðukassi bíður push cc221). Framendi verdmat-ai, gagnalag app; HALT fyrir push.
