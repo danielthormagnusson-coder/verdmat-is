@@ -4,6 +4,32 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-10 — Stuðlaskrá v1.4: 24 línur endurmældar sem leif rekstrarhams-spár utan úrtaks (cc226b)
+
+**Skilyrt GO Danna 10.10.2026** (öll skilyrði stóðust fyrir push; SKIL_CC226B §8). verdmat-ai `3367c11`, cache-lykill `cc226b-v14`.
+
+1. **Mælistærð:** leif rekstrarhams-spár (extraction NaN, eins og `build_X_matrix`) utan þjálfunarúrtaks, innan sellu canonical|matsvæði|söluár, sellu-klasað SE.
+2. **Föst regla, án undantekningar:** n < 500 → ÓMÆLANLEG; |b| > 1,96·SE → BIRTANLEG; annars NÚLL-MÆLT. Hver lína var endurleidd úr mælingarskránni fyrir push, 0 frávik.
+3. **Svalir og stórar svalir mældar SAMHLIÐA** (gagnkvæmt útilokandi dummy gegn „engum svölum", ekki staflað):
+   - `svalir` +1,51 ± 0,53 (n 11.311).
+   - `storar_svalir` = viðbót +1,91 ± 0,22. Summa línanna = mæld heild stórra svala +3,44 % (staflaða drögin gáfu +4,42).
+4. **Línur sem falla úr birtingu:** `adgengi_hjolastols` og `serlod_apt` NÚLL-MÆLT; `serlod` (sérbýli) ÓMÆLANLEG, n = 17. Í Þitt viðmið gefa þær 0.
+5. **Endaraðhús birt +1,54** (n 505, 2,2 SE): stenst regluna.
+6. **Aðrar breytingar:**
+   - Viðgerðir −13,3 → −11,49.
+   - Lofthæð 5,51 → 4,18.
+   - Garður 4,38 → 3,23.
+   - Óskráð rými: hallaliður mældur ns og felldur, hrein dummy +2,66.
+   - Austur-/vesturlóð +1,04 (áður NÚLL).
+7. **Óbreytt:**
+   - `heitur_pottur` og `arinn` (v1.1; haló ómælt).
+   - Bílskúrs- og stæðislínur (v1.2/v1.3).
+8. **Áhrif á mælt viðmið:**
+   - 38 af 62.217 eignum með lag breytast, og allar bera breytta línu.
+   - Akurgerðisakkerið (cc203) er óbreytt, 111.162.241 kr.
+
+---
+
 ## 2026-10-10 — Stuðlaskrá v1.3: stæði í bílakjallara aftur birt lína +2,94 % (villuleiðrétting á v1.2, cc226b)
 
 **Ákvörðun Danna 10.10.2026 (GO strax).** v1.2 felldi línuna á ómældri tilgátu (villa arkitekts); cc226b mældi +2,94 %.
