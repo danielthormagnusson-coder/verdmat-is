@@ -4,6 +4,30 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-10 — /nybyggingar framendi: kassar + verkefnissíður lesa cc224-v2 beint, revalidate í næturverkinu (cc224 fasi 2)
+
+1. **Síður (verdmat-ai):**
+   - `/nybyggingar` er einn kassi per verkefni, með flipunum „Með óseldar íbúðir“ (sjálfgefinn) og „Uppselt“ (`?syn=uppselt`).
+   - `/nybyggingar/[slug]` sýnir lykiltölur með nefnurum, byggingarstig, söluaðila, staðfestan söluvef og hverja íbúð með hlekk á `/eign/[fastnum]`.
+   - Röðun kassa kemur úr gagnalaginu. Framendinn reiknar hvorki röð né hlutföll (field-in-payload í `lib/nybyggingar-queries.ts`).
+   - Útgáfan sem síðan les er föst í `config/nybyggingar.ts` (`NYB_UTGAFA = "cc224-v2"`).
+2. **Slug:** `<verkefni_id>-<heiti>`. Breytist heitið finnst verkefnið á auðkenninu og fær 308 á núgildandi slóð; óþekkt slóð fær 404.
+3. **Miðgildi kr/m²** birtist aðeins við n ≥ 3 (fasi 0 §7.6), annars „—“ með fjöldanum. Ásett kr/m² per íbúð ber sömu gólf og lagið (≥ 1 m.kr, ≥ 100 þ. kr/m², ekki óskipt fastanúmer).
+4. **Óskipt fastanúmer:** einingaröðin ber `stada = a_solu` og `n_undireiningar` = allar auglýstar einingar. Verkefnaröðin telur `n_virkar` = þær sem eru á lofti núna (6 verkefni, munar 14).
+   - Haus síðunnar les verkefnaröðina; taflan merkir óskiptu röðina sérstaklega.
+   - Enginn gagnagalli — tvær kornastærðir, báðar réttar.
+5. **Skilgreiningartextinn** er fall af ári (`nybSkilgreining()` = ár − 3, eins og `AR − 3` í skriftunni), svo hann færist með gögnunum um áramót. Árið 2026 er hann orðréttur texti SKIL §5.1. Sami texti stendur á `/nybyggingar#adferd` og `/adferdafraedi#nybyggingar`.
+6. **Cache og revalidate:**
+   - Cache er eitt lag af `unstable_cache` (verkefnalisti + einingar per verkefni, aldrei hreiðrað) með 1 klst TTL og merkinu `nybyggingar`.
+   - `POST /api/nybyggingar/endurnyja` notar sömu vörslu og Verðvaktin (`ENDURNYJA_LYKILL`).
+   - Skriftan fær `--revalidate` (eftir COMMIT; fall = rc 0) og keyrarinn ber það í `Rok`.
+   - Fram að push svarar leiðin 404, sem er loggað og skaðlaust.
+7. **Sitemap:** `/nybyggingar` og allar verkefnissíður fara í `/sidur/sitemap.xml`, með lastmod = `reiknad`.
+
+**Heimildir:** `D:\_audit\cc224_nybyggingar\SKIL_CC224_1.md` §6 (síða == lag, `fasi2_sannreyna.txt`).
+
+---
+
 ## 2026-10-09 — /nybyggingar gagnalag: verkefni = landeign (+ staðfest slóð), nýbygging = regla 5 ∨ cc219-v2, Y/X með nefnurum (cc224 fasi 1)
 
 **LEIÐRÉTTING SAMA KVÖLD — útgáfa `cc224-v2` leysir v1 af (ákvörðun Danna 09.10):** liður 1 fær ALDURSVÖRN. Nýbygging = íbúð ∧ ((FULLBUID=0 ∧ (BYGGAR ≥ ár−3 ∨ óskráð)) ∨ BYGGAR ≥ ár−2 ∨ (B0–B3 ∧ matsstig 0–6)). v1 tók inn 27 verkefni eingöngu úr eldri húsum sem aldrei voru skráð fullbúin. Íbúðum innan skilgreiningar á landsvísu fækkar um 1.403 (10.706 → 9.303). v1-raðir eru fjarlægðar; keyrslur 1–6 standa í `nybygging_keyrslur`. Slóðir eru lesnar inn: tillögur lotunnar eru samþykktar í heild af Danna 09.10, nema karsnes.is, nr5.is, ggverk.is, ashamar.is og artunshofdinn.is, sem verða nei. Það gefur 49 slóðir, 10 sameiningar úr 34 landeignum og **295 verkefni** (keyrsla 7). Fasteignasöluröðun cc223 ber sama FULLBUID=0-galla — bókað í backlog, ekki lagað hér. Áætluð keyrsla: `verdmat_nybygging_verkefni` daglega 07:00 (S4U, biðhlið á nightly-delta).

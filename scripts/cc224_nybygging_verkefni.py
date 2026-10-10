@@ -1,11 +1,13 @@
 """cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v2).
 
   python scripts/cc224_nybygging_verkefni.py --dryrun [--ut DIR] [--slodir-tillaga CSV]
-  python scripts/cc224_nybygging_verkefni.py --skrifa [--ut DIR]
+  python scripts/cc224_nybygging_verkefni.py --skrifa [--ut DIR] [--revalidate]
   python scripts/cc224_nybygging_verkefni.py --lesa-slodir CSV [--nei slod,slod] [--athugasemd TEXTI]
 
 --dryrun   reiknar og skrifar verkefni.csv/einingar.csv/samantekt.txt í --ut; ekkert skrifað í gagnagrunn.
 --skrifa   sama + skrifar útgáfuna í einni færslu (DELETE útgáfu → INSERT) og eina röð í nybygging_keyrslur.
+--revalidate  (aðeins --skrifa, eftir COMMIT) POST á /api/nybyggingar/endurnyja (verdmat-ai) með ENDURNYJA_LYKILL;
+           falli kallið stendur skriftan (rc 0) og síðan endurnýjast á 1 klst TTL.
 --slodir-tillaga  (aðeins --dryrun) les slodir_ryni.csv og notar tillaga = já sem staðfest — SPÁ um áhrif
            staðfestingar, aldrei skrifuð.
 --lesa-slodir  les slodir_ryni.csv inn í semantic.nybygging_slodir (stadfest-dálkur ef fylltur, annars tillaga;
@@ -28,9 +30,11 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import sys
 import unicodedata
+import urllib.request
 from collections import Counter
 from pathlib import Path
 
@@ -444,6 +448,21 @@ def lesa_slodir(c, D, csv, nei, athugasemd, stadfest_af='Danni'):
     return len(ja), len(neir), int((t['ákv'] == 'já').sum()), int((t['ákv'] == 'nei').sum())
 
 
+def revalidate():
+    """Ógildir merkið `nybyggingar` í verdmat-ai (sama mynstur og cc188_verdvakt_refresh.revalidate)."""
+    url = os.environ.get('NYBYGGINGAR_ENDURNYJA_URL', 'https://www.verdmat.ai/api/nybyggingar/endurnyja')
+    lykill = os.environ.get('ENDURNYJA_LYKILL')
+    if not lykill:
+        print('revalidate SLEPPT: ENDURNYJA_LYKILL ekki í umhverfi'); return
+    req = urllib.request.Request(url, data=b'{}', method='POST',
+                                 headers={'content-type': 'application/json', 'x-endurnyja-lykill': lykill})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            print(f"revalidate: HTTP {r.status} {r.read(200).decode('utf-8', 'replace')}")
+    except Exception as e:  # noqa: BLE001 — síðan endurnýjast á TTL
+        print(f'revalidate FÉLL (síðan endurnýjast á TTL): {type(e).__name__} {getattr(e, "code", "")}')
+
+
 def main():
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group(required=True)
@@ -453,6 +472,7 @@ def main():
     ap.add_argument('--athugasemd', default=None)
     ap.add_argument('--ut', default=r'D:\_audit\cc224_nybyggingar\keyrsla')
     ap.add_argument('--slodir-tillaga')
+    ap.add_argument('--revalidate', action='store_true', help='POST á /api/nybyggingar/endurnyja eftir --skrifa')
     a = ap.parse_args()
     if a.lesa_slodir:
         c = tengja()
@@ -492,6 +512,8 @@ def main():
         if a.skrifa:
             kid, nv, ne = skrifa(c, V, E, D, auk, hofst)
             print(f"[OK] skrifað keyrsla_id={kid}: verkefni {nv[0]} (ΣY {nv[1]}, ΣX {nv[2]}), einingar {ne}")
+            if a.revalidate:
+                revalidate()
         return 0
     finally:
         c.close()
