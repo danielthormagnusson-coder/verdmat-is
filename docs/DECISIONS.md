@@ -30,6 +30,42 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-10 — /nybyggingar v3: virk/óvirk-sía, forsíðumynd, auglýsingahlekkir, kort; aldursvörn á byggingarstig (cc224b)
+
+**Ákvarðanir Danna 10.10.2026** (SKIL_CC224_1 §8.6). Byggt á mælingu §8; framendi verdmat-ai, HALT fyrir push.
+
+1. **Virkt verkefni = D3:** ≥ 1 virk SÖLUauglýsing (v_eign_virk_auglysing, eignarstig) á ÓSELDRI einingu.
+   - Það er nákvæmlega `n_virkar > 0`: 156 af 293 verkefnum.
+   - Endursala og leiga gera verkefni ekki virkt. Orðrétt skilgreining (D1) hefði talið 30 uppseld verkefni virk.
+   - Óvirk: uppselt 96, ekki auglýst 41.
+2. **Síða:**
+   - Ein sía, sjálfgefið virk. `?nybygg=oll` = „Sýna líka óvirk (N)", merkt Óvirkt · Uppselt / Ekki auglýst.
+   - `?syn=uppselt` (flipar cc224) 308 → `?nybygg=oll`. Canonical og sitemap óbreytt.
+   - Samtölur og kort fylgja síunni, með nefnara.
+3. **Aldursvörn á byggingarstigs-greininni (almenn regla):** „byggár ≥ ár−3 eða óskráð" gildir nú um FULLBUID=0 OG B0–B3-greinina.
+   - Tekur út 190 íbúðir á landsvísu (9.303 → 9.113 innan skilgreiningar) og 122 hópa undir gólfi.
+   - Tvö verkefni falla af síðunni: Nónsmári 9 (byggt 2022, B2, 8 íb.) og Digranesheiði 45 (hús frá 1955 á B1). Slóðir þeirra svara 404.
+   - Tryggvagata 10–12: 76 → 67. Dvergaholt 5–9: 29 → 28.
+   - Alls 295 → 293 verkefni, ΣY 7.336 → 7.314, ΣX 3.881 → 3.877.
+4. **Forsíðumynd:** mynd nr. 0 nýjustu söluauglýsingar verkefnisins sem á sótta mynd (scraper.auglysingamyndir; sama auglýsingamengi og söluaðilar). Engin safnmynd.
+   - Minnkuð EINU SINNI í 720 px WebP, gæði 80 (`semantic.nybygging_myndir`, stærð bókuð). 167 myndir, allar 720×480; miðgildi 42 KB, samtals 7,3 MB (−74,6 % frá frumritum).
+   - Þekja: virk 153/156, óvirk 14/137.
+5. **Myndhýsill er EKKI opinn.**
+   - Bein R2-slóð var forskrift, en opinber myndafata (`myndir.verdmat.ai`) var aldrei sett upp (cc117 §0: „sér lota"). Afritafatan `verdmat-backups` er lokuð og fær aldrei birtingarmyndir; skriftan neitar henni sem áfangastað.
+   - Myndirnar eru smíðaðar og skráðar (`hladid_kl` NULL) og staðbundið eintak er í `D:\verdmat-is\myndir_nyb`.
+   - Framendinn les `NYB_MYNDA_HYSILL`; tómt gildi = hlutlaus flötur.
+   - `--hlada-myndir REMOTE` / `NYBYGGINGAR_MYNDA_REMOTE` hleður þegar hýsill er til.
+6. **Auglýsingahlekkir:**
+   - `augl_id` = nýjasta virka mbl-söluauglýsing einingar, slóð `mbl.is/fasteignir/fasteign/{id}/` (leið SPA-bundis, promote_mbl.py). Hlekkur aðeins á virka auglýsingu. 2.160 einingar.
+   - `augl_endursala` = eining þinglýst seld ÁÐUR en auglýsingin sást fyrst (221). Seld eining með auglýsingu frá því fyrir sölu er merkt „auglýst fyrir sölu" (82).
+7. **Útgáfa `cc224-v3`:**
+   - Migration 20261010120000 (psycopg2, rollback prófaður fyrst). Næturkeyrslan skrifar v3 og v2 stendur óhreyfð.
+   - Framendi les `NYB_UTGAFA` cc224-v3, cache-útgáfa `cc224b`.
+
+**Heimildir:** `D:\_audit\cc224_nybyggingar\SKIL_CC224_1.md` §8–§9.
+
+---
+
 ## 2026-10-10 — Stuðlaskrá v1.3: stæði í bílakjallara aftur birt lína +2,94 % (villuleiðrétting á v1.2, cc226b)
 
 **Ákvörðun Danna 10.10.2026 (GO strax).** v1.2 felldi línuna á ómældri tilgátu (villa arkitekts); cc226b mældi +2,94 %.
