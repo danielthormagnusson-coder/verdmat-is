@@ -4,6 +4,48 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-10 — Stuðlaskrá v1.2: bílskúrs- og stæðislínur BIRTANLEG → NULL-MAELT til bráðabirgða (cc226)
+
+**Ákvörðun Danna 10.10.2026 (GO á bráðabirgðalagfæringu).** Engin ný tala var sett í skrána; aðeins staða þriggja lína breytist. Hver lína ber fyrri tölu og mælingu í `stodubreyting` (grunnregla 3).
+
+| Lína | v1.1 | v1.2 |
+|---|---|---|
+| `bilskur_hus` (sérbýli) | BIRTANLEG +4,68 % | NULL-MAELT, tölulaust merki |
+| `bilgeymsla_annad_apt` (fjölbýli) | BIRTANLEG +1,28 % | NULL-MAELT, tölulaust merki |
+| `bilskyli_kjallara_apt` (fjölbýli) | BIRTANLEG +4,38 % | NULL-MAELT, tölulaust merki |
+| `tvofaldur_bilskur` | NULL-MAELT | óbreytt |
+
+1. **Ástæða (SKIL_CC226 §3).** Nettó-talan var reiknuð sem markaður (cc38) − flaggsveipur (cc40). Sveipurinn mælir aðeins viðbragð líkansins við flagginu sjálfu, ekki það sem líkanið ber gegnum fylgibreytur (EINFLM inniheldur bílskúrinn í 98–99,8 %, hnit, lóð o.fl.). Það sem grunnmatið vantar er leif líkansins á eigindinni:
+   - **Á cc38-þýðinu sjálfu** (extraction-flagg, n = 3.649): leif iter4r **+0,13 % ± 0,44**. Markaðskontrastinn á sama þýði var +4,68 %.
+   - **Sérbýli, HMS-bílskúr, in-sample:** −0,36 % ± 0,25 (n = 14.047). Í parhúsum −0,13 % ± 0,61.
+   - **Ferskar sölur eftir þjálfun:** −1,18 % ± 2,29 (n = 151).
+   - **Sama cc38-forskrift á HMS-flaggi:** +2,32 % ± 0,97, ekki +4,68.
+2. **Fjölbýli (SKIL §4).** θ (bílskúrs-fm/íbúðar-fm) = **0,72** [0,68; 0,76], og leif á bílskúr er **−1,24 % ± 0,09**. Grunnmatið ofmetur þegar, og +1,28 % lagðist ofan á.
+   - **Stæði í bílakjallara:** ferskt +1,57 % ± 1,55 (n = 164, ns); in-sample −2,60 % ± 0,40 á þeim 545 sem bera m².
+   - Sérbýli: θ = 1,14 [0,96; 1,24]. Grunnmatið er rétt á stærð, og tvítalningin var í álaginu, ekki í fermetrunum.
+3. **Áhrif (mæld á öllum 63.986 eignum með virka bílskúrs-/stæðisröð, anon-forgangur, `D:\_audit\cc226_tvitalning\e02_ahrif.json`):**
+
+   | Hópur | Eignir sem breytast | Miðgildi breytingar | Miðgildi kr | Summa |
+   |---|---|---|---|---|
+   | Alls | **61.657** | **−4,20 %** | −3,74 m.kr. | −255 ma.kr. |
+   | Sérbýli, `bilskur_hus` | 29.871 | −4,47 % | −5,26 m.kr. | −166 ma.kr. |
+   | Fjölbýli, `bilskyli_kjallara_apt` | 19.093 | −4,20 % | −3,64 m.kr. | −73 ma.kr. |
+   | Fjölbýli, `bilgeymsla_annad_apt` | 12.693 | −1,26 % | −1,17 m.kr. | −16 ma.kr. |
+
+   - 2.248 eignir eru utan mengis (T5/fjöleining, ekkert lag).
+   - Heildarþakið bítur á 2 eignum fyrir breytingu.
+4. **Dæmi Danna (150 fm parhús, 30 fm bílskúr):** 2315410 (SEMI, 152,7 fm, 30 fm bílskúr skv. skráargögnum).
+   - Grunnmat 95,60 m.kr.
+   - Leiðrétt viðmið **100,08 → 95,60 m.kr.** (−4,47 %). Eftir breytinguna ber eignin merkið „Bílskúr · mælt · engin marktæk áhrif“.
+   - Í Þitt viðmið gefur „bílskúr“ 0 % í stað +4,5 %.
+5. **Þitt viðmið.** `bilskur_staedi` er áfram í sviðsmyndinni (`lib/svidsmynd.js`) og gefur 0 %. Grunnmatið ber bílskúrinn þegar, og að fjarlægja eigindið og bæta því aftur eftir cc226b væru tvær viðmótsbreytingar fyrir eina mælingu.
+6. **Cache.** `EIGN_CACHE_UTGAFA` er hækkað í `cc226` (varfærni). Leiðrétta talan kemur úr ócachaðri `/api/leidretting`, svo farmurinn sjálfur bar hana ekki.
+7. **Gildistími.** Bráðabirgða þar til **cc226b** endurmælir allar BIRTANLEGAR línur sem leifa-kontrast á spám utan þjálfunarúrtaks, með kveikju á HMS-skrá. Grunur er um sama frádráttargalla á öllum BIRTANLEGUM línum. Rótarlagfæring í grunnmati er `reg_bilskur_m2` + íbúðarrými sem features í næsta retrain.
+
+**Heimildir:** `D:\_audit\cc226_tvitalning\SKIL_CC226.md` §3–4 (tölur) og §7 (áhrifamat). Sannprófun er í `e02_ahrif.json`, `e03_svidsmyndir_node.json` og cc216-jafngildisprófinu gegn www. Engin Fable-köll.
+
+---
+
 ## 2026-10-10 — /nybyggingar framendi: kassar + verkefnissíður lesa cc224-v2 beint, revalidate í næturverkinu (cc224 fasi 2)
 
 1. **Síður (verdmat-ai):**
