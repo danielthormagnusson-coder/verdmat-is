@@ -242,3 +242,7 @@ Bætt við eftir sannleiks-úttekt sem fann eina nefnara-villu (92,8% vs 31,1% �
 ### (d) SAMHLIÐA-LOTU COMMIT-REGLA (added 2026-07-03)
 
 **Lotur sem skrifa í sameiginlegar continuity-skrár (STATE, DECISIONS, WORKING_PROTOCOL) committa STRAX eftir skrif með explicit paths** (`git add docs/<file>.md` → `git commit`, aldrei `git add .`). Ócommittuð doc-breyting í deildu vinnutré er á forræði HVERRAR lotu sem committar næst — hún getur sópast inn í óskylt commit og þá tapast commit-eignarhald og rekjanleiki. **Raundæmi 2026-07-03:** ócommittuð þrep-STATE-lína sópaðist inn í retrain-commit `b701903` (meinlaust í það sinn, en ekki alltaf). Reglan: skrifaðu → committaðu strax með explicit paths → haltu svo áfram. Aldrei skilja doc-skrif eftir ócommittuð milli lota í deildu vinnutré.
+
+### (e) STUÐLASKRÁ: AÐEINS MÆLD LÍNA BREYTIST (added 2026-10-10, cc226b)
+
+**Lína í stuðlaskrá (`verdmat-ai/data/leidretting_studlar_v1.json`) breytist aðeins ef hún hefur sjálf verið mæld. „Sami galli líklega" er tilgáta, og tilgáta breytir engri línu.** Hver stöðu- eða tölubreyting vísar í mælingu á ÞEIRRI línu: hennar þýði, hennar kveikjulind og sú spá sem notandinn sér (rekstrarhams-grunnmat). **Raundæmi 2026-10-10:** v1.2 (cc226) felldi `bilskyli_kjallara_apt` í NÚLL-MÆLT með rökunum „sami frádráttargalli og bílskúr", án mælingar á línunni sjálfri. cc226b mældi hana á rekstrarkveikjunni: grunnmatið vantar +2,94 % ± 0,17 (n = 18.756). 19.093 eignir voru vanmetnar um 2,94 % frá útgáfu v1.2 þar til v1.3 lagaði það (sama dag).

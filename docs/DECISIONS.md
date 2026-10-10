@@ -4,6 +4,33 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-10 — Stuðlaskrá v1.3: stæði í bílakjallara aftur birt lína +2,94 % (villuleiðrétting á v1.2, cc226b)
+
+**Ákvörðun Danna 10.10.2026 (GO strax).** v1.2 felldi línuna á ómældri tilgátu (villa arkitekts); cc226b mældi +2,94 %.
+
+1. **Villan.** v1.2 (DECISIONS fyrr í dag) setti `bilskyli_kjallara_apt` í NÚLL-MÆLT með rökunum „sami frádráttargalli og bilskur_hus“. Línan sjálf var ekki mæld á réttri stærð: in-sample leif með extraction-features og 545 stæði með m² > 0. Grunnmatið í rekstri sér hvorugt.
+2. **Mælingin (cc226b).** Leif rekstrarhams-spár utan þjálfunarúrtaks (`build_X_matrix`-mynstur: extraction-features NaN, `has_extraction_data = 0`), á skráargagnakveikjunni sem rekstur notar (99,9 % kveikja):
+   - **+2,94 % ± 0,17** (sellu-klasað), n_meðferð **18.756** af 124.484 fjölbýlissölum.
+   - OOF-hluti (5-falda endurþjálfun iter4r, brot eftir FASTNUM): +2,91 ± 0,17 (18.095).
+   - Prod-booster á sölum frá 15.01.2026, sem aldrei voru í þjálfun: +3,74 ± 0,89 (638).
+   - Stæðin eru skráð með 0 m², eru ekki í EINFLM og grunnmatið sér þau ekki.
+3. **Línan í v1.3:** BIRTANLEG, `netto_birt_pct` 2,94. Ekkert er dregið frá og ekkert þakað.
+   - `se_markadur`/`n_treated` vísa nú til þessarar mælingar (0,17 / 18.756). `maelistaerd: rekstrar_oos_leif` segir það berum orðum.
+   - Saga v1.1 (+4,38, cc38 − cc40) og v1.2 (NÚLL) í `stodubreyting.saga`.
+4. **Fyrir/eftir** (v1.2 → v1.3, `D:\_audit\cc226b_oof\v13_fyrir_eftir.json`): **19.093** fjölbýliseignir breytast, allar um **+2,94 %**.
+   - Miðgildi +2,44 m.kr. við grunnmat p50 83,0 m.kr.; summa +49,1 ma.kr.
+   - Engin önnur eign breytist. Heildarþak bítur hvergi.
+5. **Annað óbreytt, staðfest af sömu mælingu:**
+   - `bilskur_hus` NÚLL-MÆLT (−1,34 ± 0,42), heldur þar til bílskúrs-m² fer í grunnmatið (BACKLOG).
+   - `bilgeymsla_annad_apt` NÚLL-MÆLT (−0,27 ± 0,15 ns).
+   - Pottur/arinn: v1.1 stendur þar til haló er mælt eins og í cc41 (BACKLOG).
+6. **Regla bókuð:** WORKING_PROTOCOL (e) — lína breytist aðeins ef hún hefur sjálf verið mæld.
+7. **Cache:** `EIGN_CACHE_UTGAFA` → `cc226b`.
+
+**Heimildir:** `D:\_audit\cc226b_oof\SKIL_CC226B.md` §0, §2 og `b05_rekstrarkveikja.txt`.
+
+---
+
 ## 2026-10-10 — Stuðlaskrá v1.2: bílskúrs- og stæðislínur BIRTANLEG → NULL-MAELT til bráðabirgða (cc226)
 
 **Ákvörðun Danna 10.10.2026 (GO á bráðabirgðalagfæringu).** Engin ný tala var sett í skrána; aðeins staða þriggja lína breytist. Hver lína ber fyrri tölu og mælingu í `stodubreyting` (grunnregla 3).
