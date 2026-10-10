@@ -28,6 +28,7 @@ Skilgreining (ákvörðun Danna 09.10.2026, SKIL_CC224_1.md §3 + §5 aldursvör
       scripts/nybyggingar_myndaval.csv (cc224_myndaval_lesa.py, §10); „engin" eða ekkert val → engin mynd (hlutlaus flötur);
       minnkuð EINU SINNI í 720 px WebP (semantic.nybygging_myndir), engin safnmynd
   augl_id = nýjasta VIRKA mbl-söluauglýsing einingarinnar (eignarstig, v_eign_virk_auglysing); augl_endursala = eining seld
+  lækkanir (cc224c) = Verðvakt v2 með gátum Verðvaktarinnar, fyrsta sala; laekkad_30 = eining á sölu með lækkun síðustu 30 d
   Y = íbúðir á landeignum verkefnisins byggðar ≥ ár−3 eða innan skilgreiningar (eldri hús á sömu lóð ekki talin);
       óskipt fastnúmer (≥3 ólíkar auglýstar stærðir) telur max(1, auglýstar einingar)
   X = einingar með þinglýstum samningi ONOTHAEFUR=0 (regla 2, eingöngu) frá SALA_FRA; magnsala = samningur > 1 fastnr,
@@ -79,6 +80,7 @@ BA_MIN_AUGL = 2                 # byggingaraðili birtist aðeins ef hann finnst
 KR_M2_GOLF = 100_000            # kr/m² undir þessu = villa í verði/stærð (t.d. 43 þús./m²) → utan tölfræði
 ASETT_GOLF = 1_000_000          # ásett verð undir 1 m.kr. = leiga/villa → utan tölfræði
 ENDURSALA_DAGAR = 180           # „endursala" ef auglýst > 180 d eftir þinglýsta sölu (eða önnur stofa) — Danni 10.10
+LAEKKUN_DAGAR = 30            # lækkunarmerki kassa = gluggi Verðvaktarinnar (sjálfgefið „síðustu 30 dagar“)
 HEIMILISFANG = re.compile(r'^(.*?)\s+(\d+)\s*([A-Za-zÁÐÉÍÓÚÝÞÆÖáðéíóúýþæö]?)\b')
 
 
@@ -125,8 +127,9 @@ def lesa(c):
     MV = {r['verkefni_id']: r for r in _csv.DictReader(open(MYNDAVAL, encoding='utf-8'))} if MYNDAVAL.exists() else {}
     MY = pd.read_sql("select sha256, lykill, breidd, haed, baeti, hladid_kl from semantic.nybygging_myndir", c)
     VV = pd.read_sql("""
-        select listing_id, fastnum, stefna, nytt_verd, nytt_sast from semantic.v_verdvakt_breytingar_v2
-         where fastnum = any(%(fn)s) and not coalesce(grunsamleg,false) and not coalesce(grunur_villa,false)""",
+        select listing_id, fastnum, stefna, fyrra_verd, nytt_verd, nytt_sast, flokkur, a_solu from semantic.v_verdvakt_breytingar_v2
+         where fastnum = any(%(fn)s) and not coalesce(hlutd_grunur,false) and not coalesce(arekstur,false)
+           and not coalesce(grunur_villa,false) and not coalesce(grunsamleg,false)""",
                      c, params=dict(fn=fn))
     VM = pd.read_sql("select sala_id, lykill, birtingarheiti from scraper.fasteignasala_vorumerki", c)
     SL = pd.read_sql("select landeign_nr, slod from semantic.nybygging_slodir where stadfest order by landeign_nr, slod", c)
@@ -264,18 +267,32 @@ def reikna(D):
     U['asett_verd'] = np.where(U.heildareining, np.nan, U.fastnum.map(av1.price_amount))
     U['asett_flm'] = np.where(U.heildareining, np.nan, U.fastnum.map(av1.size_sqm))
 
-    # Verðvakt v2 — lækkanir (án grunsamlegra/villugruns), afrituð per (fastnr, dags, verð)
+    # Verðvakt v2 — sömu gátir og Verðvaktin (lib/verdvakt-queries.js `gild`: hlutd_grunur, arekstur, grunur_villa,
+    # grunsamleg; cc224c), afrituð per (fastnr, dags, verð). Aðeins fyrsta sala: breyting sem sást EFTIR sölu er endursala.
     vv = VV.dropna(subset=['fastnum']).copy()
     vv['fastnum'] = vv.fastnum.astype('int64')
-    vv['d'] = pd.to_datetime(vv.nytt_sast, utc=True).dt.tz_localize(None).dt.normalize()
-    vv = vv.drop_duplicates(['fastnum', 'd', 'nytt_verd', 'stefna'])
+    vv['ts'] = pd.to_datetime(vv.nytt_sast, utc=True).dt.tz_localize(None)
+    vv['d'] = vv.ts.dt.normalize()
+    vv = vv.sort_values(['fastnum', 'ts', 'listing_id']).drop_duplicates(['fastnum', 'd', 'nytt_verd', 'stefna'])
     vv = vv[~(vv.d > vv.fastnum.map(U.set_index('fastnum').sala_dags))]
-    U['n_laekkanir'] = U.fastnum.map(vv[vv.stefna == 'laekkun'].groupby('fastnum').size()).fillna(0).astype(int)
+    lk = vv[vv.stefna == 'laekkun']
+    U['n_laekkanir'] = U.fastnum.map(lk.groupby('fastnum').size()).fillna(0).astype(int)
+    # síðasta lækkun (dálkur verkefnissíðu) og lækkunarmerki (cc224c): lækkun í auglýsingu EÐA endurbirt á lægra verði
+    # sem sást síðustu LAEKKUN_DAGAR daga (frá keyrslu), auglýsingin á sölu (a_solu, sjálfgefið Verðvaktar) og einingin á
+    # sölu í fyrstu sölu núna (stada a_solu — sami teljari og „á sölu núna")
+    sl = lk.groupby('fastnum').last()
+    U['laekkun_dags'] = U.fastnum.map(sl.d)
+    U['laekkun_fra'] = U.fastnum.map(sl.fyrra_verd)
+    U['laekkun_til'] = U.fastnum.map(sl.nytt_verd)
+    U['laekkun_flokkur'] = U.fastnum.map(sl.flokkur)
+    nylega = lk[(lk.ts >= pd.Timestamp.now(tz='UTC').tz_localize(None) - pd.Timedelta(days=LAEKKUN_DAGAR)) & lk.a_solu.fillna(False)]
+    U['laekkad_30'] = U.fastnum.isin(nylega.fastnum)
     U['sidasta_verdbr'] = U.fastnum.map(vv.groupby('fastnum').d.max())
     U['sidasta_ny_augl'] = U.fastnum.map(L.groupby('fastnum').t0.max())
 
     U['stada'] = np.select([U.seld & ~U.magnsala, U.magnsala, U.n_virk > 0], ['seld', 'magnsala', 'a_solu'], 'oseld')
     U['x'] = np.where(U.seld, U.n_undireiningar, 0)
+    U['laekkad_30'] = U.laekkad_30 & (U.stada == 'a_solu')
     U['virk_oseld'] = np.where(U.seld, 0, U.n_virk)
 
     # auglýsingahlekkur: nýjasta VIRKA mbl-söluauglýsing einingarinnar (eignarstig). augl_endursala = einingin var seld
@@ -372,7 +389,7 @@ def reikna(D):
             fyrsta_sala=seld_d.min().date() if len(seld_d) else None, sidasta_sala=seld_d.max().date() if len(seld_d) else None,
             kr_m2_seld=int(round(seldar.kr_m2.median())) if len(seldar) else None, n_kr_m2_seld=len(seldar),
             kr_m2_asett=int(round((a.price_amount / a.size_sqm.astype(float)).median())) if len(a) else None, n_kr_m2_asett=len(a),
-            n_laekkanir=int(g.n_laekkanir.sum()), stofur=stofur,
+            n_laekkanir=int(g.n_laekkanir.sum()), n_laekkad_30=int(g.laekkad_30.sum()), stofur=stofur,
             byggingaradili=ba_nafn, byggingaradili_n_augl=int(ba_n), slod=None,
             byggar_min=int(g.by.min()) if g.by.notna().any() else None, byggar_max=int(g.by.max()) if g.by.notna().any() else None,
             sidasta_virkni=pd.Timestamp(virkni).date(), uppselt=(X == Y)))
@@ -398,6 +415,8 @@ def reikna(D):
         sala_dags=E.sala_dags.dt.date, kaupverd=np.where(E.stada == 'seld', E.kaupverd, np.nan),
         kr_m2=np.where((E.stada == 'seld') & E.kr_m2.notna(), E.kr_m2.round(), np.nan),
         asett_verd=E.asett_verd, asett_flm=E.asett_flm, n_laekkanir=E.n_laekkanir,
+        laekkun_dags=E.laekkun_dags.dt.date, laekkun_fra=E.laekkun_fra, laekkun_til=E.laekkun_til,
+        laekkun_flokkur=E.laekkun_flokkur, laekkad_30=E.laekkad_30.astype(bool),
         augl_id=E.augl_id, augl_endursala=E.augl_endursala, augl_flokkur=E.augl_flokkur))
     E['sala_dags'] = E.sala_dags.where(E.stada.isin(['seld', 'magnsala']))
     E = E.sort_values(['verkefni_id', 'fastnum']).reset_index(drop=True)   # föst röð → endurtekjanlegt md5
@@ -526,12 +545,12 @@ def nn(v):
 VCOLS = ['verkefni_id', 'slug', 'heiti', 'heiti_uppruni', 'gotur', 'postnr', 'postheiti', 'sveitarfelag', 'landeignir', 'lat', 'lng',
          'n_einingar', 'n_einingar_hms', 'n_heildareiningar', 'n_seld', 'n_magnseld', 'n_virkar', 'n_oseldar', 'n_oseldar_oauglystar',
          'n_b0', 'n_b1', 'n_b2', 'n_b3', 'n_b4', 'fyrsta_sala', 'sidasta_sala', 'kr_m2_seld', 'n_kr_m2_seld', 'kr_m2_asett',
-         'n_kr_m2_asett', 'n_laekkanir', 'stofur', 'byggingaradili', 'byggingaradili_n_augl', 'slod', 'byggar_min', 'byggar_max',
+         'n_kr_m2_asett', 'n_laekkanir', 'n_laekkad_30', 'stofur', 'byggingaradili', 'byggingaradili_n_augl', 'slod', 'byggar_min', 'byggar_max',
          'sidasta_virkni', 'uppselt', 'mynd_sha256', 'mynd_lykill', 'mynd_lykill_frumrit', 'mynd_breidd', 'mynd_haed', 'mynd_stofa',
          'mynd_dags', 'mynd_listing_id']
 ECOLS = ['fastnum', 'verkefni_id', 'heimilisfang', 'merking', 'einflm', 'fjherb', 'byggar', 'byggingarstig', 'innan_skilgr',
          'heildareining', 'n_undireiningar', 'stada', 'sala_dags', 'kaupverd', 'kr_m2', 'asett_verd', 'asett_flm', 'n_laekkanir',
-         'augl_id', 'augl_endursala', 'augl_flokkur']
+         'augl_id', 'augl_endursala', 'augl_flokkur', 'laekkun_dags', 'laekkun_fra', 'laekkun_til', 'laekkun_flokkur', 'laekkad_30']
 
 
 def skrifa(c, V, E, D, auk, hofst):

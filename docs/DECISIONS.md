@@ -4,6 +4,29 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-11 — /nybyggingar: lækkunarmerki (Verðvakt v2), síðuskipting, svæðarofi og sveitarfélagasía (cc224c)
+
+Forskrift Danna 10.10 (cc224c liðir 1–3; liður 4 forsíðukassi bíður push cc221). Framendi verdmat-ai, gagnalag app; HALT fyrir push.
+
+1. **Lækkunarmerki „Verð lækkað · N íbúðir" á kassa** = íbúð verkefnisins á sölu í fyrstu sölu (stada a_solu) með lækkun ásetts verðs sem sást síðustu 30 daga.
+   - Lind: `semantic.v_verdvakt_breytingar_v2`, SÖMU gátir og Verðvaktin (`gild`: hlutd_grunur, arekstur, grunur_villa, grunsamleg), breyting_kr < 0. Bæði „lækkað í auglýsingu" og „endurbirt á nýju verði" á lægra verði. Auglýsingin á sölu (a_solu, sjálfgefið Verðvaktarinnar).
+   - Fyrsta sala: breyting sem sást eftir þinglýsingu (endursala) fellur út (14 í glugganum).
+   - Glugginn reiknast frá keyrslu (næturtaktur), svo merkið getur verið allt að sólarhring á eftir Verðvaktinni.
+   - Mæling 10.10: **24 af 156 virkum verkefnum (15,4 %)**, 68 íbúðir. Óvirk verkefni fá það aldrei (krefst íbúðar á sölu).
+   - Litur = lækkun á Verðvaktinni (accent-punktur, accent-ink á accent-tint). Merkið hlekkjar á íbúðir verkefnisins á sölu.
+2. **Gagnalag** (migration 20261011090000, psycopg2, rollback prófaður fyrst; sama útgáfa cc224-v3, dálkar fyllast í keyrslu):
+   - `nybygging_einingar.laekkun_dags/_fra/_til/_flokkur` = síðasta lækkun í fyrstu sölu (212 íbúðir), `laekkad_30` (68).
+   - `nybygging_verkefni.n_laekkad_30`.
+   - **`n_laekkanir` notar nú líka fullar gátir Verðvaktarinnar**: 304 → 225 lækkanir í 28 verkefnum. 81 hrá röð féll út (hlutdeildargrunur 58, árekstur 23), sem Verðvaktin sjálf birtir ekki heldur.
+3. **Verkefnissíða:** dálkurinn „Síðasta lækkun" (−X m.kr, dagsetning, verð fyrir → eftir, „endurbirt á lægra verði"), litaður ef innan 30 daga. Á 380 px stendur hann sem undirtexti verðs.
+4. **Síðuskipting:** 12 kassar, svo „Sýna fleiri (N)" → `?allt=1#kassi-13`. Röðun óbreytt. Kortið sýnir ALLTAF allt síaða mengið.
+5. **Svæðarofi** Allt landið / Höfuðborgarsvæðið / Landsbyggðin (`?svaedi=hbs|lands`): SAMA póstnúmeraregla og Verðvaktin (`semantic.verdvakt_hbs_postnr`; landsbyggð = þekkt póstnúmer utan), aldrei region_tier. Verkefni ber algengasta póstnúmer íbúða sinna.
+6. **Sveitarfélagasía** (`?sveitarfelag=<slug>`, slug = umritað heiti HMS): fellilisti með sveitarfélögum sem eiga ≥ 1 verkefni í síunni (virk/öll × svæði), með fjölda. Sameinanleg við virk/óvirk og svæði; samtölur, nefnari og kort fylgja.
+   - Svæðarofinn er grófa sían: talan í sviga er allt svæðið og smellur hreinsar sveitarfélagið.
+   - Óþekkt slug → 307 á sömu slóð án þess. Canonical áfram /nybyggingar.
+7. **Málvilla leiðrétt:** „lækkunir/verðlækkunir" → „lækkanir/verðlækkanir" (var á www frá cc224). Aðferðafræðin sagði enn að mynd væri „fyrsta mynd nýjustu auglýsingar"; hún segir nú að myndin sé handvalin útlitsmynd (cc224b).
+8. **Cache:** `NYB_CACHE_UTGAFA` cc224c1.
+
 ## 2026-10-10 — Stuðlaskrá v1.4: 24 línur endurmældar sem leif rekstrarhams-spár utan úrtaks (cc226b)
 
 **Skilyrt GO Danna 10.10.2026** (öll skilyrði stóðust fyrir push; SKIL_CC226B §8). verdmat-ai `3367c11`, cache-lykill `cc226b-v14`.
