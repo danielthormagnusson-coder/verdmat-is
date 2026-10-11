@@ -1,4 +1,4 @@
-"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v5; v4 + heildarkaup cc228, v3 + myndaval cc224d).
+"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v6; nefnarar cc229, v5 heildarkaup cc228, v4 myndaval cc224d).
 
   python scripts/cc224_nybygging_verkefni.py --dryrun [--ut DIR] [--slodir-tillaga CSV]
   python scripts/cc224_nybygging_verkefni.py --skrifa [--ut DIR] [--revalidate] [--hlada-myndir REMOTE]
@@ -30,7 +30,13 @@ Skilgreining (ákvörðun Danna 09.10.2026, SKIL_CC224_1.md §3 + §5 aldursvör
   augl_id = nýjasta VIRKA mbl-söluauglýsing einingarinnar (eignarstig, v_eign_virk_auglysing); augl_endursala = eining seld
   lækkanir (cc224c) = Verðvakt v2 með gátum Verðvaktarinnar, fyrsta sala; laekkad_30 = eining á sölu með lækkun síðustu 30 d
   Y = íbúðir á landeignum verkefnisins byggðar ≥ ár−3 eða innan skilgreiningar (eldri hús á sömu lóð ekki talin);
-      óskipt fastnúmer (≥3 ólíkar auglýstar stærðir) telur max(1, auglýstar einingar)
+      óskipt fastnúmer (cc229 A, regla 1) = fastnr. með ≥ 2 íbúðarmatseiningar hjá HMS; telur fjölda þeirra
+  íbúðir án byggingarárs (cc229 B): íbúð á landeign verkefnis með byggár NULL/0 utan Y telst með ef sama hús (landeign +
+      heimilisfang) EÐA sami kaupsamningur (færslunúmer, öll ár) og eining í Y — NEMA ELDRI EIGN (cc229 f.3): fastnr. stofnað >
+      2 árum á undan byggingarári systureininga; stofndagur fastnr. er EKKI til í gögnunum (properties ber aðeins skodags/
+      scraped_at_latest) → VARALEIÐ: fyrsti kaupsamningur (nothæfur eða ekki) > 4 árum á undan lægsta byggári systureininga
+      (sama hús, annars sama landeign)
+  n_leiga (cc229 C) = fastnr. verkefnisins sem hafa verið í leiguauglýsingu (mbl/myigloo, sást fyrst ≥ SALA_FRA)
   X = einingar með þinglýstum samningi ONOTHAEFUR=0 (regla 2, eingöngu) frá SALA_FRA; magnsala = samningur > 1 fastnr,
       talin í X, merkt, utan kr/m²; HEILDARKAUP (cc228 D2′, GO Danna 11.10) = eining án nothæfs samnings með ÓNOTHÆFAN
       samning frá SALA_FRA, NEMA söluauglýsing hennar sást fyrst eftir síðasta ónothæfa samninginn EÐA hún sé á sölu núna;
@@ -58,11 +64,12 @@ from psycopg2.extras import execute_values
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-UTGAFA = "cc224-v5"   # cc228: = v4 + heildarkaup (D2′); cc224d (v4): forsíðumyndir úr öllum myndum allra auglýsinga
+UTGAFA = "cc224-v6"   # cc229: = v5 + óskipt skv. HMS (A), íbúðir án byggár tengdar (B), n_leiga (C); cc228 (v5): heildarkaup
 SALA_FRA = dt.date(2021, 1, 1)
 AR = dt.date.today().year
 BYGGAR_SKILGR = AR - 2          # „fullbúin innan tveggja ára"
 BYGGAR_Y = AR - 3               # Y: byggð ≥ 2023 (2026)
+ELDRI_AR = 4                    # cc229 f.3 (B) varaleið: fyrsti samningur > 4 árum fyrir byggár systra = eldri eign
 IBUD = ('Íbúð', 'Íbúð á hæð', 'Íbúð í kjallara', 'Íbúð í risi', 'Einbýlishús', 'Raðhús', 'Parhús')  # regla 7 (hvítlisti)
 SKILGREINING = (f"íbúð (regla 7: {', '.join(IBUD)}; ekki sumarhús) ∧ (((FULLBUID=0 ∨ (byggingarstig B0–B3 ∧ matsstig 0–6)) ∧ "
                 f"(BYGGAR ≥ {BYGGAR_Y} ∨ BYGGAR óskráð)) ∨ BYGGAR ≥ {BYGGAR_SKILGR}); Y = byggð ≥ {BYGGAR_Y} ∨ innan skilgr.; "
@@ -108,10 +115,24 @@ def lesa(c):
                p.byggingarstig, p.matsstig, p.landeign_nr, p.lat, p.lng,
                (select m->>'merking' from jsonb_array_elements(case when jsonb_typeof(p.matseiningar)='array'
                         then p.matseiningar else '[]'::jsonb end) m where (m->>'fastnum')::bigint = p.fastnum limit 1) merking,
-               coalesce({skilgr_sql}, false) innan_skilgr
+               (select count(*) from jsonb_array_elements(case when jsonb_typeof(p.matseiningar)='array'
+                        then p.matseiningar else '[]'::jsonb end) m
+                 where (m->>'fastnum')::bigint = p.fastnum and m->>'notkun_texti' ilike 'Íbúð%%') n_ibud_hms,
+               coalesce({skilgr_sql}, false) innan_skilgr,
+               not coalesce({skilgr_sql} or p.byggar >= {BYGGAR_Y}, false) byggar_kandidat
           from public.properties p
-         where {ibud_sql} and p.landeign_nr is not null and ({skilgr_sql} or p.byggar >= {BYGGAR_Y})""", c, params=prm)
+         where {ibud_sql} and p.landeign_nr is not null
+           and (({skilgr_sql} or p.byggar >= {BYGGAR_Y})
+                or (coalesce(nullif(p.byggar, 0), -1) = -1 and p.landeign_nr in (
+                      select p.landeign_nr from public.properties p
+                       where {ibud_sql} and p.landeign_nr is not null and ({skilgr_sql} or p.byggar >= {BYGGAR_Y}))))""", c, params=prm)
     fn = [int(x) for x in P.fastnum]
+    # cc229 B: ALLIR samningar (öll ár, nothæfir og ónothæfir) — tenging um færslunúmer og vörn „eldri eign"; aldrei verð
+    SA = pd.read_sql("""select fastnum, faerslunumer, thinglystdags from public.sales_history where fastnum = any(%(fn)s)""",
+                     c, params=dict(fn=fn))
+    # cc229 C: leiguauglýsingar á fastnr. (sást fyrst ≥ SALA_FRA)
+    RL = pd.read_sql("""select distinct fastnum from scraper.listings
+                          where tenure = 'rent' and fastnum = any(%(fn)s) and first_seen_at >= %(fra)s""", c, params=dict(fn=fn, fra=SALA_FRA))
     S = pd.read_sql("""
         with s as (select id, fastnum, thinglystdags, kaupverd_nominal, einflm_at_sale, onothaefur, faerslunumer
                      from public.sales_history where fastnum = any(%(fn)s) and thinglystdags >= %(fra)s)
@@ -138,7 +159,7 @@ def lesa(c):
     cur.execute("select max(thinglystdags) from public.sales_history"); data_through = cur.fetchone()[0]
     cur.execute("select max(last_seen_at) from scraper.listings where tenure='sale'"); snap = cur.fetchone()[0]
     c.rollback()
-    return dict(P=P, S=S, L=L, MV=MV, MY=MY, VV=VV, VM=VM, SL=SL, n_skilgr_land=n_skilgr_land, data_through=data_through, snap=snap)
+    return dict(P=P, S=S, SA=SA, RL=RL, L=L, MV=MV, MY=MY, VV=VV, VM=VM, SL=SL, n_skilgr_land=n_skilgr_land, data_through=data_through, snap=snap)
 
 
 def ba_ur_texta(t):
@@ -216,25 +237,55 @@ def verkefnalykill(U, SL):
     return U.landeign_nr.map(kort), sum(1 for k, v in kort.items() if k != v)
 
 
+def _gata(h):
+    return re.sub(r'\s+', ' ', h.strip().lower()) if isinstance(h, str) else ''
+
+
+def tengja_byggar_kandidata(U, SA):
+    """cc229 B: íbúðir án byggingarárs (byggar_kandidat) inn í Y ef tengdar einingu í Y um sama hús (landeign + heimilisfang)
+    EÐA sama kaupsamning (færslunúmer, öll ár) — nema ELDRI EIGN (cc229 f.3): stofndagur fastnr. ekki til → varaleið: fyrsti
+    kaupsamningur (nothæfur eða ekki) > ELDRI_AR árum á undan lægsta byggári systureininga (sama hús, annars sama landeign).
+    Skilar (U án ótengdra og stöðvaðra, talningu)."""
+    k = U.byggar_kandidat.astype(bool)
+    Y0 = U[~k]
+    K = U[k].copy()
+    hus = set(zip(Y0.landeign_nr, Y0.heimilisfang.map(_gata)))
+    K['sama_hus'] = [(l, _gata(h)) in hus and _gata(h) != '' for l, h in zip(K.landeign_nr, K.heimilisfang)]
+    sa = SA.dropna(subset=['faerslunumer']).copy()
+    sa['fastnum'] = sa.fastnum.astype('int64')
+    f_y = set(sa[sa.fastnum.isin(Y0.fastnum)].faerslunumer)
+    K['sami_pakki'] = K.fastnum.isin(sa[sa.faerslunumer.isin(f_y)].fastnum)
+    K['tengd'] = K.sama_hus | K.sami_pakki
+    by_hus = Y0.assign(h=Y0.heimilisfang.map(_gata)).groupby(['landeign_nr', 'h']).by.min()
+    by_land = Y0.groupby('landeign_nr').by.min()
+    K['by_systra'] = [by_hus.get((l, _gata(h)), np.nan) for l, h in zip(K.landeign_nr, K.heimilisfang)]
+    K['by_systra'] = K.by_systra.fillna(K.landeign_nr.map(by_land))
+    fyrsti = pd.to_datetime(SA.thinglystdags).groupby(SA.fastnum.astype('int64')).min()
+    K['fyrsti_ar'] = K.fastnum.map(fyrsti).dt.year
+    K['eldri'] = K.tengd & K.fyrsti_ar.notna() & K.by_systra.notna() & ((K.by_systra - K.fyrsti_ar) > ELDRI_AR)
+    inn = K[K.tengd & ~K.eldri]
+    auk = dict(b_kandidatar=int(len(K)), b_tengd=int(K.tengd.sum()), b_sama_hus=int(K.sama_hus.sum()),
+               b_sami_pakki=int(K.sami_pakki.sum()), b_eldri=int(K.eldri.sum()), b_inn=int(len(inn)),
+               b_an_vidmids=int((K.tengd & K.by_systra.isna()).sum()), b_K=K)
+    return pd.concat([Y0, inn]), auk
+
+
 def reikna(D):
     P, S, L, VV, VM = D['P'], D['S'].copy(), D['L'].copy(), D['VV'], D['VM']
     U = P.copy()
     U['fastnum'] = U.fastnum.astype('int64')
     U['by'] = pd.to_numeric(U.byggar, errors='coerce').where(lambda x: x > 0)     # byggar 0 = óskráð
+    U, auk_b = tengja_byggar_kandidata(U, D['SA'])
     U['sveitarfelag'] = U.sveitarfelag.str.strip()
     L['fastnum'] = L.fastnum.astype('int64')
     L['sz'] = pd.to_numeric(L.size_sqm, errors='coerce').round(0)
     L['rm'] = pd.to_numeric(L.rooms, errors='coerce')
 
-    # óskipt fastnúmer (bygging fyrir eignaskiptingu): ≥3 ólíkar auglýstar stærðir OG HMS-flatarmál ≥ 2 × miðgildi
-    # auglýstrar stærðar (annars er þetta ein íbúð auglýst með ólíkum stærðum, t.d. 97/193 m²); Y-framlag =
-    # max(1, ólíkar (stærð, herbergi))
-    nsz = L.groupby('fastnum').sz.nunique()
-    medsz = L[L.sz > 0].groupby('fastnum').sz.median()
-    U['heildareining'] = (U.fastnum.map(nsz).fillna(0).ge(3)
-                          & (pd.to_numeric(U.einflm, errors='coerce') >= 2 * U.fastnum.map(medsz)))
-    nund = L.drop_duplicates(['fastnum', 'sz', 'rm']).groupby('fastnum').size()
-    U['n_undireiningar'] = np.where(U.heildareining, np.maximum(1, U.fastnum.map(nund).fillna(1)), 1).astype(int)
+    # óskipt fastnúmer (cc229 A, regla 1): HMS skráir eitt fastnr. með ≥ 2 íbúðarmatseiningum (eignaskiptayfirlýsing ekki
+    # komin); Y-framlag = fjöldi íbúðarmatseininga HMS. (Áður: ≥ 3 ólíkar auglýstar stærðir — vantaldi, Baughamar 7: 5 vs 55.)
+    nhms = pd.to_numeric(U.n_ibud_hms, errors='coerce').fillna(0).astype(int)
+    U['heildareining'] = nhms >= 2
+    U['n_undireiningar'] = np.where(U.heildareining, nhms, 1).astype(int)
 
     # ónothæfir samningar (cc228 D2′): aðeins dagsetning síðasta per fastnr — aldrei verð (regla 2)
     So = S[S.onothaefur == 1]
@@ -396,6 +447,7 @@ def reikna(D):
             n_einingar=Y, n_einingar_hms=hms_n, n_heildareiningar=int(g.heildareining.sum()),
             n_seld=X, n_magnseld=int(g[g.magnsala].n_undireiningar.sum()),
             n_heildarkaup=int(g[g.stada == 'heildarkaup'].n_undireiningar.sum()),
+            n_leiga=int(g.fastnum.isin(D['RL'].fastnum.astype('int64')).sum()),
             n_virkar=int(g.virk_oseld.sum()), n_oseldar=Y - X, n_oseldar_oauglystar=Y - X - int(g.virk_oseld.sum()),
             n_b0=int((~bs.isin(['B1', 'B2', 'B3', 'B4'])).sum()), n_b1=int((bs == 'B1').sum()), n_b2=int((bs == 'B2').sum()),
             n_b3=int((bs == 'B3').sum()), n_b4=int((bs == 'B4').sum()),
@@ -435,7 +487,7 @@ def reikna(D):
     hk = E.stada == 'heildarkaup'
     E.loc[hk, 'sala_dags'] = E.loc[hk, 'fastnum'].map(ono_sidast).dt.date
     E = E.sort_values(['verkefni_id', 'fastnum']).reset_index(drop=True)   # föst röð → endurtekjanlegt md5
-    return V, E, dict(n_hopar=n_hopar, n_sameinad=n_sameinad, U=U)
+    return V, E, dict(n_hopar=n_hopar, n_sameinad=n_sameinad, U=U, **auk_b)
 
 
 def utvikka_slodir(slodir, D):
@@ -558,7 +610,7 @@ def nn(v):
 
 
 VCOLS = ['verkefni_id', 'slug', 'heiti', 'heiti_uppruni', 'gotur', 'postnr', 'postheiti', 'sveitarfelag', 'landeignir', 'lat', 'lng',
-         'n_einingar', 'n_einingar_hms', 'n_heildareiningar', 'n_seld', 'n_magnseld', 'n_heildarkaup', 'n_virkar', 'n_oseldar', 'n_oseldar_oauglystar',
+         'n_einingar', 'n_einingar_hms', 'n_heildareiningar', 'n_seld', 'n_magnseld', 'n_heildarkaup', 'n_leiga', 'n_virkar', 'n_oseldar', 'n_oseldar_oauglystar',
          'n_b0', 'n_b1', 'n_b2', 'n_b3', 'n_b4', 'fyrsta_sala', 'sidasta_sala', 'kr_m2_seld', 'n_kr_m2_seld', 'kr_m2_asett',
          'n_kr_m2_asett', 'n_laekkanir', 'n_laekkad_30', 'stofur', 'byggingaradili', 'byggingaradili_n_augl', 'slod', 'byggar_min', 'byggar_max',
          'sidasta_virkni', 'uppselt', 'mynd_sha256', 'mynd_lykill', 'mynd_lykill_frumrit', 'mynd_breidd', 'mynd_haed', 'mynd_stofa',
@@ -698,10 +750,15 @@ def main():
                + f" | heildarkaup (D2′) Σ undireininga {int(V.n_heildarkaup.sum())} í {int((V.n_heildarkaup > 0).sum())} verkefnum"
                + f" | ΣX {int(V.n_seld.sum())}",
                f"einingar m/ virka mbl-auglýsingu {int(E.augl_id.notna().sum())} | flokkar "
-               + ' · '.join(f"{k} {n}" for k, n in E.augl_flokkur.value_counts().items())]
+               + ' · '.join(f"{k} {n}" for k, n in E.augl_flokkur.value_counts().items()),
+               f"óskipt (HMS) {int(E.heildareining.sum())} fastnr., Σ undireininga {int(E[E.heildareining].n_undireiningar.sum())}"
+               f" | byggár-kandídatar {auk['b_kandidatar']}: tengd {auk['b_tengd']} (hús {auk['b_sama_hus']}, pakki {auk['b_sami_pakki']})"
+               f", eldri eign stöðvuð {auk['b_eldri']} ({100 * auk['b_eldri'] / max(1, auk['b_tengd']):.1f} %), inn {auk['b_inn']}"
+               f", án viðmiðs {auk['b_an_vidmids']} | n_leiga Σ {int(V.n_leiga.sum())} í {int((V.n_leiga > 0).sum())} verkefnum"]
         for l in lin:
             print(l)
         (ut / 'samantekt.txt').write_text('\n'.join(lin) + '\n', encoding='utf-8')
+        auk['b_K'].to_csv(ut / 'byggar_kandidatar.csv', index=False, encoding='utf-8')
         if a.skrifa:
             kid, nv, ne = skrifa(c, V, E, D, auk, hofst)
             print(f"[OK] skrifað keyrsla_id={kid}: verkefni {nv[0]} (ΣY {nv[1]}, ΣX {nv[2]}), einingar {ne}")

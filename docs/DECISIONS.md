@@ -4,6 +4,40 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-11 — /nybyggingar: nefnarar — óskipt skv. HMS, íbúðir án byggingarárs, leigulína (cc229)
+
+GO Danna 11.10 (cc229 f.3). Útgáfa **cc224-v6** (keyrsla 14, migration `20261011200000_cc229_nefnarar` + rollback); v5 stendur sem afturköllun.
+
+1. **(A) Óskipt fastanúmer = regla 1:**
+   - Fastanúmer með ≥ 2 íbúðarmatseiningar hjá HMS telur fjölda þeirra. Auglýsingareglan (≥ 3 stærðir) er felld.
+   - Niðurstaða: 20 fastnr., 462 íbúðir; Baughamar 7: 5 → 55.
+2. **(B) Íbúðir án byggingarárs (byggár NULL/0):** íbúð á landeign verkefnis telst með ef hún er í **sama húsi** (landeign + heimilisfang) EÐA **sama kaupsamningi** (færslunúmer, öll ár) og íbúð í Y.
+   - **Vörn, ELDRI EIGN:** stofndagur fastanúmers er ekki til í gögnunum (`properties` ber aðeins skodags/scraped_at_latest). **Varaleið** ræður því: fyrsti kaupsamningur (nothæfur eða ekki) > 4 árum á undan lægsta byggári systureininga (sama hús, annars landeign).
+   - Stöðvar 24 af 1.475 tengdum (**1,6 %**). Allar 17 eldri eignir með samning ≤ 2017 stöðvast; 0 fara inn.
+   - Af 30 forsölum (2019–2021) fara 23 inn, þar með Útgarður 6. 7 stöðvast: Borgarbraut 135501 ×6 og 65a ×1, samningur 2019 en byggár systra 2024.
+3. **(C) Leigulína** á verkefnissíðu: „Minnst N af M íbúðum hafa verið í leiguauglýsingu" (`n_leiga` = fastnr. í leiguauglýsingu frá 2021). Hún birtist á 87 verkefnum, Σ 269. Ekkert flokkunarmerki.
+4. **Áhrif v5 → v6:**
+
+   | | v5 | v6 |
+   |---|---|---|
+   | verkefni | 293 | 324 |
+   | Y (íbúðir) | 7.314 | 8.870 |
+   | seldar | 4.230 | 5.354 |
+   | heildarkaup | 353 | 694 |
+   | á sölu núna | 1.940 | 1.969 |
+   | virk verkefni | 155 | 164 |
+
+   - 31 ný verkefni eru öll **lyft yfir lágmark**, engin alveg ný: 24 af (B), 7 af (A). Ekkert þeirra hefur mynd, en 20 eiga nothæfa útlitsmynd í auglýsingum (ekki valið).
+   - 6 slóðir breytast (heiti fá nýjar götur, t.d. Hringbraut 120–142); gamlar slóðir svara 308.
+5. **(G) stöðnun:** „á sölu"-mengið sem /nybyggingar, Verðvakt og forsíðukassi lesa er staðfest innan 5 daga. Þrennt er opið og ekki lagað hér:
+   - stöðnun auglýsinga án fastanúmers (2,07 %)
+   - stöðnun í mbl-leigu
+   - skrifvilla (`ActiveSqlTransaction`) í loggi lífsferilssópunar
+
+**Heimildir:** `D:\_audit\cc229_nefnarar\SKIL_CC229.md` (f.1–f.3).
+
+---
+
 ## 2026-10-11 — /nybyggingar: ónothæfur samningur telst „Seld í heildarkaupum" í framvindu (cc228 D2′)
 
 GO Danna 11.10 á tillögu (D) sem D2′ (`D:\_audit\cc228_pakkasamningar\SKIL_CC228.md` (D) og §F).
