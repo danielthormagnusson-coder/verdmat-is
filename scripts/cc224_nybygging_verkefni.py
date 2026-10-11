@@ -37,6 +37,7 @@ Skilgreining (ákvörðun Danna 09.10.2026, SKIL_CC224_1.md §3 + §5 aldursvör
       scraped_at_latest) → VARALEIÐ: fyrsti kaupsamningur (nothæfur eða ekki) > 4 árum á undan lægsta byggári systureininga
       (sama hús, annars sama landeign)
   n_leiga (cc229 C) = fastnr. verkefnisins sem hafa verið í leiguauglýsingu (mbl/myigloo, sást fyrst ≥ SALA_FRA)
+  n_tviaugl_nu / leiguadili (cc234) = fastnr. NÚ samtímis í söluauglýsingu og leiguauglýsingu + birtanlegur leiguaðili (nyb_tviaugl.py)
   X = einingar með þinglýstum samningi ONOTHAEFUR=0 (regla 2, eingöngu) frá SALA_FRA; magnsala = samningur > 1 fastnr,
       talin í X, merkt, utan kr/m²; HEILDARKAUP (cc228 D2′, GO Danna 11.10) = eining án nothæfs samnings með ÓNOTHÆFAN
       samning frá SALA_FRA, NEMA söluauglýsing hennar sást fyrst eftir síðasta ónothæfa samninginn EÐA hún sé á sölu núna;
@@ -62,9 +63,11 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
 
+from nyb_tviaugl import reikna_tviaugl
+
 sys.stdout.reconfigure(encoding="utf-8")
 
-UTGAFA = "cc224-v7"   # cc224e: = v6 + forsíðumyndir 20 nýrra verkefna úr cc229 (H); cc229 (v6): = v5 + óskipt skv. HMS (A), íbúðir án byggár tengdar (B), n_leiga (C); cc228 (v5): heildarkaup
+UTGAFA = "cc224-v8"   # cc234: = v7 + n_tviaugl_nu/leiguadili (tvíauglýsing NÚ, nyb_tviaugl.py); cc224e: = v6 + forsíðumyndir 20 nýrra verkefna úr cc229 (H); cc229 (v6): = v5 + óskipt skv. HMS (A), íbúðir án byggár tengdar (B), n_leiga (C); cc228 (v5): heildarkaup
 SALA_FRA = dt.date(2021, 1, 1)
 AR = dt.date.today().year
 BYGGAR_SKILGR = AR - 2          # „fullbúin innan tveggja ára"
@@ -598,7 +601,7 @@ def nn(v):
         return None
     if isinstance(v, float) and np.isnan(v):
         return None
-    if v is pd.NaT:
+    if v is pd.NaT or v is pd.NA:
         return None
     if isinstance(v, (np.integer,)):
         return int(v)
@@ -614,13 +617,14 @@ VCOLS = ['verkefni_id', 'slug', 'heiti', 'heiti_uppruni', 'gotur', 'postnr', 'po
          'n_b0', 'n_b1', 'n_b2', 'n_b3', 'n_b4', 'fyrsta_sala', 'sidasta_sala', 'kr_m2_seld', 'n_kr_m2_seld', 'kr_m2_asett',
          'n_kr_m2_asett', 'n_laekkanir', 'n_laekkad_30', 'stofur', 'byggingaradili', 'byggingaradili_n_augl', 'slod', 'byggar_min', 'byggar_max',
          'sidasta_virkni', 'uppselt', 'mynd_sha256', 'mynd_lykill', 'mynd_lykill_frumrit', 'mynd_breidd', 'mynd_haed', 'mynd_stofa',
-         'mynd_dags', 'mynd_listing_id']
+         'mynd_dags', 'mynd_listing_id', 'n_tviaugl_nu', 'leiguadili', 'leiguadili_n']
 ECOLS = ['fastnum', 'verkefni_id', 'heimilisfang', 'merking', 'einflm', 'fjherb', 'byggar', 'byggingarstig', 'innan_skilgr',
          'heildareining', 'n_undireiningar', 'stada', 'sala_dags', 'kaupverd', 'kr_m2', 'asett_verd', 'asett_flm', 'n_laekkanir',
          'augl_id', 'augl_endursala', 'augl_flokkur', 'laekkun_dags', 'laekkun_fra', 'laekkun_til', 'laekkun_flokkur', 'laekkad_30']
 
 
 def skrifa(c, V, E, D, auk, hofst):
+    c.rollback()   # WP (h): engin opin lesfærsla á undan SET TRANSACTION READ WRITE
     cur = c.cursor()
     cur.execute("SET TRANSACTION READ WRITE")
     cur.execute("SET LOCAL lock_timeout = '10s'")
@@ -727,6 +731,14 @@ def main():
             t = t[t.tillaga == 'já']
             D['SL'] = utvikka_slodir(t.slod.unique(), D)
         V, E, auk = reikna(D)
+        # cc234: tvíauglýsing NÚ + leiguaðili (aðferð s5_tviaugl.py; aldrei last_seen_at, einstaklingar aldrei)
+        TV, _ = reikna_tviaugl(c, E)
+        c.rollback()
+        TV['verkefni_id'] = TV.verkefni_id.astype(V.verkefni_id.dtype)
+        V = V.merge(TV, on='verkefni_id', how='left')
+        V['n_tviaugl_nu'] = V.n_tviaugl_nu.fillna(0).astype(int)
+        V['leiguadili_n'] = V.leiguadili_n.astype('Int64')
+        assert (V.n_tviaugl_nu <= V.n_leiga).all(), 'n_tviaugl_nu > n_leiga'
         n_nyjar = n_hladid = 0
         MY = D['MY']
         if a.skrifa:
@@ -754,7 +766,10 @@ def main():
                f"óskipt (HMS) {int(E.heildareining.sum())} fastnr., Σ undireininga {int(E[E.heildareining].n_undireiningar.sum())}"
                f" | byggár-kandídatar {auk['b_kandidatar']}: tengd {auk['b_tengd']} (hús {auk['b_sama_hus']}, pakki {auk['b_sami_pakki']})"
                f", eldri eign stöðvuð {auk['b_eldri']} ({100 * auk['b_eldri'] / max(1, auk['b_tengd']):.1f} %), inn {auk['b_inn']}"
-               f", án viðmiðs {auk['b_an_vidmids']} | n_leiga Σ {int(V.n_leiga.sum())} í {int((V.n_leiga > 0).sum())} verkefnum"]
+               f", án viðmiðs {auk['b_an_vidmids']} | n_leiga Σ {int(V.n_leiga.sum())} í {int((V.n_leiga > 0).sum())} verkefnum",
+               f"tvíauglýst NÚ Σ {int(V.n_tviaugl_nu.sum())} í {int((V.n_tviaugl_nu > 0).sum())} verkefnum | lína (N ≥ 2) {int((V.n_tviaugl_nu >= 2).sum())}"
+               f" | leiguaðili nefndur: " + (' · '.join(f"{r.heiti}: {r.leiguadili} {r.leiguadili_n}/{r.n_tviaugl_nu}"
+                                                       for r in V[V.leiguadili.notna() & (V.n_tviaugl_nu >= 2)].itertuples()) or '—')]
         for l in lin:
             print(l)
         (ut / 'samantekt.txt').write_text('\n'.join(lin) + '\n', encoding='utf-8')
