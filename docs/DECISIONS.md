@@ -4,6 +4,49 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-11 — /nybyggingar: myndlaus verkefni, myndaval úr ÖLLUM myndum allra auglýsinga (cc224d)
+
+Forskrift Danna 11.10; push GO gefið fyrirfram (HALT aðeins ef eitthvað fellur). Engin Fable-/API-köll; CC skoðaði yfirlitsblöðin sjálf.
+
+1. **Mengi:** 90 verkefni í cc224-v3 sýndu hlutlausan flöt (11 virk). 15 voru merkt „engin" í cc224b og 75 höfðu enga mynd á blaði.
+   - **69 af 90 eiga enga auglýsingu á fastnúmerum sínum** (sölu eða leigu). Þar er engin mynd til að velja, og verkefni er ekki tengt auglýsingu eftir götuheiti.
+   - 21 eiga auglýsingu; þar af hafa Kjarralda 2A–D 25 raufar, allar 404 hjá mbl.
+2. **Af hverju fyrsta umferð missti** (`b8_yfirlitsblod.py`, cc224b):
+   - (a) **Utan 12 fyrstu:** blaðið tók hringvíst mynd 0, 1, … allra auglýsinga upp í 12. Stór verkefni bera hundruð einkvæmra mynda (Vetrarbraut 2–4: 1.082, Hafnarbraut 10: 402).
+   - (b) **Ekki í töflunni:** myndir lesnar EINGÖNGU úr `scraper.auglysingamyndir` eftir (listing_id, image_nr). Myndasækirinn sækir hverja SLÓÐ einu sinni (`myndavisir.db`, `thegar_sott`). Mynd sem önnur auglýsing (eða eldri birting) sótti fyrst fær því aldrei röð á nýju auglýsingunni: bætin eru í R2 en raufin er ósýnileg töflunni.
+     - Sólhlíð 4 og Útgarður 2–6 höfðu 0 raufar í töflunni en 5 og 28 sóttar myndir.
+   - (c) **Aðeins sala:** `tenure='sale'`, svo leiguauglýsingar (myigloo) voru aldrei lesnar.
+   - Valdar myndir umferðar 2 eftir orsök: utan 12 fyrstu **9**, aðeins í leiguauglýsingu **5**, rauf ekki í töflu **2**.
+   - Ósóttar myndir voru engar: allar raufar leystust um töfluna eða myndavísinn nema 26 sem skila 404. Sóknarfarvegurinn (`--saekja`, `myndasaekjari.Saekjari`, einn þráður, 2 s bil, stöðvar á 403/429/503) var því ekki notaður.
+3. **Lagfæring:** `scripts/cc224_myndaval_kandidatar.py` leysir `b8_yfirlitsblod.py` af og nýtist næturkeyrslu og mánaðarlegu myndavali.
+   - Tekur ALLAR myndraufar ALLRA auglýsinga (sölu og leigu) á fastnúmerum verkefnisins, í kanónísku afbrigði eins og myndasækirinn.
+   - Raufin leysist í sha256 um töfluna, svo um myndavísinn. R2-lykill fæst eftir sha.
+   - Tvítök falla burt (sama sha; nær-eins dHash ≤ 4, stærsta upplausn heldur). Útilokaðar myndir (`utilokad_kl`) fara aldrei á blað.
+   - Ekkert þak: mörg blöð per verkefni, 20 myndir á blaði. Númerið stendur á rönd OFAN við myndina, því merki ofan á myndinni huldi lógó stofa í horninu.
+   - `--myndlaus` tekur öll verkefni útgáfunnar án myndar.
+4. **Val:** útlitsmynd (ljósmynd eða 3D að utan). Hrein mynd gengur fyrir mynd með lógói eða borða stofu.
+   - Borðamynd er aðeins valin ef engin hrein finnst og er merkt `bordi=ja` í myndaval.csv. Nýr dálkur; tómt = ekki metið (cc224b).
+   - Hvert val var staðfest í fullri stærð og með hornaskoðun.
+   - **Hringhamar 3–5:** mynd Danna (Hraunhamar, mynd 8 af 25) er staðfest. Hún er útlitsmynd með borðanum „Hlutdeildarlán" og stendur á þeim stað í 2 af 9 auglýsingum Hraunhamars með 25 myndum; í hinum 7 er mynd 8 innimynd. Hrein ljósmynd fannst í leiguauglýsingu og var valin.
+5. **Niðurstaða:** **16 af 90** myndlausum verkefnum fengu mynd, **9 af 11** virkum.
+   - 12 af 15 „engin" og 4 af 75 án blaðs.
+   - **6 með borða/lógó:** Hafnarbraut 10, Útgarður 2–6, Austurtún 15, Eskiás 3A–G, Grímsgata 6, Hafnarbraut 4–8.
+   - Áfram án myndar 74: 69 án auglýsingar og 5 „engin":
+     - Bugðuleira 9–15: kort og grunnmynd.
+     - Tröllahraun 42: teikningar.
+     - Víðiholt 1 og Lautavegur 10: aðeins innimyndir.
+     - Kjarralda 2A–D: 404.
+   - Virk án myndar: Bugðuleira 9–15 og Tröllahraun 42.
+6. **Gagnalag á prófunarútgáfu** (regla Danna 11.10): myndavalið var skrifað á nýja útgáfu **cc224-v4** (keyrsla 12, `UTGAFA` í skriftunni) sem lifandi síða las ekki fyrr en framendinn (`NYB_UTGAFA`) var pushaður.
+   - cc224-v3 er óbreytt og er afturköllunarleiðin.
+   - Engin eldri mynd breyttist.
+   - Nýrri gögn í v4 færðu teljara um 1 við push (156 → 155 virk, 1.939 → 1.940 íbúðir á sölu).
+7. **Framendi:** myndir án stofu (leiguauglýsingar myigloo) heita „Mynd úr auglýsingu", ekki „söluauglýsingu". Aðferðafræðin segir „úr sölu- eða leiguauglýsingu … mynd án merkis fasteignasölu gengur fyrir".
+
+**Heimildir:** `D:\_audit\cc224_nybyggingar\SKIL_CC224_1.md` §13; `e\e7_orsok.csv`, `e\umferd2\samantekt.txt`.
+
+---
+
 ## 2026-10-11 — Forsíðukassi /nybyggingar (cc224c liður 4)
 
 Forskrift Danna 10.10; hafinn eftir push cc221 (verdmat-ai af911b8). Aðeins framendi (verdmat-ai), ekkert gagnalag; HALT fyrir push.

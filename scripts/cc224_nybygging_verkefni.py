@@ -1,4 +1,4 @@
-"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v3).
+"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v4; v3 + myndaval cc224d).
 
   python scripts/cc224_nybygging_verkefni.py --dryrun [--ut DIR] [--slodir-tillaga CSV]
   python scripts/cc224_nybygging_verkefni.py --skrifa [--ut DIR] [--revalidate] [--hlada-myndir REMOTE]
@@ -56,7 +56,7 @@ from psycopg2.extras import execute_values
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-UTGAFA = "cc224-v3"
+UTGAFA = "cc224-v4"   # cc224d: = v3 + forsíðumyndir úr öllum myndum allra auglýsinga (cc224_myndaval_kandidatar.py)
 SALA_FRA = dt.date(2021, 1, 1)
 AR = dt.date.today().year
 BYGGAR_SKILGR = AR - 2          # „fullbúin innan tveggja ára"
