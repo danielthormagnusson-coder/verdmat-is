@@ -246,3 +246,7 @@ Bætt við eftir sannleiks-úttekt sem fann eina nefnara-villu (92,8% vs 31,1% �
 ### (e) STUÐLASKRÁ: AÐEINS MÆLD LÍNA BREYTIST (added 2026-10-10, cc226b)
 
 **Lína í stuðlaskrá (`verdmat-ai/data/leidretting_studlar_v1.json`) breytist aðeins ef hún hefur sjálf verið mæld. „Sami galli líklega" er tilgáta, og tilgáta breytir engri línu.** Hver stöðu- eða tölubreyting vísar í mælingu á ÞEIRRI línu: hennar þýði, hennar kveikjulind og sú spá sem notandinn sér (rekstrarhams-grunnmat). **Raundæmi 2026-10-10:** v1.2 (cc226) felldi `bilskyli_kjallara_apt` í NÚLL-MÆLT með rökunum „sami frádráttargalli og bílskúr", án mælingar á línunni sjálfri. cc226b mældi hana á rekstrarkveikjunni: grunnmatið vantar +2,94 % ± 0,17 (n = 18.756). 19.093 eignir voru vanmetnar um 2,94 % frá útgáfu v1.2 þar til v1.3 lagaði það (sama dag).
+
+### (f) INNTAK BIRTRAR TÖLU VISTAST Á _audit ÁÐUR EN HÚN FER Í LOFTIÐ (added 2026-10-11, cc230)
+
+**Inntaksgögn birtrar tölu (pickles, CSV, fyrirspurnir) vistast á `D:\_audit\<lota>\` ÁÐUR en talan fer í loftið — aldrei aðeins í Temp/scratchpad.** Regla (b) bjargar kóðanum; þessi regla bjargar gögnunum sem kóðinn las. Frosin mynd gagnagrunns verður ekki endurgerð síðar: grunnurinn hefur hreyfst. **Raundæmi 2026-10-11 (cc230):** inntak cc218 að skýrslu 2026-09 („13,7 % lækka innan 60 d", KM-ferlar) lá aðeins í scratchpad-pickles lotunnar `eaf03c08`. Mappan var tóm þegar mælingagalli fannst, svo talan varð hvorki endurmæld né leiðrétt. Hún var tekin úr birtingu með stöðumerki og verður endurmæld á nýjum gögnum.
