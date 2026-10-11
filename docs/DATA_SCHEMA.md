@@ -517,6 +517,8 @@ Staðfest 2026-04-18 að fjórir dálkar eru HMS núverandi gildi per FASTNUM, e
 
 KAUPVERD er þegar pro-rata skipt milli rows í multi-unit samningum (998 af 1000 sample hafa mismunandi verð). **Policy**: Áfangi 2 baseline notar eingöngu single-FASTNUM SKJALANUMER (95,8%).
 
+> **Leiðrétting 2026-10-11 (cc228):** `SKJALANUMER` eitt og sér er **ekki** pakkalykill — sýslumannsembætti endurnota sama númer á óskyldar eignir á öðrum dögum. Pakki (samningur um > 1 fastanúmer) er talinn á `FAERSLUNUMER` ≡ (`EMNR`, `SKJALANUMER`). Sjá § *Lifandi lag — merkingargildrur* neðst og `D:\_audit\cc228_pakkasamningar\SKIL_CC228.md` (A).
+
 Validerað í audit 2.0: multi-unit samningar eru kerfisbundið lower pr-m² en single (Einbýli 0,91×, Fjölbýli 0,89×, Sérbýli 0,99×). Filter fjarlægir bundled-pricing bias.
 
 ### HMS kaupskra column-naming gotchas
@@ -696,3 +698,54 @@ Fjórar nýjar storage artifacts kynntar í `app/docs/SCRAPER_SPEC_v1.md` §3 �
 - **`properties` audit columns** — Track B adds `hms_fetched_at` (timestamptz) + `hms_payload` (jsonb, REVOKED frá public view) á existing `properties` tafla. Engin ný tafla — Track B writes canonical `properties` rows.
 
 **Status (per 2026-05-06)**: tables ekki enn deployed — gates á SCRAPER_SPEC §8.2 Step 4 (schema migrations), post-Decision-point #1A og #1B closure.
+
+---
+
+## Lifandi lag — merkingargildrur (added 2026-10-11, cc233)
+
+Dálkar í lifandi Supabase-laginu þar sem nafnið segir annað en gildið mælir. Hver færsla vísar í SKIL-skjalið þar sem það var mælt.
+
+### `scraper.listings.last_seen_at` — síðasta delta-sókn, EKKI líf né lok auglýsingar
+
+| Uppspretta | Gildið er | Uppfærist |
+|---|---|---|
+| **mbl sala** | `parsed_mbl_sale.fetched_at` — síðasta sókn delta (`promote_listings_append.py`) | Aðeins þegar delta sækir auglýsinguna aftur, þ.e. við nýja eða breytta auglýsingu |
+| **mbl leiga** | `parsed_mbl_rent.updated` (**breytingardagur mbl**, ekki sóknartími okkar), annars `fetched_at` | Aðeins þegar leigusali breytir auglýsingu |
+| **myigloo leiga** | `MAX(raw_fetches.fetched_at)` úr fullri nætursópun | Hverja nótt — **rétt** sem „síðast séð" |
+
+- **`lifecycle_sweep_mbl.py` skrifar aldrei `last_seen_at`.** Fundin auglýsing → ekkert skrifað; fjarvera → atburður; önnur fjarvera → `status='withdrawn'`. Kortlota cc210 geymir fundartíma aðeins í `lifecycle_sweep_state.json`.
+- Afleiðing (11.10): 52 % virkra mbl-sala með `last_seen_at` > 14 d þótt lifandi; afskráðar fá of snemmbúin lok (miðgildi +11 d). Sölutími /markadur mældist 45 d í stað 56 d og Verðvakt taldi samhliða birtingar sem endurbirtingar (1.654 í stað 1.539).
+- **Regla:** lok = fyrsti `confirmed_absent_1` / `withdrawn_at`; líf = `scraper.v_eign_virk_auglysing` (útilokar líka auglýsingar með eina fjarveru) eða `sidast_fundin_at` (hér að neðan) þegar hann er kominn í loftið. `last_seen_at` heldur merkingunni „síðasta delta-sókn" — `verdvakt_skra_athuganir` og cc180 byggja á henni.
+- Heimild: `D:\_audit\cc230_sidast_sed\SKIL_CC230.md` (1)–(3); `D:\_audit\cc229_nefnarar\SKIL_CC229.md` (G).
+
+### `scraper.listings.sidast_fundin_at` — síðast fundin lifandi af sópun (cc231)
+
+> **Staða 2026-10-11: SVIÐSETT, EKKI BEITT.** Migration `supabase/migrations/20261011210000_cc231_sidast_fundin.sql` (+ rollback) og sópunarkóði í `D:\_audit\cc231_sopun\svid/` bíða GO. Dálkurinn er ekki til á prod fyrr en það er bókað í DECISIONS.
+
+- `timestamptz`, nullable, ekkert sjálfgildi. Aðeins mbl (sala og leiga); ekki-mbl fær aldrei gildi.
+- Skrifaður af `lifecycle_sweep_mbl.py` í **sömu færslu** og atburðir lotunnar, fyrir hvert fundið auðkenni (`found`, `price_changed`) í kort-, sölu- og leigulotu og `--confirm`. Færist aldrei aftur á bak (`NULL OR < obs`). `updated_at` og `last_seen_at` eru viljandi ósnert.
+- **NULL = „aldrei fundin af sópun", ekki „dauð".** Afturfylling nær aðeins frá 04.07.2026 og er **neðri mörk** (sölutími íhaldssamur: of snemmt, aldrei of seint). Leigu-afturfylling (12 leigulotur) er **ályktuð aðild**, ekki frosin skrá.
+- Heimild: `D:\_audit\cc231_sopun\SKIL_CC231.md` (1)–(2).
+
+### Kaupskrá: `FAERSLUNUMER` er pakkalykill, `SKJALANUMER` ekki
+
+- **(`EMNR`, `SKJALANUMER`) ≡ `FAERSLUNUMER`.** Sama `SKJALANUMER` er endurnotað milli embætta á óskyldar eignir á öðrum dögum. Mælt á 4.968 skjölum með > 1 fastnr.: engin færsla spannar 2 skjöl, 2 daga eða 2 kaupverð. Teldu pakka (samning um > 1 fastanúmer) á `faerslunumer`.
+- `public.sales_history` ber `faerslunumer` og `onothaefur` en hvorki `SKJALANUMER`, `EMNR` né `UTGDAG` — þeir eru aðeins í `D:\kaupskra.csv`.
+- HMS merkir pakka nær alltaf ónothæfa: 526 af 530 pakkasamningum á nýbyggingaeiningum (99 %) eru `ONOTHAEFUR_SAMNINGUR=1`.
+- **Enginn kaupandi** (nafn, kennitala) er í kaupskrá né í neinum dálki gagnagrunnsins. „Sami kaupandi á ≥ 3 einingum" er ómælanlegt.
+- Heimild: `D:\_audit\cc228_pakkasamningar\SKIL_CC228.md` (A).
+
+### `public.properties.matseiningar` — óskipt fastanúmer
+
+- Listi HMS-matseininga fastanúmers (`matseiningar[]`, hver með `fastnum` og `notkun_texti`).
+- **Óskipt fastanúmer** = fastanúmer sem ber **≥ 2 matseiningar með `notkun_texti ilike 'Íbúð%'`**: eignaskiptayfirlýsing er ekki komin og HMS hefur ekki gefið íbúðunum eigin fastanúmer. Dæmi: Baughamar 7 (2515296) = 1 fastnr. með 55 íbúðarmatseiningum + 53 stæðum.
+- Í `semantic.nybygging_einingar` (frá cc224-v6): `heildareining` = óskipt skv. reglunni, `n_undireiningar` = fjöldi íbúðarmatseininga. Eldri auglýsingaregla (ólíkar stærðir í auglýsingum) vantaldi 106 í stað 263 og er felld.
+- Engin íbúðarmatseining óskiptu fastanúmeranna á sér eigið fastanúmer í sama verkefni (tvítalning útilokuð, 11.10).
+- Heimild: `D:\_audit\cc228_pakkasamningar\SKIL_CC228.md` (C); `D:\_audit\cc229_nefnarar\SKIL_CC229.md` (A), f.3.
+
+### `scraper.auglysingamyndir` — mynd skráð aðeins á fyrstu auglýsingu
+
+- Taflan er **ekki** heildarlisti mynda per auglýsing. Myndasækirinn sækir hverja **slóð** einu sinni (`myndavisir.db`: `slod`, `thegar_sott`). Mynd sem önnur auglýsing (eða eldri birting) sótti fyrst fær aldrei röð á nýju auglýsingunni, þótt bætin séu í R2 (lykill eftir sha).
+- **Allar myndir auglýsingar:** `photos_json`-raufar → taflan, annars `myndavisir.db` `slod.url` → sha → `r2_lykill` úr hvaða röð sem ber sha-ið. Mældu „ósótt" í vísinum áður en sótt er. Tilvísunarútfærsla: `app/scripts/cc224_myndaval_kandidatar.py`.
+- Afleiðing (cc224b): 90 verkefni dæmd myndlaus; 16 áttu nothæfa útlitsmynd.
+- Heimild: `D:\_audit\cc224_nybyggingar\SKIL_CC224_1.md` §13.1–13.2 (cc224d).

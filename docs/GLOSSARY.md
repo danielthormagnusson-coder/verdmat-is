@@ -84,7 +84,7 @@ Skrá yfir lykilhugtök sem koma fyrir í verkefninu — bæði íslensk fasteig
 
 **Afsal** — skjal sem staðfestir eignarrétt. Getur komið á undan eða eftir þinglýsingu.
 
-**Skjalanúmer** — sýslumannsembættis-númer (t.d. "R-005069/2006").
+**Skjalanúmer** — sýslumannsembættis-númer (t.d. "R-005069/2006"). **Ekki einkvæmt:** endurnotað milli embætta; samningur er auðkenndur með færslunúmeri (sjá DATA_SCHEMA.md § *Lifandi lag — merkingargildrur*, cc228).
 
 ---
 
@@ -248,6 +248,22 @@ Skiptin eru framkvæmd á DECISIONS §5D-1 (afstaða borðsins: allt á `real_pr
 **`midsaekni_old`** — dálkur í `scraper.v_expected_vs_real_all` og `scraper.v_expected_vs_real` (sæti 35) sem ber `'median'` eða `'mean'`. **Reiknaður af `valued_at`, ekki geymdur.** Aldamörkin eru mæld en ekki ályktuð: síðasta median-röðin er `2026-08-08 03:33:24,343465+00` og **0 raðir** liggja milli hennar og markanna.
 
 > **⚠ AÐVÖRUN SEM FYLGIR HUGTAKINU.** `base_pct_error`, `extraction_pct_error`, `extraction_gap` og /markadur-vísirinn eru **ósambærileg yfir aldamörkin** — meðaltal yfir blandað mengi er ekki mæling heldur blanda tveggja mælinga. **`GROUP BY midsaekni_old` eða síaðu á hann** áður en bjagi eða MAPE er lesin. `mean`-höfuðið ber auk þess **+1,93 % þekktan OOS-bjaga** (birt mat kerfisbundið undir söluverði; t = −10,74, p = 1,75·10⁻²⁵, cc123) og **sú tala á að fylgja hverri umfjöllun um nákvæmni**.
+
+---
+
+## Nýbyggingahugtök — /nybyggingar (added 2026-10-11, cc233)
+
+Hugtök í `semantic.nybygging_einingar` / `nybygging_verkefni` og á síðunni. Y = íbúðir verkefnis, X = seldar.
+
+**Heildarkaup („Seld í heildarkaupum")** — staða einingar (`stada = 'heildarkaup'`) sem á engan nothæfan kaupsamning en á `ONOTHAEFUR_SAMNINGUR=1` samning frá 1.1.2021, NEMA söluauglýsing hennar sást fyrst eftir síðasta ónothæfa samninginn eða hún er á sölu núna (regla D2′). Dagsetning = síðasti ónothæfi samningur. **Ekkert verð:** `kaupverd`/`kr_m2` eru NULL og ekkert kr-gildi birtist; verðmiðgildi og verðmatsmódel lesa áfram aðeins nothæfa samninga. Telst í X (`n_seld`) og í `n_heildarkaup`. Gólf verkefnis (hvort það er á síðunni) hvílir áfram á nothæfum sölum. Dæmigerður uppruni: pakkasala byggingaraðila, t.d. til leigufélags. Heimild: `D:\_audit\cc228_pakkasamningar\SKIL_CC228.md` (D), f.2.
+
+**Tvíauglýsing** — íbúð sem er boðin til sölu (mbl) og leigu (myigloo) **samtímis**. Flokkun miðað við L0 = fyrsta leiguauglýsing: **TVÍAUGLÝST** ef einhver söluauglýsing fannst sannanlega lifandi á eða eftir L0; **SKIPTI** ef allar söluauglýsingar lokuðust ≤ L0 + 3 d og engin fannst eftir L0. Líf sölu er mælt úr sópunarathugunum, ekki `last_seen_at`. 11.10: 14 af 16 „sala → leiga" einingum voru tvíauglýstar, 2 skipti. „Leiga virk" sannar auglýsingu, ekki útleigu. Engin birting; endurmæla í nóv 2026. Heimild: `D:\_audit\cc229_nefnarar\SKIL_CC229.md` §F-eftirfylgni.
+
+**Óskipt fastanúmer** — eitt HMS-fastanúmer sem ber ≥ 2 íbúðarmatseiningar (`properties.matseiningar[].notkun_texti ilike 'Íbúð%'`), þ.e. hús þar sem eignaskiptayfirlýsing er ekki komin. Telst `heildareining` með `n_undireiningar` = fjöldi íbúðarmatseininga. Merki á síðunni: „óskipt fastanúmer — N íbúðir skráðar undir því hjá HMS". Dálkaskilgreining í DATA_SCHEMA.md. Heimild: `D:\_audit\cc229_nefnarar\SKIL_CC229.md` (A).
+
+**Eldri eign (> 4 ára reglan)** — vörn þegar íbúð án byggingarárs hjá HMS (byggár NULL/0) er tekin inn í verkefni af því að hún stendur í sama húsi eða sama samningi (`faerslunumer`) og eining verkefnisins. Hún telst **eldri eign og fer ekki í Y** ef fyrsti kaupsamningur hennar (nothæfur eða ekki) er **> 4 árum á undan lægsta byggári systureininga** (sama hús, annars sama landeign); fasti `ELDRI_AR = 4`. Hvers vegna 4 en ekki 2: við 2 ár stöðvaði vörnin forsölur sama nýja húss (3,19 %); við 4 ár stöðvast 1,6 % og allar 17 raunverulegar eldri eignir (samningur ≤ 2017). Systur án byggárs → ekkert viðmið, hleypt inn. Heimild: `D:\_audit\cc229_nefnarar\SKIL_CC229.md` (B), f.2–f.3.
+
+**Leigulína** — lína á verkefnissíðu: „Minnst N af M íbúðum hafa verið í leiguauglýsingu". N = `n_leiga` = fastanúmer verkefnisins með leiguauglýsingu (mbl eða myigloo, sást fyrst ≥ 2021); M = Y. Talan er **lágmark** (leiguauglýsingar bera sjaldan fastnúmer). **Ekkert flokkunarmerki** — línan segir ekki að verkefni sé „byggt til leigu". Heimild: `D:\_audit\cc229_nefnarar\SKIL_CC229.md` (C), f.3.
 
 ---
 
