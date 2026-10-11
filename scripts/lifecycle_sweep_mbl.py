@@ -25,10 +25,17 @@ sweep itself demoted, and is kept only as a belt-and-braces guard for rows demot
 another path. Demotion does not change what gets swept: those ids were already excluded
 from the denominator by the anti-join, so a re-listing was never picked up here either.
 
+PRESENCE (cc231, 2026-10-11): every found id (incl. price_changed) gets
+scraper.listings.sidast_fundin_at = observation time, in the SAME transaction as the batch's
+events (GREATEST, never moves backwards). last_seen_at is NOT touched — for mbl it means
+"last delta fetch" (sale) / mbl `updated` (rent) and other consumers rely on that (cc230).
+Before cc231 the sweep recorded presence nowhere in the DB, so consumers read last_seen_at
+as "end of listing" and got it ~11 d too early in median (cc230 §1).
+
 Per id, per sweep:
   * found (returned AND, for sale, syna=true):
-      - live price == db price   -> NOTHING written (found => no event, per spec)
-      - live price != db price    -> price_changed  (evidence: old + new)
+      - live price == db price   -> no event; sidast_fundin_at only (cc231)
+      - live price != db price    -> price_changed  (evidence: old + new) + sidast_fundin_at
   * absent (not returned, or sale syna=false):
       - no prior confirmed_absent_1  -> confirmed_absent_1
       - has prior confirmed_absent_1 -> withdrawn_confirmed (evidence.withdrawn_at = now)
@@ -46,6 +53,9 @@ kill-switch (3x HTTP 400 / 403 / 429 / CAPTCHA / GraphQL errors / 3x timeout).
 WRITE SAFETY: events are written via psycopg2 on the 6543 transaction pooler, which
 defaults READ ONLY; every write transaction issues `SET TRANSACTION READ WRITE` as its
 FIRST statement (locked pooler rule). --dry-run writes NOTHING to the DB (CSV only).
+The read helpers (load_*) leave psycopg2's implicit transaction open, and Postgres rejects
+SET TRANSACTION READ WRITE after any query in the same transaction (ActiveSqlTransaction —
+deterministic, cc231 d1: 3/3). _write_events_once therefore rolls back first (cc231).
 
 CLI:
   python -m scripts.lifecycle_sweep_mbl                                  # docstring + exit 0
@@ -377,8 +387,14 @@ def sweep_slice(conn, transport, tenure, sweep_id, event_at, ids, prior_absent, 
 
 
 # ── event write (real run only) ──────────────────────────────────────────────
-def write_events(conn, events, log=print):
-    """INSERT lifecycle events + demote listings that just went terminal.
+def results_to_found(results, obs):
+    """cc231: (source_listing_id, obs) for every id the sweep found live (found + price_changed)."""
+    return [(r["id"], obs) for r in results if r["status"] != "absent"]
+
+
+def write_events(conn, events, log=print, found=()):
+    """INSERT lifecycle events + demote listings that just went terminal
+    + stamp sidast_fundin_at on `found` [(source_listing_id, obs)] (cc231).
 
     First statement SET TRANSACTION READ WRITE (pooler rule). The status demotion rides
     in the SAME transaction as the insert, so listings.status can never drift away from
@@ -394,9 +410,12 @@ def write_events(conn, events, log=print):
              e["event_at"], Json(e["evidence"])) for e in events]
     terminal = [(e["source"], e["id"], e["event_at"]) for e in events
                 if e["event_type"] == "withdrawn_confirmed"]
+    found = list(found)
+    if not rows and not found:
+        return
     for attempt in range(1, len(WRITE_BACKOFF_S) + 2):
         try:
-            return _write_events_once(conn, rows, terminal, log)
+            return _write_events_once(conn, rows, terminal, found, log)
         except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
             # The transaction is gone with the socket, so nothing was committed and a
             # full retry is safe. The one ambiguous case — connection lost after the
@@ -414,14 +433,18 @@ def write_events(conn, events, log=print):
             conn.reconnect()
 
 
-def _write_events_once(conn, rows, terminal, log):
-    n_demoted = 0
+def _write_events_once(conn, rows, terminal, found, log):
+    n_demoted = n_found = 0
+    # cc231: close the implicit read transaction left by load_* — otherwise SET TRANSACTION
+    # READ WRITE raises ActiveSqlTransaction (crashed the 07.10 rent lota and 09.10 sale round).
+    conn.rollback()
     with conn.cursor() as cur:
         cur.execute("SET TRANSACTION READ WRITE")
-        execute_values(cur,
-            "INSERT INTO scraper.listing_lifecycle_events "
-            "(source, source_listing_id, fastnum, event_type, event_at, evidence) VALUES %s",
-            rows, page_size=1000)
+        if rows:
+            execute_values(cur,
+                "INSERT INTO scraper.listing_lifecycle_events "
+                "(source, source_listing_id, fastnum, event_type, event_at, evidence) VALUES %s",
+                rows, page_size=1000)
         if terminal:
             execute_values(cur,
                 "UPDATE scraper.listings l "
@@ -434,9 +457,22 @@ def _write_events_once(conn, rows, terminal, log):
                 "   AND l.status = 'active'",
                 terminal, template="(%s, %s, %s::timestamptz)", page_size=1000)
             n_demoted = cur.rowcount
+        if found:
+            # (source, source_listing_id) is UNIQUE, so one row per id. updated_at deliberately
+            # untouched: this is an observation, not a change to the listing.
+            for i in range(0, len(found), 1000):
+                execute_values(cur,
+                    "UPDATE scraper.listings l "
+                    "   SET sidast_fundin_at = v.obs "
+                    "  FROM (VALUES %s) AS v(source_listing_id, obs) "
+                    " WHERE l.source = 'mbl' "
+                    "   AND l.source_listing_id = v.source_listing_id "
+                    "   AND (l.sidast_fundin_at IS NULL OR l.sidast_fundin_at < v.obs)",
+                    found[i:i + 1000], template="(%s, %s::timestamptz)", page_size=1000)
+                n_found += cur.rowcount
     conn.commit()
-    log("wrote %d events (%d terminal -> %d listings demoted to withdrawn)"
-        % (len(rows), len(terminal), n_demoted))
+    log("wrote %d events (%d terminal -> %d listings demoted to withdrawn), sidast_fundin_at %d/%d"
+        % (len(rows), len(terminal), n_demoted, n_found, len(found)))
 
 
 # ── dry-run CSV ──────────────────────────────────────────────────────────────
@@ -544,10 +580,12 @@ def _due(last_iso, now, days):
     return last_iso is None or (now - _parse(last_iso)) >= timedelta(days=days)
 
 
-def run_scheduled(conn, dry_run, log=print):
+def run_scheduled(conn, dry_run, log=print, budget_cap=None):
     """Task-Scheduler entry point. State-gated per-slice cadence: rent = one full lota/week;
     sale = one full round/week, snapshotted then resumed nightly over ~2 days under budget.
-    --dry-run reports decisions and makes ZERO requests and ZERO DB writes."""
+    --dry-run reports decisions and makes ZERO requests and ZERO DB writes.
+    budget_cap (cc231 --budget-cap): hand-run test of a few real batches; the run advances
+    cursor/state exactly like a scheduled run, it just stops early."""
     now = now_utc()
     state = load_sweep_state()
     budget, used, delta = budget_now(state, now)
@@ -564,6 +602,9 @@ def run_scheduled(conn, dry_run, log=print):
         log("budget clipped %d -> %d by run-time cap (%ds limit - %ds margin at %.0fs spacing)"
             % (budget, time_cap, RUN_TIME_LIMIT_S, RUN_TIME_MARGIN_S, spacing_eff))
         budget = time_cap
+    if budget_cap is not None and budget > budget_cap:
+        log("budget capped %d -> %d (--budget-cap)" % (budget, budget_cap))
+        budget = budget_cap
     transport = Transport(spacing=DEFAULT_SPACING)   # clamps up to the 60s floor
 
     def record():
@@ -609,8 +650,7 @@ def run_scheduled(conn, dry_run, log=print):
                 returned = {str(r[SLICES["rent"]["pk"]]): r for r in data["data"][SLICES["rent"]["root"]]}
                 results.extend(classify_batch(SLICES["rent"], batch, returned, prior, sid, "rent", rent_ts))
             events = results_to_events(results, rent_ts)
-            if events:
-                write_events(conn, events, log)
+            write_events(conn, events, log, found=results_to_found(results, rent_ts))
             rent["last_completed_at"] = _iso(rent_ts)
             if not rent.get("epoch"):
                 rent["epoch"] = _iso(rent_ts)
@@ -720,8 +760,7 @@ def _card_pass(conn, transport, state, budget, record, log, dry_run):
         returned = {str(r[SLICES["sale"]["pk"]]): r for r in data["data"][SLICES["sale"]["root"]]}
         res = classify_batch(SLICES["sale"], batch, returned, prior, sid, "sale", obs)
         events = results_to_events(res, obs)
-        if events:
-            write_events(conn, events, log=lambda *_a, **_k: None)
+        write_events(conn, events, log=lambda *_a, **_k: None, found=results_to_found(res, obs))
         n_abs += sum(1 for r in res if r["status"] == "absent")
         n_pc += sum(1 for r in res if r["status"] == "price_changed")
         for x in batch:
@@ -755,8 +794,7 @@ def _process_sale_chunk(conn, transport, state, budget, record, log):
         returned = {str(r[SLICES["sale"]["pk"]]): r for r in data["data"][SLICES["sale"]["root"]]}
         res = classify_batch(SLICES["sale"], batch, returned, prior, sid, "sale", obs)
         events = results_to_events(res, obs)
-        if events:
-            write_events(conn, events, log=lambda *_a, **_k: None)
+        write_events(conn, events, log=lambda *_a, **_k: None, found=results_to_found(res, obs))
         sale["cursor"] = i + len(batch)
         done += 1
         save_sweep_state(state)
@@ -796,6 +834,8 @@ def main():
                     help="Task-Scheduler entry: state-gated per-slice cadence (rent weekly, sale round resumed nightly)")
     ap.add_argument("--enable-sale", action="store_true",
                     help="one-time: flip sale.enabled=true so the next scheduled run starts the first sale round")
+    ap.add_argument("--budget-cap", type=int, default=None,
+                    help="--scheduled only: cap this run's request budget (hand-run test, cc231)")
     args = ap.parse_args()
 
     if args.enable_sale:
@@ -804,7 +844,7 @@ def main():
     if args.scheduled:
         conn = ReconnectingConn(read_db_url())
         try:
-            return run_scheduled(conn, args.dry_run)
+            return run_scheduled(conn, args.dry_run, budget_cap=args.budget_cap)
         finally:
             conn.close()
 
@@ -842,10 +882,11 @@ def main():
             events = [{"source": "mbl", "id": r["id"], "fastnum": r["fastnum"],
                        "event_type": r["event_type"], "event_at": sweep_ts, "evidence": r["evidence"]}
                       for _t, res in all_results for r in res if r["event_type"]]
-            if events:
-                write_events(conn, events, print)
+            found = [(r["id"], sweep_ts) for _t, res in all_results for r in res if r["status"] != "absent"]
+            if events or found:
+                write_events(conn, events, print, found=found)
             else:
-                print("no events to write (all found, no changes)")
+                print("nothing to write (no events, nothing found)")
         else:
             out = get_scraper_data_dir() / ("lifecycle_sweep_dryrun_%s.csv"
                                             % sweep_ts.strftime("%Y%m%dT%H%M%SZ"))

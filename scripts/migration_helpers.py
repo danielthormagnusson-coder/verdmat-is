@@ -519,7 +519,14 @@ def finish_run(
     """UPDATE a pipeline_runs row at run end. Commits.
 
     For a no-op run pass exit_status='success' with summary={'noop': True, ...}.
+
+    cc231: rolls back first. run_monthly passes its working connection, whose reads
+    (push_preview, check_version_stamp) leave the implicit transaction open; SET
+    TRANSACTION READ WRITE after a query raises ActiveSqlTransaction on a pooler backend
+    that carries the leaked read-only session default. Every helper here commits its own
+    writes, so the rollback only discards an open read.
     """
+    conn.rollback()
     with conn.cursor() as cur:
         cur.execute("SET TRANSACTION READ WRITE")  # pooler read-only-leak guard
         cur.execute(

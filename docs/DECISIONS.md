@@ -4,6 +4,58 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-11 — Sölutími endurskilgreindur: fyrsta auglýsing → kaupsamningsdagur (cc232) — **GO (3 heilir mán.), pushað verdmat-ai 5232af6 + e54e9fa, www staðfest**
+
+Framhald cc230 (ákvörðun 2).
+
+1. **Skilgreining.**
+   - Sölutími = `v_units.first_listed_at` → **`UTGDAG`** (kaupsamningsdagur í kaupskrá HMS). Hvorki þinglýsingardagur né `last_seen_at`; óháð sópun.
+   - Tengireglan í `v_units` er óbreytt frá `20260627134046`. Spegluð með `FAERSLUNUMER`; falspróf 2.429/2.429.
+   - Mengi: íbúðarsöluauglýsingar og nothæfur íbúðasamningur (cc213-regla). Kaupsamningur fyrir fyrstu skráningu telst ekki sala gegnum auglýsinguna (20 tilvik).
+2. **Nefnari í sömu línu.**
+   - Tengdir / allir nothæfir íbúðasamningar kaupsamningsmánaðar.
+   - Hlið ≥ 60 % per mánuð, í rafalnum sjálfum (keyrsla stöðvast).
+   - Fullnusta eftir reglu skýrslu 2026-09 kafla 10 (< 90 % = bráðabirgða).
+3. **Tölur.**
+   - Falspróf: 67 d úr cc230 endurgerist nákvæmlega.
+   - Tillaga fyrir /markadur (kaupsamningar júlí–sept): **59 d** (38/90/123), < 30 d 14 %, > 180 d 3 %, nefnari 1.568/1.977 = 79 %.
+   - Frávikið frá 67 er allt þinglýsingartöf: á sama mengi gefur lok = þinglýsing 67.
+   - Skýrslur, leiðrétt: júlí 22 → 41, ágúst 31 → 63,5, sept 39 → 74 d. Júní ekki birtur (25 % < hlið). Gluggafyrirvarinn vegur þungt.
+4. **HALT-1 kviknar á ógluggaðri tölu** (33 % yfir 2026).
+   - Glugginn „3 síðustu heilu kaupsamningsmánuðir" var valinn eftir að gögn voru séð, svo hann er ákvörðun Danna.
+5. **Birting.**
+   - Stöðumerki cc230 víkja aðeins fyrir sölutímanum; 60 daga-talan og Verðvaktarmerkin standa.
+   - Frosnar skýrslur fá leiðrétta tölu og nótuna „Leiðrétt 11.10.2026 — sjá aðferð", með upphaflegu töluna við hlið hennar.
+
+GO Danna 11.10: valkostur 1, og (a) síðutexti segir gluggann berum orðum, (b) skýring 59 vs 67 d bókuð í SKIL (3): −8 d endapunktur, −2 d úrtak, +2 d gluggi. Sannreynt á www.verdmat.ai: 0 villur (falspróf FYRIR: 16). Ekkert DB-skrif. **Heimildir:** `D:\_audit\cc232_solutimi\SKIL_CC232.md`.
+
+---
+
+## 2026-10-11 — Sópun: `scraper.listings.sidast_fundin_at` + rollback fyrir skrif (cc231) — **HALT, bíður GO**
+
+Lagt til, ekki beitt. Framhald cc230, ákvörðun (i) og (5).
+
+1. **Nýr dálkur `sidast_fundin_at`** (timestamptz, NULL = aldrei fundin af sópun).
+   - `lifecycle_sweep_mbl.py` skrifar hann í sömu færslu og atburði lotunnar, fyrir hvert fundið auðkenni í kort-, sölu- og leigulotu.
+   - Reglan er GREATEST, svo gildið færist aldrei aftur á bak.
+   - **`last_seen_at` ósnert:** hann merkir áfram „síðasta delta-sókn". `updated_at` er líka ósnert.
+   - Migration er `20261011210000_cc231_sidast_fundin` (+ rollback), beitt um psycopg2 með lock_timeout, ekki `apply_migration`.
+2. **Afturfylling frá 04.07** úr hringskrám, `card.checked` og leigulotum (ályktuð aðild).
+   - 36.070 mbl-raðir fá gildi: sala active 49 %, sala withdrawn 40 %, leiga active 83 %.
+   - Gildið er neðri mörk og fyrir 04.07 er ekkert.
+3. **ActiveSqlTransaction:** `conn.rollback()` fremst í `_write_events_once`.
+   - Mælt: SELECT → `SET TRANSACTION READ WRITE` fellur 3/3, með rollback tekst það 3/3. Falspróf FYRIR/EFTIR stenst.
+   - Tilfallandi eðli villunnar kemur frá **leknu session-SET** (`default_transaction_read_only=on`, `source=session`, `reset_val=off`) á bakendum 6543-poolersins, ekki stillingu.
+   - **Regla:** skrif á pooler byrjar á rollback eða nýrri tengingu á undan `SET TRANSACTION READ WRITE`.
+4. Grep yfir öll köll: `run_monthly` → `finish_run` er RISK (handvirkt, keyrir ekki nú) og 4 einskiptis freeze-skriftur. Ekki lagað hér.
+
+**GO Danna 11.10, með tveimur breytingum frá tillögunni hér að ofan:**
+- (a) Afturfylling tekur AÐEINS beinan vitnisburð: söluhringi (S) og `card.checked` (K). Ályktuð leiguaðild (R, 3.235 leiga_type-auðk.) er ekki skrifuð; þær raðir verða NULL þar til fyrsta leigulota eftir GO. Þekja er því ~32,8 þús. raðir: sala active 49 %, sala withdrawn 40 %, leiga á sölurót active 78 %, leiga_type 0 %.
+- (b) `migration_helpers.finish_run` (run_monthly) fær sama `conn.rollback()` á undan `SET TRANSACTION READ WRITE`. Falspróf f2 stenst: FYRIR fellur á opinni lesfærslu, NÝR tekst, 0 prófraðir eftir. Freeze-skriftur ósnertar (einskiptis).
+- Beiting 11.10/12.10 eftir að sópun dagsins lauk: m1 beitt (45 → 46 dálkar, md5 gagna óbreytt) → kóði commitaður → b1 ferskt → b2 → prófkeyrsla `--budget-cap 2`. Niðurstöður í SKIL §GO.
+
+---
+
 ## 2026-10-11 — /nybyggingar: myndaval á 31 ný verkefni úr cc229 (H) (cc224e)
 
 GO Danna 11.10 (cc224e). Útgáfa **cc224-v7** (keyrsla 15); v6 stendur sem afturköllun. Engin DDL.
