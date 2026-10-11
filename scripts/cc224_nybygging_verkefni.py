@@ -1,4 +1,4 @@
-"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v4; v3 + myndaval cc224d).
+"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v5; v4 + heildarkaup cc228, v3 + myndaval cc224d).
 
   python scripts/cc224_nybygging_verkefni.py --dryrun [--ut DIR] [--slodir-tillaga CSV]
   python scripts/cc224_nybygging_verkefni.py --skrifa [--ut DIR] [--revalidate] [--hlada-myndir REMOTE]
@@ -32,7 +32,9 @@ Skilgreining (ákvörðun Danna 09.10.2026, SKIL_CC224_1.md §3 + §5 aldursvör
   Y = íbúðir á landeignum verkefnisins byggðar ≥ ár−3 eða innan skilgreiningar (eldri hús á sömu lóð ekki talin);
       óskipt fastnúmer (≥3 ólíkar auglýstar stærðir) telur max(1, auglýstar einingar)
   X = einingar með þinglýstum samningi ONOTHAEFUR=0 (regla 2, eingöngu) frá SALA_FRA; magnsala = samningur > 1 fastnr,
-      talin í X, merkt, utan kr/m²
+      talin í X, merkt, utan kr/m²; HEILDARKAUP (cc228 D2′, GO Danna 11.10) = eining án nothæfs samnings með ÓNOTHÆFAN
+      samning frá SALA_FRA, NEMA söluauglýsing hennar sást fyrst eftir síðasta ónothæfa samninginn EÐA hún sé á sölu núna;
+      talin í X, ekkert verð (kaupverd/kr_m2 NULL, utan kr/m²), dagsetning = síðasti ónothæfi samningur; ekkert verðgólf
   verkefni = landeign; landeignir sameinaðar þar sem STAÐFEST slóð (nybygging_slodir) og gata eru sameiginleg
   gólf: Y ≥ 4 ∧ (X ≥ 1 ∨ virk auglýsing) ∧ ≥ 1 eining innan skilgreiningar
 Engin Fable-/API-köll: byggingaraðili með regex.
@@ -56,7 +58,7 @@ from psycopg2.extras import execute_values
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-UTGAFA = "cc224-v4"   # cc224d: = v3 + forsíðumyndir úr öllum myndum allra auglýsinga (cc224_myndaval_kandidatar.py)
+UTGAFA = "cc224-v5"   # cc228: = v4 + heildarkaup (D2′); cc224d (v4): forsíðumyndir úr öllum myndum allra auglýsinga
 SALA_FRA = dt.date(2021, 1, 1)
 AR = dt.date.today().year
 BYGGAR_SKILGR = AR - 2          # „fullbúin innan tveggja ára"
@@ -234,6 +236,9 @@ def reikna(D):
     nund = L.drop_duplicates(['fastnum', 'sz', 'rm']).groupby('fastnum').size()
     U['n_undireiningar'] = np.where(U.heildareining, np.maximum(1, U.fastnum.map(nund).fillna(1)), 1).astype(int)
 
+    # ónothæfir samningar (cc228 D2′): aðeins dagsetning síðasta per fastnr — aldrei verð (regla 2)
+    So = S[S.onothaefur == 1]
+    ono_sidast = pd.to_datetime(So.thinglystdags).groupby(So.fastnum.astype('int64')).max()
     # sölur — regla 2: ONOTHAEFUR=0 eingöngu
     S = S[S.onothaefur == 0].copy()
     S['fastnum'] = S.fastnum.astype('int64')
@@ -290,8 +295,13 @@ def reikna(D):
     U['sidasta_verdbr'] = U.fastnum.map(vv.groupby('fastnum').d.max())
     U['sidasta_ny_augl'] = U.fastnum.map(L.groupby('fastnum').t0.max())
 
-    U['stada'] = np.select([U.seld & ~U.magnsala, U.magnsala, U.n_virk > 0], ['seld', 'magnsala', 'a_solu'], 'oseld')
-    U['x'] = np.where(U.seld, U.n_undireiningar, 0)
+    # heildarkaup (cc228 D2′): ónothæfur samningur án nothæfs, ekki endurauglýst til sölu eftir hann, ekki á sölu núna
+    U['ono_dags'] = U.fastnum.map(ono_sidast)
+    endurauglyst = U.fastnum.map(Lallar.groupby('fastnum').t0.max()).gt(U.ono_dags)
+    U['heildarkaup'] = ~U.seld & U.ono_dags.notna() & ~endurauglyst & (U.n_virk == 0)
+    U['stada'] = np.select([U.seld & ~U.magnsala, U.magnsala, U.heildarkaup, U.n_virk > 0],
+                           ['seld', 'magnsala', 'heildarkaup', 'a_solu'], 'oseld')
+    U['x'] = np.where(U.seld | U.heildarkaup, U.n_undireiningar, 0)
     U['laekkad_30'] = U.laekkad_30 & (U.stada == 'a_solu')
     U['virk_oseld'] = np.where(U.seld, 0, U.n_virk)
 
@@ -337,7 +347,9 @@ def reikna(D):
         la = L[L.verkefni_id == vid]
         Y = int(g.n_undireiningar.sum()); X = int(g.x.sum())
         n_virk_any = int(g.n_virk.sum())
-        if not (Y >= 4 and (X >= 1 or n_virk_any >= 1) and g.innan_skilgr.any()):
+        # gólf á NOTHÆFUM sölum (cc228): heildarkaup færa X en hleypa ekki nýjum verkefnum inn
+        X_golf = int(np.where(g.seld, g.n_undireiningar, 0).sum())
+        if not (Y >= 4 and (X_golf >= 1 or n_virk_any >= 1) and g.innan_skilgr.any()):
             rows.append(dict(verkefni_id=vid, golf=False)); continue
         heiti, gotur = heiti_ur_hms(g)
         uppruni = 'hms'
@@ -383,6 +395,7 @@ def reikna(D):
             lat=float(g.lat.median()) if g.lat.notna().any() else None, lng=float(g.lng.median()) if g.lng.notna().any() else None,
             n_einingar=Y, n_einingar_hms=hms_n, n_heildareiningar=int(g.heildareining.sum()),
             n_seld=X, n_magnseld=int(g[g.magnsala].n_undireiningar.sum()),
+            n_heildarkaup=int(g[g.stada == 'heildarkaup'].n_undireiningar.sum()),
             n_virkar=int(g.virk_oseld.sum()), n_oseldar=Y - X, n_oseldar_oauglystar=Y - X - int(g.virk_oseld.sum()),
             n_b0=int((~bs.isin(['B1', 'B2', 'B3', 'B4'])).sum()), n_b1=int((bs == 'B1').sum()), n_b2=int((bs == 'B2').sum()),
             n_b3=int((bs == 'B3').sum()), n_b4=int((bs == 'B4').sum()),
@@ -419,6 +432,8 @@ def reikna(D):
         laekkun_flokkur=E.laekkun_flokkur, laekkad_30=E.laekkad_30.astype(bool),
         augl_id=E.augl_id, augl_endursala=E.augl_endursala, augl_flokkur=E.augl_flokkur))
     E['sala_dags'] = E.sala_dags.where(E.stada.isin(['seld', 'magnsala']))
+    hk = E.stada == 'heildarkaup'
+    E.loc[hk, 'sala_dags'] = E.loc[hk, 'fastnum'].map(ono_sidast).dt.date
     E = E.sort_values(['verkefni_id', 'fastnum']).reset_index(drop=True)   # föst röð → endurtekjanlegt md5
     return V, E, dict(n_hopar=n_hopar, n_sameinad=n_sameinad, U=U)
 
@@ -543,7 +558,7 @@ def nn(v):
 
 
 VCOLS = ['verkefni_id', 'slug', 'heiti', 'heiti_uppruni', 'gotur', 'postnr', 'postheiti', 'sveitarfelag', 'landeignir', 'lat', 'lng',
-         'n_einingar', 'n_einingar_hms', 'n_heildareiningar', 'n_seld', 'n_magnseld', 'n_virkar', 'n_oseldar', 'n_oseldar_oauglystar',
+         'n_einingar', 'n_einingar_hms', 'n_heildareiningar', 'n_seld', 'n_magnseld', 'n_heildarkaup', 'n_virkar', 'n_oseldar', 'n_oseldar_oauglystar',
          'n_b0', 'n_b1', 'n_b2', 'n_b3', 'n_b4', 'fyrsta_sala', 'sidasta_sala', 'kr_m2_seld', 'n_kr_m2_seld', 'kr_m2_asett',
          'n_kr_m2_asett', 'n_laekkanir', 'n_laekkad_30', 'stofur', 'byggingaradili', 'byggingaradili_n_augl', 'slod', 'byggar_min', 'byggar_max',
          'sidasta_virkni', 'uppselt', 'mynd_sha256', 'mynd_lykill', 'mynd_lykill_frumrit', 'mynd_breidd', 'mynd_haed', 'mynd_stofa',
@@ -679,6 +694,9 @@ def main():
                f" + ekki auglýst {int(((V.n_virkar == 0) & ~V.uppselt.astype(bool)).sum())}",
                f"forsíðumynd valin {int(V.mynd_sha256.notna().sum())}/{len(V)} | smíðuð (720 px WebP) {int(V.mynd_lykill.notna().sum())}"
                f" | nýjar í þessari keyrslu {n_nyjar} | hlaðnar á hýsil {n_hladid}",
+               f"staða eininga: " + ' · '.join(f"{k} {n}" for k, n in E.stada.value_counts().items())
+               + f" | heildarkaup (D2′) Σ undireininga {int(V.n_heildarkaup.sum())} í {int((V.n_heildarkaup > 0).sum())} verkefnum"
+               + f" | ΣX {int(V.n_seld.sum())}",
                f"einingar m/ virka mbl-auglýsingu {int(E.augl_id.notna().sum())} | flokkar "
                + ' · '.join(f"{k} {n}" for k, n in E.augl_flokkur.value_counts().items())]
         for l in lin:

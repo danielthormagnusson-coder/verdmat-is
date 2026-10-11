@@ -4,6 +4,32 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-11 — /nybyggingar: ónothæfur samningur telst „Seld í heildarkaupum" í framvindu (cc228 D2′)
+
+GO Danna 11.10 á tillögu (D) sem D2′ (`D:\_audit\cc228_pakkasamningar\SKIL_CC228.md` (D) og §F).
+
+1. **Regla (D2′):** eining án nothæfs samnings, en með samning frá 1.1.2021 sem HMS merkir ónothæfan, telst **„Seld í heildarkaupum"** í framvindu verkefnisins. Undantekningar:
+   - söluauglýsing einingarinnar sást fyrst EFTIR síðasta ónothæfa samninginn (samningurinn var ekki lokasala, t.d. tilfærsla milli félaga), EÐA
+   - einingin er á sölu núna.
+   - Ekkert verðgólf.
+2. **Verð birtist hvergi** (regla 2 óbreytt):
+   - `kaupverd`/`kr_m2` aðeins á `stada='seld'` (DB-check).
+   - Söluverðsmiðgildi, ásett verð og verðmatsmódel eru óbreytt: 0 frávik á kr_m2_seld, n_kr_m2_seld, kr_m2_asett, n_virkar og n_laekkad_30 milli v4 og v5.
+   - Í einingatöflu stendur merkið „Seld í heildarkaupum" + dagsetning síðasta ónothæfa samnings. Ekkert kr-gildi, og eldri verðlækkun úr auglýsingu (6 einingar) er líka falin.
+3. **Talning:**
+   - X (`n_seld`) telur heildarkaup. Nýr dálkur `n_heildarkaup`; lykiltalan Seldar segir „þar af N í heildarkaupum (án verðs)".
+   - **Gólf verkefnis er áfram á nothæfum sölum** (X_gólf): heildarkaup færa X en hleypa ekki nýjum verkefnum inn, og mengið er áfram 293.
+4. **Niðurstaða (keyrsla 13):**
+   - **353** einingar í 63 verkefnum; sama mengi og óháða kaupskrármælingin (353/353).
+   - ΣX 3.877 → 4.230; „á sölu" óbreytt (1.856 einingar); uppseld 96 → 100.
+5. **Útgáfa:** gagnalag cc224-v5 (migration `20261011150000_cc228_heildarkaup` + rollback). Framendinn las v4 þar til push; v4 stendur sem afturköllun.
+6. **Athugunardæmi, ekki síað: Sementsbraut 13–15** (Akranes). Pakkasamningur 1.9.2025 um 33 fastanúmer á 318 þ. kr/m², langt undir markaðsbili hinna stóru pakkanna (775–1.021 þ.).
+   - 15 einingar eru á sölu og falla utan.
+   - 18 teljast heildarkaup: síðan sýnir 18 af 33 seldar og 0 „Engin skráð sala".
+   - Ef í ljós kemur að samningurinn var tilfærsla, er verðgólf á pakka sú breyting sem kæmi til greina.
+
+---
+
 ## 2026-10-11 — /nybyggingar: myndlaus verkefni, myndaval úr ÖLLUM myndum allra auglýsinga (cc224d)
 
 Forskrift Danna 11.10; push GO gefið fyrirfram (HALT aðeins ef eitthvað fellur). Engin Fable-/API-köll; CC skoðaði yfirlitsblöðin sjálf.
