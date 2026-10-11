@@ -4,6 +4,24 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-11 — /nybyggingar: myndaval á 31 ný verkefni úr cc229 (H) (cc224e)
+
+GO Danna 11.10 (cc224e). Útgáfa **cc224-v7** (keyrsla 15); v6 stendur sem afturköllun. Engin DDL.
+
+1. **Regla óbreytt frá cc224d:** hrein útlitsmynd er tekin fram yfir mynd með borða eða lógói. `bordi=ja` merkir lógó, vatnsmerki eða borða á myndinni, líka afskorið í horni. CC fór sjálft yfir öll blöð (791 frambjóðandi á 49 blöðum) og staðfesti hvert val í fullri stærð. Engin Fable-köll voru gerð.
+2. **Teljari/nefnari, af 31:**
+   - **Valið 20:** 3 hreinar (Vatnsstígur 4, Borgarbraut, Dalsbraut 6) og **17 með borða/lógó**, þar sem engin hrein útlitsmynd var til. Ein er tölvumynd (Vorbraut 8).
+   - **Engin nothæf 11:** Lyngás 1A–C á aðeins innimyndir (`engin`). 10 eiga engar auglýsingamyndir og eru ekki í skránni.
+   - Hrafnaborg 4 og 6 bera sömu ljósmynd, sem er í auglýsingum beggja.
+3. **Gagnalag:** `nybyggingar_myndaval.csv` fær 21 nýja línu (fyrri 224 óbreyttar) og verður 245 línur, 239 með mynd. 19 nýjar 720 px WebP eru hlaðnar á verdmat-myndir. v7 == v6 í öllum dálkum nema `mynd_*` og `reiknad`. Ein eining (2539909) fær annað `augl_id`, því auglýsingin sem v6 valdi féll úr `v_eign_virk_auglysing` milli keyrslna. Það er lifandi gagnahreyfing og talningar haldast óbreyttar.
+4. **Sannreynsla:**
+   - Staðbundið gegn v7: VILLUR 0 á 1280 og 380.
+   - Falspróf gegn www (v6): 200 frávik, öll 20 verkefnin á báðum breiddum.
+
+**Heimildir:** `D:\_audit\cc229_nefnarar\SKIL_CC229.md` (cc224e), `D:\_audit\cc229_nefnarar\h_myndir\`.
+
+---
+
 ## 2026-10-11 — /nybyggingar: nefnarar — óskipt skv. HMS, íbúðir án byggingarárs, leigulína (cc229)
 
 GO Danna 11.10 (cc229 f.3). Útgáfa **cc224-v6** (keyrsla 14, migration `20261011200000_cc229_nefnarar` + rollback); v5 stendur sem afturköllun.
