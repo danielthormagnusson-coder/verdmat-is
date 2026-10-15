@@ -140,7 +140,7 @@ def reikna_soluhradi(E, K, L):
     A = E[~E.oskipt]
     fra = min(A.t_sala.min(), max(A.R1.min(), SALA_FRA)).to_period("M")
     MAN = pd.period_range(fra, data_through.to_period("M"), freq="M")
-    FM = fullnusta_manadar(Kc, data_through, [T for T in MAN if T >= data_through.to_period("M") - 14])
+    FM = fullnusta_manadar(Kc, data_through, list(MAN))      # mæld fyrir ALLA mánuði (engin 1,0-forsenda)
     lok, f_lok = sidasti_throskadi_dagur(Kc, data_through, utg_max)
     upph = lok - pd.Timedelta(days=GLUGGI_D - 1)
 
@@ -168,7 +168,7 @@ def reikna_soluhradi(E, K, L):
     r1_m = np.where(A.R1.notna(), np.searchsorted(byrjun, np.maximum(A.R1.values.astype("datetime64[ns]"),
                                                                        np.datetime64(SALA_FRA, "ns")), side="right") - 1, nm)
     f0 = pd.Series(np.minimum(np.where(sm >= 0, sm, nm), r1_m)).groupby(a_v).min().reindex(range(len(vids)), fill_value=nm)
-    full = np.round(np.array([min(FM.get(M, (1.0, 1.0))) for M in MAN]), 4)   # flaggið les SÖMU (námunduðu) tölu og dálkurinn
+    full = np.round(np.array([min(FM[M]) for M in MAN]), 4)   # flaggið les SÖMU (námunduðu) tölu og dálkurinn
     vv, mm = np.nonzero(np.arange(nm)[None, :] >= f0.values[:, None])   # verkefni án sönnunar og sölu fá engar raðir
     S = pd.DataFrame(dict(verkefni_id=np.array(vids, dtype=object)[vv], manudur=MAN.start_time.date[mm],
                           nothaefar=CN[vv, mm], heildarkaup=CH[vv, mm], oseldar_upphafi=OS[vv, mm],
