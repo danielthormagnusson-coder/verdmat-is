@@ -643,7 +643,7 @@ def soluhradi(V, E, D):
         return V.assign(**{k: None for k in nyb_soluhradi.HCOLS}), None, None
     H['verkefni_id'] = H.verkefni_id.astype(V.verkefni_id.dtype)
     V = V.merge(H[['verkefni_id'] + nyb_soluhradi.HCOLS], on='verkefni_id', how='left')
-    for k in ('hradi_oseldar', 'heildarkaup_staersti_pakki', 'heildarkaup_n_pakkar'):
+    for k in ('n_solur_90d', 'hradi_oseldar', 'heildarkaup_staersti_pakki', 'heildarkaup_n_pakkar'):
         V[k] = V[k].astype('Int64')
     assert (V.heildarkaup_fyrst.notna() == (V.n_heildarkaup > 0)).all(), 'heildarkaupamerki ≠ n_heildarkaup'
     assert V.hradi_stada.isin(nyb_soluhradi.STODUR).all()
@@ -815,7 +815,7 @@ def main():
                f" | leiguaðili nefndur: " + (' · '.join(f"{r.heiti}: {r.leiguadili} {r.leiguadili_n}/{r.n_tviaugl_nu}"
                                                        for r in V[V.leiguadili.notna() & (V.n_tviaugl_nu >= 2)].itertuples()) or '—'),
                (f"söluhraði (cc243): SLEPPT ({t_sh:.1f} s)" if SM is None else
-                f"söluhraði (cc243): gluggi {RS['gluggi'][0]}…{RS['gluggi'][1]} (fullnusta lokadags noth./ónoth. "
+                f"söluhraði (cc243, nothæfar): gluggi {RS['gluggi'][0]}…{RS['gluggi'][1]} (fullnusta lokadags noth. [ræður]/ónoth. "
                 f"{RS['fullnusta_lok'][0]:.3f}/{RS['fullnusta_lok'][1]:.3f}) | útgöngusamningar {RS['n_samsvarar']}/{RS['n_sala']}"
                 f" | mánaðarraðir {len(SM)} í {SM.verkefni_id.nunique()} verkefnum | staða "
                 + ' · '.join(f"{k} {n}" for k, n in V.hradi_stada.value_counts().items())

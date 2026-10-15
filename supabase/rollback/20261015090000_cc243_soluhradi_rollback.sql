@@ -16,7 +16,6 @@ alter table semantic.nybygging_verkefni
   drop column if exists hradi_oseldar,
   drop column if exists hradi_glugga_til,
   drop column if exists hradi_glugga_fra,
-  drop column if exists hradi_90d_samtals,
-  drop column if exists hradi_90d_heildarkaup,
-  drop column if exists hradi_90d_nothaefar;
+  drop column if exists hradi_90d,
+  drop column if exists n_solur_90d;
 notify pgrst, 'reload schema';

@@ -1,10 +1,11 @@
-"""cc243 — söluhraði per nýbyggingarverkefni (f.1 gagnalag): mánaðarsölur, 90 d hraði, heildarkaupamerki.
+"""cc243 — söluhraði per nýbyggingarverkefni (gagnalag; f.2 15.10: hraði og gluggi á NOTHÆFUM, magnsala = nothæf):
+mánaðarsölur, 90 d hraði, heildarkaupamerki.
 
 Skilgreiningar = cc237 (D:\\_audit\\cc237_soluhradi\\SKIL_CC237.md §1, s1_grunnur.py/s2_ferlar.py), óbreyttar:
   lykill        = KAUPSAMNINGSDAGUR (UTGDAG) samningsins sem einingataflan valdi (þinglýsingardagur == sala_dags);
                   sala_dags í nybygging_einingar er þinglýsingardagur og er EKKI lykill
-  teljari       = fyrsta útganga einingar frá byggjanda: nothaefar (stada seld, ONOTHAEFUR 0) og heildarkaup (cc228 D2′
-                  + magnsala) ALLTAF sér
+  teljari       = fyrsta útganga einingar frá byggjanda: nothaefar (stada seld + magnsala — magnsala er nothæfur
+                  samningur, f.2 Danni 15.10; í cc237 var hún í teljara heildarkaupa) og heildarkaup (cc228 D2′) ALLTAF sér
   pakki         = FAERSLUNUMER heildarkaupasamningsins
   óskipt fastnr.= utan mælingar (sala stakrar íbúðar kemst ekki í kaupskrá fyrr en eftir skiptingu) → „ómælanlegt",
                   aldrei 0; verkefni sem er AÐEINS óskipt fær engar mánaðarraðir og hradi_stada 'omaelanlegt'
@@ -13,13 +14,15 @@ Skilgreiningar = cc237 (D:\\_audit\\cc237_soluhradi\\SKIL_CC237.md §1, s1_grunn
   fullnusta     = q11 (cc227/cc232): miðgildi þroskaðra mánaða T−15…T−4, nothæfir og ónothæfir íbúðasamningar landsins
                   sér; mánaðarraðir bera lægri töluna, bradabirgda = < 90 %
 90 d gluggi     = endar á SÍÐASTA ÞROSKAÐA DEGI: síðasti kaupsamningsdagur d þar sem q11-fullnusta dagsins (sömu
-                  viðmiðunarmánuðir, leyfð töf = data_through − d) er ≥ 90 % bæði á nothæfum og ónothæfum
-hraði           = sölur í glugga / 3 (sölur á mánuði), nothæfar / heildarkaup / samtals
+                  viðmiðunarmánuðir, leyfð töf = data_through − d) er ≥ 90 % á NOTHÆFUM samningum (f.2; hraðinn telur
+                  aðeins nothæfar, svo fullnusta ónothæfra bindur hann ekki)
+n_solur_90d     = nothæfar sölur í glugga (alltaf fyllt þegar mælanlegt); heildarkaup ALDREI í hraða
+hraði           = n_solur_90d / 3 (sölur á mánuði) — aðeins ef n_solur_90d ≥ 5, annars NULL
 man_i_uppselt   = óseldar við gluggalok / nothæfur hraði — aðeins ef staða 'maelt', ≥ 5 NOTHÆFAR sölur í glugga,
                   ≥ 5 óseldar og ekkert óskipt fastnr. í verkefninu (óseldur lager á óskiptu númeri er óþekktur);
-                  heildarkaup eru kekkjótt (einn pakki) og fara ekki í spána
+                  dálkurinn er reiknaður en BIRTIST EKKI (f.2, ákvörðun um birtingu í f.3)
 hradi_stada     = 'omaelanlegt' (engin skipt eining, eða skiptar uppseldar en óskipt eftir) | 'uppselt' |
-                  'faar_solur' (< 5 sölur samtals í glugga) | 'maelt'
+                  'faar_solur' (< 5 nothæfar sölur í glugga) | 'maelt'
 Engir sentinlar: ómælanlegt = NULL + staða.
 
 Hreint fall (engin DB-tenging): reikna_soluhradi(E, K, L) — E = einingatafla smiðsins, K = kaupskrá (lesa_kaupskra),
@@ -93,7 +96,8 @@ def fullnusta_manadar(Kc, data_through, manudir):
 
 
 def sidasti_throskadi_dagur(Kc, data_through, utg_max):
-    """Síðasti kaupsamningsdagur d ≤ utg_max með q11-fullnustu dagsins ≥ FULL_MORK á nothæfum OG ónothæfum.
+    """Síðasti kaupsamningsdagur d ≤ utg_max með q11-fullnustu dagsins ≥ FULL_MORK á NOTHÆFUM (f.2); skilar
+    (d, (nothæf, ónothæf)) — ónothæfa talan er aðeins til skýrslu.
     Dagsfullnusta = miðgildi yfir M ∈ [T(d)−15, T(d)−4] af hlutfalli samninga í M með töf ≤ data_through − d."""
     hopar = {on: {m: g.tof.values for m, g in Kc[Kc.onoth == on].groupby("man")} for on in (0, 1)}
     d = utg_max
@@ -102,7 +106,7 @@ def sidasti_throskadi_dagur(Kc, data_through, utg_max):
         leyft = (data_through - d).days
         f = [float(np.median([(hopar[on][M] <= leyft).mean() for M in pd.period_range(T - 15, T - 4, freq="M")
                               if M in hopar[on]])) for on in (0, 1)]
-        if min(f) >= FULL_MORK:
+        if f[0] >= FULL_MORK:
             return d, f
         d -= pd.Timedelta(days=1)
 
@@ -123,7 +127,7 @@ def reikna_soluhradi(E, K, L):
     sala = m.groupby("fastnum").agg(t_sala=("utg", "first"), pakki=("faerslunumer", "first"))
     n_samsv = int(E.loc[sel, "fastnum"].isin(sala.index).sum())
     E = E.merge(sala, left_on="fastnum", right_index=True, how="left")
-    E["sala_teg"] = E.stada.map({"seld": "nothaef", "heildarkaup": "heildarkaup", "magnsala": "heildarkaup"})
+    E["sala_teg"] = E.stada.map({"seld": "nothaef", "magnsala": "nothaef", "heildarkaup": "heildarkaup"})  # f.2 (b)
 
     # ---- í boði (R1)
     fyrsti, f_hms = _t_hms(K)
@@ -191,25 +195,23 @@ def reikna_soluhradi(E, K, L):
                  hradi_glugga_fra=upph.date(), hradi_glugga_til=lok.date())
         ig = a.t_sala.between(upph, lok)
         n_n = int((ig & (a.sala_teg == "nothaef")).sum())
-        n_h = int((ig & (a.sala_teg == "heildarkaup")).sum())
+        n_h = int((ig & (a.sala_teg == "heildarkaup")).sum())   # aðeins til skýrslu — ekki í hraða (f.2)
         osl = int((a.t_sala.isna() | (a.t_sala > lok)).sum())
         if len(a) == 0 or (osl == 0 and n_osk > 0):
             stada = "omaelanlegt"
         elif osl == 0:
             stada = "uppselt"
-        elif n_n + n_h < MIN_SOLUR:
+        elif n_n < MIN_SOLUR:
             stada = "faar_solur"
         else:
             stada = "maelt"
         if stada == "omaelanlegt":
-            r.update(hradi_90d_nothaefar=None, hradi_90d_heildarkaup=None, hradi_90d_samtals=None,
-                     hradi_oseldar=None, man_i_uppselt=None)
+            r.update(n_solur_90d=None, hradi_90d=None, hradi_oseldar=None, man_i_uppselt=None)
         else:
-            hn, hh = n_n * 30 / GLUGGI_D, n_h * 30 / GLUGGI_D
-            mu = (round(osl / hn, 1) if stada == "maelt" and n_n >= MIN_SOLUR and osl >= MIN_OSELDAR and n_osk == 0
-                  else None)
-            r.update(hradi_90d_nothaefar=round(hn, 2), hradi_90d_heildarkaup=round(hh, 2),
-                     hradi_90d_samtals=round(hn + hh, 2), hradi_oseldar=osl, man_i_uppselt=mu)
+            hn = n_n * 30 / GLUGGI_D
+            mu = (round(osl / hn, 1) if stada == "maelt" and osl >= MIN_OSELDAR and n_osk == 0 else None)
+            r.update(n_solur_90d=n_n, hradi_90d=round(hn, 2) if n_n >= MIN_SOLUR else None, hradi_oseldar=osl,
+                     man_i_uppselt=mu)
         r["hradi_stada"] = stada
         r["_n_glugga_noth"], r["_n_glugga_heild"], r["_n_oskipt"] = n_n, n_h, n_osk
         H.append(r)
@@ -222,6 +224,6 @@ def reikna_soluhradi(E, K, L):
 
 SCOLS = ["verkefni_id", "manudur", "nothaefar", "heildarkaup", "uppsafnad_nothaefar", "uppsafnad_heildarkaup",
          "oseldar_upphafi", "fullnusta", "bradabirgda"]
-HCOLS = ["hradi_90d_nothaefar", "hradi_90d_heildarkaup", "hradi_90d_samtals", "hradi_glugga_fra", "hradi_glugga_til",
+HCOLS = ["n_solur_90d", "hradi_90d", "hradi_glugga_fra", "hradi_glugga_til",
          "hradi_oseldar", "man_i_uppselt", "hradi_stada", "heildarkaup_fyrst", "heildarkaup_sidast",
          "heildarkaup_staersti_pakki", "heildarkaup_n_pakkar"]

@@ -1,5 +1,6 @@
 -- =====================================================================
--- cc243 f.1 — söluhraði per nýbyggingarverkefni (gagnalag). EKKI BEITT — bíður GO Danna.
+-- cc243 — söluhraði per nýbyggingarverkefni (gagnalag). f.1 14.–15.10; f.2 15.10 (GO Danna með breytingum a–d):
+--   hraði og gluggi á NOTHÆFUM eingöngu, magnsala = nothæf, n_solur_90d alltaf fyllt þegar mælanlegt, hraði aðeins ef ≥ 5.
 -- Skrifað af scripts/cc224_nybygging_verkefni.py + scripts/nyb_soluhradi.py (grein cc243).
 -- Rollback (skrifuð á undan): supabase/rollback/20261015090000_cc243_soluhradi_rollback.sql
 -- Skil: D:\_audit\cc243_soluhradi\SKIL_CC243.md. Skilgreiningar = cc237 §1 (D:\_audit\cc237_soluhradi\SKIL_CC237.md).
@@ -8,12 +9,14 @@
 -- 8.428/8.428 eins). Eldri útgáfur (v2–v7) fá NULL; CHECK-skilyrðin leyfa það (hradi_stada IS NULL = ekki reiknað).
 --
 --   lykill        = kaupsamningsdagur (UTGDAG) útgöngusamningsins, ekki þinglýsingardagur (sala_dags)
---   nothaefar     = fyrsta útganga, ONOTHAEFUR 0 (stada seld); heildarkaup = cc228 D2′ + magnsala (teljari b, cc237)
+--   nothaefar     = fyrsta útganga, stada seld (ONOTHAEFUR 0) + magnsala (nothæfur samningur, f.2); heildarkaup = cc228 D2′
 --   oseldar_upphafi = óseldar einingar í boði 1. dag mánaðar (R1: HMS-nálgun ∧ fyrsta auglýsing ∧ fyrsti samningur)
 --   óskipt fastnr. utan; verkefni sem er eingöngu óskipt fær ENGAR mánaðarraðir og hradi_stada 'omaelanlegt' (aldrei 0)
 --   fullnusta     = q11 (lægri af nothæfum/ónothæfum), bradabirgda = fullnusta < 0,90
---   hradi_90d_*   = sölur á mánuði (sölur í glugga / 3) í 90 d glugga sem endar á síðasta þroskaða degi
---   man_i_uppselt = hradi_oseldar / hradi_90d_nothaefar; aðeins 'maelt', ≥ 5 nothæfar í glugga, ≥ 5 óseldar, ekkert óskipt
+--   gluggi        = 90 d sem enda á síðasta kaupsamningsdegi með fullnustu NOTHÆFRA ≥ 90 % (f.2)
+--   n_solur_90d   = nothæfar sölur í glugga; hradi_90d = n_solur_90d / 3 (á mánuði), AÐEINS ef n_solur_90d ≥ 5
+--                   heildarkaup ALDREI í hraða — aðeins í heildarkaup_* og mánaðartöflu
+--   man_i_uppselt = hradi_oseldar / hradi_90d; aðeins 'maelt', ≥ 5 óseldar, ekkert óskipt. Reiknað, BIRTIST EKKI (f.3)
 --   heildarkaup_* = D2′ eingöngu (= n_heildarkaup); pakki = FAERSLUNUMER; dagsetningar = UTGDAG
 --
 -- NEFNARASKYLDA ER DÁLKASKYLDA: engir sentinlar — NULL + staða.
@@ -26,11 +29,10 @@ SET TRANSACTION READ WRITE;  -- pooler-reglan (WP h)
 -- 1. Dálkar á verkefni
 -- ---------------------------------------------------------------------
 ALTER TABLE semantic.nybygging_verkefni
-  ADD COLUMN IF NOT EXISTS hradi_90d_nothaefar        numeric(7,2),
-  ADD COLUMN IF NOT EXISTS hradi_90d_heildarkaup      numeric(7,2),
-  ADD COLUMN IF NOT EXISTS hradi_90d_samtals          numeric(7,2),
+  ADD COLUMN IF NOT EXISTS n_solur_90d                integer,       -- nothæfar sölur í glugga
+  ADD COLUMN IF NOT EXISTS hradi_90d                  numeric(7,2),  -- nothæfar á mánuði; NULL ef n_solur_90d < 5
   ADD COLUMN IF NOT EXISTS hradi_glugga_fra           date,
-  ADD COLUMN IF NOT EXISTS hradi_glugga_til           date,          -- síðasti þroskaði dagur (fullnusta ≥ 90 %)
+  ADD COLUMN IF NOT EXISTS hradi_glugga_til           date,          -- síðasti þroskaði dagur (fullnusta nothæfra ≥ 90 %)
   ADD COLUMN IF NOT EXISTS hradi_oseldar              integer,       -- óseldar skiptar einingar við gluggalok
   ADD COLUMN IF NOT EXISTS man_i_uppselt              numeric(6,1),
   ADD COLUMN IF NOT EXISTS hradi_stada                text,
@@ -41,19 +43,19 @@ ALTER TABLE semantic.nybygging_verkefni
 
 ALTER TABLE semantic.nybygging_verkefni ADD CONSTRAINT nybygging_verkefni_hradi_chk CHECK (
   (hradi_stada IS NULL
-     AND hradi_glugga_fra IS NULL AND hradi_glugga_til IS NULL AND hradi_90d_nothaefar IS NULL
-     AND hradi_90d_heildarkaup IS NULL AND hradi_90d_samtals IS NULL AND hradi_oseldar IS NULL AND man_i_uppselt IS NULL)
+     AND hradi_glugga_fra IS NULL AND hradi_glugga_til IS NULL AND n_solur_90d IS NULL AND hradi_90d IS NULL
+     AND hradi_oseldar IS NULL AND man_i_uppselt IS NULL)
   OR (hradi_stada IN ('maelt', 'faar_solur', 'omaelanlegt', 'uppselt')
      AND hradi_glugga_til IS NOT NULL AND hradi_glugga_fra = hradi_glugga_til - 89
-     AND (hradi_stada = 'omaelanlegt') = (hradi_90d_samtals IS NULL)
-     AND (hradi_90d_samtals IS NULL) = (hradi_90d_nothaefar IS NULL)
-     AND (hradi_90d_samtals IS NULL) = (hradi_90d_heildarkaup IS NULL)
-     AND (hradi_90d_samtals IS NULL) = (hradi_oseldar IS NULL)
-     AND (hradi_90d_samtals IS NULL OR (hradi_90d_nothaefar >= 0 AND hradi_90d_heildarkaup >= 0
-          AND hradi_90d_samtals >= greatest(hradi_90d_nothaefar, hradi_90d_heildarkaup) AND hradi_oseldar >= 0))
+     AND (hradi_stada = 'omaelanlegt') = (n_solur_90d IS NULL)
+     AND (n_solur_90d IS NULL) = (hradi_oseldar IS NULL)
+     AND (n_solur_90d IS NULL OR (n_solur_90d >= 0 AND hradi_oseldar >= 0))
+     AND (hradi_90d IS NOT NULL) = (coalesce(n_solur_90d, 0) >= 5)
+     AND (hradi_90d IS NULL OR hradi_90d = round(n_solur_90d * 30 / 90.0, 2))
      AND (hradi_stada <> 'uppselt' OR hradi_oseldar = 0)
-     AND (man_i_uppselt IS NULL OR (hradi_stada = 'maelt' AND hradi_oseldar >= 5 AND hradi_90d_nothaefar > 0
-          AND man_i_uppselt > 0))
+     AND (hradi_stada <> 'maelt' OR (n_solur_90d >= 5 AND hradi_oseldar > 0))
+     AND (hradi_stada <> 'faar_solur' OR (n_solur_90d < 5 AND hradi_oseldar > 0))
+     AND (man_i_uppselt IS NULL OR (hradi_stada = 'maelt' AND hradi_oseldar >= 5 AND man_i_uppselt > 0))
      AND (heildarkaup_fyrst IS NOT NULL) = (n_heildarkaup > 0)));
 
 ALTER TABLE semantic.nybygging_verkefni ADD CONSTRAINT nybygging_verkefni_heildarkaup_merki_chk CHECK (
@@ -62,6 +64,15 @@ ALTER TABLE semantic.nybygging_verkefni ADD CONSTRAINT nybygging_verkefni_heilda
   AND (heildarkaup_fyrst IS NULL) = (heildarkaup_n_pakkar IS NULL)
   AND (heildarkaup_fyrst IS NULL OR (heildarkaup_fyrst <= heildarkaup_sidast
        AND heildarkaup_staersti_pakki BETWEEN 1 AND n_heildarkaup AND heildarkaup_n_pakkar BETWEEN 1 AND n_heildarkaup)));
+
+COMMENT ON COLUMN semantic.nybygging_verkefni.n_solur_90d IS
+  'cc243: NOTHÆFAR sölur (UTGDAG) í glugga hradi_glugga_fra…til; heildarkaup aldrei. NULL = omaelanlegt.';
+COMMENT ON COLUMN semantic.nybygging_verkefni.hradi_90d IS
+  'cc243: n_solur_90d / 3 (nothæfar sölur á mánuði). NULL ef n_solur_90d < 5 eða omaelanlegt.';
+COMMENT ON COLUMN semantic.nybygging_verkefni.hradi_glugga_til IS
+  'cc243: síðasti kaupsamningsdagur með q11-fullnustu NOTHÆFRA samninga ≥ 90 % (sami fyrir öll verkefni keyrslunnar).';
+COMMENT ON COLUMN semantic.nybygging_verkefni.man_i_uppselt IS
+  'cc243: hradi_oseldar / hradi_90d. Reiknað en EKKI birt (Danni 15.10, f.3).';
 
 -- ---------------------------------------------------------------------
 -- 2. Mánaðarsölur per verkefni (eitt sett per keyrslu = útgáfa; smiðurinn eyðir og skrifar í sömu færslu)
@@ -88,7 +99,7 @@ CREATE TABLE semantic.nybygging_solur_manadar (
     AND fullnusta BETWEEN 0 AND 1 AND bradabirgda = (fullnusta < 0.90))
 );
 COMMENT ON TABLE semantic.nybygging_solur_manadar IS
-  'cc243: sölur per verkefni og kaupsamningsmánuð (UTGDAG). nothaefar / heildarkaup (D2′+magnsala) aðskilið; '
+  'cc243: sölur per verkefni og kaupsamningsmánuð (UTGDAG). nothaefar (þ.m.t. magnsala) / heildarkaup (D2′) aðskilið; '
   'óskipt fastnr. utan (verkefni eingöngu óskipt = engar raðir, hradi_stada omaelanlegt). bradabirgda = fullnusta q11 < 90 %.';
 
 -- ---------------------------------------------------------------------
