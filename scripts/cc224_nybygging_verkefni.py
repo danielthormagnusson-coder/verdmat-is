@@ -1,4 +1,5 @@
-"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar (útgáfa cc224-v7; myndaval nýrra verkefna cc224e, v6 nefnarar cc229, v5 heildarkaup cc228, v4 myndaval cc224d).
+"""cc224 — /nybyggingar: reiknar semantic.nybygging_verkefni + semantic.nybygging_einingar + semantic.nybygging_solur_manadar
+(cc243: söluhraði per verkefni, nyb_soluhradi.py; útgáfa cc224-v7; myndaval nýrra verkefna cc224e, v6 nefnarar cc229, v5 heildarkaup cc228, v4 myndaval cc224d).
 
   python scripts/cc224_nybygging_verkefni.py --dryrun [--ut DIR] [--slodir-tillaga CSV]
   python scripts/cc224_nybygging_verkefni.py --skrifa [--ut DIR] [--revalidate] [--hlada-myndir REMOTE]
@@ -64,10 +65,11 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 from nyb_tviaugl import reikna_tviaugl
+import nyb_soluhradi
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-UTGAFA = "cc224-v8"   # cc234: = v7 + n_tviaugl_nu/leiguadili (tvíauglýsing NÚ, nyb_tviaugl.py); cc224e: = v6 + forsíðumyndir 20 nýrra verkefna úr cc229 (H); cc229 (v6): = v5 + óskipt skv. HMS (A), íbúðir án byggár tengdar (B), n_leiga (C); cc228 (v5): heildarkaup
+UTGAFA = "cc224-v8"   # cc243: v8 ÓBREYTT að heiti — söluhraðadálkar + nybygging_solur_manadar eru hrein viðbót (enginn birtur dálkur breytist); cc234: = v7 + n_tviaugl_nu/leiguadili (tvíauglýsing NÚ, nyb_tviaugl.py); cc224e: = v6 + forsíðumyndir 20 nýrra verkefna úr cc229 (H); cc229 (v6): = v5 + óskipt skv. HMS (A), íbúðir án byggár tengdar (B), n_leiga (C); cc228 (v5): heildarkaup
 SALA_FRA = dt.date(2021, 1, 1)
 AR = dt.date.today().year
 BYGGAR_SKILGR = AR - 2          # „fullbúin innan tveggja ára"
@@ -157,12 +159,15 @@ def lesa(c):
          where fastnum = any(%(fn)s) and not coalesce(hlutd_grunur,false) and not coalesce(arekstur,false)
            and not coalesce(grunur_villa,false) and not coalesce(grunsamleg,false)""",
                      c, params=dict(fn=fn))
+    # cc243: fyrsta söluauglýsing fastnr. í ÖLLUM flokkum („í boði", regla R1 cc237) — aðeins dagsetningar
+    LA = pd.read_sql("""select fastnum, listed_at, first_seen_at from scraper.listings
+                         where tenure = 'sale' and fastnum = any(%(fn)s)""", c, params=dict(fn=fn))
     VM = pd.read_sql("select sala_id, lykill, birtingarheiti from scraper.fasteignasala_vorumerki", c)
     SL = pd.read_sql("select landeign_nr, slod from semantic.nybygging_slodir where stadfest order by landeign_nr, slod", c)
     cur.execute("select max(thinglystdags) from public.sales_history"); data_through = cur.fetchone()[0]
     cur.execute("select max(last_seen_at) from scraper.listings where tenure='sale'"); snap = cur.fetchone()[0]
     c.rollback()
-    return dict(P=P, S=S, SA=SA, RL=RL, L=L, MV=MV, MY=MY, VV=VV, VM=VM, SL=SL, n_skilgr_land=n_skilgr_land, data_through=data_through, snap=snap)
+    return dict(P=P, S=S, SA=SA, RL=RL, L=L, LA=LA, MV=MV, MY=MY, VV=VV, VM=VM, SL=SL, n_skilgr_land=n_skilgr_land, data_through=data_through, snap=snap)
 
 
 def ba_ur_texta(t):
@@ -617,13 +622,35 @@ VCOLS = ['verkefni_id', 'slug', 'heiti', 'heiti_uppruni', 'gotur', 'postnr', 'po
          'n_b0', 'n_b1', 'n_b2', 'n_b3', 'n_b4', 'fyrsta_sala', 'sidasta_sala', 'kr_m2_seld', 'n_kr_m2_seld', 'kr_m2_asett',
          'n_kr_m2_asett', 'n_laekkanir', 'n_laekkad_30', 'stofur', 'byggingaradili', 'byggingaradili_n_augl', 'slod', 'byggar_min', 'byggar_max',
          'sidasta_virkni', 'uppselt', 'mynd_sha256', 'mynd_lykill', 'mynd_lykill_frumrit', 'mynd_breidd', 'mynd_haed', 'mynd_stofa',
-         'mynd_dags', 'mynd_listing_id', 'n_tviaugl_nu', 'leiguadili', 'leiguadili_n']
+         'mynd_dags', 'mynd_listing_id', 'n_tviaugl_nu', 'leiguadili', 'leiguadili_n'] + nyb_soluhradi.HCOLS
 ECOLS = ['fastnum', 'verkefni_id', 'heimilisfang', 'merking', 'einflm', 'fjherb', 'byggar', 'byggingarstig', 'innan_skilgr',
          'heildareining', 'n_undireiningar', 'stada', 'sala_dags', 'kaupverd', 'kr_m2', 'asett_verd', 'asett_flm', 'n_laekkanir',
          'augl_id', 'augl_endursala', 'augl_flokkur', 'laekkun_dags', 'laekkun_fra', 'laekkun_til', 'laekkun_flokkur', 'laekkad_30']
 
 
-def skrifa(c, V, E, D, auk, hofst):
+def soluhradi(V, E, D):
+    """cc243: söluhraði per verkefni (nyb_soluhradi.py). Lykill UTGDAG úr D:\\kaupskra.csv (sales_history ber hann ekki);
+    kaupskráin og sales_history verða að vera sama útgáfa (daily_sales_refresh 02:30). Samsvari ekki ÖLL útgöngusamningar
+    eininganna er söluhraðinn SLEPPTUR þessa keyrslu (dálkar NULL, engar mánaðarraðir) — aldrei hálf tala."""
+    K = nyb_soluhradi.lesa_kaupskra()
+    dt_k = K.thgl.max().date()
+    if dt_k != D['data_through']:
+        print(f"[AÐVÖRUN] söluhraði SLEPPT: kaupskrá þinglýst til {dt_k} en sales_history til {D['data_through']}")
+        return V.assign(**{k: None for k in nyb_soluhradi.HCOLS}), None, None
+    S, H, R = nyb_soluhradi.reikna_soluhradi(E, K, D['LA'])
+    if R['n_samsvarar'] != R['n_sala']:
+        print(f"[AÐVÖRUN] söluhraði SLEPPT: útgöngusamningur fannst fyrir {R['n_samsvarar']}/{R['n_sala']} einingar")
+        return V.assign(**{k: None for k in nyb_soluhradi.HCOLS}), None, None
+    H['verkefni_id'] = H.verkefni_id.astype(V.verkefni_id.dtype)
+    V = V.merge(H[['verkefni_id'] + nyb_soluhradi.HCOLS], on='verkefni_id', how='left')
+    for k in ('hradi_oseldar', 'heildarkaup_staersti_pakki', 'heildarkaup_n_pakkar'):
+        V[k] = V[k].astype('Int64')
+    assert (V.heildarkaup_fyrst.notna() == (V.n_heildarkaup > 0)).all(), 'heildarkaupamerki ≠ n_heildarkaup'
+    assert V.hradi_stada.isin(nyb_soluhradi.STODUR).all()
+    return V, S, R
+
+
+def skrifa(c, V, E, D, auk, hofst, S=None):
     c.rollback()   # WP (h): engin opin lesfærsla á undan SET TRANSACTION READ WRITE
     cur = c.cursor()
     cur.execute("SET TRANSACTION READ WRITE")
@@ -644,11 +671,22 @@ def skrifa(c, V, E, D, auk, hofst):
                    page_size=1000)
     er = [[UTGAFA] + [nn(r[k]) for k in ECOLS] for r in E.to_dict('records')]
     execute_values(cur, f"insert into semantic.nybygging_einingar (utgafa, {', '.join(ECOLS)}) values %s", er, page_size=2000)
+    # cc243: mánaðarsölur — eitt sett per keyrslu; sleppt söluhraði (S None) skilur útgáfuna eftir TÓMA, aldrei gamla
+    cur.execute("delete from semantic.nybygging_solur_manadar where utgafa = %s", (UTGAFA,))
+    n_s = 0
+    if S is not None:
+        sr = [[UTGAFA] + [nn(r[k]) for k in nyb_soluhradi.SCOLS] for r in S.to_dict('records')]
+        execute_values(cur, f"insert into semantic.nybygging_solur_manadar (utgafa, {', '.join(nyb_soluhradi.SCOLS)}) values %s",
+                       sr, page_size=5000)
+        n_s = len(sr)
     cur.execute("select count(*), coalesce(sum(n_einingar),0), coalesce(sum(n_seld),0) from semantic.nybygging_verkefni where utgafa=%s", (UTGAFA,))
     nv = cur.fetchone()
     cur.execute("select count(*) from semantic.nybygging_einingar where utgafa=%s", (UTGAFA,))
     ne = cur.fetchone()[0]
+    cur.execute("select count(*) from semantic.nybygging_solur_manadar where utgafa=%s", (UTGAFA,))
+    ns_ = cur.fetchone()[0]
     assert nv == (len(V), int(V.n_einingar.sum()), int(V.n_seld.sum())) and ne == len(E), (nv, ne, len(V), len(E))
+    assert ns_ == n_s, (ns_, n_s)
     c.commit()
     return kid, nv, ne
 
@@ -739,6 +777,10 @@ def main():
         V['n_tviaugl_nu'] = V.n_tviaugl_nu.fillna(0).astype(int)
         V['leiguadili_n'] = V.leiguadili_n.astype('Int64')
         assert (V.n_tviaugl_nu <= V.n_leiga).all(), 'n_tviaugl_nu > n_leiga'
+        # cc243: söluhraði per verkefni (lykill UTGDAG, R1-nefnari, 90 d gluggi á síðasta þroskaða degi)
+        t_sh = dt.datetime.now()
+        V, SM, RS = soluhradi(V, E, D)
+        t_sh = (dt.datetime.now() - t_sh).total_seconds()
         n_nyjar = n_hladid = 0
         MY = D['MY']
         if a.skrifa:
@@ -746,6 +788,8 @@ def main():
         V = mynd_i_verkefni(V, MY)
         V.to_csv(ut / 'verkefni.csv', index=False, encoding='utf-8-sig')
         E.to_csv(ut / 'einingar.csv', index=False, encoding='utf-8-sig')
+        if SM is not None:
+            SM.to_csv(ut / 'solur_manadar.csv', index=False, encoding='utf-8-sig')
         U = auk['U']
         lin = [f"útgáfa {UTGAFA} | {'SPÁ m/ slóðatillögum' if a.slodir_tillaga else 'staðfestar slóðir: ' + str(len(D['SL']))}",
                f"skilgreining: {SKILGREINING}",
@@ -769,13 +813,20 @@ def main():
                f", án viðmiðs {auk['b_an_vidmids']} | n_leiga Σ {int(V.n_leiga.sum())} í {int((V.n_leiga > 0).sum())} verkefnum",
                f"tvíauglýst NÚ Σ {int(V.n_tviaugl_nu.sum())} í {int((V.n_tviaugl_nu > 0).sum())} verkefnum | lína (N ≥ 2) {int((V.n_tviaugl_nu >= 2).sum())}"
                f" | leiguaðili nefndur: " + (' · '.join(f"{r.heiti}: {r.leiguadili} {r.leiguadili_n}/{r.n_tviaugl_nu}"
-                                                       for r in V[V.leiguadili.notna() & (V.n_tviaugl_nu >= 2)].itertuples()) or '—')]
+                                                       for r in V[V.leiguadili.notna() & (V.n_tviaugl_nu >= 2)].itertuples()) or '—'),
+               (f"söluhraði (cc243): SLEPPT ({t_sh:.1f} s)" if SM is None else
+                f"söluhraði (cc243): gluggi {RS['gluggi'][0]}…{RS['gluggi'][1]} (fullnusta lokadags noth./ónoth. "
+                f"{RS['fullnusta_lok'][0]:.3f}/{RS['fullnusta_lok'][1]:.3f}) | útgöngusamningar {RS['n_samsvarar']}/{RS['n_sala']}"
+                f" | mánaðarraðir {len(SM)} í {SM.verkefni_id.nunique()} verkefnum | staða "
+                + ' · '.join(f"{k} {n}" for k, n in V.hradi_stada.value_counts().items())
+                + f" | man_i_uppselt {int(V.man_i_uppselt.notna().sum())} | heildarkaupamerki {int(V.heildarkaup_fyrst.notna().sum())}"
+                f" | {t_sh:.1f} s")]
         for l in lin:
             print(l)
         (ut / 'samantekt.txt').write_text('\n'.join(lin) + '\n', encoding='utf-8')
         auk['b_K'].to_csv(ut / 'byggar_kandidatar.csv', index=False, encoding='utf-8')
         if a.skrifa:
-            kid, nv, ne = skrifa(c, V, E, D, auk, hofst)
+            kid, nv, ne = skrifa(c, V, E, D, auk, hofst, SM)
             print(f"[OK] skrifað keyrsla_id={kid}: verkefni {nv[0]} (ΣY {nv[1]}, ΣX {nv[2]}), einingar {ne}")
             if a.revalidate:
                 revalidate()
