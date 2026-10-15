@@ -146,6 +146,10 @@ blandast, miðjan alltaf fersk.
 
 ## 5. Skref 4 — flip (sér-lota, sér-go)
 
+> **⛔ Skylduskref 0 (cc244 f.3, 2026-10-15):** keyrðu
+> `python D:\verdmat-is\app\scripts\thekjuhlid.py --model <version>` strangt, án
+> `--leyfa-thekkt`. rc ≠ 0 → ekkert flipp. Sjá efst í `ROLLBACK_RUNBOOK_CC78.md`.
+
 Flippið fylgir júlí-flip mynstrinu (DECISIONS 2026-06-30 + 2026-07-02 conformal-flip):
 
 1. Nýtt universe-rebuild með kandídat-artifactinu:

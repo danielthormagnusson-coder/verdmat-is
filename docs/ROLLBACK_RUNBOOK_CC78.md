@@ -1,5 +1,24 @@
 # ROLLBACK_RUNBOOK_CC78 — ágúst-endurþjálfunin (regla R)
 
+> **⛔ SKYLDUSKREF 0 FYRIR HVERT FLIPP — `thekjuhlid` strangt, rc 0 áður en flipp**
+> *(bætt við 2026-10-15, cc244 f.3; DECISIONS 2026-10-15 + viðbót)*
+>
+> ```
+> python D:\verdmat-is\app\scripts\thekjuhlid.py --model <ný model_version>
+> ```
+>
+> - Keyrt **strangt**: **án** `--leyfa-thekkt`, á sjálfgefnu leiðunum rebuild og adapter.
+> - Það er gert **áður en** §2 þrep 1 hefst og áður en nokkur skrif-tenging opnast.
+> - **rc ≠ 0 → ekkert flipp.** Á það við um hvert flipp, hvaða skript sem framkvæmir það.
+>   - `flip_iter4r.py --phase flip` keyrir hliðið sjálft (`thekjuhlid_fyrir_flipp`).
+>   - Flipp-skript sem er ekki afritað af því ber **ekki** hliðið. Þá verður að keyra
+>     skipunina hér að ofan handvirkt og bóka rc í flipp-skýrsluna.
+> - Listinn yfir þekkt frávik (cc244(a)) gildir **aðeins** fyrir rebuild-skorun undir
+>   `iter4r_20260805_reglaR_strukt`, aldrei fyrir flipp.
+>   - Meðan hæðar-features eru NaN í rekstri (BACKLOG cc244 (a)) stöðvast þetta skref á 4
+>     features. Það er ætlað.
+> - Rollback (§3) er **ekki** hliðað, því leiðin til baka má aldrei lokast.
+
 > **Staða: LESIN OG STAÐFEST AF ARKITEKT 2026-08-03.** Sjá §10 — allir sex
 > staðfestingarreitir fylltir, með þremur sérstökum staðfestingum bókuðum.
 > **Fasi 2 má hefjast** að uppfylltu einu útistandandi skilyrði: æfingarstig 1
