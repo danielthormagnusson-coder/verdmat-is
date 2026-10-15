@@ -1831,3 +1831,26 @@ sé endurvakinn á skoðun einni.
 - **cc233 f.2 — CLAUDE.md ↔ docs/: 6 mótsagnir bókaðar, ekki lagaðar (bókað 11.10, cc233; ákvörðun Danna).** (1) Routes/data flow/Commands/Authentication-kaflar lýsa frosna speglinum, ekki www.verdmat.ai (`verdmat-ai`); endurskrifun er structural. (2) Models: iter5-hindrunin „Phase D + export" virðist leyst (D3 27.05, properties_v2 úr Supabase 29.05); staða iter5 ómæld. (3) „Listings canonical at evalue.is scrape outputs" (líka SOURCES_OF_TRUTH.md) nær ekki yfir lifandi `scraper.listings`. (4) Fyrirsögn „verdmat.is" — afurðin er verdmat.ai. (5) DECISIONS „newest at top" brotið af §5D-11…14 um miðja skrá. (6) Eldri læstar DECISIONS-færslur um „pooler read-only"; ný regla bíður commits cc231. Sex ótvíræð atriði voru lagfærð í CLAUDE.md. Heimild: `D:\_audit\cc233_laerdomur\SKIL_CC233.md` f.2.
 
 - **cc234 — Greining: hlutdeild kaupa til útleigu í nýbyggingum (bókað 11.10, cc234; ákvörðun Danna).** Greining: hlutdeild kaupa til útleigu í nýbyggingum (cc234: 232/269 leiguauglýsinga frá einstaklingum) — aðgreina frá óþinglýstum sölum fyrst. Af 232 einingum þar sem einstaklingur auglýsir leiguna eru 67 óseldar skv. HMS (38 á sölu, 29 óseldar án auglýsingar): þar getur auglýsandinn verið starfsmaður/eigandi byggingaraðila á eigin aðgangi eða kaupandi sem hefur ekki þinglýst — það þarf að greina áður en nokkur hlutdeild er reiknuð. Auglýsandi myigloo er aðeins í hráblöðum (`organization.name`, `owner.is_individual`); kennitala er hvergi til. Fundur: `D:\_audit\cc234_leiguaugl\SKIL_CC234.md` (2).
+
+- **cc244 (a) — HÆÐARAFLEIÐSLA Í SKORUNARLEIÐ + RETRAIN + ENDURKVÖRÐUN STIGS + ENDURMAT MEÐ VERSION STAMP (bókað 15.10, cc244 f.2; ákvörðun Danna: næsti retrain-hringur, ekki heitlagfæring).** Hæðar-features fjögur eru 100 % NaN í rekstri. Þjálfunarþekja er 100 / 99,8 / 72,6 / 72,6 %, og þau voru aldrei leidd í rebuild, VÉL-1 adapter eða Phase 1A (DECISIONS 2026-10-15).
+  - **Verk:**
+    1. Eitt sameiginlegt fall `haedar_features(merking, landnum, heimild_max)` með reglu `build_training_data.py:313–356` orðrétt. Það er kallað í þjálfun, `rebuild_predictions_iter4.build_X_matrix` og `phase_d3_score_extract.build_X_matrix`, ekki afritað í hverja skrá.
+    2. Lind í DB: nýr `properties.merking` (tillaga (a), gagnalagsbreyting, sér-GO). Valkosturinn er `matseiningar`, sem hefur 99,56 % samræmi og frávik 1 ↔ 0. `building_max_floor` reiknast á fullu eignamengi per landnum.
+    3. Bæta nöfnunum fjórum í `_structural` (`phase_d3_score_extract.py:246`). Annars fær grunnlínan `has_extraction_data = 1` í hljóði.
+    4. Retrain. Kvarða stig og conformal á **rekstrarham-leifum**, ekki trainer-`_predictions.pkl`. Í dag hækkar fylling fjölbýli +0,44 → +1,77 % skekkju (calib n=3.075).
+    5. Hlið: `scripts/thekjuhlid.py` (P1) skal standast á rebuild og adapter. Auk þess gildisparity (P2), parity adapter ↔ rebuild með `has_extraction_data == 0` (P3) og OOS-GO-hlið (P5): MdAPE ekki verri en +0,1 pp alls og í hverju hæðarbili með n ≥ 100.
+    6. Endurmat **allra** main-verðmata (líka sérbýlis, +1,9 %) í einni txn eftir ROLLBACK_RUNBOOK_CC78, með R1-frystingu og útgáfustimpli (`calibration_version … +haed1` eða `feature_build_version`). Prófunarútgáfa kemur fyrir GO.
+  - Fundur: `D:\_audit\cc244_haed\SKIL_CC244.md` §4.
+
+- **cc244 (b) — ENDURMÆLA STUÐLASKRÁ v1.4 OG HÆÐARLÍNUR cc241 EFTIR (a) (bókað 15.10, cc244 f.2).** Á eftir flippinu í (a) þarf að endurmæla þrennt:
+  - (1) 24 rekstrar-OOS-línur stuðlaskrár v1.4 (cc226b). Grunnlína þeirra er rekstrarhamur án hæðar, og línur tengdar hæð (svalir, útsýni, lyfta, þvottahús) geta færst.
+  - (2) Stöðu `haed_4plus`, `kjallari_apt` og `ris_apt` (cc241 A5). `haed_4plus` er **ekki** LIKAN-BER-THEGAR í rekstri í dag: −1,7 pp miðað við miðhæðir, SE ~0,7, calib n=491.
+  - (3) `flag_divergence`, sem skiptir um stöðu á 3.905 eignum við fyllingu.
+  - Fundur: `D:\_audit\cc244_haed\SKIL_CC244.md` §2.2, §4.3. `D:\_audit\cc241_krass\SKIL_CC241.md`.
+
+- **cc244 (c) — SHAP-RAÐIR „HÆÐ Í BYGGINGU" MEÐ TÓMU GILDI — FELA TÓM GILDI (bókað 15.10, cc244 f.2).** `public.feature_attributions` ber topp-10 SHAP-raðir þar sem hæðar-feature hefur **tómt gildi**: 85.961 fyrir `merking_floor`, 34.094 fyrir `building_max_floor` og 2.149 fyrir `floor_fraction`; meðal-|SHAP| er ~0,013 log.
+  - Þetta er NaN-greinin sjálf, ekki eiginleiki eignarinnar.
+  - Taflan er aðeins lesin af `/dev/farm` (`AttributionWaterfall`), ekki á lifandi fleti.
+  - Verk: fela raðir með tómu feature-gildi í birtingu, eða skrifa þær ekki. Það á líka við um aðra NaN-liði.
+  - Raðirnar hverfa sjálfkrafa eftir (a) fyrir hæðina, en reglan á að gilda almennt.
+  - Fundur: `D:\_audit\cc244_haed\SKIL_CC244.md` §3.

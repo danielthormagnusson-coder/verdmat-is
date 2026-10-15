@@ -4,6 +4,32 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-15 — Hæðar-features tóm í rekstri — lagað í næsta retrain-hring, ekki heitlagfæring (cc244) — **ákvörðun Danna; ekkert birt grunnmat breytt**
+
+1. **Staðfest (cc244, read-only).** Fjögur hæðar-features í `iter4r_20260805_reglaR_strukt` main_mean eru **100 % NaN í rekstri**: `merking_floor`, `building_max_floor`, `is_top_floor` og `floor_fraction`.
+   - Þekja í þjálfun (`training_data_v2.pkl`, main n=142.913): 100 / 99,8 / 72,6 / 72,6 %.
+   - Í rekstri: 0 % í báðum lifandi skorunarleiðum. Það eru lotuskorun `rebuild_predictions_iter4` (n=162.005) og VÉL-1 adapterinn `phase_d3_score_extract` (n=155.832), sem þekjuhliðið mældi 15.10.
+   - **Aldrei smíðað, ekki brot.** Þjálfun leiðir hæðina í `D:\build_training_data.py:313–356`, en hvorki rebuild (`build_X_matrix`, col_map `:322–334`), adapterinn (col_map `:202–217`, allar þrjár git-útgáfur) né Phase 1A gerðu það nokkurn tíma. Gatið hefur staðið frá því að iter4 fór í rekstur 21.04.2026.
+   - `public.properties` ber engan `merking`-dálk.
+   - Gain-hlutur hæðarhópsins er 0,51 % (ekki ~2,3 % eins og í cc241).
+2. **Áhrif fyllingar, mæld en ekki beitt:**
+   - Fjölbýli: miðgildi **+1,25 %** (n=98.739), og 9,0 % fá |Δ| > 5 %. Á frosnu úrtaki (n=3.000, 600 per bil): kjallari +0,42, 1. hæð +1,27, 2.–3. hæð +1,19, 4.+ hæð +2,35 og ris +3,73 %. Á 13. hæð +16 % (n=35).
+   - Sérbýli: **+1,9 %** (n=55.007).
+   - **Engin nákvæmnisbót gegn þinglýstu verði.** Calib-gluggi utan þjálfunar (16.01–31.07, APT n=3.075): MdAPE 4,91 → 4,88 %, en skekkja fjölbýlis +0,44 → +1,77 %. Lifandi grunnmat gegn kaupskrá (04.08–14.10, n=976): MdAPE 5,71 → 5,77 % og skekkja +1,26 → +2,46 %.
+   - Fyllingin jafnar 4.+-hallann (−1,7 pp miðað við miðhæðir, SE ~0,7, aðeins í calib). Sérbýli lagast: −1,36 → +0,30 % (n=884).
+   - Þrep T breytist ekki (0, að smíð). Flokkur A–D breytist ekki (0 af 98.739). Bil × (1+Δ). `flag_divergence` skiptir um stöðu á 3.905 af 145.961 eignum, en það er ekki birt.
+3. **Ákvörðun.** Engin heitlagfæring á iter4r. Heitlagfæring myndi hækka fjölbýli um ~1,3 pp ofan á þekkta jákvæða stigskekkju án mældrar nákvæmnisbótar.
+   - Lagfæringin fer í næsta retrain-hring (PLANNING_BACKLOG cc244 (a)–(c)): eitt sameiginlegt hæðarfall á öllum skorunarstöðum, endurkvörðun stigs og conformal á rekstrarham-leifum, og endurmat með útgáfustimpli.
+   - **Þekjuhlið smíðað, ekki tengt:** `scripts/thekjuhlid.py`.
+     - Það fellur ef feature hefur ≥ 50 % þekju í þjálfun en < 50 % í rekstri, eða ef |Δ þekju| > 20 pp. Þjálfunarþekjan er vegin eftir samsetningu leiðarinnar (canonical_code × has_extraction_data).
+     - Á núverandi ástandi fellur það á nákvæmlega 4 í rebuild og adapter, og á 9 í Phase 1A (úrelt iter3v2-leið).
+     - Sjálfspróf á frosnu úrtaki cc244: 4 föll í dag, 0 með hæð fyllta, og 1 (`postnr`) við stökkbreytingu.
+     - Hvar það á að tengjast er í SKIL cc244 f.2.
+
+**Heimildir:** `D:\_audit\cc244_haed\SKIL_CC244.md`, `D:\_audit\cc244_haed\SKIL_CC244_F2.md`.
+
+---
+
 ## 2026-10-11 — Sölutími endurskilgreindur: fyrsta auglýsing → kaupsamningsdagur (cc232) — **GO (3 heilir mán.), pushað verdmat-ai 5232af6 + e54e9fa, www staðfest**
 
 Framhald cc230 (ákvörðun 2).
