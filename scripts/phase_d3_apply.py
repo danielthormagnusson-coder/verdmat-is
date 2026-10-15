@@ -41,6 +41,11 @@ PREDS_PARQUET = Path(r"D:\phase_d3_predictions.parquet")
 ROLLBACK_SQL = Path(r"D:\phase_d3_rollback.sql")
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
 BATCH = 500
+# cc244 f.4: þekjuhlið (adapter-leið) á skrifleið predictions
+SCRIPTS_DIR = Path(__file__).resolve().parent
+ARTIFACT_ROOT = Path(r"D:\model_artifacts")
+HMS_PKL = Path(r"D:\hms_classification_v1.pkl")
+HMS_SHA16 = "16d78e39d57cfcad"
 
 
 PROPS_INSERT_SQL = """
@@ -160,6 +165,40 @@ SELECT * FROM unnest(
 )
 ON CONFLICT (fastnum) DO NOTHING;
 """
+
+
+def thekjuhlid_fyrir_skrif(props: pd.DataFrame, preds: pd.DataFrame) -> int:
+    """cc244 f.4 — þekjuhlið (thekjuhlid.athuga_X, leið adapter, listi cc244(a)) á X sem
+    phase_d3_score_extract smíðar fyrir NÁKVÆMLEGA þær main-raðir sem á að skrifa í
+    public.predictions, undir model_version sem þær eru stimplaðar með. Listinn tæmist
+    sjálfkrafa fyrir hverja útgáfu ≠ iter4r_20260805_reglaR_strukt. rc ≠ 0 → engin skrif."""
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+    import phase_d3_score_extract as P  # noqa: E402
+    import thekjuhlid  # noqa: E402
+    mvs = preds["model_version"].dropna().unique()
+    if len(mvs) != 1:
+        print(f"ÞEKJUHLIÐ: predictions bera {len(mvs)} model_version-gildi ({list(mvs)}), vænst 1")
+        return 1
+    mv = str(mvs[0])
+    ad = ARTIFACT_ROOT / mv
+    # sama hleðsla og skorunin: artifact-hamur ef artifactið er til, annars söguleg iter4a
+    models = P.load_models(artifact_dir=str(ad), hms_pkl=str(HMS_PKL), hms_sha16=HMS_SHA16) \
+        if ad.exists() else P.load_models()
+    main_fn = set(preds.loc[preds["model_group"].eq("main"), "fastnum"].astype("int64"))
+    scor = props[props["fastnum"].astype("int64").isin(main_fn)].drop_duplicates("fastnum") \
+        .reset_index(drop=True)
+    if models.get("region_tier_map") is not None:      # = score() í artifact-ham
+        scor = P.mirror_derived_dims(scor, models)
+    if models.get("hms") is not None:
+        scor = P.attach_hms_features(scor, models["hms"])
+    X = P.build_X_matrix(scor, models["feature_names"], models["categorical_mappings"],
+                         models["valuation_year"], models["valuation_month"])
+    rc = thekjuhlid.athuga_X(X, scor["canonical_code"], mv, leid="adapter", leyfa_thekkt=True,
+                             log=print)
+    if rc != 0:
+        print("AÐVÖRUN: þekjuhlið féll (cc244 f.4) — ekkert skrifað í Supabase.")
+    return rc
 
 
 def na_to_none(s):
@@ -356,6 +395,11 @@ def main() -> int:
 
     if not integrity_check(props):
         print("ABORT: integrity check failed.")
+        return 3
+
+    # cc244 f.4: þekjuhlið áður en nokkuð er skrifað (fyrir YES-staðfestingu og DB-tengingu)
+    if thekjuhlid_fyrir_skrif(props, preds) != 0:
+        print("ABORT: þekjuhlið féll.")
         return 3
 
     # Predictions stamping check
