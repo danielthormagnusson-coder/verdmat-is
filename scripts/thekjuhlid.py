@@ -1,7 +1,11 @@
 """cc244 f.2 — ÞEKJUHLIÐ ÞJÁLFUN ↔ REKSTUR (P1 í D:\\_audit\\cc244_haed\\SKIL_CC244.md §4.2).
 
 READ-ONLY: les pkl, líkans-artifact og DB í read-only session. Skrifar ekkert nema
-valfrjálst --json úttak. EKKI tengt í næturkeyrslu (sjá SKIL cc244 f.2 um hvar).
+valfrjálst --json úttak. EKKI í næturkeyrslu. TENGT (cc244 f.3, DECISIONS 2026-10-15), rc ≠ 0 stöðvar:
+  (i)   flipp á model_version — precompute/flip_iter4r.py phase_flip (rebuild+adapter, ENGINN listi)
+  (ii)  kandídatsmat eftir retrain — precompute/holdout_eval.py (rebuild+adapter, ENGINN listi)
+  (iii) rebuild-skorun sem skrifar public.predictions — precompute/rebuild_predictions_iter4.main
+        → athuga_X(..., leyfa_thekkt=True): THEKKT_FRAVIK[útgáfa], tómur fyrir aðra útgáfu.
 
 Hvað það ver: cc244 fann að fjögur hæðar-features (merking_floor, building_max_floor,
 is_top_floor, floor_fraction) eru ~100 % þakin í þjálfun en 100 % NaN í rekstri, af því að
@@ -13,7 +17,9 @@ hverrar skorunarleiðar:
              (lotuskorun sem skrifar public.predictions)
   adapter  — scripts/phase_d3_score_extract.build_X_matrix í artifact-ham (VÉL-1; nætur-
              vélin og value_listings), grunnlína án extraction, inntak úr public.properties
-  phase1a  — precompute/build_precompute.build_master_frame + _build_X_batch (Phase 1A)
+  phase1a  — precompute/build_precompute.build_master_frame + _build_X_batch (Phase 1A).
+             ÚRELT (cc244 f.3, H5): ekki í sjálfgefnum leiðum; `--leid phase1a` keyrir hana,
+             merkta ÚRELT í úttaki, og hún ræður ekki rc.
 
 FELL á feature f í leið L ef
   (a) þekja(þjálfun) ≥ 50 % og þekja(L) < 50 %, eða
@@ -34,8 +40,9 @@ rekstrarham, bítur hliðið á það eins og á hvert annað feature.
 rc: 0 = stenst · 1 = FELL · 2 = leið gat ekki smíðað X (mæling ekki gerð — telst ekki stenst).
 
 Notkun (úr app-rót):
-  python scripts/thekjuhlid.py                     # allar þrjár leiðir, líkan úr pipeline_config
-  python scripts/thekjuhlid.py --leidir rebuild,adapter --model iter4r_20260805_reglaR_strukt
+  python scripts/thekjuhlid.py                     # rebuild + adapter, líkan úr pipeline_config
+  python scripts/thekjuhlid.py --model iter4r_20260805_reglaR_strukt --leyfa-thekkt
+  python scripts/thekjuhlid.py --leid phase1a      # úrelt leið, upplýsandi
   python scripts/thekjuhlid.py --sjalfsprof        # falspróf á frosnu úrtaki cc244
 """
 from __future__ import annotations
@@ -66,6 +73,22 @@ THR_HALF = 50.0     # (a) ≥ 50 % í þjálfun → verður að vera ≥ 50 % í
 THR_DELTA = 20.0    # (b) |Δ þekju| > 20 pp
 FLOOR = ["merking_floor", "building_max_floor", "is_top_floor", "floor_fraction"]
 LEIDIR = ("rebuild", "adapter", "phase1a")
+SJALFGEFNAR = ("rebuild", "adapter")    # cc244 f.3 (H5): phase1a út úr sjálfgefnum leiðum
+URELTAR = {"phase1a": "ÚRELT — iter3v2-leið (engin hms-features, gamall flokkaorðaforði); "
+                      "getur ekki skorað iter4r. Upplýsandi, ekki hlið á lifandi tölu (cc244 f.3)"}
+
+# cc244 f.3 (H6 iii): ÞEKKT FRÁVIK — aðeins fyrir rebuild-skorun sem skrifar public.predictions,
+# og AÐEINS fyrir nákvæmlega þá líkansútgáfu sem frávikið var mælt á. Listinn er LYKLAÐUR á
+# útgáfu: önnur útgáfa (næsti retrain-hringur, eða flipp) fær TÓMAN lista sjálfkrafa, svo
+# frávikið verður að vera lagað þá (PLANNING_BACKLOG cc244 (a)). Flipp (i) og kandídatsmat (ii)
+# nota listann ALDREI.
+THEKKT_FRAVIK = {
+    "iter4r_20260805_reglaR_strukt": {f: "cc244(a)" for f in FLOOR},
+}
+
+
+def thekkt_fravik(model_version: str) -> dict:
+    return dict(THEKKT_FRAVIK.get(model_version, {}))
 
 
 def log(*a):
@@ -125,7 +148,9 @@ def serving_cells(cc: pd.Series, X: pd.DataFrame) -> pd.Series:
 
 
 def gate(X: pd.DataFrame, cells: pd.Series, cov_tr: pd.DataFrame, raw_tr: pd.Series,
-         gain: dict) -> tuple[pd.DataFrame, dict]:
+         gain: dict, leyft: dict | None = None) -> tuple[pd.DataFrame, dict]:
+    """`fell` = reglan (a)/(b) bítur; `thekkt` = merki úr þekktra-frávika-lista;
+    `stodvar` = fell OG ekki á lista. Aðeins `stodvar` ræður rc."""
     share = cells.value_counts(normalize=True)
     known = share[share.index.isin(cov_tr.index)]
     dropped = float(share[~share.index.isin(cov_tr.index)].sum())
@@ -139,28 +164,84 @@ def gate(X: pd.DataFrame, cells: pd.Series, cov_tr: pd.DataFrame, raw_tr: pd.Ser
     fb = T.delta_pp.abs() > THR_DELTA
     T["fell"] = fa | fb
     T["regla"] = np.where(fa & fb, "a+b", np.where(fa, "a", np.where(fb, "b", "")))
+    T["thekkt"] = [(leyft or {}).get(f, "") for f in T.index]
+    T["stodvar"] = T.fell & T.thekkt.eq("")
     meta = {"n": int(len(X)), "hlutur_sella_utan_thjalfunar": dropped,
             "sellur": int(len(share)), "has_extraction_1_hlutur": float(
                 cells.str.endswith("|1").mean())}
     return T, meta
 
 
-def prenta(leid: str, T: pd.DataFrame, meta: dict, allt: bool):
-    log(f"\n=== {leid}: n={meta['n']:,}  sellur={meta['sellur']}  "
+def prenta(leid: str, T: pd.DataFrame, meta: dict, allt: bool, log=log):
+    urelt = URELTAR.get(leid.split()[0])
+    log(f"\n=== {leid}{' [' + urelt + ']' if urelt else ''}: n={meta['n']:,}  sellur={meta['sellur']}  "
         f"has_extraction_data=1: {meta['has_extraction_1_hlutur']*100:.1f} %  "
         f"hlutur utan þjálfunarsella: {meta['hlutur_sella_utan_thjalfunar']*100:.2f} %")
-    S = T if allt else T[T.fell | (T.delta_pp.abs() > 5)]
-    S = S.sort_values(["fell", "gain_pct"], ascending=[False, False])
+    S = T if allt else T[T.fell | (T.delta_pp.abs() > 5) | T.thekkt.ne("")]
+    S = S.sort_values(["stodvar", "fell", "gain_pct"], ascending=[False, False, False])
     log(f"  {'feature':32s} {'gain%':>6s} {'þjálf.hrátt':>11s} {'þjálf.vegið':>11s} "
         f"{'rekstur':>8s} {'Δ pp':>7s}  dómur")
     for f, r in S.iterrows():
-        d = f"FELL ({r.regla})" if r.fell else "ok"
+        if r.fell and r.thekkt:
+            d = f"þekkt frávik {r.thekkt} ({r.regla})"
+        elif r.fell:
+            d = f"FELL ({r.regla})"
+        elif r.thekkt:
+            d = f"ok — þekkt frávik {r.thekkt} ekki lengur virkt"
+        else:
+            d = "ok"
         log(f"  {f:32s} {r.gain_pct:6.2f} {r.thjalfun_hratt:11.1f} {r.thjalfun_vegid:11.1f} "
             f"{r.rekstur:8.1f} {r.delta_pp:+7.1f}  {d}")
-    n_f = int(T.fell.sum())
-    log(f"  → {'FELL' if n_f else 'STENST'}: {n_f} af {len(T)} features"
-        + (f" ({', '.join(T.index[T.fell])})" if n_f else "")
-        + ("" if allt else "  [sýnd: föll + |Δ| > 5 pp; --allt fyrir öll]"))
+    n_s, n_k = int(T.stodvar.sum()), int((T.fell & T.thekkt.ne("")).sum())
+    log(f"  → {'FELL' if n_s else 'STENST'}{' (ÚRELT leið)' if urelt else ''}: "
+        f"{n_s} af {len(T)} features"
+        + (f" ({', '.join(T.index[T.stodvar])})" if n_s else "")
+        + (f"; {n_k} þekkt frávik leyfð ({', '.join(T.index[T.fell & T.thekkt.ne('')])})" if n_k else "")
+        + ("" if allt else "  [sýnd: föll + |Δ| > 5 pp + listi; --allt fyrir öll]"))
+
+
+def _gain(model_version: str) -> tuple[list[str], dict]:
+    b = lgb.Booster(model_file=str(ARTIFACT_ROOT / model_version / f"{model_version}_main_mean.lgb"))
+    feats = b.feature_name()
+    g = dict(zip(feats, b.feature_importance("gain")))
+    gt = sum(g.values())
+    return feats, {f: 100 * v / gt for f, v in g.items()}
+
+
+def hlid_strangt(model_version: str, samhengi: str, log=log) -> int:
+    """cc244 f.3 (i)/(ii) — STRANGT hlið (enginn listi þekktra frávika) á rebuild + adapter
+    fyrir `model_version`, keyrt sem SÉR FERLI (pkl-hleðslan lifir ekki í minni kallandans).
+    Skilar rc ferlisins; kallandinn stöðvar á rc ≠ 0. Úttakið fer beint í log kallandans."""
+    import subprocess
+    cmd = [sys.executable, str(Path(__file__).resolve()), "--model", model_version]
+    log(f"þekjuhlið ({samhengi}): {' '.join(cmd)}")
+    rc = subprocess.run(cmd).returncode
+    log(f"þekjuhlið ({samhengi}): rc={rc} → {'STENST' if rc == 0 else 'STÖÐVAR'}")
+    return rc
+
+
+def athuga_X(X: pd.DataFrame, canonical_code: pd.Series, model_version: str,
+             leid: str = "rebuild", leyfa_thekkt: bool = False, log=log) -> int:
+    """Hlið á X SEM KALLANDINN HEFUR ÞEGAR SMÍÐAÐ (cc244 f.3 (iii): rebuild_predictions_iter4.main).
+
+    X = main-raðir (SUMMERHOUSE utan), dálkar = feature-listi main_mean. Skilar 0 ef ekkert
+    stöðvandi fall, annars 1. Kallandinn á að stöðva án skrifa á rc ≠ 0.
+    leyfa_thekkt=True beitir THEKKT_FRAVIK[model_version] — tómur listi fyrir hverja aðra útgáfu."""
+    try:
+        feats, gain = _gain(model_version)
+    except Exception:          # útgáfa án artifacts (t.d. söguleg iter4a á D:\) — gain aðeins til birtingar
+        feats, gain = list(X.columns), {f: np.nan for f in X.columns}
+    if list(X.columns) != feats:
+        log(f"ÞEKJUHLIÐ: X-dálkar ({len(X.columns)}) ≠ feature-listi {model_version} ({len(feats)})")
+        return 1
+    cov_tr, raw_tr, _, _ = training_coverage(feats)
+    leyft = thekkt_fravik(model_version) if leyfa_thekkt else {}
+    T, meta = gate(X.reset_index(drop=True), serving_cells(canonical_code.reset_index(drop=True), X),
+                   cov_tr, raw_tr, gain, leyft)
+    prenta(f"{leid} · {model_version} · þekkt frávik: "
+           f"{'{' + ', '.join(sorted(set(leyft.values()))) + '}' if leyft else 'engin'}",
+           T, meta, allt=False, log=log)
+    return 1 if T.stodvar.any() else 0
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +329,9 @@ def _haed_fixture(fastnums: np.ndarray) -> pd.DataFrame:
     return d.drop_duplicates("fastnum").set_index("fastnum").reindex(fastnums)
 
 
+PROF_UTGAFA = "iter4r_20260805_reglaR_strukt"   # útgáfan sem frosna úrtakið cc244 var mælt á
+
+
 def sjalfsprof(feats, cov_tr, raw_tr, cat_map, gain) -> int:
     fz = np.array(json.load(open(URTAK_CC244, encoding="utf-8"))["fastnum"], dtype="int64")
     log(f"\nSJÁLFSPRÓF á frosnu úrtaki cc244 ({URTAK_CC244.name}, n={len(fz):,}) — rebuild-leið")
@@ -259,14 +343,24 @@ def sjalfsprof(feats, cov_tr, raw_tr, cat_map, gain) -> int:
         X1[f] = F[f].to_numpy(dtype="float64")
     X2 = X1.copy()
     X2["postnr"] = np.nan                       # stökkbreyting: eitt annað feature tæmt
-    tilvik = [("(i)  núverandi rekstur", X0, set(FLOOR)),
-              ("(ii) hæð fyllt (dry-run)", X1, set()),
-              ("(iii) hæð fyllt + postnr tæmt (stökkbreyting)", X2, {"postnr"})]
+    X3 = X0.copy()
+    X3["postnr"] = np.nan                       # núverandi + stökkbreyting, MEÐ lista
+    L = thekkt_fravik(PROF_UTGAFA)
+    L_annad = thekkt_fravik(PROF_UTGAFA + "_naesta")      # önnur útgáfa → tómur listi
+    tilvik = [("(i)  núverandi rekstur", X0, None, set(FLOOR)),
+              ("(ii) hæð fyllt (dry-run)", X1, None, set()),
+              ("(iii) hæð fyllt + postnr tæmt (stökkbreyting)", X2, None, {"postnr"}),
+              ("(iv) núverandi rekstur MEÐ lista cc244(a)", X0, L, set()),
+              ("(v)  núverandi + postnr tæmt MEÐ lista", X3, L, {"postnr"}),
+              ("(vi) núverandi, listi annarrar útgáfu (tæmist)", X0, L_annad, set(FLOOR))]
+    if set(L) != set(FLOOR) or L_annad:
+        log(f"  listinn sjálfur rangur: {L} / {L_annad}")
+        return 1
     ok_all = True
-    for nafn, X, vaenst in tilvik:
-        T, meta = gate(X, cells, cov_tr, raw_tr, gain)
+    for nafn, X, leyft, vaenst in tilvik:
+        T, meta = gate(X, cells, cov_tr, raw_tr, gain, leyft)
         prenta(f"sjálfspróf {nafn}", T, meta, allt=False)
-        fell = set(T.index[T.fell])
+        fell = set(T.index[T.stodvar])
         ok = fell == vaenst
         ok_all &= ok
         log(f"  vænst FELL á {sorted(vaenst) or '∅'} → fékk {sorted(fell) or '∅'}: "
@@ -278,28 +372,35 @@ def sjalfsprof(feats, cov_tr, raw_tr, cat_map, gain) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--model", help="artifact-útgáfa (sjálfgefið pipeline_config.model_version)")
-    ap.add_argument("--leidir", default=",".join(LEIDIR), help="komma-listi úr " + ",".join(LEIDIR))
+    ap.add_argument("--leidir", "--leid", dest="leidir", default=",".join(SJALFGEFNAR),
+                    help="komma-listi úr " + ",".join(LEIDIR) + " (sjálfgefið "
+                         + ",".join(SJALFGEFNAR) + "; phase1a er ÚRELT og aðeins á beiðni)")
+    ap.add_argument("--leyfa-thekkt", action="store_true",
+                    help="beita THEKKT_FRAVIK[líkan] (aðeins rebuild-skorun, cc244 f.3 iii); "
+                         "flipp og kandídatsmat nota það aldrei")
     ap.add_argument("--sjalfsprof", action="store_true", help="falspróf á frosnu úrtaki cc244")
     ap.add_argument("--allt", action="store_true", help="prenta öll features, ekki aðeins föll")
     ap.add_argument("--json", help="skrifa niðurstöðu í þessa skrá")
     a = ap.parse_args()
 
-    mv = a.model or read_model_version()
-    booster = lgb.Booster(model_file=str(ARTIFACT_ROOT / mv / f"{mv}_main_mean.lgb"))
-    feats = booster.feature_name()
-    g = dict(zip(feats, booster.feature_importance("gain")))
-    gt = sum(g.values())
-    gain = {f: 100 * v / gt for f, v in g.items()}
+    mv = a.model or (PROF_UTGAFA if a.sjalfsprof else read_model_version())
+    feats, gain = _gain(mv)
     log(f"ÞEKJUHLIÐ · líkan {mv} main_mean · {len(feats)} features · "
         f"regla: (a) þjálfun ≥ {THR_HALF:.0f} % og rekstur < {THR_HALF:.0f} %, (b) |Δ| > {THR_DELTA:.0f} pp")
     cov_tr, raw_tr, n_tr, cat_map = training_coverage(feats)
     log(f"þjálfun: {TRAINING_PKL.name} main n={n_tr:,}; {len(cov_tr)} sellur (canonical_code × has_extraction_data)")
 
     if a.sjalfsprof:
+        if mv != PROF_UTGAFA:
+            raise SystemExit(f"sjálfsprófið er bundið við {PROF_UTGAFA} (frosna úrtakið cc244)")
         return sjalfsprof(feats, cov_tr, raw_tr, cat_map, gain)
 
+    leyft = thekkt_fravik(mv) if a.leyfa_thekkt else {}
+    log(f"þekkt frávik: {sorted(leyft) if leyft else 'engin'}"
+        + (f" (listi tómur: engin færsla fyrir {mv})" if a.leyfa_thekkt and not leyft else ""))
     rc = 0
-    out = {"likan": mv, "regla": {"half": THR_HALF, "delta_pp": THR_DELTA}, "leidir": {}}
+    out = {"likan": mv, "regla": {"half": THR_HALF, "delta_pp": THR_DELTA},
+           "thekkt_fravik": leyft, "leidir": {}}
     for leid in [s.strip() for s in a.leidir.split(",") if s.strip()]:
         if leid not in LEIDIR:
             raise SystemExit(f"óþekkt leið: {leid}")
@@ -312,13 +413,16 @@ def main() -> int:
             out["leidir"][leid] = {"villa": f"{type(e).__name__}: {e}"}
             rc = max(rc, 2)
             continue
-        T, meta = gate(X, serving_cells(cc, X), cov_tr, raw_tr, gain)
+        T, meta = gate(X, serving_cells(cc, X), cov_tr, raw_tr, gain, leyft)
         prenta(leid, T, meta, a.allt)
-        out["leidir"][leid] = {**meta, "fell": list(T.index[T.fell]),
+        out["leidir"][leid] = {**meta, "urelt": leid in URELTAR, "fell": list(T.index[T.fell]),
+                               "stodvar": list(T.index[T.stodvar]),
                                "tafla": T.round(3).reset_index(names="feature").to_dict("records")}
-        if T.fell.any():
+        if T.stodvar.any() and leid not in URELTAR:   # úrelt leið er upplýsandi, ræður ekki rc
             rc = max(rc, 1)
-    log(f"\nNIÐURSTAÐA: {'STENST' if rc == 0 else 'FELL' if rc == 1 else 'VILLA'} (rc={rc})")
+    hlid = [k for k in out["leidir"] if k not in URELTAR]
+    log(f"\nNIÐURSTAÐA: {'STENST' if rc == 0 else 'FELL' if rc == 1 else 'VILLA'} (rc={rc})"
+        + ("" if hlid else " — aðeins ÚRELTAR leiðir keyrðar: upplýsandi, ekkert hlið metið"))
     if a.json:
         Path(a.json).write_text(json.dumps(out, ensure_ascii=False, indent=1, default=float), encoding="utf-8")
     return rc

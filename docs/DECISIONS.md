@@ -28,6 +28,34 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 **Heimildir:** `D:\_audit\cc244_haed\SKIL_CC244.md`, `D:\_audit\cc244_haed\SKIL_CC244_F2.md`.
 
+**Viðbót 2026-10-15 (cc244 f.3, ákvörðun Danna H5 + H6) — þekjuhliðið tengt; rc ≠ 0 stöðvar.**
+
+- **H5.** Phase 1A er úr sjálfgefnum leiðum `scripts/thekjuhlid.py`, sem eru nú `rebuild` og `adapter`.
+  - `--leid phase1a` er áfram tiltæk. Úttakið merkir hana **ÚRELT** og hún ræður ekki rc.
+  - Mælt 15.10: hún fellur á 9 features og 26 % raða hennar eru utan þjálfunarsella.
+- **H6, tengingar.** Allar þrjár eru í `verdmat-is-precompute`:
+  - **(i) Flipp á `model_version`** (`flip_iter4r.py`, `thekjuhlid_fyrir_flipp`, fyrir `--phase flip`). Strangt hlið á rebuild og adapter fyrir útgáfuna sem flippið setur, **enginn listi** þekktra frávika.
+    - Keyrt áður en DB-tenging er opnuð: á falli verður ekkert flipp og `pipeline_config` er ósnert.
+    - Rollback er **ekki** hliðað, því endurheimt má aldrei stöðvast.
+    - Nýtt flipp-skript sem afritar mynstrið ber hliðið með sér.
+  - **(ii) Kandídatsmat eftir retrain** (`holdout_eval.py`, fremst í `main`). Strangt hlið á kandídatnum, rebuild og adapter, **enginn listi**. Á falli verður ekkert holdout-mat og engin skýrsla skrifuð.
+  - **(iii) Hver rebuild-skorun sem skrifar `public.predictions`** (`rebuild_predictions_iter4.main`, `thekjuhlid_fyrir_skorun`, eftir `build_master_frame` og fyrir `score_and_shap`). Hliðið les X þessarar keyrslu, smíðað með `build_X_matrix` skrárinnar.
+    - Export-CSV skorunarinnar er það sem staging og flipp lesa inn í DB, svo hliðið ver skrifleiðina.
+    - **Listi þekktra frávika** = nákvæmlega `merking_floor`, `building_max_floor`, `is_top_floor` og `floor_fraction`, merkt **„cc244(a)“**. Hann er lyklaður á `iter4r_20260805_reglaR_strukt` (`THEKKT_FRAVIK` í `thekjuhlid.py`).
+    - **Hver önnur útgáfa fær tóman lista sjálfkrafa.** Það á líka við sögulega iter4a-haminn án `--artifact-dir`, sem því stöðvast.
+    - Nýtt fall utan lista stöðvar skorunina: aðvörun fer í log og `SystemExit`, ekkert er skorað og ekkert export skrifað.
+- **Falspróf** (`D:\_audit\cc244_haed\f3_prof.py`, keyrt á tengingunum sjálfum), 6 af 6 RÉTT:
+  - R1: núverandi lifandi rammi með lista **stenst**;
+  - R2: `postnr` tæmt **fellur** (rc 1);
+  - R3: sama X undir annarri útgáfu **fellur** á hæðarfeatures fjórum, því listinn tæmist;
+  - F1: flipp-hliðið stöðvar á iter4r, strangt;
+  - H1: holdout_eval stöðvast á hliðinu (rc 1);
+  - H1b: eldri holdout-skrár artifactsins eru óbreyttar (sha).
+  - Sjálfspróf á frosnu úrtaki cc244, 6 tilvik, stenst.
+- **Leiðrétting á cc244 §1.3:** precompute **er** í git (`verdmat-is-precompute`). Í öllum 6 útgáfum `rebuild_predictions_iter4.py` (c85ad83 05.05 – 05dc55f 06.08) eru 0 tilvísanir í hæðarfeatures. Það staðfestir að afleiðslan var aldrei smíðuð.
+
+Heimild: `D:\_audit\cc244_haed\SKIL_CC244_F3.md`.
+
 ---
 
 ## 2026-10-11 — Sölutími endurskilgreindur: fyrsta auglýsing → kaupsamningsdagur (cc232) — **GO (3 heilir mán.), pushað verdmat-ai 5232af6 + e54e9fa, www staðfest**
