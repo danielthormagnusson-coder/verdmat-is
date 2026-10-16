@@ -4,6 +4,19 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-16 — Krass v1.5: eldhús/bað/gólf „uppgert“ fá tölu, aðeins við val notanda (cc250 §A) — **ákvörðun Danna; verdmat-ai cc252 (2af63cf, grein cc252), ópushað (bíður push Danna); ekkert birt grunnmat breytt**
+
+1. **Tala á ástandsröðum, notandakveikt.** Þegar notandinn velur „Uppgert“ á eldhúsi, baðherbergi eða gólfefnum sýnir röðin stuðul stuðlaskrár v1.4 **óbreyttan** sem „um +X %“ (eldhús +1,94, bað +2,23, gólf +2,07). Í smáletri er 95 % bil endursöluparanna úr cc250 §A (hlutáhrif, allir þættir saman): eldhús [1,1; 3,3], bað [1,6; 3,6], gólf [1,1; 3,3], og heimildin „mælt á 5.523 endursölupörum“. Bilin og fjöldinn eru í `data/krass_astand_endursolupor_v1.json`, ekki í kóða. Þetta lyftir A2 (2026-10-16 §5) fyrir þessar þrjár raðir. **Heildarástand (`astand_eignar`) er áfram tölulaust**, því það fer saman við raðirnar þrjár (cc250 §4 (b)).
+2. **Sjálfvirk kveiking óbreytt: merki, ekki tala.** Skráð „uppgert“ (extraction/auglýsing) gefur merkið „skráð — tala aðeins við þitt val“. Talan birtist aðeins eftir inngrip notandans: val í fellilista eða „sýna mælda tölu“. Rök: cc247 sýndi að sjálfvirk tillaga bætir grunnmatið ekki.
+3. **Engin samtala.** Engin „tillaga samtals“ er birt. Þitt mat byrjar áfram á grunnmati og breytist aðeins við inngrip notandans („nota tillögu“ eða eigið %).
+4. **Samsetningarorðalag aðlagað, engin ný lína.** Í stað „Áhrifin eru sameinuð (margfölduð); samspil þeirra er ekki mælt.“ stendur nú „Áhrif þátta leggjast ekki línulega saman: þau eru margfölduð og samspil þeirra er ekki mælt.“ Það er ein setning án tölu (cc250 A6: 1/2/3 þættir +1,4/+4,1/+9,2 %). Þaksetningin er óbreytt.
+5. **Óbreytt:** stuðlaskráin, þak ×1,15 í hvora átt (+15,0 % / −13,0 %), stæðislína tölulaus (OSTADFEST), grunnmat, bil, þrep T og flokkur A–D.
+6. **Fyrirvari (cc250 §1.6):** talan er verðmunur tengdur merki í auglýsingatexta innan sömu eignar. Hún er ekki sannaður orsakaþáttur og ekki kostnaður við endurbætur. Notandi getur ofmetið eigið „uppgert“, og það er ómælt.
+
+Skil: `D:\_audit\cc252_krass15\SKIL_CC252.md`; mælingar: `D:\_audit\cc250_nalgun\SKIL_CC250.md`.
+
+---
+
 ## 2026-10-16 — Krass: tillaga samtals ekki birt (cc247); stæðislína tölulaus; þitt mat byrjar á grunnmati; áskriftarrök cc44 lögð niður (A1) — **ákvörðun Danna; verdmat-ai cc246 + cc246 f.2, ópushað (bíður push Danna); ekkert birt grunnmat breytt**
 
 1. **Áskriftarrök cc44 lögð niður (A1, 15.10).** Stuðlaskráin `data/leidretting_studlar_v1.json` (v1.4) er opin og fer í vafrann sem gögn krassins „Þitt mat“. Læsta Leiðrétta viðmiðið og „Þitt viðmið“ víkja (A6, rofi `SYNA_KRASS`). Síðan kallar hvorki `/api/vidmid` né `/api/leidretting`, og engu er eytt. Krassið reiknar allt í React-state, sendir ekkert og vistar ekkert.
