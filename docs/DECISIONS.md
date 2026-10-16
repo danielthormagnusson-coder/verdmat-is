@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-16 — Krass: tillaga samtals ekki birt (cc247); stæðislína tölulaus; þitt mat byrjar á grunnmati; áskriftarrök cc44 lögð niður (A1) — **ákvörðun Danna; verdmat-ai cc246 + cc246 f.2, ópushað (bíður push Danna); ekkert birt grunnmat breytt**
+
+1. **Áskriftarrök cc44 lögð niður (A1, 15.10).** Stuðlaskráin `data/leidretting_studlar_v1.json` (v1.4) er opin og fer í vafrann sem gögn krassins „Þitt mat“. Læsta Leiðrétta viðmiðið og „Þitt viðmið“ víkja (A6, rofi `SYNA_KRASS`). Síðan kallar hvorki `/api/vidmid` né `/api/leidretting`, og engu er eytt. Krassið reiknar allt í React-state, sendir ekkert og vistar ekkert.
+2. **„Tillaga samtals“ ekki birt (cc247, regla 3).** Kvörðun á 1.649 sölum utan v1.4 sýndi að samtalan bætir grunnmatið ekki. Hallinn er b ≈ 0 og MdAPE versnar 6,24 → 6,52. Tvítalning er ómælanleg. Krassið sýnir aðeins tillögu per línu, ásamt Grunnmat (læst) | Þitt mat. Skil: `D:\_audit\cc247_kvordun\SKIL_CC247.md`.
+3. **Þitt mat byrjar á grunnmati.** Þitt % er 0 í öllum línum við upphaf og eftir „Byrja upp á nýtt“. Tillaga fer aðeins í reit þegar notandinn velur „nota tillögu“. Annars væri upphaf „Þíns mats“ sama tala og samtalan sem regla 3 felur.
+4. **Stæðislína tölulaus í krassinu.** Þetta á við `bilskyli_kjallara_apt`, sem stendur +2,94 % í v1.4. Á sölum utan mælitímans mældist hún ~0,5–1,5 % innan sellu (cc247 §4). Það fellir línuna ekki en staðfestir hana ekki heldur. Merkið er „mælt — áhrif ekki staðfest utan mælitíma“ og talan fer ekki í farminn (`lib/krass-studlar.ts`). **Stuðlaskráin sjálf er óbreytt.** Endurmæling með cc226b-aðferðinni bíður ≥ 9–12 mánaða af sölum eftir 15.07.2026 (cc247 backlog).
+5. **Óbreytt:** grunnmat, 80/95 % bil, þrep T og flokkur A–D. Engin tillaga er gefin fyrir ástand (A2), pott/arin (A3) eða hæð (A5), og engin stærðarstilling (A4). Á þrepi 5 er ekkert krass. Þakorðalag cc46 helst: „×1,15 í hvora átt (+15,0 % / −13,0 %)“. Samsetningin er orðuð „Áhrifin eru sameinuð (margfölduð); samspil þeirra er ekki mælt.“
+
+Skil: `D:\_audit\cc246_krass\SKIL_CC246.md` (f.1) og `SKIL_CC246_F2.md` (f.2).
+
+---
+
 ## 2026-10-15 — Hæðar-features tóm í rekstri — lagað í næsta retrain-hring, ekki heitlagfæring (cc244) — **ákvörðun Danna; ekkert birt grunnmat breytt**
 
 1. **Staðfest (cc244, read-only).** Fjögur hæðar-features í `iter4r_20260805_reglaR_strukt` main_mean eru **100 % NaN í rekstri**: `merking_floor`, `building_max_floor`, `is_top_floor` og `floor_fraction`.
