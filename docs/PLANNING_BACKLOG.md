@@ -1854,3 +1854,12 @@ sé endurvakinn á skoðun einni.
   - Verk: fela raðir með tómu feature-gildi í birtingu, eða skrifa þær ekki. Það á líka við um aðra NaN-liði.
   - Raðirnar hverfa sjálfkrafa eftir (a) fyrir hæðina, en reglan á að gilda almennt.
   - Fundur: `D:\_audit\cc244_haed\SKIL_CC244.md` §3.
+
+- **cc243 (f.4) — DÁLKUR `fullnusta_nothaefar` Í `semantic.nybygging_solur_manadar` SVO SKYGGING SMÁGRAFS LESI HANN BEINT (bókað 16.10, cc243 f.3; gagnalagsbreyting, sér-GO).** Mánaðartaflan ber í dag aðeins `bradabirgda` (fullnusta = **lægri** af nothæfum/ónothæfum < 90 %), ekki fullnustu nothæfra sér.
+  - **Nálgun í framenda (cc243 f.3, `verdmat-ai` `lib/nybyggingar-soluhradi.ts` `smagraf`):** mánuður telst þroskaður fyrir nothæfar ⇔ mánaðarlok ≤ `hradi_glugga_til` á `nybygging_verkefni`. Það stenst af því að lokadagurinn ER síðasti dagur með fullnustu nothæfra ≥ 90 % og fullnusta fellur með styttri töf. En hún erfir landsvísu-gluggann, ekki mánaðarlega mælingu, og án `hradi_glugga_til` (söluhraða sleppt) fellur hún á `bradabirgda` eitt og sér.
+  - **Verk:**
+    1. Migration: `fullnusta_nothaefar numeric` (og helst `fullnusta_onothaefar`) á `semantic.nybygging_solur_manadar`; `bradabirgda` óbreytt (= lægri < 0,90) til afturábaksamhæfis.
+    2. Smiður: `scripts/nyb_soluhradi.py` skrifar báða hlutfallsdálkana úr sömu töfdreifingu og `sidasti_throskadi_dagur`, per mánuð; `scripts/cc224_nybygging_verkefni.py --skrifa` (næturverkið) óbreytt að öðru leyti.
+    3. Hlið: fyrir hvert verkefni skal `max(manudur where fullnusta_nothaefar ≥ 0,90)` stemma við mánuð `hradi_glugga_til` (sama regla, tvær leiðir) — dry-run á frosnu inntaki cc237 fyrst (F8: 01.07–28.09, 0,906 á lokadegi).
+    4. Framendi: `nothThroskad = r.fullnusta_nothaefar >= 0.9`, `heildThroskad = !r.bradabirgda`; hækka `NYB_CACHE_UTGAFA`. Prófunarútgáfa fyrir GO (Playwright `D:\_audit\cc243_soluhradi\f3_playwright.py`).
+  - Fundur: `D:\_audit\cc243_soluhradi\SKIL_CC243_F3.md`, `SKIL_CC243_F2.md` (a).
