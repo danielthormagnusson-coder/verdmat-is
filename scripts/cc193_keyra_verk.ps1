@@ -24,7 +24,7 @@
 #   (d) póstumferð/idempotens (email_sent_at) óbreytt.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni')]
+    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy')]
     [string]$Verk,
     [switch]$Thurrt
 )
@@ -87,6 +87,16 @@ $Verkin = @{
         Skrift = 'D:\verdmat-is\app\scripts\cc224_nybygging_verkefni.py'
         Rok    = @('--skrifa', '--ut', 'D:\verdmat-is\logs\nybygging_verkefni', '--revalidate', '--hlada-myndir', 'r2backup:verdmat-myndir')
         Thurr  = @('--dryrun', '--ut', 'D:\verdmat-is\logs\nybygging_verkefni_thurrt')
+        WD     = 'D:\verdmat-is\app'
+        Bida   = $true
+    }
+    # cc251: mánaðarsala á móti sama mánuði í fyrra -> semantic.manadarsala_yoy (regla cc251-v1). Les D:\kaupskra.csv
+    # (sales-refresh 02:30) -> daglega 05:15 í lok næturkeðjunnar, sama biðhlið og fasteignasala_manudur. Ein færsla
+    # (DELETE + INSERT regla_version); teljarahlið fyrir COMMIT; rc 2 = hlið féll (gömul kaupskrá o.fl.), ekkert skrifað.
+    manadarsala_yoy = @{
+        Skrift = 'D:\verdmat-is\app\scripts\cc251_manadarsala_yoy.py'
+        Rok    = @('--skrifa')
+        Thurr  = @()
         WD     = 'D:\verdmat-is\app'
         Bida   = $true
     }
