@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-17 — Krass v2: krónur, fermetrar, hliðun eftir gerð/hæð (cc257 → cc258) — **ákvarðanir arkitekts 16.10 23:49; verdmat-ai cc258 (e5d1176, grein cc258), ópushað (HALT fyrir push); ekkert birt grunnmat breytt**
+
+1. **Ástandslínur í krónum, ekki %.** Eldhús/bað/gólf „Uppgert“ sýna „um X m.kr.“ með 95 % bili: eldhús 1,3 [0,6; 2,1], bað 1,2 [0,6; 1,8], gólf 1,4 [0,7; 2,1] m.kr. (cc257 §A1, föst kr, hlutáhrif, P1-stýrt, 5.324 endursölupör án lánþega; θ ≈ 0,25 nálgað sem föst kr). Föst skýring: „Verðmunur sem fylgir „uppgert“ í sölum — ekki kostnaður við endurbætur.“ Tala áfram aðeins við val notanda (v1.5).
+2. **Óskráðir fermetrar = m² × jaðarfermetraverð SELLU × gæðastuðull notanda.** 18 sellur (region_tier × gerð × stærðarbil, cc257 §B, miðgildi d = +10 á lifandi kvarða); aldrei jaðarverð per eign (0/18 stöðugar per eign). Sérbýli > 200 m² tölulaus. Gæði: full lofthæð = 1,0; súð/kjallari/ósamþykkt = notandinn velur stuðul 0,1–1,0 (OMAELANLEG, engin tala frá okkur). Viðmið „~0,2 × meðalfermetraverð“ (cc257 §C) sýnt, aldrei sjálfgefið. Kemur í stað `oskrad_rymi` (+2,66 %).
+3. **Hliðun (cc257 §E), hvítlisti per lína í `data/krass_v2.json`.** Innri eigindir (ástand, lofthæð, opið rými) bera tölu nema þar sem hópur er T2/T3; ytri (svalir, stórar svalir, verönd, garður) aðeins í mældum hópi. Halo-línur (útsýni ×3, lóðarátt ×3, endaraðhús, hleðslustöð, þvottahús) tölulausar alls staðar. Óþekkt hæð → tölulaus þar sem hæð ræður. BIRTANLEG lína sem skráin nefnir ekki fær ekki tölu. Hæð = `properties.unit_category[2:4]` (100,00 % samræmi við merking_floor, 60.303 fjölbýli).
+4. **Baðfjöldi tölulaus.** f.0 utan tíma (cc247-úrtak 16.07–15.10.2026, lánþegar felldir): fjölbýli 2 böð +2,7 % [−0,4; 5,9] (n 71), 3+ n 8, sérbýli bil yfir 0 → regla fellir alla fjóra reiti. Röðin stendur með krónureit fyrir eigið mat.
+5. **%-línur sem standa:** lofthæð, opið rými, svalir, stórar svalir, verönd, garður — §E staðfestir sama formerki í mældum hópum, ekki halo; kr-form ómælt fyrir þær (endursölupör ná aðeins til ástands).
+6. **Þitt mat = (grunnmat + Σ kr) × Π(1 + p_i)**, hlutfallið klemmt við ×1,15 í hvora átt (+15,0 % / −13,0 %); krónuliður klemmdur við grunnmat × liðarmörk. %-liðir margfaldast (log-rúm, sama og stuðlaskrá v1.4 og KRASS_REGLUR cc252) — „(1 + Σ %)“ í ákvörðuninni lesið svo; munurinn er 0,06 pp við svalir + lofthæð (1,51 % og 4,18 %) og 0,35 pp við 5 % + 7 %. Engin tillaga samtals; upphaf = grunnmat.
+7. **Viðmót:** lokað sjálfgefið (cc256) + „Loka“ sem felur spjaldið og heldur stillingum til endurhleðslu; beta-lína „Beta — liðir eru nú metnir í krónum þar sem mælingar styðja það.“ Allt orðalag í `config/krass.ts`. „Bera saman“ ekki í þessari lotu.
+
+Skil: `D:\_audit\cc258_krass_v2\SKIL_CC258.md`; mælingar: `D:\_audit\cc257_krass_v2\SKIL_CC257.md`.
+
+---
+
 ## 2026-10-16 — Krass v1.5: eldhús/bað/gólf „uppgert“ fá tölu, aðeins við val notanda (cc250 §A) — **ákvörðun Danna; verdmat-ai cc252 (2af63cf, grein cc252), ópushað (bíður push Danna); ekkert birt grunnmat breytt**
 
 1. **Tala á ástandsröðum, notandakveikt.** Þegar notandinn velur „Uppgert“ á eldhúsi, baðherbergi eða gólfefnum sýnir röðin stuðul stuðlaskrár v1.4 **óbreyttan** sem „um +X %“ (eldhús +1,94, bað +2,23, gólf +2,07). Í smáletri er 95 % bil endursöluparanna úr cc250 §A (hlutáhrif, allir þættir saman): eldhús [1,1; 3,3], bað [1,6; 3,6], gólf [1,1; 3,3], og heimildin „mælt á 5.523 endursölupörum“. Bilin og fjöldinn eru í `data/krass_astand_endursolupor_v1.json`, ekki í kóða. Þetta lyftir A2 (2026-10-16 §5) fyrir þessar þrjár raðir. **Heildarástand (`astand_eignar`) er áfram tölulaust**, því það fer saman við raðirnar þrjár (cc250 §4 (b)).

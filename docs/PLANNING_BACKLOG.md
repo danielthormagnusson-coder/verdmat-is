@@ -51,6 +51,16 @@ Planning promptir skulu takast í þessari röð, ekki parallel:
 
 ---
 
+## Áfangi 4.x — iter5: einhalla skorða á EINFLM (logged 2026-10-17, cc258)
+
+**Context (cc257 §B):** prod iter4r gefur **35 % eigna lægra mat** einhvers staðar á +1..40 m² (trjáþrep; stærsta 1-m² skref miðg. 4 % af mati, max 17,6 %). Jaðarfermetraverð per eign er því ónothæft og krass v2 notar sellutölu.
+
+**Tillaga:** iter5 þjálfað með `monotone_constraints` +1 á EINFLM (og helst flm_hlutfall 0) í LightGBM. Mæla: hlutfall eigna með kr(d) < kr(0) á d ∈ 1..40 (markmið 0), MdAPE/held MAPE per segment á móti iter4r, og hvort sellutölurnar ~0,6 × fermetraverð haldast. Ef stenst má endurskoða jaðarverð per eign í krassinu (cc257 §2.3 leið 2).
+
+**Tengt:** cc241 m03, cc257 b01_jadar.py, krass v2 (DECISIONS 2026-10-17).
+
+---
+
 ## Áfangi 4.x — iter5 spec re-frame (logged 2026-05-18, decision pending)
 
 **Context**: Eftir Áfangi 0 Stage 1 weekend run höfum við nýja HMS dálka (brunabotamat,
