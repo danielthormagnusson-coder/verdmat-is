@@ -1873,3 +1873,20 @@ sé endurvakinn á skoðun einni.
     3. Hlið: fyrir hvert verkefni skal `max(manudur where fullnusta_nothaefar ≥ 0,90)` stemma við mánuð `hradi_glugga_til` (sama regla, tvær leiðir) — dry-run á frosnu inntaki cc237 fyrst (F8: 01.07–28.09, 0,906 á lokadegi).
     4. Framendi: `nothThroskad = r.fullnusta_nothaefar >= 0.9`, `heildThroskad = !r.bradabirgda`; hækka `NYB_CACHE_UTGAFA`. Prófunarútgáfa fyrir GO (Playwright `D:\_audit\cc243_soluhradi\f3_playwright.py`).
   - Fundur: `D:\_audit\cc243_soluhradi\SKIL_CC243_F3.md`, `SKIL_CC243_F2.md` (a).
+
+- **cc263 (f.2) — iter5: `unit_category` (og `merking_floor` cc244 (a)) ÚR ÍBÚÐAR-MATSEININGU, OG REGLA FYRIR ÓSKIPT FASTNÚMER (bókað 20.10, cc263; EKKI laga í properties-uppfærslu nú).** `unit_category` = `merking[:4]` þar sem `merking` er sú sem `properties_v2.pkl` ber, með FEPILOG-vara kaupskrár (`precompute/build_precompute.py:222`, sama afleiðsla í `rebuild_predictions_iter4.py`). Hún er ekki valin sem íbúðar-matseining.
+  - **Mælt 20.10 á 102.240 APT-eignum** (íbúðar-merking = regla cc262 `lib/ibudarnumer.ts`):
+    - **27** eignir hafa einkvæma íbúðar-merkingu og `unit_category` ≠ hennar `[:4]`: 25 í engri eigin matseiningu (FEPILOG/úrelt), 2 = önnur matseining. 26 af 27 víkja aðeins í matshluta, 1 í hæð (Vitastígur 16, 01→02).
+    - **1.002** óskipt fastnúmer (≥ 2 íbúðar-merkingar). Þar er ekkert eitt rétt gildi; 814 af 905 í krass-mengi spanna fleiri en eina hæð. „970" í cc262 §1 endurgerist best sem þessi hópur (APT_FLOOR án einkvæmrar íbúðar-merkingar: 971), ekki sem misræmi.
+  - **Gagnfærsla (prod `iter4r_20260805_reglaR_strukt` main_mean, parity 100 %):** á 27 eignum er miðgildi Δ +0,18 %, bil −6,1 % (Karfavogur 38, −2,8 m.kr.) til +4,7 %, og 6 af 27 hafa |Δ| > 2 %. Á óskiptum er næmi gagnvart vali merkingar mest |Δ| með miðgildi 1,8 %, p90 7,6 % og max 17,5 %.
+  - **Af hverju ekki nú:**
+    - Grunnmatið les `unit_category` úr pkl-afleiðslu rebuild, ekki úr `public.properties`. Uppfærsla þar hreyfir því engu mati fyrr en við endurþjálfun/rebuild.
+    - Eftir cc263 les enginn lifandi flötur `properties.unit_category`: krass les hæð úr íbúðar-merkingu, og birting hefur gert það síðan cc262.
+    - `unit_category` er flokkabreyta með 246 flokkum sem eru þjálfaðir á sömu afleiðslu. Að breyta gildum í rekstri án endurþjálfunar væri dreififrávik.
+  - **Verk í iter5:**
+    1. `unit_category` og `merking_floor` (cc244 (a)) úr íbúðar-matseiningu eigin fastnr., í þjálfun OG rekstri. Sama regla og cc262/cc263.
+    2. Regla fyrir óskipt fastnr.: lægsta hæð, NaN eða sér-flokkur. Mæla á endursölupörum.
+    3. FEPILOG-varinn aðeins þar sem engin íbúðar-matseining er.
+    4. Endurmæla stuðlaskrá/krass-hópa á eftir, sbr. cc244 (b).
+  - **Valkostur utan iter5 (bíður Danna):** hæð krassins á 91 óskiptu fastnr. þar sem allar íbúðar-merkingar eru á sömu hæð. cc263 gefur þeim „óþekkt hæð“ (sama fall og cc262). Ein lína: einkvæmni á hæð í stað merkingar.
+  - Fundur: `D:\_audit\cc263_merking_gagnalag\SKIL_CC263.md` §2.
