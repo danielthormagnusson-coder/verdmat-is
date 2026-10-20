@@ -140,18 +140,32 @@ Skrifa ('env: ' + $nEnv + ' lyklar hlaðnir úr ' + $EnvRot + '; ENDURNYJA_LYKIL
 
 # ── 3. biðhlið á næturkeðjuna ───────────────────────────────────────────────
 if ($V.ContainsKey('BidVerk')) { $BidVerk = $V.BidVerk }   # cc210: biðhlið per verk
+# cc268 (a): á næturkeðjuna er beðið á LOKAMERKI hennar í night_YYYYMMDD.log, ekki verkstöðu — tímaþakið drepur
+# aðeins ræsinn og verkið sýnir Ready meðan keðjan heldur áfram (cc265 (1), 17.10). Biðverkin þurfa ferskar
+# listings, ekki extraction, svo PROMOTE_LOKID dugar. myndahledsla bíður myndasækisins (ekkert lokamerki) á verkstöðu.
+$Lokamerki = ($BidVerk -eq 'verdmat-nightly-delta')
+if ($Lokamerki) { . (Join-Path $PSScriptRoot 'vakt_kedja.ps1') }
 if ($V.Bida) {
     $t0 = Get-Date
     while ($true) {
         $st = $null
-        try { $st = (Get-ScheduledTask -TaskName $BidVerk -ErrorAction Stop).State } catch { $st = 'ÓÞEKKT' }
+        if ($Lokamerki) {
+            $Nu = Get-Date
+            try { $st = Get-KedjuStada } catch { $st = 'ÓÞEKKT' }
+            if ($st -ne 'I_GANGI') { Skrifa ('biðhlið: keðjan ' + $st); break }
+            $st = 'Running'   # sama bið- og hámarksleið og verkstöðuhliðið
+            $hvad = 'keðjan I_GANGI (ekkert promote/CHAIN-merki)'
+        } else {
+            try { $st = (Get-ScheduledTask -TaskName $BidVerk -ErrorAction Stop).State } catch { $st = 'ÓÞEKKT' }
+            $hvad = $BidVerk + ' er Running'
+        }
         if ($st -ne 'Running') { break }
         $lidid = ((Get-Date) - $t0).TotalMinutes
         if ($lidid -ge $BidHamarkMin) {
-            Skrifa ('biðhlið: ' + $BidVerk + ' enn Running eftir ' + [int]$lidid + ' mín — hámark náð, keyri samt')
+            Skrifa ('biðhlið: ' + $hvad + ' eftir ' + [int]$lidid + ' mín — hámark náð, keyri samt')
             break
         }
-        Skrifa ('biðhlið: ' + $BidVerk + ' er Running — bíð 2 mín (liðið ' + [int]$lidid + ' mín)')
+        Skrifa ('biðhlið: ' + $hvad + ' — bíð 2 mín (liðið ' + [int]$lidid + ' mín)')
         Start-Sleep -Seconds 120
     }
 }

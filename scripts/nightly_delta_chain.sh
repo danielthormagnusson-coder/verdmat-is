@@ -103,12 +103,38 @@ EXTRACT_DAILY_CAP_USD="2.00"
 # Útdrátturinn (EXTRACT_FORWARD, Haiku) er ÓSNERTUR — hann er ferskleiki, ekki bakfylling.
 EXTRACT_VALUE_LIMIT=2000
 
+# cc268 (d) — MJÚKUR SÓKNARFRESTUR. Sóknin er eini teygjanlegi hluti næturinnar (síður x 120 s);
+# promote + revalidate + extraction eru 20–60 mín. 17.10 tók sóknin 319 síður (tvítakahrina mbl,
+# cc265) og keðjan lauk 12:13 — biðverkin sem lesa scraper.listings biðu eða keyrðu á gömlu.
+# Hér er hverju sóknarþrepi skammtað það sem rúmast fram að FETCH_DEADLINE: --max-pages lækkað,
+# eða þrepinu sleppt með FRESTAÐ-línu sé ekkert rúm eftir. Bendlarnir halda (cc201 A1: þak er
+# TÖF, ekki TAP), svo næsta nótt heldur áfram nákvæmlega þar. Promote/extraction keyra ÓSKERT
+# á eftir — frestinum er aldrei beitt á þau, því dráp í miðjum promote er verra en sein keðja.
+# Versta nótt: ~05:30 + 2 mín (framhalds-aggregate) + promote 25 + extraction 32 ≈ 06:30.
+# Venjuleg nótt (01:00, ≤100 síður á straum) rúmar 133 síður í fyrsta þrepi og er óbreytt.
+# Ræsing EFTIR frestinum (handkeyrsla að degi) fær sama glugga og nóttin: FETCH_WINDOW_MIN.
+# PT16H-þak verksins (og Job Object-umbúðirnar, cc268 (c)) er síðasta vörn sem á aldrei að bíta.
+FETCH_DEADLINE=05:30
+FETCH_WINDOW_MIN=270         # 01:00 -> 05:30
+PAGE_SEC=120                 # = fetch_mbl DEFAULT_SPACING; aðeins notað í frestreikninginn
+FRESTAD=0                    # straumar sem var sleppt (ekkert rúm)
+STYTT=0                      # straumar sem fengu lægra --max-pages en DELTA_MAX_PAGES
+
 DRY=0
 [ "$1" = "--dry-run" ] && DRY=1
 
 TS=$(date +%Y%m%d)
 REPORT=$NIGHTLOGS/night_${TS}.log
 CHAIN_START=$(python -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).isoformat())")
+
+# cc268 (d): frestur dagsins sem epoch; ræsing eftir honum fær FETCH_WINDOW_MIN frá ræsingu.
+fetch_deadline_epoch() {
+  local d n
+  d=$(date -d "$FETCH_DEADLINE" +%s); n=$(date +%s)
+  [ "$n" -ge "$d" ] && d=$((n + FETCH_WINDOW_MIN * 60))
+  echo "$d"
+}
+DEADLINE_EPOCH=$(fetch_deadline_epoch)
 
 # cc94/cc99 — stigsmunur á nóttinni. run_extraction skilar 0 þótt einstök köll
 # falli (per-kall grip, viljandi: eitt fall má ekki fella 199 heppnuð). Fjöldi
@@ -189,15 +215,35 @@ print("high_water=%s halt_reason=%s" % (st.get(sys.argv[3]), st.get("halt_reason
 PY
 }
 
+# ── cc268 (d): síður sem rúmast fyrir sóknarfrest ────────────────────────────
+# Ein PAGE_SEC dregin frá fyrir framhalds-aggregate sem fetch_mbl sækir eftir þak. < 1 = ekkert rúm.
+frest_rum() {
+  echo $(( (DEADLINE_EPOCH - $(date +%s) - PAGE_SEC) / PAGE_SEC ))
+}
+
 # ── run one mode, gated ──────────────────────────────────────────────────────
 run_mode() {                  # $1 mode, $2 state key, $3 since key
   local mode=$1 key=$2 sk=$3
+  # cc268 (d): Ekkert rúm -> FRESTAÐ, fetcherinn ekki ræstur, bendill ósnertur; lítið rúm -> lægra þak.
+  local cap=$DELTA_MAX_PAGES left fit
+  left=$(( DEADLINE_EPOCH - $(date +%s) ))
+  fit=$(frest_rum)
+  if [ "$fit" -lt 1 ]; then
+    FRESTAD=$((FRESTAD + 1))
+    say "FRESTAÐ: $mode — sóknarfrestur $(date -d @$DEADLINE_EPOCH '+%H:%M') liðinn; ekkert sótt, bendill heldur ($(state_line "$key" "$sk")) — næsta nótt heldur áfram þaðan"
+    return 0
+  fi
+  if [ "$fit" -lt "$cap" ]; then
+    cap=$fit
+    STYTT=$((STYTT + 1))
+    say "FRESTUR: $mode fær --max-pages $cap (af $DELTA_MAX_PAGES) — $((left / 60)) mín til sóknarfrests $(date -d @$DEADLINE_EPOCH '+%H:%M')"
+  fi
   if [ $DRY -eq 1 ]; then
-    echo "[dry-run] would run: python $APP/scripts/fetch_mbl.py --mode $mode --max-pages $DELTA_MAX_PAGES"
+    echo "[dry-run] would run: python $APP/scripts/fetch_mbl.py --mode $mode --max-pages $cap"
     return 0
   fi
   local mlog=$MODELOGS/delta_${mode}_${TS}.log
-  python $APP/scripts/fetch_mbl.py --mode "$mode" --max-pages $DELTA_MAX_PAGES \
+  python $APP/scripts/fetch_mbl.py --mode "$mode" --max-pages $cap \
     > "$mlog" 2>&1
   local rc=$?
   local summary
@@ -218,10 +264,10 @@ run_mode() {                  # $1 mode, $2 state key, $3 since key
   # night-log. No manual re-run is needed — the next night resumes from the cursor.
   local pages
   pages=$(echo "$summary" | grep -oE "[0-9]+ pages" | grep -oE "[0-9]+")
-  if [ -n "$pages" ] && [ "$pages" -ge $DELTA_MAX_PAGES ]; then
+  if [ -n "$pages" ] && [ "$pages" -ge $cap ]; then
     local carry
     carry=$(grep -E "framhald í nótt" "$mlog" | tail -1 | sed 's/^ *//')
-    say "FRAMHALD: $mode hit the $DELTA_MAX_PAGES-page cap — ${carry:-<no framhald line in $mlog>}"
+    say "FRAMHALD: $mode hit the $cap-page cap — ${carry:-<no framhald line in $mlog>}"
   fi
   return 0
 }
@@ -230,12 +276,25 @@ run_mode() {                  # $1 mode, $2 state key, $3 since key
 # Eigin state-lykill (head_sale); snertir ALDREI delta_sale-bendilinn. Kill-switch/villa = abort eins
 # og önnur sóknarþrep (abort-not-retry) — mbl-throttle á ekki að halda áfram í delta-sale.
 run_head() {
+  # cc268 (d): sóknarfresturinn gildir líka hér. Höfuðgangan er allt að 60 síður (120 mín) á undan
+  # delta-sale; síðbúin ræsing (StartWhenAvailable eftir að vélin var slökkt) bæri hana annars yfir
+  # frestinn. --max-pages = rúmið; fetch_mbl tekur min(rúm, HEAD_MAX_PAGES), svo venjuleg nótt er óbreytt.
+  local fit
+  fit=$(frest_rum)
+  if [ "$fit" -lt 1 ]; then
+    FRESTAD=$((FRESTAD + 1))
+    say "FRESTAÐ: head-sale — sóknarfrestur $(date -d @$DEADLINE_EPOCH '+%H:%M') liðinn; ekkert sótt ($(state_line head_sale last_newest))"
+    return 0
+  fi
+  if [ "$fit" -lt "$DELTA_MAX_PAGES" ]; then
+    say "FRESTUR: head-sale fær --max-pages $fit — $(( (DEADLINE_EPOCH - $(date +%s)) / 60 )) mín til sóknarfrests $(date -d @$DEADLINE_EPOCH '+%H:%M')"
+  fi
   if [ $DRY -eq 1 ]; then
-    echo "[dry-run] would run: python $APP/scripts/fetch_mbl.py --mode head-sale"
+    echo "[dry-run] would run: python $APP/scripts/fetch_mbl.py --mode head-sale --max-pages $fit"
     return 0
   fi
   local mlog=$MODELOGS/head_sale_${TS}.log
-  python $APP/scripts/fetch_mbl.py --mode head-sale > "$mlog" 2>&1
+  python $APP/scripts/fetch_mbl.py --mode head-sale --max-pages $fit > "$mlog" 2>&1
   local rc=$?
   local summary
   summary=$(grep -E "head done" "$mlog" | tail -1 | sed 's/^ *//')
@@ -392,6 +451,8 @@ chain_fail() {
 # ════════════════════════════════ main ═══════════════════════════════════════
 say "=== nightly delta chain start (fetch+parse+promote+extraction, dry_run=$DRY) ==="
 
+say "  sóknarfrestur: $(date -d @$DEADLINE_EPOCH '+%Y-%m-%d %H:%M') (FETCH_DEADLINE=$FETCH_DEADLINE; promote/extraction óskert á eftir)"
+
 PRE=$(preflight)
 PRERC=$?
 while IFS= read -r line; do say "  $line"; done <<< "$PRE"
@@ -432,6 +493,11 @@ fi
 
 TOT=$(night_totals)
 while IFS= read -r line; do say "  $line"; done <<< "$TOT"
+# cc268 (d): fresturinn er EKKI fall og breytir ekki CHAIN-línunni (status-probe og biðhlið lesa
+# hana) — hann fær sína eigin samantekt svo morgunlesturinn sjái að halinn bíður næstu nætur.
+if [ $((FRESTAD + STYTT)) -gt 0 ]; then
+  say "  FRESTUR-SAMANTEKT: $FRESTAD straumum sleppt, $STYTT styttir — bendlar halda, næsta nótt heldur áfram"
+fi
 # cc94 — ÞRJÚ STIG. Keðjan kláraði í báðum tilvikum hér (exit 0); munurinn er
 # hvort eitthvað féll á leiðinni. DEGRADED er flagg, ekki bilun: gögnin sem
 # tókust eru rétt, en nóttin er ekki heil og biðröðin ber afganginn áfram.
