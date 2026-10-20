@@ -27,7 +27,8 @@ CLI:
   python fetch_mbl.py --mode resume                          # continue in-flight seed/delta
   python fetch_mbl.py --mode resync-sale --since X --until Y --max-pk Z   # cc204 A4: bounded re-fetch
                                                              # of a cap-skipped window (own state key)
-  python fetch_mbl.py --mode head-sale                       # cc267: newest-first <=5 pages, own state key
+  python fetch_mbl.py --mode head-sale                       # cc267: newest-first <=60 pages, only if
+                                                             # delta-sale cursor > 10 h old (own state key)
 
 deps: stdlib + requests + canonicalize_mbl.
 """
@@ -154,7 +155,9 @@ MODECFG = {
     # cc267 f.3 HÖFUÐGANGA: lítil newest-first sókn (created desc, eign_id desc) á undan delta-sale, svo
     # NÝJAR söluauglýsingar komist inn þótt FIFO-biðröð delta-sale sé löng (15.10: ~11.200 mbl-tvítök
     # lokuðu bendlinum í 5+ nætur, 0 ný verðsett sala — SKIL_CC265 §3). Sama forsögn og delta-sale +
-    # `created >= now - HEAD_HOURS`. EIGIN state-lykill (head_sale) — les hvorki né skrifar delta_sale,
+    # `created > since`. Kostur C (Danni 20.10): keyrir AÐEINS þegar sölubendillinn er > HEAD_BENDILL_KLST
+    # gamall, og since = nýrra af (delta-bendli, nýjustu created síðustu höfuðgöngu) — „frá síðustu göngu".
+    # EIGIN state-lykill (head_sale) — LES delta_sale-bendilinn (aldur + gólf) en skrifar hann aldrei,
     # svo FIFO-bendillinn er óbreyttur; þegar hann nær sömu röðum síðar eru þær sóttar aftur (sama
     # content_hash = engin ný blob, parse er DELETE+INSERT per auðkenni = sama röð). fetch_kind ber
     # list_page_sale-forskeytið, svo parse_mbl tekur blöðin óbreytt.
@@ -162,8 +165,8 @@ MODECFG = {
                    "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC,
                    "kind": "list_page_sale_head", "op": "head_sale", "head_field": "created"},
 }
-HEAD_MAX_PAGES = 5                # 80 raðir; ein sölunótt hefur ~50–150 nýjar verðsettar (cc267 §3)
-HEAD_HOURS = 48
+HEAD_MAX_PAGES = 60               # 960 raðir ≈ 1 sólarhringur af nýjum verðsettum sölum (mælt 20.10: 883/24 klst)
+HEAD_BENDILL_KLST = 10.0          # venjuleg nótt ≤ 6,3 klst kl. 07:15; hrina 15.10: 12,7 → 107,9 (cc267 §5)
 
 # --mode choices (kept module-level so tests assert on it without invoking main()/the DB).
 MODE_CHOICES = ["seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable",
@@ -231,7 +234,7 @@ def default_state() -> dict:
         # cc204 A4: per-window resync cursors, keyed "since|until|max_pk". Never consulted by the
         # delta modes, the chain preflight, prime_delta_since or resume().
         "resync_sale": {"windows": {}, "last_run_at": None, "halt_reason": None},
-        # cc267 f.3: höfuðgangan ber engan bendil milli nátta (gluggi = now - HEAD_HOURS), aðeins skýrslu.
+        # cc267 f.3: last_newest = nýjasta created sem höfuðganga hefur séð — gólf næstu göngu (kostur C).
         "head_sale": {"last_run_at": None, "last_pages": 0, "last_rows": 0, "last_newest": None,
                       "last_oldest": None, "halt_reason": None},
         "session_request_count": 0,
@@ -343,18 +346,40 @@ def validate_resync_args(mode, since, until, max_pk):
 
 
 def effective_max_pages(mode, requested):
-    """cc267 f.3: höfuðgangan er alltaf lítil — HEAD_MAX_PAGES gildir líka þótt --max-pages sé hærra
-    (keðjan kallar með DELTA_MAX_PAGES=100 á aðra hami; 100 síður hér væru 200 mín á undan delta-sale)."""
+    """cc267 f.3: HEAD_MAX_PAGES gildir líka þótt --max-pages sé hærra (sjálfgefið 400 = 13 klst á 120 s)."""
     return min(requested, HEAD_MAX_PAGES) if mode == "head-sale" else requested
+
+
+def _utc(ts):
+    """ISO-strengur (mbl `created` er án tímabeltis = UTC; state ber +00:00) -> aware datetime, eða None."""
+    if not ts:
+        return None
+    d = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def head_plan(state, now):
+    """cc267 kostur C (hreint fall): (keyra?, since, bendilaldur_klst).
+    keyra aðeins ef delta_sale-bendillinn er > HEAD_BENDILL_KLST gamall; ósettur bendill = ekki keyra
+    (ekkert gólf). since = nýrra af (delta-bendli, last_newest höfuðgöngu)."""
+    ds = state.get("delta_sale", {})
+    bendill = _utc(ds.get("cursor_ts") or ds.get("last_br_dags_seen"))
+    if bendill is None:
+        return False, None, None
+    aldur = (now - bendill).total_seconds() / 3600.0
+    if aldur <= HEAD_BENDILL_KLST:
+        return False, None, aldur
+    golf = max(x for x in (bendill, _utc(state.get("head_sale", {}).get("last_newest"))) if x is not None)
+    return True, golf.strftime("%Y-%m-%dT%H:%M:%S.%f+00:00"), aldur
 
 
 def head_where(cfg, since, before_ts=None, before_pk=None):
     """cc267 f.3: keyset newest-first — raðir STRANGT á undan (before_ts, before_pk) í (created desc, pk desc),
-    takmarkaðar við created >= since. Bendillinn er í `_and` (draft ber top-level `_or`, SALE_DOMESTIC)."""
+    takmarkaðar við created > since. Bendillinn er í `_and` (draft ber top-level `_or`, SALE_DOMESTIC)."""
     f, pk = cfg["head_field"], cfg["pk"]
     cursor = ("" if before_ts is None else
               '{_or:[{%s:{_lt:"%s"}},{%s:{_eq:"%s"}, %s:{_lt:%d}}]}, ' % (f, before_ts, f, before_ts, pk, int(before_pk)))
-    return '_and:[%s{%s:{_gte:"%s"}}], %s' % (cursor, f, since, cfg["draft"])
+    return '_and:[%s{%s:{_gt:"%s"}}], %s' % (cursor, f, since, cfg["draft"])
 
 
 def head_query(cfg, since, before_ts=None, before_pk=None):
@@ -673,9 +698,14 @@ class MblFetcher:
         key = cfg["key"]
         self._active_key = key
         st = self.state.setdefault(key, default_state()[key])
-        since = datetime.fromtimestamp(time.time() - HEAD_HOURS * 3600, timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%S+00:00")
-        self.log("=== %s (created >= %s, max %d pages) ===" % (mode, since, self.max_pages))
+        keyra, since, aldur = head_plan(self.state, datetime.now(timezone.utc))
+        if not keyra:
+            st.update({"last_run_at": now_iso(), "last_pages": 0, "last_rows": 0, "halt_reason": None})
+            self._save()
+            self.log("  head done — skipped (sölubendill %s klst ≤ %.0f eða ósettur)"
+                     % ("%.1f" % aldur if aldur is not None else "?", HEAD_BENDILL_KLST))
+            return
+        self.log("=== %s (bendill %.1f klst, created > %s, max %d pages) ===" % (mode, aldur, since, self.max_pages))
         before_ts = before_pk = None
         pages = rows_n = 0
         newest = oldest = None
@@ -703,8 +733,10 @@ class MblFetcher:
             before_ts, before_pk, oldest = str(nxt_ts), int(nxt_pk), str(nxt_ts)
             if len(rows) < PAGE:
                 break
-        st.update({"last_run_at": now_iso(), "last_pages": pages, "last_rows": rows_n,
-                   "last_newest": newest, "last_oldest": oldest, "halt_reason": None})
+        st.update({"last_run_at": now_iso(), "last_pages": pages, "last_rows": rows_n, "last_oldest": oldest,
+                   "halt_reason": None})
+        if newest:                        # gólf næstu göngu færist aðeins fram þegar eitthvað nýtt sást
+            st["last_newest"] = _utc(newest).strftime("%Y-%m-%dT%H:%M:%S.%f+00:00")
         self._save()
         self.log("  head done — %d pages, %d rows, created %s .. %s%s"
                  % (pages, rows_n, newest, oldest, " (síðuþak)" if pages >= self.max_pages else ""))

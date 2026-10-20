@@ -865,52 +865,93 @@ class HeadHasura:
         self.served = []
 
     def __call__(self, q, i):
-        since = re.search(r'created:\{_gte:"([^"]+)"\}', q).group(1)
+        since = re.search(r'created:\{_gt:"([^"]+)"\}', q).group(1)
         m = re.search(r'\{created:\{_lt:"([^"]+)"\}\},\{created:\{_eq:"[^"]+"\}, eign_id:\{_lt:(\d+)\}\}', q)
-        out = [r for r in self.rows if r["created"] >= since
-               and (m is None or (r["created"], r["eign_id"]) < (m.group(1), int(m.group(2))))][:fm.PAGE]
+        out = [r for r in self.rows if fm._utc(r["created"]) > fm._utc(since)
+               and (m is None or (fm._utc(r["created"]), r["eign_id"]) < (fm._utc(m.group(1)), int(m.group(2))))][:fm.PAGE]
         self.served.extend(out)
         return FakeResp(200, body({"data": {"fs_fasteign": out}}))
 
 
 class TestHeadSale(unittest.TestCase):
-    def _rows(self, n, start_h=1):
-        from datetime import datetime, timedelta, timezone
-        t = datetime.now(timezone.utc)
-        return [{"eign_id": 1900000 + i, "created": (t - timedelta(minutes=10 * i + 60 * (start_h - 1))).strftime(
-                 "%Y-%m-%dT%H:%M:%S+00:00"), "br_dags": "2026-10-20T00:00:00+00:00"} for i in range(n)]
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    NOW = _dt.now(_tz.utc)
 
-    def _run(self, rows, st, max_pages=fm.HEAD_MAX_PAGES):
-        conn = mem_conn()
+    def _ts(self, minutes_ago, tz=False):
+        t = self.NOW - self._td(minutes=minutes_ago)
+        return t.strftime("%Y-%m-%dT%H:%M:%S.%f") + ("+00:00" if tz else "")   # mbl created ber ekkert tímabelti
+
+    def _rows(self, n, start_min=1, step=3):
+        return [{"eign_id": 1900000 + i, "created": self._ts(start_min + step * i),
+                 "br_dags": "2026-10-20T00:00:00+00:00"} for i in range(n)]
+
+    def _state(self, bendill_h=48.0, last_newest_min=None):
+        st = fm.default_state()
+        b = self._ts(bendill_h * 60, tz=True)
+        st["delta_sale"].update({"last_br_dags_seen": b, "cursor_pk": 1815257, "cursor_ts": b})
+        if last_newest_min is not None:
+            st["head_sale"]["last_newest"] = self._ts(last_newest_min, tz=True)
+        return st
+
+    def _run(self, rows, st, max_pages=fm.HEAD_MAX_PAGES, conn=None, logs=None):
+        conn = conn or mem_conn()
         mock = HeadHasura(rows)
         f = fetcher(FakeSession(mock), conn, st, mode="head-sale")
         f.max_pages = max_pages
+        if logs is not None:
+            f.log = logs.append
         f.run()
         return f, conn, mock
 
-    # h1) síðuþak: 200 nýjar raðir -> nákvæmlega 5 síður, newest-first, hver röð einu sinni; delta_sale ÓSNERT
+    # h1) síðuþak: fleiri nýjar raðir en þakið -> nákvæmlega HEAD_MAX_PAGES síður, newest-first, hver röð
+    #     einu sinni; delta_sale BÆTI-EINS (höfuðgangan les bendilinn, skrifar hann aldrei)
     def test_h1_cap_newest_first_delta_untouched(self):
-        rows = self._rows(200)
-        st = fm.default_state()
-        st["delta_sale"].update({"last_br_dags_seen": "2026-10-15T19:20:27+00:00", "cursor_pk": 1815257,
-                                 "cursor_ts": "2026-10-15T19:20:27+00:00"})
+        n = fm.HEAD_MAX_PAGES * fm.PAGE + 40
+        rows = self._rows(n, step=1)
+        st = self._state(bendill_h=48 + n / 60)
         before = json.dumps(st["delta_sale"], sort_keys=True)
         f, conn, mock = self._run(rows, st)
-        self.assertEqual(f.stats.pages, 5)
-        ids = [r["eign_id"] for r in mock.served]
-        self.assertEqual(ids, [1900000 + i for i in range(80)])
+        self.assertEqual(f.stats.pages, fm.HEAD_MAX_PAGES)
+        self.assertEqual([r["eign_id"] for r in mock.served], [1900000 + i for i in range(fm.HEAD_MAX_PAGES * fm.PAGE)])
         self.assertEqual(json.dumps(st["delta_sale"], sort_keys=True), before)
-        self.assertEqual((st["head_sale"]["last_pages"], st["head_sale"]["last_rows"]), (5, 80))
+        self.assertEqual(st["head_sale"]["last_pages"], fm.HEAD_MAX_PAGES)
         self.assertEqual(conn.execute("SELECT DISTINCT fetch_kind FROM raw_fetches").fetchall(),
                          [("list_page_sale_head",)])
 
-    # h2) gluggi: raðir eldri en HEAD_HOURS eru ekki sóttar; hálf síða stöðvar án auka-beiðni
-    def test_h2_window_and_short_page_stop(self):
-        rows = self._rows(20) + self._rows(30, start_h=fm.HEAD_HOURS + 2)
-        f, conn, mock = self._run(rows, fm.default_state())
+    # h2) gólf = delta-bendill: raðir stofnaðar FYRIR bendli eru ekki sóttar; hálf síða stöðvar án auka-beiðni
+    def test_h2_floor_is_delta_cursor(self):
+        rows = self._rows(20, step=3) + self._rows(30, start_min=13 * 60, step=3)   # seinni hópur eldri en bendill
+        f, conn, mock = self._run(rows, self._state(bendill_h=12.0))
         self.assertEqual(len(mock.served), 20)
-        self.assertEqual(f.stats.pages, 2)                   # 16 + 4, engin þriðja beiðni
+        self.assertEqual(f.stats.pages, 2)
         self.assertEqual(len(f.s.queries), 2)
+
+    # h6) kostur C — „frá síðustu göngu": önnur ganga sækir AÐEINS það sem kom eftir nýjustu röð fyrri göngu
+    def test_h6_second_walk_starts_after_last_newest(self):
+        st = self._state(bendill_h=48.0)
+        old = self._rows(10, start_min=60, step=3)
+        self._run(old, st)
+        self.assertEqual(fm._utc(st["head_sale"]["last_newest"]), fm._utc(old[0]["created"]))
+        new = self._rows(5, start_min=1, step=3)
+        f, conn, mock = self._run(old + new, st)
+        self.assertEqual(sorted(r["eign_id"] for r in mock.served), sorted(r["eign_id"] for r in new))
+        # ekkert nýtt -> gólfið stendur, engin röð sótt
+        f, conn, mock = self._run(old + new, st)
+        self.assertEqual(mock.served, [])
+        self.assertEqual(fm._utc(st["head_sale"]["last_newest"]), fm._utc(new[0]["created"]))
+
+    # h7) kostur C — hlið: bendill ≤ 10 klst eða ósettur -> 0 beiðnir, „head done — skipped"; > 10 klst -> keyrir
+    def test_h7_gate_on_cursor_age(self):
+        for h, keyrir in ((5.0, False), (9.9, False), (10.5, True), (60.0, True)):
+            with self.subTest(bendill_h=h):
+                logs = []
+                f, conn, mock = self._run(self._rows(3), self._state(bendill_h=h), logs=logs)
+                self.assertEqual(len(f.s.queries) > 0, keyrir)
+                self.assertTrue(any("head done" in l for l in logs))      # keðjan greppar þessa línu
+        logs = []
+        f, conn, mock = self._run(self._rows(3), fm.default_state(), logs=logs)
+        self.assertEqual(len(f.s.queries), 0)
+        self.assertTrue(any("skipped" in l for l in logs))
 
     # h3) fyrirspurnarsnið: sama forsögn og delta-sale, bendill í _and (draft ber top-level _or), list order_by
     def test_h3_query_shape(self):
@@ -919,27 +960,26 @@ class TestHeadSale(unittest.TestCase):
         self.assertEqual(cfg["draft"], fm.MODECFG["delta-sale"]["draft"])
         self.assertTrue(cfg["kind"].startswith("list_page_sale"))
         q = fm.head_query(cfg, "2026-10-18T00:00:00+00:00", "2026-10-20T10:00:00+00:00", 1900010)
-        self.assertEqual(q.count("_or:["), 2)                # bendill + SALE_DOMESTIC, ekki tvöfaldur lykill í sama hlut
+        self.assertEqual(q.count("_or:["), 2)
         self.assertIn('_and:[{_or:[{created:{_lt:"2026-10-20T10:00:00+00:00"}}', q)
+        self.assertIn('created:{_gt:"2026-10-18T00:00:00+00:00"}', q)
         self.assertIn("order_by:[{created:desc},{eign_id:desc}]", q)
         self.assertNotIn("offset", q)
 
-    # h5) CLI-þak: --max-pages 400 (sjálfgefið) gefur samt ≤ 10 síður í head-sale; aðrir hamir óbreyttir
+    # h5) CLI-þak: --max-pages 400 (sjálfgefið) gefur samt HEAD_MAX_PAGES (≤ 60) í head-sale; aðrir hamir óbreyttir
     def test_h5_cli_cap(self):
-        self.assertLessEqual(fm.effective_max_pages("head-sale", fm.DEFAULT_MAX_PAGES), 10)
-        self.assertLessEqual(fm.effective_max_pages("head-sale", 100), 10)
+        self.assertLessEqual(fm.effective_max_pages("head-sale", fm.DEFAULT_MAX_PAGES), 60)
         self.assertEqual(fm.effective_max_pages("head-sale", 3), 3)
         self.assertEqual(fm.effective_max_pages("delta-sale", 100), 100)
 
     # h4) falspróf: höfuðgangan skrifar ALDREI í delta-lykla, líka við kill-switch
     def test_h4_killswitch_sets_own_halt_only(self):
-        st = fm.default_state()
+        st = self._state(bendill_h=48.0)
         f = fetcher(FakeSession(lambda q, i: FakeResp(429)), mem_conn(), st, mode="head-sale")
         with self.assertRaises(fm.KillSwitch):
             f.run()
         self.assertIn("429", st["head_sale"]["halt_reason"])
         self.assertIsNone(st["delta_sale"]["halt_reason"])
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -11,6 +11,9 @@ REGLA (regla_version = REGLA_VERSION):
   * innan efnislykils eru raðir raðaðar eftir (listed_at, listing-auðkenni) og KEÐJAÐAR í klasa:
     röð fer í klasa fyrri raðar ef listed_at - listed_at(fyrri) <= GLUGGI.
   * frumrit = fyrsta röð klasans; allar hinar eru tvítök frumritsins.
+    frumrit er KLASALYKILL (scraper.listing_tvitok.frumrit_listing_id), ekki endilega röðin sem birtist:
+    scraper.v_tvitok_falin endurmetur við hverja lesningu og BIRTIR elsta LIFANDI eintak klasans
+    (cc267 ákvörðun 2) — taki mbl frumritið niður en tvítak lifir, helst eignin „Á sölu".
 GLUGGI = 10 mín: bil milli raða með sama efni er tvítoppað (mælt 20.10 á 83.176 klösum,
 cc267 §1): 13.824 bil < 10 mín, 5 bil 10–60 mín, svo ekkert fyrr en ≥ 1 klst (1.260 < 1 d, 52.818 ≥ 1 d).
 Endurbirting sama efnis daginn eftir er því EKKI tvítak — hún er utan þessarar reglu.

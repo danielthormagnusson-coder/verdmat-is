@@ -57,7 +57,7 @@ from psycopg2.extras import Json
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_mbl import SALE_DOMESTIC  # noqa: E402  sama innlenda sía og delta-forsögnin
 from lifecycle_sweep_mbl import Transport, DEFAULT_SPACING  # noqa: E402  sami kill-switch
-from fetch_mbl import KillSwitch  # noqa: E402
+from fetch_mbl import KillSwitch, HEAD_BENDILL_KLST  # noqa: E402  cc267: sama mörk og höfuðgangan
 from scraper_paths import get_scraper_data_dir  # noqa: E402
 
 ADFERD = "thekjuprof_mbl_v1"
@@ -70,7 +70,7 @@ PAGE = 16
 DRAUG_N = 32
 DRAUG_PER_REQ = 8
 # cc267 (d) — þröskuldar settir EFTIR mælingu dreifingarinnar (sjá docstring + SKIL_CC267 §5)
-BENDILL_ALERT_KLST = 10.0  # venjulegt ≤ 6,3
+BENDILL_ALERT_KLST = HEAD_BENDILL_KLST  # 10 klst; venjulegt ≤ 6,3 — viðvörun og höfuðganga kveikja á sama marki
 NYJAR_EIGNIR_MIN = 100     # venjulegt ≥ 231
 TVITAK_RADIR_MAX = 100     # venjulegt ≤ 45
 PRICED = "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC

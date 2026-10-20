@@ -2,17 +2,26 @@
 -- cc267 f.2 — SÓTTKVÍ mbl-tvítaka (merking, ekki eyðing)
 -- Rollback: supabase/rollback/20261021090000_cc267_tvitok_sottkvi_rollback.sql
 --
--- scraper.listing_tvitok: ein röð per tvítak (listing_id) með frumriti sínu. Reglan býr í
--- scripts/tvitak_regla.py (EITT fall; regla_version skráð per röð). Raðirnar í scraper.listings
--- standa óbreyttar — sóttkví er að lesfletirnir tveir sem allt lifandi les sía tvítök út:
+-- scraper.listing_tvitok: ein röð per tvítak (listing_id) með frumriti klasans (frumrit_listing_id =
+-- klasalykill: elsta röð klasans skv. scripts/tvitak_regla.py; regla_version skráð per röð).
+-- Raðirnar í scraper.listings standa óbreyttar.
+--
+-- scraper.v_tvitok_falin (cc267 ákvörðun 2, Danni 20.10): ENDURMAT við hverja lesningu — í hverjum
+-- klasa (frumrit + tvítök) BIRTIST elsta LIFANDI eintakið (status active, hvorki withdrawn_confirmed
+-- né confirmed_absent_1), öll hin eru falin. Taki mbl frumritið niður en tvítak lifir, birtist elsta
+-- lifandi tvítakið, svo eign hverfur aldrei úr „Á sölu" meðan eitthvert eintak lifir. Ekkert lifandi ->
+-- frumritið er „sýnt" (grunnsíur sýnanna fella það hvort eð er).
+--
+-- Lesfletirnir tveir sem allt lifandi les sía út v_tvitok_falin:
 --   scraper.v_eign_virk_auglysing  (/eign „Á sölu", svæði, verðvakt-nefnari, nybygging virk, agent)
 --   scraper.v_leit_listings        (/leit, Púlsinn „Framboð núna", leiga, agent frambodsleit)
--- Sían er í WHERE, svo er_nyjasta_birting (row_number) reiknast eftir síun: frumritið tekur flaggið.
--- Skilgreiningar að öðru leyti ORÐRÉTTAR úr pg_get_viewdef 20.10.2026 (lifandi gerð, ekki migration-skrá).
+-- Sían er í WHERE, svo er_nyjasta_birting (row_number) reiknast eftir síun.
+-- Skilgreiningar að öðru leyti ORÐRÉTTAR úr pg_get_viewdef 20.10.2026 (lifandi gerð; v_leit_listings
+-- á uppruna í verdmat-ai/supabase/migrations — þessi migration tekur við henni).
 --
--- Tóm tafla = engin breyting á lifandi tölu. Merking er sér skref (D:\_audit\cc267_tvitok\merkja_tvitok.py
--- --beita) eftir GO.
--- Ekki app-lesin beint: RLS á, engar heimildir til anon/authenticated (views eru definer).
+-- Tóm tafla = engin breyting á lifandi tölu. Merking: D:\_audit\cc267_tvitok\merkja_tvitok.py --beita,
+-- síðan scripts/promote_listings_append.py (vörnin virkjast þegar taflan er til).
+-- Ekki app-lesin beint: RLS á töflu, engar heimildir anon/authenticated (lesfletir eru definer-views).
 -- =====================================================================
 
 BEGIN;
@@ -29,10 +38,40 @@ CREATE TABLE scraper.listing_tvitok (
 CREATE INDEX listing_tvitok_frumrit_idx ON scraper.listing_tvitok (frumrit_listing_id);
 
 COMMENT ON TABLE scraper.listing_tvitok IS
-  'cc267: sóttkví mbl-tvítaka (sama efni innan 10 mín, scripts/tvitak_regla.py). Lesfletir v_eign_virk_auglysing og v_leit_listings sía út.';
+  'cc267: sóttkví mbl-tvítaka (sama efni innan 10 mín, scripts/tvitak_regla.py). Lesfletir sía út scraper.v_tvitok_falin.';
 
 ALTER TABLE scraper.listing_tvitok ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE scraper.listing_tvitok FROM PUBLIC, anon, authenticated;
+
+CREATE VIEW scraper.v_tvitok_falin AS
+WITH klasi AS (
+         SELECT t.frumrit_listing_id AS klasi_id, t.frumrit_listing_id AS listing_id
+           FROM scraper.listing_tvitok t
+          GROUP BY t.frumrit_listing_id
+        UNION ALL
+         SELECT t.frumrit_listing_id, t.listing_id
+           FROM scraper.listing_tvitok t
+        ), medlimir AS (
+         SELECT k.klasi_id, k.listing_id, l.listed_at,
+            (l.status = 'active'::text AND NOT (EXISTS ( SELECT 1
+                   FROM scraper.listing_lifecycle_events e
+                  WHERE e.source = l.source AND e.source_listing_id = l.source_listing_id
+                    AND (e.event_type = ANY (ARRAY['withdrawn_confirmed'::scraper.lifecycle_event_enum,
+                                                   'confirmed_absent_1'::scraper.lifecycle_event_enum]))))) AS lifandi
+           FROM klasi k
+             JOIN scraper.listings l ON l.listing_id = k.listing_id
+        ), synt AS (
+         SELECT DISTINCT ON (m.klasi_id) m.klasi_id, m.listing_id
+           FROM medlimir m
+          ORDER BY m.klasi_id, m.lifandi DESC, m.listed_at, m.listing_id
+        )
+ SELECT DISTINCT m.listing_id
+   FROM medlimir m
+  WHERE NOT (EXISTS ( SELECT 1 FROM synt s WHERE s.klasi_id = m.klasi_id AND s.listing_id = m.listing_id));
+
+COMMENT ON VIEW scraper.v_tvitok_falin IS
+  'cc267: auglýsingar faldar vegna tvítaka — allir klasameðlimir nema elsta LIFANDI eintak klasans.';
+REVOKE ALL ON TABLE scraper.v_tvitok_falin FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE VIEW scraper.v_eign_virk_auglysing AS
  SELECT l.listing_id,
@@ -63,8 +102,8 @@ CREATE OR REPLACE VIEW scraper.v_eign_virk_auglysing AS
           WHERE e.source = l.source AND e.source_listing_id = l.source_listing_id AND e.event_type = 'withdrawn_confirmed'::scraper.lifecycle_event_enum)) AND NOT (EXISTS ( SELECT 1
            FROM scraper.listing_lifecycle_events ea
           WHERE ea.source = l.source AND ea.source_listing_id = l.source_listing_id AND ea.event_type = 'confirmed_absent_1'::scraper.lifecycle_event_enum)) AND (l.addr_text IS NULL OR l.addr_text !~* '(\yseld\y|\yseldar\y|\yseldur\y|\ysold\y|\yfrátekin\y|\yfrátekið\y)'::text) AND NOT (EXISTS ( SELECT 1
-           FROM scraper.listing_tvitok tv
-          WHERE tv.listing_id = l.listing_id));
+           FROM scraper.v_tvitok_falin tf
+          WHERE tf.listing_id = l.listing_id));
 
 CREATE OR REPLACE VIEW scraper.v_leit_listings AS
  SELECT l.listing_id,
@@ -139,7 +178,7 @@ CREATE OR REPLACE VIEW scraper.v_leit_listings AS
   WHERE l.status = 'active'::text AND NOT (EXISTS ( SELECT 1
            FROM scraper.listing_lifecycle_events e
           WHERE e.source = l.source AND e.source_listing_id = l.source_listing_id AND e.event_type = 'withdrawn_confirmed'::scraper.lifecycle_event_enum)) AND NOT (EXISTS ( SELECT 1
-           FROM scraper.listing_tvitok tv
-          WHERE tv.listing_id = l.listing_id));
+           FROM scraper.v_tvitok_falin tf
+          WHERE tf.listing_id = l.listing_id));
 
 COMMIT;

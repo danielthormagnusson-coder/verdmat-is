@@ -1,4 +1,4 @@
--- Rollback 20261021090000_cc267_tvitok_sottkvi: lesfletirnir aftur í gerð 20.10.2026 (pg_get_viewdef) + tafla felld.
+-- Rollback 20261021090000_cc267_tvitok_sottkvi: lesfletirnir aftur í gerð 20.10.2026 (pg_get_viewdef), sóttkvíarsýn og tafla felld.
 BEGIN;
 SET TRANSACTION READ WRITE;
 
@@ -106,6 +106,7 @@ CREATE OR REPLACE VIEW scraper.v_leit_listings AS
            FROM scraper.listing_lifecycle_events e
           WHERE e.source = l.source AND e.source_listing_id = l.source_listing_id AND e.event_type = 'withdrawn_confirmed'::scraper.lifecycle_event_enum));
 
+DROP VIEW scraper.v_tvitok_falin;
 DROP TABLE scraper.listing_tvitok;
 
 COMMIT;
