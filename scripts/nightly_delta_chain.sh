@@ -226,12 +226,40 @@ run_mode() {                  # $1 mode, $2 state key, $3 since key
   return 0
 }
 
+# ── cc267 f.3: höfuðganga sölu (newest-first, ≤5 síður) á undan FIFO delta-sale ──
+# Eigin state-lykill (head_sale); snertir ALDREI delta_sale-bendilinn. Kill-switch/villa = abort eins
+# og önnur sóknarþrep (abort-not-retry) — mbl-throttle á ekki að halda áfram í delta-sale.
+run_head() {
+  if [ $DRY -eq 1 ]; then
+    echo "[dry-run] would run: python $APP/scripts/fetch_mbl.py --mode head-sale"
+    return 0
+  fi
+  local mlog=$MODELOGS/head_sale_${TS}.log
+  python $APP/scripts/fetch_mbl.py --mode head-sale > "$mlog" 2>&1
+  local rc=$?
+  local summary
+  summary=$(grep -E "head done" "$mlog" | tail -1 | sed 's/^ *//')
+  local st
+  st=$(state_line head_sale last_newest)
+  say "head-sale: exit=$rc ${summary:-<no head-done line>} $st"
+  if [ $rc -ne 0 ]; then
+    say "ABORT chain at head-sale (exit $rc) — NO RETRY (abort-not-retry)"
+    return 1
+  fi
+  echo "$st" | grep -q "halt_reason=None" || {
+    say "ABORT chain at head-sale (halt_reason set) — NO RETRY"
+    return 1
+  }
+  return 0
+}
+
 # ── night totals (pages + listings fetched since chain start, per kind) ──────
 night_totals() {
   python - "$RAWDB" "$CHAIN_START" <<'PY'
 import gzip, json, sqlite3, sys
 rawdb, since = sys.argv[1], sys.argv[2]
-kinds = {"list_page_sale": "delta-sale", "list_page_rent": "delta-rent",
+kinds = {"list_page_sale_head": "head-sale",
+         "list_page_sale": "delta-sale", "list_page_rent": "delta-rent",
          "list_page_sale_negotiable_delta": "delta-sale-negotiable",
          "list_page_rent_negotiable_delta": "delta-rent-negotiable"}
 c = sqlite3.connect("file:%s?mode=ro" % rawdb.replace("\\", "/"), uri=True)
@@ -377,6 +405,8 @@ if [ $PRERC -ne 0 ]; then
 fi
 
 # §6-A.5 rule 1: delta always runs first / is the whole v1 night. Serial, gated.
+# cc267 f.3: nýjustu sölurnar fyrst, svo FIFO-halinn — ein hrina lokar þá ekki á nýjar auglýsingar.
+run_head                                                          || chain_fail "head-sale" 1
 run_mode delta-sale            delta_sale            last_br_dags_seen  || chain_fail "delta-sale" 1
 run_mode delta-rent            delta_rent            last_updated_seen  || chain_fail "delta-rent" 1
 run_mode delta-sale-negotiable delta_sale_negotiable last_br_dags_seen  || chain_fail "delta-sale-neg" 1

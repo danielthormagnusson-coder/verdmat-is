@@ -858,5 +858,88 @@ class TestCc204ResyncSale(unittest.TestCase):
         os.remove(f3.state_path)
 
 
+class HeadHasura:
+    """cc267: þjónar fs_fasteign newest-first eftir keyset-bendli úr fyrirspurninni (created desc, eign_id desc)."""
+    def __init__(self, rows):
+        self.rows = sorted(rows, key=lambda r: (r["created"], r["eign_id"]), reverse=True)
+        self.served = []
+
+    def __call__(self, q, i):
+        since = re.search(r'created:\{_gte:"([^"]+)"\}', q).group(1)
+        m = re.search(r'\{created:\{_lt:"([^"]+)"\}\},\{created:\{_eq:"[^"]+"\}, eign_id:\{_lt:(\d+)\}\}', q)
+        out = [r for r in self.rows if r["created"] >= since
+               and (m is None or (r["created"], r["eign_id"]) < (m.group(1), int(m.group(2))))][:fm.PAGE]
+        self.served.extend(out)
+        return FakeResp(200, body({"data": {"fs_fasteign": out}}))
+
+
+class TestHeadSale(unittest.TestCase):
+    def _rows(self, n, start_h=1):
+        from datetime import datetime, timedelta, timezone
+        t = datetime.now(timezone.utc)
+        return [{"eign_id": 1900000 + i, "created": (t - timedelta(minutes=10 * i + 60 * (start_h - 1))).strftime(
+                 "%Y-%m-%dT%H:%M:%S+00:00"), "br_dags": "2026-10-20T00:00:00+00:00"} for i in range(n)]
+
+    def _run(self, rows, st, max_pages=fm.HEAD_MAX_PAGES):
+        conn = mem_conn()
+        mock = HeadHasura(rows)
+        f = fetcher(FakeSession(mock), conn, st, mode="head-sale")
+        f.max_pages = max_pages
+        f.run()
+        return f, conn, mock
+
+    # h1) síðuþak: 200 nýjar raðir -> nákvæmlega 5 síður, newest-first, hver röð einu sinni; delta_sale ÓSNERT
+    def test_h1_cap_newest_first_delta_untouched(self):
+        rows = self._rows(200)
+        st = fm.default_state()
+        st["delta_sale"].update({"last_br_dags_seen": "2026-10-15T19:20:27+00:00", "cursor_pk": 1815257,
+                                 "cursor_ts": "2026-10-15T19:20:27+00:00"})
+        before = json.dumps(st["delta_sale"], sort_keys=True)
+        f, conn, mock = self._run(rows, st)
+        self.assertEqual(f.stats.pages, 5)
+        ids = [r["eign_id"] for r in mock.served]
+        self.assertEqual(ids, [1900000 + i for i in range(80)])
+        self.assertEqual(json.dumps(st["delta_sale"], sort_keys=True), before)
+        self.assertEqual((st["head_sale"]["last_pages"], st["head_sale"]["last_rows"]), (5, 80))
+        self.assertEqual(conn.execute("SELECT DISTINCT fetch_kind FROM raw_fetches").fetchall(),
+                         [("list_page_sale_head",)])
+
+    # h2) gluggi: raðir eldri en HEAD_HOURS eru ekki sóttar; hálf síða stöðvar án auka-beiðni
+    def test_h2_window_and_short_page_stop(self):
+        rows = self._rows(20) + self._rows(30, start_h=fm.HEAD_HOURS + 2)
+        f, conn, mock = self._run(rows, fm.default_state())
+        self.assertEqual(len(mock.served), 20)
+        self.assertEqual(f.stats.pages, 2)                   # 16 + 4, engin þriðja beiðni
+        self.assertEqual(len(f.s.queries), 2)
+
+    # h3) fyrirspurnarsnið: sama forsögn og delta-sale, bendill í _and (draft ber top-level _or), list order_by
+    def test_h3_query_shape(self):
+        cfg = fm.MODECFG["head-sale"]
+        self.assertIn("head-sale", fm.MODE_CHOICES)
+        self.assertEqual(cfg["draft"], fm.MODECFG["delta-sale"]["draft"])
+        self.assertTrue(cfg["kind"].startswith("list_page_sale"))
+        q = fm.head_query(cfg, "2026-10-18T00:00:00+00:00", "2026-10-20T10:00:00+00:00", 1900010)
+        self.assertEqual(q.count("_or:["), 2)                # bendill + SALE_DOMESTIC, ekki tvöfaldur lykill í sama hlut
+        self.assertIn('_and:[{_or:[{created:{_lt:"2026-10-20T10:00:00+00:00"}}', q)
+        self.assertIn("order_by:[{created:desc},{eign_id:desc}]", q)
+        self.assertNotIn("offset", q)
+
+    # h5) CLI-þak: --max-pages 400 (sjálfgefið) gefur samt ≤ 10 síður í head-sale; aðrir hamir óbreyttir
+    def test_h5_cli_cap(self):
+        self.assertLessEqual(fm.effective_max_pages("head-sale", fm.DEFAULT_MAX_PAGES), 10)
+        self.assertLessEqual(fm.effective_max_pages("head-sale", 100), 10)
+        self.assertEqual(fm.effective_max_pages("head-sale", 3), 3)
+        self.assertEqual(fm.effective_max_pages("delta-sale", 100), 100)
+
+    # h4) falspróf: höfuðgangan skrifar ALDREI í delta-lykla, líka við kill-switch
+    def test_h4_killswitch_sets_own_halt_only(self):
+        st = fm.default_state()
+        f = fetcher(FakeSession(lambda q, i: FakeResp(429)), mem_conn(), st, mode="head-sale")
+        with self.assertRaises(fm.KillSwitch):
+            f.run()
+        self.assertIn("429", st["head_sale"]["halt_reason"])
+        self.assertIsNone(st["delta_sale"]["halt_reason"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

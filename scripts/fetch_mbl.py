@@ -27,6 +27,7 @@ CLI:
   python fetch_mbl.py --mode resume                          # continue in-flight seed/delta
   python fetch_mbl.py --mode resync-sale --since X --until Y --max-pk Z   # cc204 A4: bounded re-fetch
                                                              # of a cap-skipped window (own state key)
+  python fetch_mbl.py --mode head-sale                       # cc267: newest-first <=5 pages, own state key
 
 deps: stdlib + requests + canonicalize_mbl.
 """
@@ -150,12 +151,24 @@ MODECFG = {
     "resync-sale": {"key": "resync_sale", "root": "fs_fasteign", "pk": "eign_id", "fields": SALE_FIELDS,
                    "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC,
                    "kind": "list_page_sale_resync", "op": "resync_sale", "delta_field": "br_dags"},
+    # cc267 f.3 HÖFUÐGANGA: lítil newest-first sókn (created desc, eign_id desc) á undan delta-sale, svo
+    # NÝJAR söluauglýsingar komist inn þótt FIFO-biðröð delta-sale sé löng (15.10: ~11.200 mbl-tvítök
+    # lokuðu bendlinum í 5+ nætur, 0 ný verðsett sala — SKIL_CC265 §3). Sama forsögn og delta-sale +
+    # `created >= now - HEAD_HOURS`. EIGIN state-lykill (head_sale) — les hvorki né skrifar delta_sale,
+    # svo FIFO-bendillinn er óbreyttur; þegar hann nær sömu röðum síðar eru þær sóttar aftur (sama
+    # content_hash = engin ný blob, parse er DELETE+INSERT per auðkenni = sama röð). fetch_kind ber
+    # list_page_sale-forskeytið, svo parse_mbl tekur blöðin óbreytt.
+    "head-sale": {"key": "head_sale", "root": "fs_fasteign", "pk": "eign_id", "fields": SALE_FIELDS,
+                   "draft": "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC,
+                   "kind": "list_page_sale_head", "op": "head_sale", "head_field": "created"},
 }
+HEAD_MAX_PAGES = 5                # 80 raðir; ein sölunótt hefur ~50–150 nýjar verðsettar (cc267 §3)
+HEAD_HOURS = 48
 
 # --mode choices (kept module-level so tests assert on it without invoking main()/the DB).
 MODE_CHOICES = ["seed-sale", "seed-rent", "seed-sale-negotiable", "seed-rent-negotiable",
                 "delta-sale", "delta-rent", "delta-sale-negotiable", "delta-rent-negotiable",
-                "aggregate-check", "resume", "resync-sale"]
+                "aggregate-check", "resume", "resync-sale", "head-sale"]
 
 
 class KillSwitch(RuntimeError):
@@ -218,6 +231,9 @@ def default_state() -> dict:
         # cc204 A4: per-window resync cursors, keyed "since|until|max_pk". Never consulted by the
         # delta modes, the chain preflight, prime_delta_since or resume().
         "resync_sale": {"windows": {}, "last_run_at": None, "halt_reason": None},
+        # cc267 f.3: höfuðgangan ber engan bendil milli nátta (gluggi = now - HEAD_HOURS), aðeins skýrslu.
+        "head_sale": {"last_run_at": None, "last_pages": 0, "last_rows": 0, "last_newest": None,
+                      "last_oldest": None, "halt_reason": None},
         "session_request_count": 0,
     }
 
@@ -324,6 +340,27 @@ def validate_resync_args(mode, since, until, max_pk):
     if int(max_pk) <= 0:
         return "--max-pk must be a positive pk"
     return None
+
+
+def effective_max_pages(mode, requested):
+    """cc267 f.3: höfuðgangan er alltaf lítil — HEAD_MAX_PAGES gildir líka þótt --max-pages sé hærra
+    (keðjan kallar með DELTA_MAX_PAGES=100 á aðra hami; 100 síður hér væru 200 mín á undan delta-sale)."""
+    return min(requested, HEAD_MAX_PAGES) if mode == "head-sale" else requested
+
+
+def head_where(cfg, since, before_ts=None, before_pk=None):
+    """cc267 f.3: keyset newest-first — raðir STRANGT á undan (before_ts, before_pk) í (created desc, pk desc),
+    takmarkaðar við created >= since. Bendillinn er í `_and` (draft ber top-level `_or`, SALE_DOMESTIC)."""
+    f, pk = cfg["head_field"], cfg["pk"]
+    cursor = ("" if before_ts is None else
+              '{_or:[{%s:{_lt:"%s"}},{%s:{_eq:"%s"}, %s:{_lt:%d}}]}, ' % (f, before_ts, f, before_ts, pk, int(before_pk)))
+    return '_and:[%s{%s:{_gte:"%s"}}], %s' % (cursor, f, since, cfg["draft"])
+
+
+def head_query(cfg, since, before_ts=None, before_pk=None):
+    return ('query { %s(where:{%s}, order_by:[{%s:desc},{%s:desc}], limit:%d) { %s } }'
+            % (cfg["root"], head_where(cfg, since, before_ts, before_pk), cfg["head_field"], cfg["pk"],
+               PAGE, cfg["fields"]))
 
 
 def max_id_query(cfg):
@@ -630,6 +667,48 @@ class MblFetcher:
         if capped:
             self.log("  framhald: re-run the same --since/--until/--max-pk to continue from the cursor")
 
+    # ── head (cc267 f.3): newest-first, ≤ max_pages, own state, never touches delta_sale ──
+    def _head(self, mode):
+        cfg = MODECFG[mode]
+        key = cfg["key"]
+        self._active_key = key
+        st = self.state.setdefault(key, default_state()[key])
+        since = datetime.fromtimestamp(time.time() - HEAD_HOURS * 3600, timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S+00:00")
+        self.log("=== %s (created >= %s, max %d pages) ===" % (mode, since, self.max_pages))
+        before_ts = before_pk = None
+        pages = rows_n = 0
+        newest = oldest = None
+        while pages < self.max_pages:
+            q = head_query(cfg, since, before_ts, before_pk)
+            if self.dry_run:
+                self.log("  [dry-run] %s  ::  %s" % (synthetic_url(cfg["op"], since=since), q[:90] + "..."))
+                break
+            if pages > 0:
+                self._sleep(self.min_spacing)
+            status, body, ctype, data = self._gql(
+                q, ctx="%s page=%d before=(%s,%s)" % (cfg["op"], pages, before_ts, before_pk))
+            rows = data["data"][cfg["root"]]
+            if not rows:
+                break
+            self._record_page(body, ctype, status, cfg["kind"], synthetic_url(cfg["op"], since=since), len(rows))
+            pages += 1
+            rows_n += len(rows)
+            newest = newest or rows[0].get(cfg["head_field"])
+            last = rows[-1]
+            nxt_ts, nxt_pk = last.get(cfg["head_field"]), last.get(cfg["pk"])
+            if not nxt_ts or nxt_pk is None:
+                self.log("  !! last row of page %d has no (%s, %s) — stop" % (pages, cfg["head_field"], cfg["pk"]))
+                break
+            before_ts, before_pk, oldest = str(nxt_ts), int(nxt_pk), str(nxt_ts)
+            if len(rows) < PAGE:
+                break
+        st.update({"last_run_at": now_iso(), "last_pages": pages, "last_rows": rows_n,
+                   "last_newest": newest, "last_oldest": oldest, "halt_reason": None})
+        self._save()
+        self.log("  head done — %d pages, %d rows, created %s .. %s%s"
+                 % (pages, rows_n, newest, oldest, " (síðuþak)" if pages >= self.max_pages else ""))
+
     # ── aggregate-check (1 request, no writes) ──
     def aggregate_check(self):
         self.log("=== aggregate-check (1 request, no writes) ===")
@@ -678,6 +757,8 @@ class MblFetcher:
             return self.aggregate_check()
         if mode == "resync-sale":
             return self._resync(mode)
+        if mode == "head-sale":
+            return self._head(mode)
         raise ValueError("unknown mode %r" % mode)
 
     def run(self):
@@ -719,7 +800,8 @@ def main():
     conn.execute("PRAGMA foreign_keys=ON")
     session = requests.Session()
     session.headers.update({"User-Agent": UA})
-    f = MblFetcher(session, conn, state, args.state_file, mode=args.mode, max_pages=args.max_pages,
+    max_pages = effective_max_pages(args.mode, args.max_pages)
+    f = MblFetcher(session, conn, state, args.state_file, mode=args.mode, max_pages=max_pages,
                    min_spacing=args.min_spacing_sec, dry_run=args.dry_run,
                    force_restart=args.force_restart,
                    resync_since=args.since, resync_until=args.until, resync_max_pk=args.max_pk)

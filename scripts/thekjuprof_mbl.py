@@ -20,6 +20,15 @@ scraper.thekjuprof per keyrsla + ein lína í night_logs/night_YYYYMMDD.log.
      (f*10..f*10+9) EÐA undir einhverju korta-auðkenni? Ef ekki → draugur. 8 fastnum per
      beiðni; skili beiðni 16 röðum (Hasura-þakið) eru ófundnir í henni ÓVÍSIR og utan nefnara.
 
+(d) FERSKLEIKI (cc267, DB-eingöngu, 0 mbl-beiðnir) — það sem (a) er blint á: (a) mælir aðeins
+     br_dags < bendill og sá því gap=0 18.–20.10 meðan 5 dagar af nýrri sölu sátu EFTIR bendlinum.
+     d1 bendilaldur = now − cursor_sale (klst).            mælt 21.9.–15.10 kl. 07:15: ≤ 6,3; 16.10: 12,7; 17.10: 36,5
+     d2 einkvæmar eignir meðal nýrra verðsettra söluraða síðasta sólarhring (discovered_at).
+                                                          mælt 25.9.–15.10: 231–897/dag; 17.–20.10: 5
+     d3 mest raðir á EINA eign (fastnum/heimilisfang) síðasta sólarhring, sala+leiga.
+                                                          mælt 25.9.–15.10: ≤ 45; 16.–20.10: 320–1.595
+     Gildin fara í upplysingar.ferskleiki (engin skemabreyting) og í vidvorun.
+
 Viðvörun (vidvorun-dálkur + „VIÐVÖRUN" í night-log): gap_n > GAP_ALERT eða draugar >
 DRAUG_ALERT_PCT % af nefnara. Viðvörun fellir ekki keyrsluna (exit 0).
 
@@ -60,6 +69,10 @@ N_SAMPLE_PAGES = 4
 PAGE = 16
 DRAUG_N = 32
 DRAUG_PER_REQ = 8
+# cc267 (d) — þröskuldar settir EFTIR mælingu dreifingarinnar (sjá docstring + SKIL_CC267 §5)
+BENDILL_ALERT_KLST = 10.0  # venjulegt ≤ 6,3
+NYJAR_EIGNIR_MIN = 100     # venjulegt ≥ 231
+TVITAK_RADIR_MAX = 100     # venjulegt ≤ 45
 PRICED = "syna:{_eq:true}, verd:{_gt:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC
 NEGOT = "syna:{_eq:true}, verd:{_eq:0}, fermetrar:{_gt:0}, " + SALE_DOMESTIC
 # sölu-rót okkar megin (sama greinir og lifecycle_sweep_mbl.load_active_ids): leigu-borðið
@@ -99,6 +112,25 @@ def agg(where):
     return "fs_fasteign_aggregate(where:{%s}) { aggregate { count } }" % where
 
 
+def ferskleiki(pg, cur_sale, now=None):
+    """cc267 (d): þrjár DB-mælingar án mbl-beiðna. Skilar dict sem fer í upplysingar.ferskleiki."""
+    now = now or now_utc()
+    bendill = datetime.fromisoformat(str(cur_sale).replace("Z", "+00:00"))
+    with pg.cursor() as c:
+        c.execute("""SELECT count(*), count(DISTINCT coalesce(fastnum::text, lower(addr_text)))
+                       FROM scraper.listings WHERE source='mbl' AND tenure='sale' AND NOT is_price_on_request
+                        AND discovered_at >= %s - interval '24 hours'""", (now,))
+        n_rad, n_eign = c.fetchone()
+        c.execute("""SELECT coalesce(fastnum::text, 'addr:' || lower(addr_text)), tenure, count(*) n
+                       FROM scraper.listings WHERE source='mbl' AND discovered_at >= %s - interval '24 hours'
+                      GROUP BY 1, 2 ORDER BY n DESC LIMIT 1""", (now,))
+        top = c.fetchone()
+    return {"bendill_aldur_klst": round((now - bendill).total_seconds() / 3600.0, 1),
+            "nyjar_verds_sala_radir_24h": n_rad, "nyjar_verds_sala_eignir_24h": n_eign,
+            "mest_radir_a_eign_24h": top[2] if top else 0,
+            "mest_radir_eign": ("%s %s" % (top[1], top[0])) if top else None}
+
+
 def measure(pg, tr, log, seed):
     rnd = random.Random(seed)
     cur_sale, cur_neg = load_cursors()
@@ -113,6 +145,13 @@ def measure(pg, tr, log, seed):
                   "WHERE v.source='mbl' AND v.fastnum IS NOT NULL AND " + SALE_ROOT.replace('%%', '%') + " "
                   "GROUP BY v.fastnum ORDER BY v.fastnum")
         cards = c.fetchall()
+
+    # ── (0) ferskleiki (cc267, DB-eingöngu) ──
+    fersk = ferskleiki(pg, cur_sale)
+    info["ferskleiki"] = fersk
+    log("(0) FERSKLEIKI: bendill %.1f klst | nýjar verðs. sölur 24h %d raðir / %d eignir | mest %d raðir á %s"
+        % (fersk["bendill_aldur_klst"], fersk["nyjar_verds_sala_radir_24h"], fersk["nyjar_verds_sala_eignir_24h"],
+           fersk["mest_radir_a_eign_24h"], fersk["mest_radir_eign"]))
 
     # ── (1) universe + lægsta eign_id gluggans ──
     seen_priced = 'br_dags:{_lt:"%s"}, %s' % (cur_sale, PRICED)
@@ -216,7 +255,24 @@ def alerts(m):
         out.append("gap %d > %d" % (m["gap_n"], GAP_ALERT))
     if m["draug_nefnari"] and 100.0 * m["draug_n"] / m["draug_nefnari"] > DRAUG_ALERT_PCT:
         out.append("draugar %.1f %% > %.0f %%" % (100.0 * m["draug_n"] / m["draug_nefnari"], DRAUG_ALERT_PCT))
+    out.extend(ferskleika_vidvaranir(m["upplysingar"].get("ferskleiki")))
     return "; ".join(out) or None
+
+
+def ferskleika_vidvaranir(f):
+    """cc267 (d): hreint fall (prófað á mældri sögu 25.9.–20.10 í thekjuprof_mbl_test)."""
+    if not f:
+        return []
+    out = []
+    if f["bendill_aldur_klst"] > BENDILL_ALERT_KLST:
+        out.append("sölubendill %.1f klst gamall > %.0f" % (f["bendill_aldur_klst"], BENDILL_ALERT_KLST))
+    if f["nyjar_verds_sala_eignir_24h"] < NYJAR_EIGNIR_MIN:
+        out.append("aðeins %d nýjar verðsettar söluauglýsingar (eignir) á 24 klst < %d"
+                   % (f["nyjar_verds_sala_eignir_24h"], NYJAR_EIGNIR_MIN))
+    if f["mest_radir_a_eign_24h"] > TVITAK_RADIR_MAX:
+        out.append("%d nýjar raðir á eina eign á 24 klst > %d (%s) — tvítakahrina?"
+                   % (f["mest_radir_a_eign_24h"], TVITAK_RADIR_MAX, f.get("mest_radir_eign")))
+    return out
 
 
 def write_row(dsn, m, beidnir, vidvorun, dags):

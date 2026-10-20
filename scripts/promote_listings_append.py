@@ -70,6 +70,7 @@ from promote_mbl import (  # noqa: E402  reuse identical resolution logic
     parse_agency, AGENCY_COLS,
 )
 from scraper_paths import get_scraper_data_dir  # noqa: E402
+from tvitak_regla import flokka as flokka_tvitok, REGLA_VERSION as TVITAK_REGLA  # noqa: E402  cc267
 
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
 PROMOTER_VERSION = "listings_append_v2"
@@ -300,6 +301,33 @@ def write_batch(pg, records, log=print):
     return len(rows), len(ph), changed_fastnums
 
 
+def tvitok_ad_merkja(all_recs, merkt_slid):
+    """cc267 f.4: (tvítak_slid, frumrit_slid) fyrir hvert tvítak í ÖLLUM corpus sem er ekki þegar í sóttkví.
+    Reglan er tvitak_regla.flokka (eitt fall) á allan corpus, svo klasi sem nær yfir tvær nætur
+    þekkist og frumrit helst það sama (elsta röð klasans)."""
+    m = flokka_tvitok(all_recs, audkenni="source_listing_id")
+    return [(str(t), str(f)) for t, f in m.items() if str(t) not in merkt_slid]
+
+
+def merkja_tvitok(pg, pairs):
+    """cc267 f.4: INSERT í scraper.listing_tvitok (sóttkví — raðirnar í listings standa). Sér færsla EFTIR
+    listings-skrifin, svo nýju raðirnar eiga listing_id. ON CONFLICT DO NOTHING = endurkeyrsla örugg."""
+    if not pairs:
+        return 0
+    pg.rollback()
+    cur = pg.cursor()
+    cur.execute("SET TRANSACTION READ WRITE")
+    ret = execute_values(cur,
+        "INSERT INTO scraper.listing_tvitok (listing_id, frumrit_listing_id, regla_version, merkt_af) "
+        "SELECT t.listing_id, f.listing_id, v.regla, v.af FROM (VALUES %s) v(t_slid, f_slid, regla, af) "
+        "JOIN scraper.listings t ON t.source = 'mbl' AND t.source_listing_id = v.t_slid "
+        "JOIN scraper.listings f ON f.source = 'mbl' AND f.source_listing_id = v.f_slid "
+        "ON CONFLICT (listing_id) DO NOTHING RETURNING listing_id",
+        [(t, f, TVITAK_REGLA, PROMOTER_VERSION) for t, f in pairs], page_size=1000, fetch=True)
+    pg.commit()
+    return len(ret)
+
+
 def run(limit, dry_run=False, log=print):
     sq = sqlite3.connect(str(parsed_db_path()))
     sq.row_factory = sqlite3.Row
@@ -349,7 +377,18 @@ def run(limit, dry_run=False, log=print):
         cur = pg.cursor()
         cur.execute("SELECT source_listing_id, unit_key FROM scraper.listings WHERE source='mbl'")
         db_units = {row[0]: row[1] for row in cur.fetchall()}
+        # cc267 f.4: tvítakavörn virk aðeins ef sóttkvíartaflan er til (migration cc267 = GO-hliðið)
+        cur.execute("SELECT to_regclass('scraper.listing_tvitok') IS NOT NULL")
+        tv_virk = cur.fetchone()[0]
+        merkt_slid = set()
+        if tv_virk:
+            cur.execute("SELECT l.source_listing_id FROM scraper.listing_tvitok t "
+                        "JOIN scraper.listings l ON l.listing_id = t.listing_id WHERE l.source='mbl'")
+            merkt_slid = {row[0] for row in cur.fetchall()}
         pg.rollback()  # close read-tx; next write-tx SET READ WRITE stays first stmt
+        tv_pairs = tvitok_ad_merkja(all_recs, merkt_slid)
+        log(f"  tvítök ({TVITAK_REGLA}): {len(tv_pairs)} ómerkt í corpus (þegar í sóttkví {len(merkt_slid)}; "
+            f"vörn {'VIRK' if tv_virk else 'ÓVIRK — scraper.listing_tvitok ekki til'})")
         n_delta = n_drift = n_missing = 0
         write_recs = []
         for r in all_recs:
@@ -391,6 +430,9 @@ def run(limit, dry_run=False, log=print):
                 f"-> {state_path().name}")
         else:
             log("  --limit run: watermark NOT advanced")
+        if tv_virk and limit is None:  # --limit = hluti corpus -> frumrit gæti verið utan hans
+            n_tv = merkja_tvitok(pg, tv_pairs)
+            log(f"  tvítök sett í sóttkví: {n_tv} (scraper.listing_tvitok)")
         save_changed_fastnums(changed)
         log(f"  changed fastnums={len(changed)} -> {CHANGED_FILE} (cc210 revalidate)")
         log(f"  wrote listings rows={nL}, price_history rows={nP} ({time.perf_counter()-t0:.1f}s)")
