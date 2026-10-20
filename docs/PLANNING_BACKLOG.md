@@ -1890,3 +1890,8 @@ sé endurvakinn á skoðun einni.
     4. Endurmæla stuðlaskrá/krass-hópa á eftir, sbr. cc244 (b).
   - **Valkostur utan iter5 (bíður Danna):** hæð krassins á 91 óskiptu fastnr. þar sem allar íbúðar-merkingar eru á sömu hæð. cc263 gefur þeim „óþekkt hæð“ (sama fall og cc262). Ein lína: einkvæmni á hæð í stað merkingar.
   - Fundur: `D:\_audit\cc263_merking_gagnalag\SKIL_CC263.md` §2.
+
+- **cc263 (ákv. 2) — RAÐHÚS/EINBÝLI ÁN NÚMERS Í NÝBYGGINGARTÖFLUNNI: MÆLA HVE MÖRG DEILA STAÐFANGI MEÐ SYSTKINUM (bókað 20.10, cc263; ákvörðun arkitekts: NEI í bili).** 411 raðir í `semantic.nybygging_einingar` (keyrsla 25) hafa `merking` NULL eftir cc263 f.1, því notkun matseiningar er „Raðhús"/„Einbýlishús"/„Parhús", ekki „íbúð" (regla cc262 `lib/ibudarnumer.ts`). Framendinn hefur ekki sýnt númer á þeim síðan cc262.
+  - Rök fyrir NEI: raðhús/einbýli bera eigið húsnúmer í heimilisfangi, svo einingin er auðkennd án númers.
+  - Verk: telja hve mörg af 411 deila (heimilisfang, postnr) með annarri einingu í töflunni. Aðeins þar þarf númer. Ef fjöldinn er > 0 þarf að víkka regluna (notkun) á BÁÐUM stöðum: `cc224_nybygging_verkefni.py` og `lib/ibudarnumer.ts`.
+  - Fundur: `D:\_audit\cc263_merking_gagnalag\SKIL_CC263.md` §1, `f1_breyttar_radir_flokkad.csv`.

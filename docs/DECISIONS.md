@@ -4,6 +4,22 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-20 — Hæð krassins, númer raðhúsa og iter5-regla unit_category (cc263) — **ákvarðanir arkitekts 20.10; verdmat-ai cc263b (3c07a86, grein cc263b), ópushað (HALT fyrir push); ekkert birt grunnmat breytt**
+
+1. **JÁ — einkvæmni á HÆÐ, ekki merkingu, í hliðun krassins.** Óskipt fastanúmer þar sem allar íbúðar-merkingar eru á sömu hæð fá þá hæð. Dæmi: Sunnuvegur 25, 010101 + 010102 → 1. hæð.
+   - Ólíkar hæðir (Stýrimannastígur 5: 010001 + 010101) eða engin íbúðar-matseining gefa áfram óþekkta hæð.
+   - Sían er sú sama og fyrir íbúðarnúmer (cc262): eigið fastnr., 6 stafir, notkun ber „íbúð". Útfært sem `lib/ibudarnumer.ts` `ibudarHaed`.
+   - Mælt 20.10: af 91 slíku fastnr. í krass-mengi fá 88 hópinn aftur. Hinar 3 (2 ris, 1 kjallari) bera hóp úr `canonical_code` óháð hæð.
+   - Skipti miðað við cc258: 892 → 804 af 99.700. `EIGN_CACHE_UTGAFA` cc263 → cc263b.
+2. **NEI í bili — engin íbúðarnúmer á raðhús/einbýli í nýbyggingartöflunni.** Þau bera eigið húsnúmer.
+   - 411 raðir í `semantic.nybygging_einingar` (keyrsla 25) eru án merkingar, því notkun matseiningar er „Raðhús" o.s.frv., ekki „íbúð".
+   - Backlog: mæla hve mörg deila staðfangi með systkinum. Aðeins þá þarf númer.
+3. **iter5-reglan fyrir `unit_category`, `merking_floor` og óskipt fastnúmer ákveðst í iter5-lotunni sjálfri**, eftir mælingu á endursölupörum (backlog „cc263 (f.2)"). Ekkert gert núna.
+
+Skil: `D:\_audit\cc263_merking_gagnalag\SKIL_CC263.md` (§2, §3, viðauki cc263b).
+
+---
+
 ## 2026-10-17 — Krass v2: krónur, fermetrar, hliðun eftir gerð/hæð (cc257 → cc258) — **ákvarðanir arkitekts 16.10 23:49; verdmat-ai cc258 (e5d1176, grein cc258), ópushað (HALT fyrir push); ekkert birt grunnmat breytt**
 
 1. **Ástandslínur í krónum, ekki %.** Eldhús/bað/gólf „Uppgert“ sýna „um X m.kr.“ með 95 % bili: eldhús 1,3 [0,6; 2,1], bað 1,2 [0,6; 1,8], gólf 1,4 [0,7; 2,1] m.kr. (cc257 §A1, föst kr, hlutáhrif, P1-stýrt, 5.324 endursölupör án lánþega; θ ≈ 0,25 nálgað sem föst kr). Föst skýring: „Verðmunur sem fylgir „uppgert“ í sölum — ekki kostnaður við endurbætur.“ Tala áfram aðeins við val notanda (v1.5).
