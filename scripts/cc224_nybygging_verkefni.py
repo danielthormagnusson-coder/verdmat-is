@@ -118,8 +118,14 @@ def lesa(c):
     P = pd.read_sql(f"""
         select p.fastnum, p.heimilisfang, p.postnr, p.postheiti, p.sveitarfelag, p.einflm, p.byggar, p.fjherb, p.fullbuid,
                p.byggingarstig, p.matsstig, p.landeign_nr, p.lat, p.lng,
-               (select m->>'merking' from jsonb_array_elements(case when jsonb_typeof(p.matseiningar)='array'
-                        then p.matseiningar else '[]'::jsonb end) m where (m->>'fastnum')::bigint = p.fastnum limit 1) merking,
+               -- cc263: merking ÍBÚÐAR-matseiningarinnar (sama regla og verdmat-ai lib/ibudarnumer.ts, cc262): eigið
+               -- fastnr., 6 stafir, notkun ber „íbúð"; nákvæmlega 1 ólík → hún, annars NULL (óskipt). Áður fyrsta
+               -- matseining í blindni (limit 1 án röðunar) → 323 fastnr. báru bílskúrs-/stæðismerkingu.
+               (select case when count(distinct btrim(m->>'merking')) = 1 then min(btrim(m->>'merking')) end
+                  from jsonb_array_elements(case when jsonb_typeof(p.matseiningar)='array'
+                        then p.matseiningar else '[]'::jsonb end) m
+                 where (m->>'fastnum')::bigint = p.fastnum and btrim(m->>'merking') ~ '^[0-9]{{6}}$'
+                   and m->>'notkun_texti' ilike '%%íbúð%%') merking,
                (select count(*) from jsonb_array_elements(case when jsonb_typeof(p.matseiningar)='array'
                         then p.matseiningar else '[]'::jsonb end) m
                  where (m->>'fastnum')::bigint = p.fastnum and m->>'notkun_texti' ilike 'Íbúð%%') n_ibud_hms,
