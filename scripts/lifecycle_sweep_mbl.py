@@ -88,6 +88,7 @@ from fetch_mbl import (  # noqa: E402  reuse the exact transport + kill-switch d
     MIN_SPACING_FLOOR, KillSwitch, _is_captcha,
 )
 from scraper_paths import get_scraper_data_dir, get_raw_db_path  # noqa: E402
+from tvitok_falin import endurreikna as endurreikna_tvitok_falin  # noqa: E402  cc276
 
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
 SWEEP_VERSION = "lifecycle_sweep_mbl_v1"
@@ -415,7 +416,10 @@ def write_events(conn, events, log=print, found=()):
         return
     for attempt in range(1, len(WRITE_BACKOFF_S) + 2):
         try:
-            return _write_events_once(conn, rows, terminal, found, log)
+            out = _write_events_once(conn, rows, terminal, found, log)
+            if rows:
+                _endurreikna_tvitok_falin(conn, log)
+            return out
         except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
             # The transaction is gone with the socket, so nothing was committed and a
             # full retry is safe. The one ambiguous case — connection lost after the
@@ -431,6 +435,22 @@ def write_events(conn, events, log=print, found=()):
                 % (type(exc).__name__, delay, attempt, len(WRITE_BACKOFF_S) + 1))
             time.sleep(delay)
             conn.reconnect()
+
+
+def _endurreikna_tvitok_falin(conn, log):
+    """cc276: atburðir (withdrawn_confirmed / confirmed_absent_1) og status eru inntök sóttkvíarreglunnar
+    (elsta LIFANDI eintak klasans birtist) — efnisgerða mengið scraper.tvitok_falin er endurreiknað eftir
+    hver skrif. Best-effort: atburðirnir eru þegar vistaðir og vikulegur sópur má ekki falla á þessu;
+    næsti endurreikningur (næsta skrif eða promote í nótt) nær upp frávikinu."""
+    try:
+        endurreikna_tvitok_falin(conn, log)
+    except psycopg2.Error as exc:   # nær líka Operational/InterfaceError: má aldrei kveikja endurtekningu skrifanna
+        try:
+            conn.rollback()
+        except psycopg2.Error:
+            pass                    # tenging dauð; næsta write_events tengist aftur
+        log("VILLA tvitok_falin endurreikningur (%s: %s) — taflan á eftir reglunni þar til næsti endurreikningur"
+            % (type(exc).__name__, exc))
 
 
 def _write_events_once(conn, rows, terminal, found, log):

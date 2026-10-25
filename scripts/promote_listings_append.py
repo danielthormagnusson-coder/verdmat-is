@@ -71,6 +71,7 @@ from promote_mbl import (  # noqa: E402  reuse identical resolution logic
 )
 from scraper_paths import get_scraper_data_dir  # noqa: E402
 from tvitak_regla import flokka as flokka_tvitok, REGLA_VERSION as TVITAK_REGLA  # noqa: E402  cc267
+from tvitok_falin import endurreikna as endurreikna_tvitok_falin  # noqa: E402  cc276
 
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
 PROMOTER_VERSION = "listings_append_v2"
@@ -433,6 +434,8 @@ def run(limit, dry_run=False, log=print):
         if tv_virk and limit is None:  # --limit = hluti corpus -> frumrit gæti verið utan hans
             n_tv = merkja_tvitok(pg, tv_pairs)
             log(f"  tvítök sett í sóttkví: {n_tv} (scraper.listing_tvitok)")
+        # cc276: lesfletirnir lesa efnisgert mengi — endurreikna EFTIR skrifin (status, listed_at) og merkinguna
+        endurreikna_tvitok_falin(pg, log)
         save_changed_fastnums(changed)
         log(f"  changed fastnums={len(changed)} -> {CHANGED_FILE} (cc210 revalidate)")
         log(f"  wrote listings rows={nL}, price_history rows={nP} ({time.perf_counter()-t0:.1f}s)")
