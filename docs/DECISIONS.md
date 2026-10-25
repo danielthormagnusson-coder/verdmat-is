@@ -4,6 +4,33 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-25 — Krass: %-línur fá aðeins tölu ef stærðin stenst utan tíma (cc273) — **verkbeiðni arkitekts 25.10 (tilefni: Danni, Egilsgata 10); verdmat-ai cc273 (97cb34a, grein cc273), ópushað (HALT fyrir push); ekkert birt grunnmat breytt**
+
+1. **Föst regla.** %-lína krassins ber tölu í hópi g (cc257 §5.1-hópar: kjallari / 1. / 2.–3. / 4.+ hæð / ris / sérbýli / óþekkt / annað) **aðeins ef 95 % bil utan tíma útilokar 0 OG v1.4-talan liggur innan bilsins**.
+   - Sýni línan tölu, er það **mælda talan utan tíma**, ekki v1.4.
+   - Annars er línan tölulaus með skýringunni „ekki staðfest utan mælitíma“ (merki „mælt — ekki staðfest utan mælitíma“).
+   - Reglan þrengir og víkkar aldrei: hópur sem bar ekki tölu í cc258 fær ekki tölu.
+   - **Mæling utan tíma:**
+     - úrtak: cc247 (þinglýst 16.07–15.10.2026);
+     - lánþegar felldir (cc253);
+     - r = log(verð/grunnmat) innan sellu canonical × matsvæði;
+     - SE sellu-klasað;
+     - meðferð úr `scraper.listing_extractions` með sömu vörpun og þjálfunargögn (`build_extraction_features`);
+     - hæð úr íbúðar-matseiningu (cc263b).
+2. **Niðurstaða: 0 af 21 lína × hópur stenst.**
+   - Allar sex %-línur (lofthæð, opið rými, svalir, stórar svalir, verönd/pallur, garður) eru tölulausar í öllum hópum.
+   - Dæmi Danna, Egilsgata 10 (F_1):
+     - verönd utan tíma −3,6 % [−14,3; +8,4] (n 16);
+     - svalir +2,2 % [−6,0; +11,1] (n 36);
+     - hvorugt staðfestir +7,0 / +1,5.
+   - Extraction nær aðeins til 508 af 1.376 pöruðum auglýsingum, því nætursópun kaupir ~88 lýsingar á nóttu. Endurmæla þegar þekja og sölur hafa safnast.
+3. **Heildarástand + eldhús/bað/gólf valin saman** (val notanda eða áhrif ≠ 0) → viðvörunarlína um tvítalningu. Engin tala breytist.
+4. `EIGN_CACHE_UTGAFA` óbreytt: krassStudlar() er reiknað við renderun, ekki í `unstable_cache`-farminum.
+
+Skil: `D:\_audit\cc273_krass_prosentur\SKIL_CC273.md`; mæling: `m01_utan_tima.txt`.
+
+---
+
 ## 2026-10-20 — Hæð krassins, númer raðhúsa og iter5-regla unit_category (cc263) — **ákvarðanir arkitekts 20.10; verdmat-ai cc263b (3c07a86, grein cc263b), ópushað (HALT fyrir push); ekkert birt grunnmat breytt**
 
 1. **JÁ — einkvæmni á HÆÐ, ekki merkingu, í hliðun krassins.** Óskipt fastanúmer þar sem allar íbúðar-merkingar eru á sömu hæð fá þá hæð. Dæmi: Sunnuvegur 25, 010101 + 010102 → 1. hæð.
