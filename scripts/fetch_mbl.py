@@ -178,6 +178,22 @@ class KillSwitch(RuntimeError):
     pass
 
 
+# cc281: 502/503/504/520 eru tímabundnar villur veitunnar (Cloudflare 520 felldi þekjupróf 24.10).
+# Endurtekið með bilinu hér á undan hverri tilraun; eftir síðustu = KillSwitch. 403/429 óbreytt.
+ENDURTEKNA_5XX = (502, 503, 504, 520)
+BIL_5XX = (30, 60, 120)
+
+
+def bida_5xx(status, n, sleep, log, ctx=None):
+    """Bíður fyrir endurtilraun n+1 á 5xx og skilar n+1; KillSwitch þegar BIL_5XX er tæmt."""
+    if n >= len(BIL_5XX):
+        raise KillSwitch("unexpected HTTP %s after %d retries" % (status, n))
+    log("  !! HTTP %s%s, endurtilraun %d/%d eftir %d s at %s" % (
+        status, " [%s]" % ctx if ctx else "", n + 1, len(BIL_5XX), BIL_5XX[n], now_iso()))
+    sleep(BIL_5XX[n])
+    return n + 1
+
+
 class SchemaMissing(RuntimeError):
     pass
 
@@ -424,12 +440,15 @@ class MblFetcher:
 
     # ── transport + kill-switch ──
     def _gql(self, query, ctx=None):
-        for _ in range(3):
+        forsok = 0                        # 400/timeout-tilraunir, þak 3 (óbreytt)
+        n5xx = 0                          # cc281: 5xx-endurtilraunir, telja ekki í forsok
+        while forsok < 3:
             try:
                 r = self.s.post(ENDPOINT, json={"query": query},
                                 headers={"User-Agent": UA, "Accept": "application/json",
                                          "Content-Type": "application/json"}, timeout=TIMEOUT_S)
             except requests.RequestException as exc:
+                forsok += 1
                 self._consec_timeout += 1
                 self.log("  !! timeout %d/%d%s (%s) at %s" % (
                     self._consec_timeout, MAX_CONSEC_TIMEOUT,
@@ -441,6 +460,7 @@ class MblFetcher:
             self._consec_timeout = 0
             status = r.status_code
             if status == 400:
+                forsok += 1
                 self._consec_400 += 1
                 if self._consec_400 >= MAX_CONSEC_400:
                     raise KillSwitch("%d consecutive HTTP 400 — likely throttle" % self._consec_400)
@@ -449,6 +469,9 @@ class MblFetcher:
             self._consec_400 = 0
             if status in (403, 429):
                 raise KillSwitch("HTTP %s" % status)
+            if status in ENDURTEKNA_5XX:
+                n5xx = bida_5xx(status, n5xx, self._sleep, self.log, ctx)
+                continue
             if status != 200:
                 raise KillSwitch("unexpected HTTP %s" % status)
             body = r.content or b""

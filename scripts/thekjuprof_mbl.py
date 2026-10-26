@@ -33,7 +33,7 @@ Viðvörun (vidvorun-dálkur + „VIÐVÖRUN" í night-log): gap_n > GAP_ALERT e
 DRAUG_ALERT_PCT % af nefnara. Viðvörun fellir ekki keyrsluna (exit 0).
 
 Kurteisi: 2 + 4 + 4 = 10 beiðnir, 120 s bil (fetch_mbl gólf 60 s), kill-switch lifecycle-
-sópunarinnar (Transport: 3×400/403/429/CAPTCHA/GraphQL-villur/3× timeout). Beiðnirnar
+sópunarinnar (Transport: 3×400/403/429/CAPTCHA/GraphQL-villur/3× timeout; 5xx ≤ 3 endurtilraunir, cc281). Beiðnirnar
 teljast ekki í raw_fetches (eins og sópunin) — ~10/dag ofan á delta+sópun, langt undir 1000.
 
 DB: les á pooler read-only; eina skrifin eru INSERT í scraper.thekjuprof (SET TRANSACTION

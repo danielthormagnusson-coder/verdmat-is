@@ -48,7 +48,8 @@ rare and the mis-timing is at most one sweep. A future 'confirmed_present'/strea
 is the refinement if it ever matters.
 
 Polite crawl: same discipline as the delta chain — default 120s spacing, fetch_mbl's
-kill-switch (3x HTTP 400 / 403 / 429 / CAPTCHA / GraphQL errors / 3x timeout).
+kill-switch (3x HTTP 400 / 403 / 429 / CAPTCHA / GraphQL errors / 3x timeout;
+cc281: 502/503/504/520 retried after 30/60/120 s, then kill-switch).
 
 WRITE SAFETY: events are written via psycopg2 on the 6543 transaction pooler, which
 defaults READ ONLY; every write transaction issues `SET TRANSACTION READ WRITE` as its
@@ -85,7 +86,7 @@ from psycopg2.extras import execute_values, Json
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_mbl import (  # noqa: E402  reuse the exact transport + kill-switch discipline
     ENDPOINT, UA, TIMEOUT_S, MAX_CONSEC_400, MAX_CONSEC_TIMEOUT,
-    MIN_SPACING_FLOOR, KillSwitch, _is_captcha,
+    MIN_SPACING_FLOOR, KillSwitch, _is_captcha, ENDURTEKNA_5XX, bida_5xx,
 )
 from scraper_paths import get_scraper_data_dir, get_raw_db_path  # noqa: E402
 from tvitok_falin import endurreikna as endurreikna_tvitok_falin  # noqa: E402  cc276
@@ -264,6 +265,7 @@ class Transport:
         self._consec_timeout = 0
         self._last_at = 0.0
         self.request_count = 0
+        self._sleep = time.sleep          # patchable in tests
 
     def _pace(self):
         dt = time.monotonic() - self._last_at
@@ -272,29 +274,36 @@ class Transport:
         self._last_at = time.monotonic()
 
     def gql(self, query):
-        for _ in range(3):
+        forsok = 0                        # 400/timeout-tilraunir, þak 3 (óbreytt)
+        n5xx = 0                          # cc281: 5xx-endurtilraunir; bilið bætist ofan á _pace
+        while forsok < 3:
             self._pace()
             try:
                 r = self.s.post(ENDPOINT, json={"query": query},
                                 headers={"User-Agent": UA, "Accept": "application/json",
                                          "Content-Type": "application/json"}, timeout=TIMEOUT_S)
             except requests.RequestException:
+                forsok += 1
                 self._consec_timeout += 1
                 if self._consec_timeout >= MAX_CONSEC_TIMEOUT:
                     raise KillSwitch("%d consecutive timeouts" % self._consec_timeout)
-                time.sleep(2)
+                self._sleep(2)
                 continue
             self._consec_timeout = 0
             status = r.status_code
             if status == 400:
+                forsok += 1
                 self._consec_400 += 1
                 if self._consec_400 >= MAX_CONSEC_400:
                     raise KillSwitch("%d consecutive HTTP 400 — likely throttle" % self._consec_400)
-                time.sleep(2)
+                self._sleep(2)
                 continue
             self._consec_400 = 0
             if status in (403, 429):
                 raise KillSwitch("HTTP %s" % status)
+            if status in ENDURTEKNA_5XX:
+                n5xx = bida_5xx(status, n5xx, self._sleep, self.log)
+                continue
             if status != 200:
                 raise KillSwitch("unexpected HTTP %s" % status)
             body = r.content or b""
