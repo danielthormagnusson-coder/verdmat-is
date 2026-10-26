@@ -4,6 +4,27 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-25 — Eignasíðan einfölduð: krass falið, dauð kort út, verðsaga + akkeri sameinuð (cc279) — **ákvörðun Danna/arkitekts 25.10; verdmat-ai cc279 (f66ffb4, grein cc279, ofan á cc273 6aa51cc), ópushað (HALT fyrir push); ekkert birt grunnmat breytt**
+
+1. **Krassið falið.** Það er of ruglingslegt og %-línurnar standast ekki (cc247, cc273). Nákvæmni kemur úr ferskleika (cc278), ásettu verði (cc254) og iter5, ekki úr notandastillingum.
+   - `SYNA_KRASS = false`. `turbopack.resolveAlias` vísar Krass á tóman íhlut.
+   - Mælt eftir byggingu: 0 krass-tilvik í útsendum JS-bútum, og stuðlaskráin er ekki í RSC-farmi. Eftir standa `.vm-krass*`-veljarar í global CSS.
+   - Kóðinn og gögnin standa óbreytt í repo.
+2. **Gömlu lögin fá eigin rofa, `SYNA_ELDRI_VIDMID = false`.** Þetta eru Leiðrétt viðmið og Þitt viðmið/sviðsmynd. cc246 lofaði að `SYNA_KRASS = false` setti þau aftur í birtingu, en þau bera sömu óstaðfestu %-stærðir. Það loforð fellur.
+3. **Dauð kort út (rofar, engu eytt):**
+   - `SYNA_EIGN_SPJALL = false`: „Spjallaðu um eignina — Lokað tímabundið" er farið af eignasíðunni. /markadur, /verdmat og /bera-saman eru ósnertar.
+   - `SYNA_GREINING = false`: „Greina" kallar RPC `greining_eignar` (EXECUTE: authenticated). Meðan söfnun er lokuð er notandi alltaf null, svo hnappurinn var varanlega óvirkur.
+   - Eigindi: „Fylla út með gervigreind" og óvirka „Skrá"-flísin birtast aðeins þegar `SAFNA_PERSONUUPPLYSINGUM`. Meðan söfnun er lokuð gerðu þau ekkert, því /api/eigindi/soekja skilar 404. Spjaldið sýnir skráð gildi + lind, enga tölu og engin áhrif.
+4. **Verðsaga = eitt kort.** Það sýnir þinglýstar sölur, framreikning akkerissölunnar sem undirlínu hennar sölu, Verðmat í dag og eina línu um hvort framreiknaða salan sé innan 80 % vissubils. K8-fyrirvarinn fer í sömu línu þegar hann á við.
+   - Mælt: 77.420 af 77.484 akkerum eiga sölu í sales_history með sama degi og sama verði. Hinar 64 fá eigin línu.
+   - „Aldur fyrri sölu" fellur brott, því dagsetningin stendur í línunni. Engin tala birtist tvisvar í kortinu.
+5. **Röð korta á /eign:** Verðmat → (ásett-bil, cc254) → Samanburðarsölur → Verðsaga → Eigindi → Nærþjónusta.
+   - Leigumatið stendur áfram aðeins á /leiguverd (cc33) og hefur þar sama sæti, á undan Eigindum. Opin spurning: á leigumatið að koma á /eign?
+
+Skil: `D:\_audit\cc279_einfold_sida\SKIL_CC279.md`.
+
+---
+
 ## 2026-10-25 — Krass: %-línur fá aðeins tölu ef stærðin stenst utan tíma (cc273) — **verkbeiðni arkitekts 25.10 (tilefni: Danni, Egilsgata 10); verdmat-ai cc273 (97cb34a, grein cc273), ópushað (HALT fyrir push); ekkert birt grunnmat breytt**
 
 1. **Föst regla.** %-lína krassins ber tölu í hópi g (cc257 §5.1-hópar: kjallari / 1. / 2.–3. / 4.+ hæð / ris / sérbýli / óþekkt / annað) **aðeins ef 95 % bil utan tíma útilokar 0 OG v1.4-talan liggur innan bilsins**.
