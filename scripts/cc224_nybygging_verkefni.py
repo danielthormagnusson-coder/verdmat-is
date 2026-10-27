@@ -45,6 +45,22 @@ Skilgreining (ákvörðun Danna 09.10.2026, SKIL_CC224_1.md §3 + §5 aldursvör
       talin í X, ekkert verð (kaupverd/kr_m2 NULL, utan kr/m²), dagsetning = síðasti ónothæfi samningur; ekkert verðgólf
   verkefni = landeign; landeignir sameinaðar þar sem STAÐFEST slóð (nybygging_slodir) og gata eru sameiginleg
   gólf: Y ≥ 4 ∧ (X ≥ 1 ∨ virk auglýsing) ∧ ≥ 1 eining innan skilgreiningar
+
+cc283 (v9, GO Danna/arkitekts 27.10, SKIL_CC283.md): ÞRÍSKIPTING — hver íbúð er „þinglýst seld" / „auglýst" /
+„óþekkt staða (ekki þinglýst, ekki auglýst)". Hugtakið „óseld" er hvergi tala í úttaki (n_oseldar,
+n_oseldar_oauglystar, hradi_oseldar, man_i_uppselt og oseldar_upphafi eru ekki skrifuð; staðan 'oseld' heitir 'othekkt').
+  ónothæfur samningur (D2″, kemur í stað D2′) = þinglýst seld (heildarkaup), NEMA virk söluauglýsing á fastnr. sást
+      fyrst EFTIR síðasta ónothæfa samninginn (endurauglýst og á sölu núna → auglýst). Gömul auglýsing frá því fyrir
+      samninginn sem er enn uppi fellir ekki samninginn (D2′ gerði það).
+  forsala ósýnileg í kaupskrá = HÚS (verkefni × heimilisfang; heimilisfang NULL er sér hús) þar sem minnst ein íbúð er á
+      óskiptu fastnr., byggingarstigi B0–B2/óskráð eða án heimilisfangs í properties, EÐA húsið á engan samning
+      (nothæfan né ónothæfan) frá SALA_FRA. „Óþekkt" í slíku húsi er aldrei lagt í samtölu (n_othekkt telur það ekki).
+  auglýsing án fastnr. (virk, íbúð til sölu) telst auglýst á húsi ef gata + númer + stafur + póstnr. hitta EITT hús í
+      EINU verkefni, og þá: allt-óskipt hús með EITT óskipt fastnr. → undireining þess (ólíkar stærð × herbergi); hús
+      með stökum fastnr. → eina íbúð hússins sem er hvorki seld né auglýst og stærð (±1 m²) og herbergi passa við.
+      Annars ótengd (n_augl_an_fastnr_otengd): íbúðirnar standa sem óþekkt staða, aldrei sem óauglýstar.
+  HLIÐ H-NYB (fail-closed, hlid_nyb): bygging fellur (rc 4, ekkert skrifað) ef fastnr. án heimilisfangs er í húsi sem
+      ekki er merkt forsala ósýnileg, eða ef „óseld"/oseld stendur í dálkheiti með gildi eða í texta úttaks.
 Engin Fable-/API-köll: byggingaraðili með regex.
 """
 import argparse
@@ -69,7 +85,7 @@ import nyb_soluhradi
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-UTGAFA = "cc224-v8"   # cc243: v8 ÓBREYTT að heiti — söluhraðadálkar + nybygging_solur_manadar eru hrein viðbót (enginn birtur dálkur breytist); cc234: = v7 + n_tviaugl_nu/leiguadili (tvíauglýsing NÚ, nyb_tviaugl.py); cc224e: = v6 + forsíðumyndir 20 nýrra verkefna úr cc229 (H); cc229 (v6): = v5 + óskipt skv. HMS (A), íbúðir án byggár tengdar (B), n_leiga (C); cc228 (v5): heildarkaup
+UTGAFA = "cc224-v9"   # cc283: þrískipting (þinglýst seld / auglýst / óþekkt), forsala ósýnileg, D2″, auglýsingar án fastnr.; ekkert „óseld"; cc243: v8 ÓBREYTT að heiti — söluhraðadálkar + nybygging_solur_manadar eru hrein viðbót (enginn birtur dálkur breytist); cc234: = v7 + n_tviaugl_nu/leiguadili (tvíauglýsing NÚ, nyb_tviaugl.py); cc224e: = v6 + forsíðumyndir 20 nýrra verkefna úr cc229 (H); cc229 (v6): = v5 + óskipt skv. HMS (A), íbúðir án byggár tengdar (B), n_leiga (C); cc228 (v5): heildarkaup
 SALA_FRA = dt.date(2021, 1, 1)
 AR = dt.date.today().year
 BYGGAR_SKILGR = AR - 2          # „fullbúin innan tveggja ára"
@@ -79,7 +95,9 @@ IBUD = ('Íbúð', 'Íbúð á hæð', 'Íbúð í kjallara', 'Íbúð í risi',
 SKILGREINING = (f"íbúð (regla 7: {', '.join(IBUD)}; ekki sumarhús) ∧ (((FULLBUID=0 ∨ (byggingarstig B0–B3 ∧ matsstig 0–6)) ∧ "
                 f"(BYGGAR ≥ {BYGGAR_Y} ∨ BYGGAR óskráð)) ∨ BYGGAR ≥ {BYGGAR_SKILGR}); Y = byggð ≥ {BYGGAR_Y} ∨ innan skilgr.; "
                 f"X = ONOTHAEFUR=0 frá {SALA_FRA}; magnsala = samningur > 1 fastnr; "
-                f"gólf Y ≥ 4 ∧ (X ≥ 1 ∨ virk augl.); sameining = staðfest slóð ∧ sameiginleg gata")
+                f"gólf Y ≥ 4 ∧ (X ≥ 1 ∨ virk augl.); sameining = staðfest slóð ∧ sameiginleg gata; "
+                f"cc283: þinglýst seld / auglýst / óþekkt; ónothæfur = seld nema endurauglýst virk eftir samning (D2″); "
+                f"forsala ósýnileg = hús m/ óskipt ∨ B0–B2/óskráð ∨ án heimilisfangs ∨ 0 samninga frá {SALA_FRA}")
 DSN = Path(r"D:\verdmat-is\.dbconfig")
 MYNDAVAL = Path(__file__).resolve().parent / 'nybyggingar_myndaval.csv'   # handval útlitsmynda (cc224b §10)
 
@@ -156,6 +174,11 @@ def lesa(c):
                exists (select 1 from scraper.v_eign_virk_auglysing v where v.listing_id = l.listing_id) virk
           from scraper.listings l
          where l.tenure = 'sale' and l.category = 'residential' and l.fastnum = any(%(fn)s)""", c, params=dict(fn=fn))
+    # cc283 (2): VIRKAR íbúðasöluauglýsingar án fastnr. — tengdar húsi aðeins ef það er víst (tengja_augl_an_fastnr)
+    LN = pd.read_sql("""
+        select l.listing_id, l.addr_text, l.addr_postcode, l.size_sqm, l.rooms
+          from scraper.listings l join scraper.v_eign_virk_auglysing v on v.listing_id = l.listing_id
+         where l.tenure = 'sale' and l.category = 'residential' and l.fastnum is null""", c)
     # forsíðumyndir: handval (cc224_myndaval_lesa.py → nybyggingar_myndaval.csv)
     import csv as _csv
     MV = {r['verkefni_id']: r for r in _csv.DictReader(open(MYNDAVAL, encoding='utf-8'))} if MYNDAVAL.exists() else {}
@@ -173,7 +196,7 @@ def lesa(c):
     cur.execute("select max(thinglystdags) from public.sales_history"); data_through = cur.fetchone()[0]
     cur.execute("select max(last_seen_at) from scraper.listings where tenure='sale'"); snap = cur.fetchone()[0]
     c.rollback()
-    return dict(P=P, S=S, SA=SA, RL=RL, L=L, LA=LA, MV=MV, MY=MY, VV=VV, VM=VM, SL=SL, n_skilgr_land=n_skilgr_land, data_through=data_through, snap=snap)
+    return dict(P=P, S=S, SA=SA, RL=RL, L=L, LN=LN, LA=LA, MV=MV, MY=MY, VV=VV, VM=VM, SL=SL, n_skilgr_land=n_skilgr_land, data_through=data_through, snap=snap)
 
 
 def ba_ur_texta(t):
@@ -284,6 +307,89 @@ def tengja_byggar_kandidata(U, SA):
     return pd.concat([Y0, inn]), auk
 
 
+def _hus_lykill(h):
+    """(gata lágstafir, númer, STAFUR) úr heimilisfangi/auglýsingatexta (fram að fyrstu kommu); None ef ekki húsnúmer."""
+    if not isinstance(h, str):
+        return None
+    g, n, st = gata_hus(re.sub(r'\s+', ' ', h.split(',')[0]).strip())
+    return (g.lower(), n, st) if g and n is not None else None
+
+
+def tengja_augl_an_fastnr(U, LN, AV_eigin):
+    """cc283 (2): virkar söluauglýsingar án fastnr. → hús verkefnis, aðeins ef VÍST. Hús = gata + númer + stafur + póstnr.
+    sem hittir íbúðir í EINU verkefni (verkefni_id). Innan hússins:
+      allt-óskipt hús með EITT óskipt fastnr.     → undireining þess fastnr. (talið eftir ólíkum stærð × herbergi)
+      hús án óskiptra fastnr.                     → EINA íbúðin sem er hvorki þinglýst seld né auglýst og passar á
+                                                     stærð (±1 m²) og herbergjum; annars ótengd
+      annað (blandað hús, mörg óskipt fastnr.)    → ótengd
+    Skilar (T tengdar: listing_id, fastnum, sz, rm; O ótengdar á húsi verkefnis: listing_id, verkefni_id; R skýrsla)."""
+    T0 = pd.DataFrame(columns=['listing_id', 'fastnum', 'sz', 'rm'])
+    O0 = pd.DataFrame(columns=['listing_id', 'verkefni_id'])
+    if LN is None or not len(LN):
+        return T0, O0, dict(n_augl=0, n_hus=0, n_tengd=0, n_otengd=0, n_utan=0)
+    A = LN.copy()
+    A['k'] = A.addr_text.map(_hus_lykill)
+    A['pn'] = pd.to_numeric(A.addr_postcode, errors='coerce')
+    A['sz'] = pd.to_numeric(A.size_sqm, errors='coerce').round(0)
+    A['rm'] = pd.to_numeric(A.rooms, errors='coerce')
+    H = U[['fastnum', 'verkefni_id', 'heimilisfang', 'postnr', 'heildareining', 'seld_any', 'einflm', 'fjherb']].copy()
+    H['k'] = H.heimilisfang.map(_hus_lykill)
+    H['pn'] = pd.to_numeric(H.postnr, errors='coerce')
+    H = H.dropna(subset=['k', 'pn'])
+    eigin = set(AV_eigin.fastnum)
+    hus = {kk: g for kk, g in H.groupby(['k', 'pn'])}
+    T, O, n_utan = [], [], 0
+    for r in A.itertuples():
+        g = hus.get((r.k, r.pn)) if r.k is not None else None
+        if g is None or g.verkefni_id.nunique() != 1:
+            n_utan += 1
+            continue
+        vid = g.verkefni_id.iloc[0]
+        osk = g[g.heildareining]
+        if len(osk) == len(g) and len(osk) == 1:
+            T.append((r.listing_id, int(osk.fastnum.iloc[0]), r.sz, r.rm))
+            continue
+        if len(osk) == 0 and pd.notna(r.sz) and pd.notna(r.rm):
+            fl = pd.to_numeric(g.einflm, errors='coerce')
+            hb = pd.to_numeric(g.fjherb, errors='coerce')
+            k = g[~g.seld_any & ~g.fastnum.isin(eigin) & ((fl - r.sz).abs() <= 1) & (hb == r.rm)]
+            if len(k) == 1:
+                T.append((r.listing_id, int(k.fastnum.iloc[0]), r.sz, r.rm))
+                continue
+        O.append((r.listing_id, vid))
+    T = pd.DataFrame(T, columns=T0.columns) if T else T0
+    O = pd.DataFrame(O, columns=O0.columns) if O else O0
+    T['fastnum'] = T.fastnum.astype('int64')
+    return T, O, dict(n_augl=len(A), n_hus=len(T) + len(O), n_tengd=len(T), n_otengd=len(O), n_utan=n_utan)
+
+
+FORSALA_ASTAEDUR = ('oskipt', 'b0_b2', 'an_heimilisfangs', 'hus_0_samninga')
+
+
+def _hus(U):
+    """Hús = verkefni × heimilisfang (bil jöfnuð, lágstafir); heimilisfang NULL er sér hús."""
+    return U.verkefni_id.astype(str) + '|' + U.heimilisfang.map(
+        lambda h: re.sub(r'\s+', ' ', h.strip().lower()) if isinstance(h, str) else '\x00')
+
+
+def forsala_hus(U, samn_fastnr):
+    """cc283 (1): forsala ósýnileg í kaupskrá, per HÚS. Ástæður (cc282 a4): óskipt fastnr. · byggingarstig B0–B2/óskráð ·
+    fastnr. án heimilisfangs í properties · húsið á 0 samninga (nothæfa eða ónothæfa) frá SALA_FRA.
+    Skilar (bool per einingu, ástæðulisti per einingu = hússins)."""
+    hus = _hus(U)
+    f = pd.DataFrame({'hus': hus,
+                      'oskipt': U.heildareining.astype(bool).values,
+                      'b0_b2': U.byggingarstig.fillna('').isin(['B0', 'B1', 'B2', '']).values,
+                      'an_heimilisfangs': U.heimilisfang.isna().values,
+                      'samn': U.fastnum.isin(samn_fastnr).values}, index=U.index)
+    g = f.groupby('hus').agg(oskipt=('oskipt', 'any'), b0_b2=('b0_b2', 'any'), an_heimilisfangs=('an_heimilisfangs', 'any'),
+                             samn=('samn', 'any'))
+    g['hus_0_samninga'] = ~g.samn
+    ast = {h: [a for a in FORSALA_ASTAEDUR if r[a]] for h, r in g.iterrows()}
+    a = hus.map(ast)
+    return a.map(bool), a
+
+
 def reikna(D):
     P, S, L, VV, VM = D['P'], D['S'].copy(), D['L'].copy(), D['VV'], D['VM']
     U = P.copy()
@@ -300,6 +406,10 @@ def reikna(D):
     nhms = pd.to_numeric(U.n_ibud_hms, errors='coerce').fillna(0).astype(int)
     U['heildareining'] = nhms >= 2
     U['n_undireiningar'] = np.where(U.heildareining, nhms, 1).astype(int)
+
+    # verkefni (landeign; sameinað um staðfesta slóð) — óháð stöðu; cc283: þarf fyrir hús auglýsinga án fastnr.
+    U['verkefni_id'], n_sameinad = verkefnalykill(U, D['SL'])
+    samn_fastnr = set(S.fastnum.astype('int64'))      # cc283: hvaða samningur sem er frá SALA_FRA (nothæfur eða ekki)
 
     # ónothæfir samningar (cc228 D2′): aðeins dagsetning síðasta per fastnr — aldrei verð (regla 2)
     So = S[S.onothaefur == 1]
@@ -328,11 +438,23 @@ def reikna(D):
     Lallar = L.copy()                    # allar söluauglýsingar einingarinnar, líka endursala (auglýsingahlekkur)
     L = L[~(L.t0 > L.fastnum.map(U.set_index('fastnum').sala_dags))].copy()
 
+    # heildarkaup (cc283 D2″, í stað cc228 D2′): ónothæfur samningur án nothæfs = þinglýst seld, NEMA VIRK söluauglýsing
+    # á fastnr. sást fyrst EFTIR síðasta ónothæfa samninginn (endurauglýst og á sölu núna). D2′ felldi líka einingu með
+    # gamla auglýsingu frá því fyrir samninginn sem enn var uppi, og einingu sem var endurauglýst en ekki lengur á sölu.
+    U['ono_dags'] = U.fastnum.map(ono_sidast)
+    endurauglyst_virk = U.fastnum.map(Lallar[Lallar.virk].groupby('fastnum').t0.max()).gt(U.ono_dags)
+    U['heildarkaup'] = ~U.seld & U.ono_dags.notna() & ~endurauglyst_virk
+    U['seld_any'] = U.seld | U.heildarkaup
+
     # virkar auglýsingar — eignarstig (v_eign_virk_auglysing); eining = fastnr, óskipt = (fastnr, stærð, herbergi)
     AV = L[L.virk]
-    nvirk = AV.drop_duplicates(['fastnum', 'sz', 'rm']).groupby('fastnum').size()
-    U['n_virk'] = np.where(U.heildareining, U.fastnum.map(nvirk).fillna(0), U.fastnum.isin(AV.fastnum).astype(int)).astype(int)
+    # cc283 (2): + virkar auglýsingar án fastnr. tengdar með vissu (aðeins í talningu „auglýst", ekki í verð/stofur/hlekk)
+    TA, OA, R_augl = tengja_augl_an_fastnr(U, D.get('LN'), AV)
+    AVx = pd.concat([AV[['fastnum', 'sz', 'rm']], TA[['fastnum', 'sz', 'rm']]])
+    nvirk = AVx.drop_duplicates(['fastnum', 'sz', 'rm']).groupby('fastnum').size()
+    U['n_virk'] = np.where(U.heildareining, U.fastnum.map(nvirk).fillna(0), U.fastnum.isin(AVx.fastnum).astype(int)).astype(int)
     U['n_virk'] = np.minimum(U.n_virk, U.n_undireiningar)
+    U['n_augl_an_fastnr'] = U.fastnum.map(TA.groupby('fastnum').size()).fillna(0).astype(int)
     av1 = AV[(AV.price_amount >= ASETT_GOLF) & ~AV.is_price_on_request.fillna(False)].sort_values('first_seen_at').groupby('fastnum').last()
     U['asett_verd'] = np.where(U.heildareining, np.nan, U.fastnum.map(av1.price_amount))
     U['asett_flm'] = np.where(U.heildareining, np.nan, U.fastnum.map(av1.size_sqm))
@@ -360,15 +482,16 @@ def reikna(D):
     U['sidasta_verdbr'] = U.fastnum.map(vv.groupby('fastnum').d.max())
     U['sidasta_ny_augl'] = U.fastnum.map(L.groupby('fastnum').t0.max())
 
-    # heildarkaup (cc228 D2′): ónothæfur samningur án nothæfs, ekki endurauglýst til sölu eftir hann, ekki á sölu núna
-    U['ono_dags'] = U.fastnum.map(ono_sidast)
-    endurauglyst = U.fastnum.map(Lallar.groupby('fastnum').t0.max()).gt(U.ono_dags)
-    U['heildarkaup'] = ~U.seld & U.ono_dags.notna() & ~endurauglyst & (U.n_virk == 0)
     U['stada'] = np.select([U.seld & ~U.magnsala, U.magnsala, U.heildarkaup, U.n_virk > 0],
-                           ['seld', 'magnsala', 'heildarkaup', 'a_solu'], 'oseld')
-    U['x'] = np.where(U.seld | U.heildarkaup, U.n_undireiningar, 0)
+                           ['seld', 'magnsala', 'heildarkaup', 'a_solu'], 'othekkt')
+    # cc283 þrískipting per einingu (óskipt fastnr. telur undireiningar sínar): þinglýst seld / auglýst / óþekkt staða
+    U['n_thinglyst'] = np.where(U.seld_any, U.n_undireiningar, 0).astype(int)
+    U['n_auglyst'] = np.where(U.seld_any, 0, U.n_virk).astype(int)
+    U['n_othekkt'] = (U.n_undireiningar - U.n_thinglyst - U.n_auglyst).astype(int)
+    U['thriskipting'] = np.select([U.seld_any, U.n_auglyst > 0], ['thinglyst_seld', 'auglyst'], 'othekkt')
+    U['forsala_osynileg'], U['forsala_astaedur'] = forsala_hus(U, samn_fastnr)
+    U['x'] = U.n_thinglyst
     U['laekkad_30'] = U.laekkad_30 & (U.stada == 'a_solu')
-    U['virk_oseld'] = np.where(U.seld, 0, U.n_virk)
 
     # auglýsingahlekkur: nýjasta VIRKA mbl-söluauglýsing einingarinnar (eignarstig). augl_endursala = einingin var seld
     # ÁÐUR en auglýsingin sást fyrst; seld eining með auglýsingu frá því fyrir sölu fær False (framendinn merkir hana sér)
@@ -377,8 +500,6 @@ def reikna(D):
     U['augl_id'] = U.fastnum.map(augl.source_listing_id)
     U['augl_t0'] = U.fastnum.map(augl.t0)
     U['augl_stofa'] = U.fastnum.map(augl.stofa_lykill)
-
-    U['verkefni_id'], n_sameinad = verkefnalykill(U, D['SL'])
 
     # flokkur auglýsingahlekks (ákvörðun Danna 10.10, cc224b §9.6): seld eining með auglýsingu sem sást fyrst EFTIR
     # þinglýsingu = „endursala" aðeins ef > ENDURSALA_DAGAR frá sölu EÐA önnur stofa en auglýsti eininguna fyrir sölu
@@ -462,7 +583,17 @@ def reikna(D):
             n_seld=X, n_magnseld=int(g[g.magnsala].n_undireiningar.sum()),
             n_heildarkaup=int(g[g.stada == 'heildarkaup'].n_undireiningar.sum()),
             n_leiga=int(g.fastnum.isin(D['RL'].fastnum.astype('int64')).sum()),
-            n_virkar=int(g.virk_oseld.sum()), n_oseldar=Y - X, n_oseldar_oauglystar=Y - X - int(g.virk_oseld.sum()),
+            n_virkar=int(g.n_auglyst.sum()),
+            # cc283: þrískipting — n_othekkt telur ALDREI óþekkt í húsum þar sem forsala er ósýnileg
+            n_auglyst=int(g.n_auglyst.sum()), n_othekkt=int(g[~g.forsala_osynileg].n_othekkt.sum()),
+            n_forsala_ibudir=int(g[g.forsala_osynileg].n_undireiningar.sum()),
+            n_forsala_thinglyst=int(g[g.forsala_osynileg].n_thinglyst.sum()),
+            n_forsala_auglyst=int(g[g.forsala_osynileg].n_auglyst.sum()),
+            forsala_osynileg=bool(g.forsala_osynileg.any()),
+            forsala_hus=sorted({h if isinstance(h, str) else 'án heimilisfangs' for h in g[g.forsala_osynileg].heimilisfang},
+                               key=lambda h: (h == 'án heimilisfangs', h)),
+            forsala_astaedur=[a for a in FORSALA_ASTAEDUR if any(a in x for x in g[g.forsala_osynileg].forsala_astaedur)],
+            n_augl_an_fastnr=int(g.n_augl_an_fastnr.sum()), n_augl_an_fastnr_otengd=int((OA.verkefni_id == vid).sum()),
             n_b0=int((~bs.isin(['B1', 'B2', 'B3', 'B4'])).sum()), n_b1=int((bs == 'B1').sum()), n_b2=int((bs == 'B2').sum()),
             n_b3=int((bs == 'B3').sum()), n_b4=int((bs == 'B4').sum()),
             fyrsta_sala=seld_d.min().date() if len(seld_d) else None, sidasta_sala=seld_d.max().date() if len(seld_d) else None,
@@ -496,12 +627,15 @@ def reikna(D):
         asett_verd=E.asett_verd, asett_flm=E.asett_flm, n_laekkanir=E.n_laekkanir,
         laekkun_dags=E.laekkun_dags.dt.date, laekkun_fra=E.laekkun_fra, laekkun_til=E.laekkun_til,
         laekkun_flokkur=E.laekkun_flokkur, laekkad_30=E.laekkad_30.astype(bool),
-        augl_id=E.augl_id, augl_endursala=E.augl_endursala, augl_flokkur=E.augl_flokkur))
+        augl_id=E.augl_id, augl_endursala=E.augl_endursala, augl_flokkur=E.augl_flokkur,
+        thriskipting=E.thriskipting, n_thinglyst=E.n_thinglyst, n_auglyst=E.n_auglyst, n_othekkt=E.n_othekkt,
+        forsala_osynileg=E.forsala_osynileg.astype(bool), forsala_astaedur=E.forsala_astaedur,
+        n_augl_an_fastnr=E.n_augl_an_fastnr))
     E['sala_dags'] = E.sala_dags.where(E.stada.isin(['seld', 'magnsala']))
     hk = E.stada == 'heildarkaup'
     E.loc[hk, 'sala_dags'] = E.loc[hk, 'fastnum'].map(ono_sidast).dt.date
     E = E.sort_values(['verkefni_id', 'fastnum']).reset_index(drop=True)   # föst röð → endurtekjanlegt md5
-    return V, E, dict(n_hopar=n_hopar, n_sameinad=n_sameinad, U=U, **auk_b)
+    return V, E, dict(n_hopar=n_hopar, n_sameinad=n_sameinad, U=U, R_augl=R_augl, TA=TA, OA=OA, **auk_b)
 
 
 def utvikka_slodir(slodir, D):
@@ -623,15 +757,91 @@ def nn(v):
     return v
 
 
+# cc283: Y − X-afleiður („óseldar") sem nyb_soluhradi reiknar innbyrðis (hradi_stada byggir á þeim) en fara aldrei í úttak
+UTAN_UTTAKS = ('hradi_oseldar', 'man_i_uppselt', 'oseldar_upphafi')
 VCOLS = ['verkefni_id', 'slug', 'heiti', 'heiti_uppruni', 'gotur', 'postnr', 'postheiti', 'sveitarfelag', 'landeignir', 'lat', 'lng',
-         'n_einingar', 'n_einingar_hms', 'n_heildareiningar', 'n_seld', 'n_magnseld', 'n_heildarkaup', 'n_leiga', 'n_virkar', 'n_oseldar', 'n_oseldar_oauglystar',
+         'n_einingar', 'n_einingar_hms', 'n_heildareiningar', 'n_seld', 'n_magnseld', 'n_heildarkaup', 'n_leiga', 'n_virkar',
+         'n_auglyst', 'n_othekkt', 'n_forsala_ibudir', 'n_forsala_thinglyst', 'n_forsala_auglyst', 'forsala_osynileg', 'forsala_hus',
+         'forsala_astaedur', 'n_augl_an_fastnr', 'n_augl_an_fastnr_otengd',
          'n_b0', 'n_b1', 'n_b2', 'n_b3', 'n_b4', 'fyrsta_sala', 'sidasta_sala', 'kr_m2_seld', 'n_kr_m2_seld', 'kr_m2_asett',
          'n_kr_m2_asett', 'n_laekkanir', 'n_laekkad_30', 'stofur', 'byggingaradili', 'byggingaradili_n_augl', 'slod', 'byggar_min', 'byggar_max',
          'sidasta_virkni', 'uppselt', 'mynd_sha256', 'mynd_lykill', 'mynd_lykill_frumrit', 'mynd_breidd', 'mynd_haed', 'mynd_stofa',
-         'mynd_dags', 'mynd_listing_id', 'n_tviaugl_nu', 'leiguadili', 'leiguadili_n'] + nyb_soluhradi.HCOLS
+         'mynd_dags', 'mynd_listing_id', 'n_tviaugl_nu', 'leiguadili', 'leiguadili_n'] + [k for k in nyb_soluhradi.HCOLS if k not in UTAN_UTTAKS]
 ECOLS = ['fastnum', 'verkefni_id', 'heimilisfang', 'merking', 'einflm', 'fjherb', 'byggar', 'byggingarstig', 'innan_skilgr',
          'heildareining', 'n_undireiningar', 'stada', 'sala_dags', 'kaupverd', 'kr_m2', 'asett_verd', 'asett_flm', 'n_laekkanir',
-         'augl_id', 'augl_endursala', 'augl_flokkur', 'laekkun_dags', 'laekkun_fra', 'laekkun_til', 'laekkun_flokkur', 'laekkad_30']
+         'augl_id', 'augl_endursala', 'augl_flokkur', 'laekkun_dags', 'laekkun_fra', 'laekkun_til', 'laekkun_flokkur', 'laekkad_30',
+         'thriskipting', 'n_thinglyst', 'n_auglyst', 'n_othekkt', 'forsala_osynileg', 'forsala_astaedur', 'n_augl_an_fastnr']
+SCOLS = [k for k in nyb_soluhradi.SCOLS if k not in UTAN_UTTAKS]
+
+
+class HlidFall(Exception):
+    """H-NYB féll — bygging stöðvuð, ekkert skrifað."""
+
+
+OSELD = re.compile(r'[óo]seld', re.I)
+
+
+def hlid_nyb(V, E, S=None):
+    """cc283 H-NYB (fail-closed). Skilar lista brota (tómur = stenst); kallandi stöðvar bygginguna ef eitthvað brotnar.
+      H1 fastnr. án heimilisfangs í húsi sem er EKKI merkt forsala ósýnileg (einingar), eða verkefni með slíkt fastnr.
+         sem ber ekki forsala_osynileg
+      H2 „óseld" sem tala í úttaki: dálkur sem heitir *oseld*/*óseld* og ber gildi, eða texti (hvaða strengjadálkur sem er,
+         líka fylki) sem inniheldur óseld/oseld
+      H3 þrískiptingin stemmir: n_thinglyst + n_auglyst + n_othekkt = n_undireiningar per einingu; per verkefni
+         n_seld + n_auglyst + n_othekkt + (óþekkt í forsöluhúsum) = n_einingar og n_othekkt telur ekkert forsöluhús"""
+    brot = []
+    vantar = [f"{n}.{k}" for n, df, kk in (('einingar', E, ('heimilisfang', 'forsala_osynileg')),
+                                           ('verkefni', V, ('forsala_osynileg',))) for k in kk if k not in df.columns]
+    if vantar:   # fail-closed: merking sem vantar er brot, ekki undanþága
+        brot.append(f"H1: forsölumerkingu vantar í úttak ({', '.join(vantar)})")
+        E = E.assign(**{k: False for k in ('forsala_osynileg',) if k not in E.columns})
+        V = V.assign(**{k: False for k in ('forsala_osynileg',) if k not in V.columns})
+    an = E[E.heimilisfang.isna() & ~E.forsala_osynileg.astype(bool)]
+    if len(an):
+        brot.append(f"H1: {len(an)} fastnr. án heimilisfangs utan forsöluhúss í {an.verkefni_id.nunique()} verkefnum "
+                    f"(t.d. {', '.join(map(str, an.fastnum.head(3)))})")
+    vh = set(E[E.heimilisfang.isna()].verkefni_id)
+    vm = V[V.verkefni_id.isin(vh) & ~V.forsala_osynileg.astype(bool)]
+    if len(vm):
+        brot.append(f"H1: {len(vm)} verkefni með fastnr. án heimilisfangs ekki merkt forsala ósýnileg ({', '.join(vm.heiti.head(3))})")
+    for nafn, df in (('verkefni', V), ('einingar', E), ('solur_manadar', S)):
+        if df is None:
+            continue
+        for k in df.columns:
+            if OSELD.search(str(k)) and df[k].notna().any():
+                brot.append(f"H2: {nafn}.{k} ber „óseld\"-tölu ({int(df[k].notna().sum())} gildi)")
+            # pandas 3: strengjadálkur er 'str' (StringDtype), ekki object — báðir skannaðir (cc283 falspróf b4)
+            elif df[k].dtype == object or pd.api.types.is_string_dtype(df[k]):
+                t = df[k].dropna().map(lambda v: ' '.join(map(str, v)) if isinstance(v, (list, tuple, np.ndarray)) else str(v))
+                h = t[t.str.contains(OSELD)]
+                if len(h):
+                    brot.append(f"H2: {nafn}.{k} ber „óseld\" í texta ({len(h)} raðir, t.d. {h.iloc[0][:60]!r})")
+    if {'n_thinglyst', 'n_auglyst', 'n_othekkt'} <= set(E.columns):
+        d = E[(E.n_thinglyst + E.n_auglyst + E.n_othekkt) != E.n_undireiningar]
+        if len(d):
+            brot.append(f"H3: {len(d)} einingar þar sem þrískiptingin ≠ n_undireiningar")
+        fo = E[E.forsala_osynileg.astype(bool)].groupby('verkefni_id').n_othekkt.sum()
+        vv = V.set_index('verkefni_id')
+        rest = vv.n_einingar - vv.n_seld - vv.n_auglyst - vv.n_othekkt - fo.reindex(vv.index).fillna(0)
+        if (rest != 0).any():
+            brot.append(f"H3: {int((rest != 0).sum())} verkefni þar sem þinglýst + auglýst + óþekkt ≠ íbúðir")
+    return brot
+
+
+def kodi_hash():
+    """sha256 (16 fyrstu) yfir kóða byggingarinnar: þessi skrifta + nyb_soluhradi.py + nyb_tviaugl.py (bætin eins og þau
+    eru á diski — óháð git-stöðu) + git HEAD ef til."""
+    import subprocess
+    h = hashlib.sha256()
+    d = Path(__file__).resolve().parent
+    for f in ('cc224_nybygging_verkefni.py', 'nyb_soluhradi.py', 'nyb_tviaugl.py'):
+        h.update(f.encode() + b'\0' + (d / f).read_bytes())
+    try:
+        head = subprocess.run(['git', '-C', str(d), 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True,
+                              timeout=10).stdout.strip()
+    except Exception:  # noqa: BLE001
+        head = ''
+    return f"{h.hexdigest()[:16]}" + (f"@{head}" if head else '')
 
 
 def soluhradi(V, E, D):
@@ -642,15 +852,18 @@ def soluhradi(V, E, D):
     dt_k = K.thgl.max().date()
     if dt_k != D['data_through']:
         print(f"[AÐVÖRUN] söluhraði SLEPPT: kaupskrá þinglýst til {dt_k} en sales_history til {D['data_through']}")
-        return V.assign(**{k: None for k in nyb_soluhradi.HCOLS}), None, None
+        return V.assign(**{k: None for k in nyb_soluhradi.HCOLS if k not in UTAN_UTTAKS}), None, None
     S, H, R = nyb_soluhradi.reikna_soluhradi(E, K, D['LA'])
     if R['n_samsvarar'] != R['n_sala']:
         print(f"[AÐVÖRUN] söluhraði SLEPPT: útgöngusamningur fannst fyrir {R['n_samsvarar']}/{R['n_sala']} einingar")
-        return V.assign(**{k: None for k in nyb_soluhradi.HCOLS}), None, None
+        return V.assign(**{k: None for k in nyb_soluhradi.HCOLS if k not in UTAN_UTTAKS}), None, None
     H['verkefni_id'] = H.verkefni_id.astype(V.verkefni_id.dtype)
     V = V.merge(H[['verkefni_id'] + nyb_soluhradi.HCOLS], on='verkefni_id', how='left')
-    for k in ('n_solur_90d', 'hradi_oseldar', 'heildarkaup_staersti_pakki', 'heildarkaup_n_pakkar'):
+    for k in ('n_solur_90d', 'heildarkaup_staersti_pakki', 'heildarkaup_n_pakkar'):
         V[k] = V[k].astype('Int64')
+    # cc283: hraðinn sjálfur (nothæfar sölur í glugga) stendur; frádráttartölur „óseldra" fara EKKI í úttak
+    V = V.drop(columns=[k for k in UTAN_UTTAKS if k in V.columns])
+    S = S.drop(columns=[k for k in UTAN_UTTAKS if k in S.columns])
     assert (V.heildarkaup_fyrst.notna() == (V.n_heildarkaup > 0)).all(), 'heildarkaupamerki ≠ n_heildarkaup'
     assert V.hradi_stada.isin(nyb_soluhradi.STODUR).all()
     return V, S, R
@@ -664,11 +877,11 @@ def skrifa(c, V, E, D, auk, hofst, S=None):
     cur.execute("SET LOCAL statement_timeout = '120s'")
     cur.execute("""insert into semantic.nybygging_keyrslur (utgafa, skilgreining, hofst, sala_fra, data_through, listings_snapshot,
                      n_einingar_skilgr, n_hopar, n_verkefni, n_uppselt, n_einingar, n_seld, n_magnseld, n_virkar,
-                     n_slodir_stadfestar, n_sameinad_um_slod, md5_verkefni, md5_einingar)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning keyrsla_id""",
+                     n_slodir_stadfestar, n_sameinad_um_slod, md5_verkefni, md5_einingar, kodi_hash)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning keyrsla_id""",
                 (UTGAFA, SKILGREINING, hofst, SALA_FRA, D['data_through'], D['snap'], D['n_skilgr_land'], auk['n_hopar'],
                  len(V), int(V.uppselt.sum()), int(V.n_einingar.sum()), int(V.n_seld.sum()), int(V.n_magnseld.sum()),
-                 int(V.n_virkar.sum()), len(D['SL']), auk['n_sameinad'], md5_df(V[VCOLS]), md5_df(E[ECOLS])))
+                 int(V.n_virkar.sum()), len(D['SL']), auk['n_sameinad'], md5_df(V[VCOLS]), md5_df(E[ECOLS]), auk['kodi_hash']))
     kid = cur.fetchone()[0]
     cur.execute("delete from semantic.nybygging_verkefni where utgafa = %s", (UTGAFA,))
     vr = [[UTGAFA] + [json.dumps(r[k], ensure_ascii=False) if k == 'stofur' else nn(r[k]) for k in VCOLS] + [kid]
@@ -681,8 +894,8 @@ def skrifa(c, V, E, D, auk, hofst, S=None):
     cur.execute("delete from semantic.nybygging_solur_manadar where utgafa = %s", (UTGAFA,))
     n_s = 0
     if S is not None:
-        sr = [[UTGAFA] + [nn(r[k]) for k in nyb_soluhradi.SCOLS] for r in S.to_dict('records')]
-        execute_values(cur, f"insert into semantic.nybygging_solur_manadar (utgafa, {', '.join(nyb_soluhradi.SCOLS)}) values %s",
+        sr = [[UTGAFA] + [nn(r[k]) for k in SCOLS] for r in S.to_dict('records')]
+        execute_values(cur, f"insert into semantic.nybygging_solur_manadar (utgafa, {', '.join(SCOLS)}) values %s",
                        sr, page_size=5000)
         n_s = len(sr)
     cur.execute("select count(*), coalesce(sum(n_einingar),0), coalesce(sum(n_seld),0) from semantic.nybygging_verkefni where utgafa=%s", (UTGAFA,))
@@ -792,10 +1005,21 @@ def main():
         if a.skrifa:
             MY, n_nyjar, n_hladid = smida_myndir(c, V, MY, a.hlada_myndir)
         V = mynd_i_verkefni(V, MY)
+        # cc283 H-NYB: fail-closed — ekkert skrifað (hvorki CSV né DB) ef hliðið fellur
+        brot = hlid_nyb(V[VCOLS], E[ECOLS], SM[SCOLS] if SM is not None else None)
+        if brot:
+            for b in brot:
+                print(f"[H-NYB FELLUR] {b}")
+            print("[STOPP] H-NYB féll — ekkert skrifað")
+            return 4
+        auk['kodi_hash'] = kodi_hash()
         V.to_csv(ut / 'verkefni.csv', index=False, encoding='utf-8-sig')
         E.to_csv(ut / 'einingar.csv', index=False, encoding='utf-8-sig')
         if SM is not None:
             SM.to_csv(ut / 'solur_manadar.csv', index=False, encoding='utf-8-sig')
+        # cc283: farmurinn nákvæmlega eins og hann fer í DB (gerðir varðveittar) — frysting afhendinga og migration-próf lesa hann
+        pd.to_pickle(dict(V=V[VCOLS], E=E[ECOLS], S=SM[SCOLS] if SM is not None else None, utgafa=UTGAFA,
+                          data_through=D['data_through'], snap=D['snap'], kodi_hash=auk['kodi_hash']), ut / 'farmur.pkl')
         U = auk['U']
         lin = [f"útgáfa {UTGAFA} | {'SPÁ m/ slóðatillögum' if a.slodir_tillaga else 'staðfestar slóðir: ' + str(len(D['SL']))}",
                f"skilgreining: {SKILGREINING}",
@@ -808,6 +1032,11 @@ def main():
                f" + ekki auglýst {int(((V.n_virkar == 0) & ~V.uppselt.astype(bool)).sum())}",
                f"forsíðumynd valin {int(V.mynd_sha256.notna().sum())}/{len(V)} | smíðuð (720 px WebP) {int(V.mynd_lykill.notna().sum())}"
                f" | nýjar í þessari keyrslu {n_nyjar} | hlaðnar á hýsil {n_hladid}",
+               f"cc283 þrískipting (íbúðir): þinglýst seld {int(E.n_thinglyst.sum())} · auglýst {int(E.n_auglyst.sum())} · óþekkt "
+               f"{int(E.n_othekkt.sum())} (þar af í forsöluhúsum {int(E[E.forsala_osynileg].n_othekkt.sum())}, ekki í samtölu)"
+               f" | forsala ósýnileg: {int(V.forsala_osynileg.sum())} verkefni, {int(V.n_forsala_ibudir.sum())} íbúðir"
+               f" | auglýsingar án fastnr.: {auk['R_augl']['n_augl']} virkar, á húsi {auk['R_augl']['n_hus']} (tengdar"
+               f" {auk['R_augl']['n_tengd']}, ótengdar {auk['R_augl']['n_otengd']}) | H-NYB stenst | kóði {auk['kodi_hash']}",
                f"staða eininga: " + ' · '.join(f"{k} {n}" for k, n in E.stada.value_counts().items())
                + f" | heildarkaup (D2′) Σ undireininga {int(V.n_heildarkaup.sum())} í {int((V.n_heildarkaup > 0).sum())} verkefnum"
                + f" | ΣX {int(V.n_seld.sum())}",
@@ -825,7 +1054,7 @@ def main():
                 f"{RS['fullnusta_lok'][0]:.3f}/{RS['fullnusta_lok'][1]:.3f}) | útgöngusamningar {RS['n_samsvarar']}/{RS['n_sala']}"
                 f" | mánaðarraðir {len(SM)} í {SM.verkefni_id.nunique()} verkefnum | staða "
                 + ' · '.join(f"{k} {n}" for k, n in V.hradi_stada.value_counts().items())
-                + f" | man_i_uppselt {int(V.man_i_uppselt.notna().sum())} | heildarkaupamerki {int(V.heildarkaup_fyrst.notna().sum())}"
+                + f" | heildarkaupamerki {int(V.heildarkaup_fyrst.notna().sum())}"
                 f" | {t_sh:.1f} s")]
         for l in lin:
             print(l)

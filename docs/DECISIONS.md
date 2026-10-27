@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-27 — /nybyggingar: þrískipting í stað „óseldra“; forsala ósýnileg í kaupskrá; frysting afhendinga (cc283) — **GO Danna/arkitekts 27.10 á þrískiptingu, athugun og frystingu; grein cc283 (app + verdmat-ai), ópushað (HALT fyrir push); migration 20261027120000 skrifuð og sönnuð (--prof), EKKI beitt**
+
+1. **Þrjár stöður per íbúð** (cc224-v9): „þinglýst seld“ / „auglýst“ / „óþekkt staða (ekki þinglýst, ekki auglýst)“. „Óseld“ er hvergi tala í úttaki. `n_oseldar`, `n_oseldar_oauglystar`, `hradi_oseldar`, `man_i_uppselt` og `oseldar_upphafi` eru ekki skrifuð, og staðan `oseld` heitir `othekkt`. Ástæða: cc282 — VB dró 130 „óseldar“ á Heklureit af 182 − 52 úr okkar gögnum, en 100 þeirra voru á L170 þar sem kaupskrá getur ekki sýnt forsölu.
+2. **Forsala ósýnileg í kaupskrá** er merking á HÚSI (verkefni × heimilisfang; NULL = sér hús). Hún gildir ef minnst ein íbúð hússins er á óskiptu fastnr., á byggingarstigi B0–B2/óskráð eða án heimilisfangs í properties, EÐA ef húsið á engan samning frá 2021. Óþekkt staða í slíku húsi er aldrei lögð í samtölu (`n_othekkt` telur hana ekki), og þar er ekkert söluhlutfall.
+3. **D2″ (í stað D2′):** ónothæfur samningur = þinglýst seld, NEMA virk söluauglýsing sást fyrst eftir síðasta ónothæfa samninginn (þá „auglýst“). Gömul auglýsing sem er enn uppi fellir ekki samninginn. Áhrif 27.10: +22 íbúðir í heildarkaupum. Heklureitur óbreyttur (öll 4 tilvikin endurauglýst eftir samning).
+4. **Auglýsing án fastnr.** telst á íbúð aðeins með vissu: gata + nr + stafur + póstnr hitta EITT hús í EINU verkefni, og húsið er eitt óskipt fastnr. eða ein íbúð passar á stærð (±1 m²) og herbergjum. Annars er hún ótengd, og íbúðirnar standa sem óþekkt staða (aldrei „óauglýst“). 27.10: 131 auglýsing á húsi, 119 tengdar, 12 ótengdar.
+5. **H-NYB fail-closed** (`hlid_nyb`): bygging stöðvast (rc 4, ekkert skrifað) ef fastnr. án heimilisfangs er utan forsöluhúss, ef „óseld“ stendur í dálki með gildi eða í texta, eða ef þrískiptingin stemmir ekki. Sama regla er í skorðum gagnagrunnsins (`*_thriskipting_chk`): annaðhvort gamla formið eða þrískipting, aldrei bæði.
+6. **Frysting afhendinga** (`scripts/nyb_afhending.py`): hvert skjal til þriðja aðila fer óbreytanlegt í `D:\_audit\afhent\<dags>_<viðtakandi>[_N]\`, með keyrslu_id, kóða-hash byggingar (`nybygging_keyrslur.kodi_hash`) og afhendingar, sha256 hverrar skrár og H-NYB. Ekkert er yfirskrifað. Skriftan sendir ekkert.
+7. **Röð útgáfu (bindandi):** migration → merge app (næturkeyrslan skrifar þá v9) → `--skrifa` v9 → merge verdmat-ai (`NYB_UTGAFA = cc224-v9`). Framendinn má ALDREI fara út á undan v9-röðum: hann les nýju dálkana og /nybyggingar svarar annars „Gagnalag svaraði ekki“.
+
+Skil: `D:\_audit\cc283_nybyggingar_thriskipting\SKIL_CC283.md`.
+
+---
+
 ## 2026-10-25 — Eignasíðan einfölduð: krass falið, dauð kort út, verðsaga + akkeri sameinuð (cc279) — **ákvörðun Danna/arkitekts 25.10; verdmat-ai cc279 (f66ffb4, grein cc279, ofan á cc273 6aa51cc), ópushað (HALT fyrir push); ekkert birt grunnmat breytt**
 
 1. **Krassið falið.** Það er of ruglingslegt og %-línurnar standast ekki (cc247, cc273). Nákvæmni kemur úr ferskleika (cc278), ásettu verði (cc254) og iter5, ekki úr notandastillingum.
