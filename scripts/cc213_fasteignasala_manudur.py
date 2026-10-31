@@ -26,6 +26,17 @@ cc223 (regla_version cc223-v1 = cc213-v2 + nýbyggingarstaðir): þrír staðir 
   med = nefnarar-röðin óbreytt. cc213-v2 (lifandi framendi fram að flippi FS_REGLA) er skrifuð samhliða úr sömu
   útreikningum, aðeins med/an og án stað-raða — eldri RLS-regla gildir um hana.
 
+cc286 (regla_version cc286-v1 = cc223-v1 + rétt „virk á kaupsamningsdegi", óháð staðfesting cc287 §6.1):
+  lokadagur   = withdrawn_at ef hann er til; annars status='active' → ENN VIRK (opin lok); annars (status='inactive',
+                mbl syna≠1 við síðustu sókn) → max(last_seen_at, sidast_fundin_at). last_seen_at er síðasta delta-sókn,
+                EKKI lok auglýsingar (DATA_SCHEMA § Lifandi lag): með gömlu reglunni max(withdrawn_at, last_seen_at) „lauk"
+                virk auglýsing á síðustu sókn og eignunin hoppaði á eldri auglýsingu annarrar stofu (10 af 2.015 í júl–sep).
+  virk á K    = upphafsDAGUR ≤ K ≤ lokadagur (dagsgrunnur: auglýsing sem birtist á kaupsamningsdegi var virk á honum;
+                áður var klukkutími upphafs borinn við miðnætti K).
+  eignun      = hreinsuð per (regla_version, tímabil reiknuðu mánaðanna), ekki per lista núverandi samninga — samningur
+                sem fellur úr menginu (t.d. HMS merkir ONOTHAEFUR 0→1) skilur ekki eftir eignunarröð.
+  cc223-v1 er ekki skrifuð lengur; framendinn flippar FS_REGLA → cc286-v1 (verdmat-ai config/fasteignasolur.ts).
+
 Notkun:
   python scripts/cc213_fasteignasala_manudur.py --man 2026-08 [--man 2026-07] [--dry-run]
   python scripts/cc213_fasteignasala_manudur.py --sjalfvirkt          # 2026-07 … síðasti mánuður m/ fullnustu ≥ 90 %
@@ -53,7 +64,9 @@ import psycopg2.extras
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sali_utdrattur import UTGAFA, Nafnaskra, candidates, extract, fold, personal_emails, same_person  # noqa: E402
 
-REGLA_VERSION = "cc223-v1"   # cc223 (09.10): cc213-v2 + þrír nýbyggingarstaðir (med/an/adeins) með eigin gólfum
+REGLA_VERSION = "cc286-v1"   # cc286 (31.10): cc223-v1 + lokadagur virkrar auglýsingar + virk á K á dagsgrunni
+#                              (cc223 09.10: cc213-v2 + þrír nýbyggingarstaðir med/an/adeins með eigin gólfum)
+OPIN_LOK = pd.Timestamp("2100-01-01")   # lokadagur virkrar auglýsingar án withdrawn_at („enn virk")
 ELDRI_REGLA = "cc213-v2"     # v2 (29.09): handvirk útilokun sala + staðfest vörumerkjakort — lifandi framendi fram að flippi
 ELDRI_REGLA_TIL = dt.date(2026, 10, 16)   # ákvörðun Danna 09.10: cc213-v2 skrifuð til og með keyrslunni 16.10, svo hætt
 REGLUR = (ELDRI_REGLA, REGLA_VERSION)
@@ -120,15 +133,26 @@ def fullnusta(c: pd.DataFrame, T: pd.Period, data_through: pd.Timestamp) -> floa
     return round(100 * float(np.median(fr)), 1) if fr else 0.0
 
 
+def lokadagur(a: pd.DataFrame) -> pd.Series:
+    """Lokadagur auglýsingar (cc286): withdrawn_at → annars active = OPIN_LOK → annars max(last_seen_at, sidast_fundin_at).
+    last_seen_at ræður ALDREI lokum virkrar auglýsingar (það er síðasta delta-sókn, ekki líf)."""
+    end = a["withdrawn_at"].copy()
+    virk = end.isna() & (a["status"] == "active")
+    end[virk] = OPIN_LOK
+    rest = end.isna()
+    end[rest] = a.loc[rest, ["last_seen_at", "sidast_fundin_at"]].max(axis=1)
+    return end
+
+
 def lesa_listings(cur) -> pd.DataFrame:
-    cur.execute("""select listing_id, fastnum, agency_source_id, agency_name, lysing, source_listing_id,
-                          listed_at, first_seen_at, last_seen_at, withdrawn_at, updated_at
+    cur.execute("""select listing_id, fastnum, agency_source_id, agency_name, lysing, source_listing_id, status,
+                          listed_at, first_seen_at, last_seen_at, sidast_fundin_at, withdrawn_at, updated_at
                      from scraper.listings where tenure = 'sale' and fastnum is not null""")
     a = pd.DataFrame(cur.fetchall(), columns=[d[0] for d in cur.description])
-    for col in ("listed_at", "first_seen_at", "last_seen_at", "withdrawn_at", "updated_at"):
+    for col in ("listed_at", "first_seen_at", "last_seen_at", "sidast_fundin_at", "withdrawn_at", "updated_at"):
         a[col] = pd.to_datetime(a[col], utc=True).dt.tz_localize(None)
     a["start"] = a[["listed_at", "first_seen_at"]].min(axis=1)
-    a["end"] = a[["withdrawn_at", "last_seen_at"]].max(axis=1)
+    a["end"] = lokadagur(a)
     a["dealer_email"] = None
     if PARSED_MBL.exists():
         p = pd.read_sql("select source_listing_id, dealer_email from parsed_mbl_sale where dealer_email is not null",
@@ -242,7 +266,7 @@ def eigna(c: pd.DataFrame, k: pd.DataFrame, a: pd.DataFrame) -> pd.DataFrame:
     m = cf.merge(c[["FAERSLUNUMER", "utg"]], on="FAERSLUNUMER").merge(
         a[["listing_id", "fastnum", "start", "end", "agency_source_id"]], on="fastnum")
     m = m[((m.start - m.utg).dt.days <= EFTIR_DAGAR) & ((m.end - m.utg).dt.days >= -W_DAGAR)].copy()
-    m["fyrir"] = m.start <= m.utg
+    m["fyrir"] = m.start.dt.normalize() <= m.utg          # cc286: upphafsDAGUR ≤ K (dagsgrunnur, utg er miðnætti K)
     m["virk"] = m.fyrir & (m.end >= m.utg)
     n_st = m.dropna(subset=["agency_source_id"]).groupby("FAERSLUNUMER").agency_source_id.nunique()
     m = m.sort_values(["FAERSLUNUMER", "virk", "fyrir", "start", "listing_id"], ascending=[True, False, False, False, True])
@@ -364,8 +388,9 @@ def main() -> int:
         # skrif: eignun
         allar = pd.concat([eignad_man[M] for M in eignad_man])
         for regla in reglur:
-            cur.execute("delete from scraper.fasteignasala_eignun where regla_version = %s and faerslunumer = any(%s)",
-                        (regla, list(map(int, allar.faerslunumer))))
+            # cc286: hreinsað per tímabil reiknuðu mánaðanna — samningur sem féll úr menginu skilur ekki eftir röð
+            cur.execute("delete from scraper.fasteignasala_eignun where regla_version = %s and utgdag between %s and %s",
+                        (regla, min(eignad_man).start_time.date(), max(eignad_man).end_time.date()))
             psycopg2.extras.execute_values(cur, """insert into scraper.fasteignasala_eignun
                 (faerslunumer, regla_version, utgdag, thinglyst, kaupverd, n_fastnum, nybygging, regla, listing_id, sala_id,
                  stofa_lykill, n_stofur_i_glugga, salar, sali_uppruni) values %s""",
