@@ -303,6 +303,23 @@ def eigna(c: pd.DataFrame, k: pd.DataFrame, a: pd.DataFrame) -> pd.DataFrame:
     return r.reset_index()
 
 
+def stofur_jafnteflis(jafntefli, stofa_lykill, utan_rodunar, vm):
+    """cc286: stofur jafnteflis innan dags per samning (sigurvegarinn fyrst), ein auglýsing per stofulykil.
+    Skilar (stofur, pör (listing_id, stofulykill)). Samningur utan röðunar eða án stofu → tómir listar.
+    ATH: utan_rodunar getur verið Arrow-strengjadálkur (pandas 3) þar sem skortur er NaN, ekki None — því isinstance."""
+    stofur_l, por_l = [], []
+    for j, st0, utan in zip(jafntefli, stofa_lykill, utan_rodunar):
+        if isinstance(utan, str) or not isinstance(st0, str):
+            stofur_l.append([]); por_l.append([]); continue
+        sts, pr = [], []
+        for lid_, sid_ in j:
+            st_ = vm.get(int(sid_), (None,))[0]
+            if isinstance(st_, str) and st_ not in sts:
+                sts.append(st_); pr.append((lid_, st_))
+        stofur_l.append(sts); por_l.append(pr)
+    return stofur_l, por_l
+
+
 # ---------------------------------------------------------------------------- samantekt
 def rodun(e: pd.DataFrame, tegund: str, lykill: str, nafn_af, stofa_af, velta_col: str, sameig: bool):
     """Röðunarlínur allra staða (med/an/adeins) — hver staður raðaður sjálfstætt, ekki afleiddur af öðrum."""
@@ -385,17 +402,7 @@ def main() -> int:
             # cc286 R-H: heildarkaup fjölbýlishúss — utan röðunar (engin stofa, engir salar), talið í nefnara
             e["utan_rodunar"] = [UTAN_HEILDARKAUP if h else None for h in e.heildarkaup]
             e.loc[e.heildarkaup.astype(bool), "stofa_lykill"] = None
-            # cc286: stofur jafnteflis innan dags (sigurvegarinn fyrst); ein auglýsing per stofulykil
-            stofur_l, por_l = [], []
-            for j, st0, utan in zip(e.jafntefli, e.stofa_lykill, e.utan_rodunar):
-                if utan is not None or not isinstance(st0, str):
-                    stofur_l.append([]); por_l.append([]); continue
-                sts, pr = [], []
-                for lid_, sid_ in j:
-                    st_ = vm.get(int(sid_), (None,))[0]
-                    if isinstance(st_, str) and st_ not in sts:
-                        sts.append(st_); pr.append((lid_, st_))
-                stofur_l.append(sts); por_l.append(pr)
+            stofur_l, por_l = stofur_jafnteflis(e.jafntefli, e.stofa_lykill, e.utan_rodunar, vm)
             e["stofur"] = stofur_l
 
             def salar_af(lid, st):

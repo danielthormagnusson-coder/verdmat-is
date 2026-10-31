@@ -188,6 +188,17 @@ prof("S-2 fjoldi_sameiginl talin á stofulínum (Hvammur 1, Akureyrar 1, Byggð 
      h["fjoldi_sameiginl"] == 1 and a_["fjoldi_sameiginl"] == 1 and rr[("byggd", "fjoldi", "med")]["fjoldi_sameiginl"] == 0)
 prof("S-3 summa stofuveltu = heildarvelta eignaðra (enginn tvítalinn kr)", sum(r["velta"] for (k_, m_, s_), r in rr.items() if m_ == "fjoldi" and s_ == "med") == 200)
 
+# ---------------------------------------------------------------- aðhvarf: blandaður utan_rodunar-dálkur (ágúst 2026)
+VM = {474: ("hvammur", "Hvammur"), 600: ("akureyrar", "Akureyrar"), 553: ("torg", "TORG")}
+e_ = pd.DataFrame({"jafntefli": [[(1, 474), (2, 600)], [(3, 553)], [(4, 553)]], "stofa_lykill": ["hvammur", "torg", None]})
+e_["utan_rodunar"] = [None, None, "heildarkaup_fjolbylishuss"]          # pandas 3: Arrow-strengur, skortur = NaN
+st_, pr_ = F.stofur_jafnteflis(e_.jafntefli, e_.stofa_lykill, e_.utan_rodunar, VM)
+prof("A-1 blandaður dálkur (str + skortur): venjulegir samningar halda stofum, heildarkaup tómt",
+     st_ == [["hvammur", "akureyrar"], ["torg"], []] and pr_[0] == [(1, "hvammur"), (2, "akureyrar")])
+gamalt = [[] if (u_ is not None or not isinstance(s0, str)) else ["x"] for s0, u_ in zip(e_.stofa_lykill, e_.utan_rodunar)]
+prof("FA-1 FALSPRÓF: gamla prófið `utan is not None` tæmir ALLA samninga mánaðarins — A-1 VERÐUR að grípa það",
+     gamalt == [[], [], []])
+
 ok = all(b for _, b in nidur)
 for n, b in nidur:
     print(f"{'STENST' if b else 'FELLUR'}  {n}")
