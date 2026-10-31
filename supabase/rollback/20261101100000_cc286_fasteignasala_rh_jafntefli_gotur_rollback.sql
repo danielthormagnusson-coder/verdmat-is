@@ -1,4 +1,4 @@
--- ROLLBACK 20261031140000_cc286_fasteignasala_rh_jafntefli_gotur
+-- ROLLBACK 20261101100000_cc286_fasteignasala_rh_jafntefli_gotur
 DROP MATERIALIZED VIEW semantic.v_street_prices;
 CREATE MATERIALIZED VIEW semantic.v_street_prices AS
  WITH win AS (

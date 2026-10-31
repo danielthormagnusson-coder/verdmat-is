@@ -1,4 +1,4 @@
--- 20261031140000_cc286_fasteignasala_rh_jafntefli_gotur — cc286 (ákvarðanir Danna 31.10). Additíft + endurgerð eins MV. Beitt með psycopg2 (lock_timeout 10 s),
+-- 20261101100000_cc286_fasteignasala_rh_jafntefli_gotur — cc286 (ákvarðanir Danna 31.10). Additíft + endurgerð eins MV. Beitt með psycopg2 (lock_timeout 10 s),
 -- rollback skrifað og sannað á undan (D:\_audit\cc286_markadur\scripts/beita_migration_cc286.py --prof).
 --
 -- (a) R-H: heildarkaup fjölbýlishúss (Fjölbýli, samningsflötur > 500 m²) utan röðunar — talið í nefnurum.

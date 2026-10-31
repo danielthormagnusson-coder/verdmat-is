@@ -378,6 +378,9 @@ def main() -> int:
     conn.autocommit = False
     cur = conn.cursor()
     try:
+        # Pooler-gildran (WORKING_PROTOCOL (h), cc231/cc288): rollback FYRST, síðan READ WRITE sem fyrsta skipun færslunnar —
+        # bakendi 6543 getur borið lekið default_transaction_read_only=on frá fyrri biðlara.
+        conn.rollback()
         cur.execute("SET TRANSACTION READ WRITE")
         cur.execute("SET LOCAL statement_timeout = '15min'")   # pooler-sjálfgildið féll á listings-lestri undir álagi (29.09)
         a = lesa_listings(cur)
