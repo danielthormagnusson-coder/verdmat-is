@@ -113,6 +113,81 @@ prof("U1 engin virk á K → síðasta sem hófst ≤ K (REMAX), eins og áður"
 prof("U2 sama niðurstaða með gömlu reglunni (breytingin snertir ekki afskráðar)", eigna_med(U, gamli_lokadagur, fastnum=8).agency_source_id == REMAX)
 prof("R1 REGLA_VERSION = cc286-v1", F.REGLA_VERSION == "cc286-v1" and F.SJALFGEFNAR_REGLUR == ("cc286-v1",))
 
+# ---------------------------------------------------------------- jafntefli innan dags (raungögn, ákvörðun Danna 31.10)
+HVAMMUR, AKUREYRAR, BYGGD, FS, VALHOLL, HRAUNHAMAR = 474, 600, 119, 802, 15, 17
+def stofur(r):
+    return [s for _, s in r.jafntefli]
+
+HEIDARTUN = auglysingar([      # 745820 Heiðartún 2, fnr 2364125, K = 2026-07-24
+    (203116, 2364125, HVAMMUR, "withdrawn", "2026-07-06 13:59:12", "2026-07-06 13:59:12", "2026-07-11 02:18:16", "2026-07-19 16:52:03", "2026-08-11 08:30:04"),
+    (203147, 2364125, AKUREYRAR, "withdrawn", "2026-07-06 13:24:03", "2026-07-06 13:24:03", "2026-07-07 01:40:14", "2026-07-19 16:56:03", "2026-08-11 08:32:04"),
+    (12905, 2364125, AKUREYRAR, "withdrawn", "2026-04-10 11:24:14", "2026-04-10 11:24:14", "2026-06-19 03:08:29", None, "2026-07-29 17:52:04"),
+])
+r = eigna_med(HEIDARTUN, F.lokadagur, K="2026-07-24", fastnum=2364125, faersla="745820")
+prof("J1 Heiðartún 2: sama upphafsdag 06.07 → sameiginleg Hvammur + Akureyrar (sigurvegari fyrst)",
+     stofur(r) == [HVAMMUR, AKUREYRAR] and r.regla == "virk_a_K")
+
+JADARSTUN = auglysingar([      # 746995 Jaðarstún 12, fnr 2353873, K = 2026-08-09
+    (315559, 2353873, BYGGD, "withdrawn", "2026-07-31 16:40:48", "2026-07-31 16:40:48", "2026-08-01 01:18:07", "2026-08-12 15:16:04", "2026-09-03 09:46:04"),
+    (315653, 2353873, FS, "withdrawn", "2026-07-31 11:33:00", "2026-07-31 11:33:00", "2026-08-01 01:32:09", None, "2026-08-23 08:54:03"),
+    (290390, 2353873, FS, "withdrawn", "2026-07-20 11:07:00", "2026-07-20 11:07:00", "2026-07-21 01:42:20", None, "2026-08-11 17:16:07"),
+])
+r = eigna_med(JADARSTUN, F.lokadagur, K="2026-08-09", fastnum=2353873, faersla="746995")
+prof("J2 Jaðarstún 12: sama upphafsdag 31.07 → sameiginleg Byggð + FS; eldri FS (20.07) ekki í jafntefli",
+     stofur(r) == [BYGGD, FS] and [l for l, _ in r.jafntefli] == [315559, 315653])
+
+HJALLABRAUT = auglysingar([    # 744938 Hjallabraut 47B, fnr 2522260, K = 2026-07-07
+    (263814, 2522260, HRAUNHAMAR, "withdrawn", "2026-07-07 12:32:13", "2026-07-07 12:32:13", "2026-07-08 01:32:13", None, "2026-07-31 06:40:04"),
+    (128876, 2522260, VALHOLL, "withdrawn", "2026-07-01 23:48:23", "2026-07-01 23:48:23", "2026-07-09 02:38:25", None, "2026-07-31 01:27:27"),
+    (128393, 2522260, HRAUNHAMAR, "withdrawn", "2026-06-29 09:58:33", "2026-06-29 09:58:33", "2026-07-01 03:00:25", None, "2026-07-19 11:46:03"),
+])
+r = eigna_med(HJALLABRAUT, F.lokadagur, K="2026-07-07", fastnum=2522260, faersla="744938")
+prof("J3 Hjallabraut 47B: Hraunhamar hófst á K, Valhöll 01.07 → EKKI jafntefli, Hraunhamar einn",
+     stofur(r) == [HRAUNHAMAR] and r.listing_id == 263814)
+prof("FJ FALSPRÓF: klukkutímareglan (sigurvegari einn) gefur Heiðartúni eina stofu — J1 VERÐUR að grípa það",
+     len([eigna_med(HEIDARTUN, F.lokadagur, K="2026-07-24", fastnum=2364125, faersla="745820").agency_source_id]) == 1
+     and eigna_med(HEIDARTUN, F.lokadagur, K="2026-07-24", fastnum=2364125, faersla="745820").agency_source_id == HVAMMUR)
+
+# ---------------------------------------------------------------- R-H: heildarkaup fjölbýlishúss (ákvörðun Danna 31.10)
+def kaupskra_gervi(radir):
+    k = pd.DataFrame(radir, columns=["FAERSLUNUMER", "UTGDAG", "THINGLYSTDAGS", "FASTNUM", "KAUPVERD", "BYGGAR", "FULLBUID",
+                                     "TEGUND", "ONOTHAEFUR_SAMNINGUR", "EINFLM"])
+    k["utg"] = pd.to_datetime(k.UTGDAG); k["thgl"] = pd.to_datetime(k.THINGLYSTDAGS); k["fastnum"] = k.FASTNUM.astype("int64")
+    k["kaupverd"] = k.KAUPVERD.astype("int64") * 1000; k["byggar"] = pd.to_numeric(k.BYGGAR); k["fullbuid"] = pd.to_numeric(k.FULLBUID)
+    k["ibud"] = k.TEGUND.str.strip().isin(F.IBUD); k["onoth"] = k.ONOTHAEFUR_SAMNINGUR.astype(int)
+    k["einflm"] = pd.to_numeric(k.EINFLM, errors="coerce"); k["fjolbyli"] = k.TEGUND.str.strip() == "Fjölbýli"
+    k["nyb"] = (k.fullbuid == 0) | (k.byggar >= k.utg.dt.year - 2)
+    return k
+
+K_ = kaupskra_gervi([
+    ("747053", "2026-08-31", "2026-09-14", "2310478", "650000", "1953", "1", "Fjölbýli", "0", "2262"),   # Keilisbraut 748
+    ("1", "2026-08-01", "2026-08-05", "1", "90000", "2000", "1", "Fjölbýli", "0", "500"),
+    ("2", "2026-08-01", "2026-08-05", "2", "90000", "2000", "1", "Fjölbýli", "0", "500.1"),
+    ("746998", "2026-09-07", "2026-09-20", "2020035", "510000", "1960", "1", "Einbýli", "0", "594"),     # Dyngjuvegur 2
+])
+c_ = F.samningar(K_).set_index("FAERSLUNUMER")
+prof("H-1 Keilisbraut 748 (Fjölbýli 2.262 m²) → heildarkaup", bool(c_.at["747053", "heildarkaup"]))
+prof("H-2 Fjölbýli nákvæmlega 500 m² → EKKI (> 500)", not bool(c_.at["1", "heildarkaup"]))
+prof("H-3 Fjölbýli 500,1 m² → heildarkaup", bool(c_.at["2", "heildarkaup"]))
+prof("H-4 Einbýli 594 m² (Dyngjuvegur 2) → EKKI (aðeins Fjölbýli)", not bool(c_.at["746998", "heildarkaup"]))
+prof("FH FALSPRÓF: án reglunnar (HEILDARKAUP_FLM óendanlegt) er Keilisbraut talin í röðun — H-1 VERÐUR að grípa það",
+     (lambda g: (setattr(F, "HEILDARKAUP_FLM", float("inf")), not bool(F.samningar(K_).set_index("FAERSLUNUMER").at["747053", "heildarkaup"]),
+                 setattr(F, "HEILDARKAUP_FLM", g))[1])(F.HEILDARKAUP_FLM))
+
+# ---------------------------------------------------------------- stofuröðun með sameiginlegri sölu (sami vélbúnaður og salar)
+eig = pd.DataFrame({"faerslunumer": [1, 2, 3], "kaupverd": [100, 60, 40], "nyb": [False, True, False],
+                    "stofur": [["hvammur", "akureyrar"], ["hvammur"], ["byggd"]]})
+xs = eig.explode("stofur").rename(columns={"stofur": "stofa"})
+xs["n_st"] = xs.groupby("faerslunumer").stofa.transform("size"); xs["velta_skipt"] = xs.kaupverd / xs.n_st
+xs["nyb_velta"] = xs.velta_skipt.where(xs.nyb, 0); xs["sameig"] = xs.n_st > 1
+rr = {(r["adili_lykill"], r["maelikvardi"], r["nybyggingar"]): r for r in F.rodun(xs, "stofa", "stofa", lambda l: l, lambda l: (l, l), "velta_skipt", True)}
+h = rr[("hvammur", "fjoldi", "med")]; a_ = rr[("akureyrar", "fjoldi", "med")]
+prof("S-1 sameiginleg sala: fjöldi óskiptur (Hvammur 2, Akureyrar 1), velta skipt (Hvammur 50+60, Akureyrar 50)",
+     h["fjoldi"] == 2 and a_["fjoldi"] == 1 and h["velta"] == 110 and a_["velta"] == 50)
+prof("S-2 fjoldi_sameiginl talin á stofulínum (Hvammur 1, Akureyrar 1, Byggð 0)",
+     h["fjoldi_sameiginl"] == 1 and a_["fjoldi_sameiginl"] == 1 and rr[("byggd", "fjoldi", "med")]["fjoldi_sameiginl"] == 0)
+prof("S-3 summa stofuveltu = heildarvelta eignaðra (enginn tvítalinn kr)", sum(r["velta"] for (k_, m_, s_), r in rr.items() if m_ == "fjoldi" and s_ == "med") == 200)
+
 ok = all(b for _, b in nidur)
 for n, b in nidur:
     print(f"{'STENST' if b else 'FELLUR'}  {n}")
