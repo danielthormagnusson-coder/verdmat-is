@@ -1895,3 +1895,24 @@ sé endurvakinn á skoðun einni.
   - Rök fyrir NEI: raðhús/einbýli bera eigið húsnúmer í heimilisfangi, svo einingin er auðkennd án númers.
   - Verk: telja hve mörg af 411 deila (heimilisfang, postnr) með annarri einingu í töflunni. Aðeins þar þarf númer. Ef fjöldinn er > 0 þarf að víkka regluna (notkun) á BÁÐUM stöðum: `cc224_nybygging_verkefni.py` og `lib/ibudarnumer.ts`.
   - Fundur: `D:\_audit\cc263_merking_gagnalag\SKIL_CC263.md` §1, `f1_breyttar_radir_flokkad.csv`.
+
+- **cc288 — FASTEIGNAMAT HMS Á /markadur: SKIPTA Í ÁRGERÐ 2027 EFTIR 31.12.2026 (bókað 31.10, cc288 Á1; utan lotunnar).** Kassinn „Fasteignamat HMS 2026" sýnir núgildandi mat 2026 sem aðaltölu. Mat 2027 er aðeins notað sem breyting, úr HMS-safninu `D:\HMS_jonas\hms_archive_staging.db` (sótt 3.–5.6.2026). Það safn er ekki borið saman við opinberar tölur HMS og breytingar eftir athugasemdir eru ekki með.
+  - **Verk eftir 31.12:**
+    1. Ný sókn til HMS (curl_cffi, `hms_full_scrape_refresh.py`-mynstur) → `properties.fasteignamat_hms` með `_argerd = 2027`.
+    2. Í `scripts/cc288_fasteignamat.py`: `ARGERD = 2027`, `ARGERD_BREYTING = 2028`. `hlada_argerd` les þá 2028 úr `fasteignamat_naesta_ar` ef HMS birtir það (júní 2027), annars `sott_breyting = NULL` og breytingardálkurinn tómur.
+    3. Í `semantic.fasteignamat_argerd` stendur árgerð 2026 eftir sem saga (ný árgerð = ný röð).
+    4. `--skrifa` → ný virk keyrsla.
+    5. Titill kaflans í verdmat-ai `config/markadur.ts` („Fasteignamat HMS 2026") og `uppruni` uppfærð. Kassinn sjálfur les árið úr `v_fasteignamat_keyrsla.argerd`.
+  - **Vörn:** `argerd_vorn` krefst þess að `safn.fasteignamat` = `properties.fasteignamat_hms` á ≥ 99 % eininga. Annars er `naesta_ar` ekki árgerðin á eftir og keyrslan stöðvast.
+  - Fundur: `D:\_audit\cc288_fasteignamat\SKIL_CC288.md` § Smíði.
+
+- **cc288 (Á9) — `properties.sveitarfelag` BER HALA AF BILUM: SÉR LOTA FYRIR AÐRA FLETI (bókað 31.10, cc288; ekki lagað).** 122.691/232.887 raðir bera bil aftan við nafnið (1–20 bil): 124 ólík gildi fyrir 62 `svfn`. Öll stærri sveitarfélög eru klofin í 2 afbrigði (t.d. Reykjavík 38.940 + 20.018). Kassi cc288 btrim-ar í eigin gagnalagi (CHECK á `heiti`/`svf`).
+  - **Mæling 31.10 (`D:\_audit\cc288_fasteignamat\b1_svf_bil.out`):**
+    - Normaliseraðir og án tvítalningar: `semantic.v_street_directory`, `_sales_base`, `v_street_prices`, `v_sveitarfelag_market`, `v_street_activity`, `v_sveitarfelag_lookup`, `v_summerhouse_market`, `scraper.v_leit_listings` (0 raðir með bil, ólík = ólík eftir btrim).
+    - **Bera bilin áfram:** `public.v_properties` (122.622 raðir; 124 → 64 nöfn), `semantic.v_verdvakt_afsala` (2.881 raðir, 102 → 57), `v_verdvakt_breytingar` (1.508, 84 → 49), `v_verdvakt_breytingar_v2` (1.650, 84 → 49). Engin þeirra flokkar á nafninu í SQL (engin GROUP BY). Verðvaktin notar það aðeins sem birtingarheiti í varaleið (`lib/verdvakt-queries.js:189`) — snyrtilegt, ekki tvítalning.
+    - **Raunveruleg villa (vantalning, ekki tvítalning):** `lib/agent-tools.js:461` götuyfirlit agentsins leitar `.eq("sveitarfelag", p.sveitarfelag)` í `properties`. Það finnur aðeins eignir með SAMA bilaafbrigði og eignin sjálf. Í Reykjavík getur þá þriðjungur götunnar vantað. Agentinn er falinn (`SYNA_SPJALL=false`) en tólið er til.
+    - `lib/leit-queries.js:158` og `lib/markadur-lykiltolur.js:84` lesa normaliseraða fleti. Engin áhrif.
+  - **Verk (sér lota):**
+    1. Hreinsa við uppruna (`properties.sveitarfelag = btrim(...)` + hleðsluskriftur, eða CHECK).
+    2. Eða `svfn` í stað nafns í `agent-tools`.
+    3. Endurgera MV-in sem bera bilin.
