@@ -28,7 +28,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-REGLA = "cc288-v2"
+REGLA = "cc288-v3"
 ARGERD = 2026
 ARGERD_BREYTING = 2027
 LAGMARK_N = 5
@@ -90,8 +90,8 @@ def lesa(cur):
 
 
 # ------------------------------------------------------------------ reikningur (hrein föll, einingaprófuð)
-def undirbua(p: pd.DataFrame, m: pd.DataFrame, f: pd.DataFrame):
-    """→ (einingar með hopur/tegund/mat/kr_m2/gata, talning-dict). Engin röðun hér."""
+def _flokka(p: pd.DataFrame, m: pd.DataFrame, f: pd.DataFrame):
+    """Sameiginlegur grunnur beggja þýða: flokkur, mat (ARGERD og breytingarárgerð), normuð heiti, talning."""
     d = p.copy()
     for c in ("einflm", "postnr", "svfn", "matsvaedi_numer", "fastnum"):
         d[c] = pd.to_numeric(d[c], errors="coerce")
@@ -112,6 +112,22 @@ def undirbua(p: pd.DataFrame, m: pd.DataFrame, f: pd.DataFrame):
     mat = m.pivot_table(index="fastnum", columns="argerd", values="mat_thkr", aggfunc="first")
     d["mat"] = d.fastnum.map(mat[ARGERD]) if ARGERD in mat else np.nan
     d["mat_b"] = d.fastnum.map(mat[ARGERD_BREYTING]) if ARGERD_BREYTING in mat else np.nan
+    return d, talning
+
+
+def _afleitt(e: pd.DataFrame) -> pd.DataFrame:
+    e["hopur"] = e.flokkur
+    e["teg"] = np.where(e.canonical_code.isin(FJOLBYLI), "fjolbyli", np.where(e.canonical_code.isin(SERBYLI), "serbyli", None))
+    e["kr_m2"] = e.mat * 1000 / e.einflm.where(e.einflm > 0)
+    e["i_bili"] = np.where(e.hopur == "ibud", e.einflm.between(*IBUD_M2), True)  # atvinnu: allar einingar flokks
+    g = e.heimilisfang.map(gata_ur)
+    e["gata"] = [a for a, _ in g]
+    return e
+
+
+def undirbua(p: pd.DataFrame, m: pd.DataFrame, f: pd.DataFrame):
+    """→ (SÍAÐA þýðið: einingar með hopur/tegund/mat/kr_m2/gata, talning-dict). Engin röðun hér."""
+    d, talning = _flokka(p, m, f)
     hop = d.flokkur.isin(("ibud",) + RADAFLOKKAR)
     trappa = {}
     e = d[hop].copy(); trappa["0_flokkur"] = len(e)
@@ -128,23 +144,31 @@ def undirbua(p: pd.DataFrame, m: pd.DataFrame, f: pd.DataFrame):
     e = e[~gb]; trappa["6_geymslubil_ut"] = len(e)
     talning["trappa"] = trappa
     talning["thydi"] = {k: int(v) for k, v in e.flokkur.value_counts().items()}
-    e["hopur"] = e.flokkur
-    e["teg"] = np.where(e.canonical_code.isin(FJOLBYLI), "fjolbyli", np.where(e.canonical_code.isin(SERBYLI), "serbyli", None))
-    e["kr_m2"] = e.mat * 1000 / e.einflm
-    e["i_bili"] = np.where(e.hopur == "ibud", e.einflm.between(*IBUD_M2), True)  # atvinnu: allar einingar flokks
-    g = e.heimilisfang.map(gata_ur)
-    e["gata"] = [a for a, _ in g]
-    return e, talning
+    return _afleitt(e), talning
 
 
-def _hopar(e):
-    """(hopur, tegund, undirmengi): íbúðir allt/fjölbýli/sérbýli; atvinnu per flokk (aldrei alls)."""
+def heildarthydi(p: pd.DataFrame, m: pd.DataFrame, f: pd.DataFrame):
+    """cc288-v3: VÍÐA þýðið fyrir samanlagt mat — allar einingar hópsins með mat > 0, ekki afskráðar, óháð matsstigi og
+    stærð (heilt fjölbýli á einu fastanúmeri = EIN eining með fullu mati). Geymslubil (v2) utan. → (eH, talning_heild)."""
+    d, _ = _flokka(p, m, f)
+    h = d[d.flokkur.isin(("ibud",) + RADAFLOKKAR) & ~d.deregistered.astype(bool) & (d.mat > 0)].copy()
+    gb = (h.flokkur == "idnadur_lager") & (h.einflm < GEYMSLUBIL_M2)
+    h = h[~gb]
+    if h.fastnum.duplicated().any():  # vörn: hvert fastanúmer einu sinni
+        raise RuntimeError("heildarþýði: tvítekið fastanúmer")
+    return _afleitt(h), {"geymslubil_heild": int(gb.sum()), "thydi_heild": {k: int(v) for k, v in h.flokkur.value_counts().items()}}
+
+
+def _hopar(e, eH):
+    """(hopur, tegund, síað undirmengi, heildar-undirmengi): íbúðir allt/fjölbýli/sérbýli; atvinnu per flokk;
+    + cc288-v3 „atvinnu“ = atvinnu samanlagt, AÐEINS heildarmælikvarðinn (síaða mengið tómt)."""
     for h in ("ibud",) + RADAFLOKKAR:
-        s = e[e.hopur == h]
-        yield h, "allt", s
+        s, sh = e[e.hopur == h], eH[eH.hopur == h]
+        yield h, "allt", s, sh
         if h == "ibud":
-            yield h, "fjolbyli", s[s.teg == "fjolbyli"]
-            yield h, "serbyli", s[s.teg == "serbyli"]
+            yield h, "fjolbyli", s[s.teg == "fjolbyli"], sh[sh.teg == "fjolbyli"]
+            yield h, "serbyli", s[s.teg == "serbyli"], sh[sh.teg == "serbyli"]
+    yield "atvinnu", "allt", e.iloc[0:0], eH[eH.hopur.isin(RADAFLOKKAR)]
 
 
 def _mode(v):
@@ -152,7 +176,12 @@ def _mode(v):
     return v.mode().iloc[0] if len(v) else None
 
 
+_SIAD = ["n", "heildarmat_thkr", "midg_mat_eign_thkr", "midg_flm", "n_kr_m2", "midg_kr_m2", "n_breyting", "breyting_pct"]
+
+
 def _samantekt(s: pd.DataFrame, keys: list[str]):
+    if s.empty:
+        return pd.DataFrame(columns=keys + _SIAD)
     g = s.groupby(keys, dropna=True, sort=True)
     t = g.agg(n=("fastnum", "size"), heildarmat_thkr=("mat", "sum"), midg_mat_eign_thkr=("mat", "median"),
               midg_flm=("einflm", "median")).reset_index()
@@ -165,43 +194,75 @@ def _samantekt(s: pd.DataFrame, keys: list[str]):
     return t.drop(columns=["_s26", "_s27"])
 
 
-def reikna(e: pd.DataFrame) -> pd.DataFrame:
-    """Allar röðunarraðir. Miðgildi/breyting NULL undir LAGMARK_N (sama regla og CHECK í töflunni)."""
+def _samantekt_heild(sh: pd.DataFrame, keys: list[str]):
+    if sh.empty:
+        return pd.DataFrame(columns=keys + ["n_heild", "heildarmat_heild_thkr", "midg_mat_heild_thkr"])
+    return sh.groupby(keys, dropna=True, sort=True).agg(n_heild=("fastnum", "nunique"), heildarmat_heild_thkr=("mat", "sum"),
+                                                      midg_mat_heild_thkr=("mat", "median")).reset_index()
+
+
+def _sameina(s, sh, keys):
+    t = _samantekt(s, keys).merge(_samantekt_heild(sh, keys), on=keys, how="outer")
+    for c in ("n", "n_kr_m2", "n_breyting", "n_heild"):
+        t[c] = pd.to_numeric(t[c]).fillna(0).astype(int)
+    for c in ("heildarmat_thkr", "midg_mat_eign_thkr", "midg_flm", "midg_kr_m2", "breyting_pct",
+              "heildarmat_heild_thkr", "midg_mat_heild_thkr"):
+        t[c] = pd.to_numeric(t[c], errors="coerce").astype(float)
+    return t
+
+
+def _meta(s, sh, keys, **agg):
+    """Lýsigögn (svf, matsvæði …) úr síaða menginu fyrst (= v2 orðrétt), annars úr heildarmenginu."""
+    a = s.groupby(keys).agg(**agg) if not s.empty else None
+    b = sh.groupby(keys).agg(**agg) if not sh.empty else None
+    if a is None and b is None:  # ekkert mengi ber lykil (t.d. engin gata greind) — tómt, sama snið
+        return pd.DataFrame(columns=list(agg)).rename_axis(keys[0] if len(keys) == 1 else None)
+    if a is None:
+        return b
+    return a if b is None else a.combine_first(b)
+
+
+def reikna(e: pd.DataFrame, eH: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Allar röðunarraðir. Miðgildi/breyting/samtala NULL undir LAGMARK_N (sama regla og CHECK í töflunni).
+    eH = víða þýðið (cc288-v3); None → síaða þýðið notað (próf)."""
+    if eH is None:
+        eH = e
     ut = []
-    for h, teg, s in _hopar(e):
-        if s.empty:
+    for h, teg, s, sh in _hopar(e, eH):
+        if s.empty and sh.empty:
             continue
         # götur
-        sg = s[s.gata.notna() & s.postnr.notna()]
-        t = _samantekt(sg, ["gata", "postnr"])
-        meta = sg.groupby(["gata", "postnr"]).agg(svfn=("svfn", _mode), svf=("svf", _mode),
-                                                   matsvaedi_numer=("matsvaedi_numer", _mode)).reset_index()
-        t = t.merge(meta, on=["gata", "postnr"])
-        t["stig"] = "gata"; t["lykill"] = [f"{g}|{int(pn)}" for g, pn in zip(t.gata, t.postnr)]; t["heiti"] = t.gata
-        ut.append(t.assign(hopur=h, tegund=teg))
+        sg, shg = s[s.gata.notna() & s.postnr.notna()], sh[sh.gata.notna() & sh.postnr.notna()]
+        t = _sameina(sg, shg, ["gata", "postnr"])
+        if t.empty:
+            meta = None
+        else:
+            meta = _meta(sg, shg, ["gata", "postnr"], svfn=("svfn", _mode), svf=("svf", _mode), matsvaedi_numer=("matsvaedi_numer", _mode))
+        if meta is not None:
+            t = t.join(meta, on=["gata", "postnr"])
+            t["stig"] = "gata"; t["lykill"] = [f"{g}|{int(pn)}" for g, pn in zip(t.gata, t.postnr)]; t["heiti"] = t.gata
+            ut.append(t.assign(hopur=h, tegund=teg))
         # svæði
         for stig, keys in (("matsvaedi", ["matsvaedi_numer"]), ("postnr", ["postnr"]), ("svf", ["svfn"])):
-            t = _samantekt(s, keys)
+            t = _sameina(s, sh, keys)
             if stig == "matsvaedi":
-                nofn = s.groupby("matsvaedi_numer").matsvaedi_nafn.agg(_mode)
+                nofn = _meta(s, sh, ["matsvaedi_numer"], nafn=("matsvaedi_nafn", _mode)).nafn
                 t["heiti"] = t.matsvaedi_numer.map(nofn).map(norm)
-                t["heiti"] = [h if isinstance(h, str) else f"Matsvæði {int(k)}" for h, k in zip(t.heiti, t.matsvaedi_numer)]
+                t["heiti"] = [hh if isinstance(hh, str) else f"Matsvæði {int(k)}" for hh, k in zip(t.heiti, t.matsvaedi_numer)]
                 t["lykill"] = [str(int(k)) for k in t.matsvaedi_numer]
-                sv = s.groupby("matsvaedi_numer").agg(svfn=("svfn", _mode), svf=("svf", _mode))
-                t = t.join(sv, on="matsvaedi_numer")
+                t = t.join(_meta(s, sh, ["matsvaedi_numer"], svfn=("svfn", _mode), svf=("svf", _mode)), on="matsvaedi_numer")
             elif stig == "postnr":
                 t["lykill"] = [str(int(k)) for k in t.postnr]; t["heiti"] = t.lykill
-                sv = s.groupby("postnr").agg(svfn=("svfn", _mode), svf=("svf", _mode))
-                t = t.join(sv, on="postnr")
+                t = t.join(_meta(s, sh, ["postnr"], svfn=("svfn", _mode), svf=("svf", _mode)), on="postnr")
             else:
-                nofn = s.groupby("svfn").svf.agg(_mode)
+                nofn = _meta(s, sh, ["svfn"], svf=("svf", _mode)).svf
                 t["svf"] = t.svfn.map(nofn)
-                t["heiti"] = [h if isinstance(h, str) else f"Sveitarfélag {int(k)}" for h, k in zip(t.svf, t.svfn)]
+                t["heiti"] = [hh if isinstance(hh, str) else f"Sveitarfélag {int(k)}" for hh, k in zip(t.svf, t.svfn)]
                 t["lykill"] = [str(int(k)) for k in t.svfn]
             t["stig"] = stig
             ut.append(t.assign(hopur=h, tegund=teg))
         # landið
-        t = _samantekt(s.assign(_l="land"), ["_l"]).drop(columns="_l")
+        t = _sameina(s.assign(_l="land"), sh.assign(_l="land"), ["_l"]).drop(columns="_l")
         t["stig"] = "land"; t["lykill"] = "land"; t["heiti"] = "Landið"
         ut.append(t.assign(hopur=h, tegund=teg))
     r = pd.concat(ut, ignore_index=True)
@@ -211,9 +272,12 @@ def reikna(e: pd.DataFrame) -> pd.DataFrame:
     r.loc[r.n_kr_m2 < LAGMARK_N, "midg_kr_m2"] = np.nan
     r.loc[r.n < LAGMARK_N, "midg_mat_eign_thkr"] = np.nan
     r.loc[r.n_breyting < LAGMARK_N, "breyting_pct"] = np.nan
+    r.loc[r.n_heild < LAGMARK_N, ["heildarmat_heild_thkr", "midg_mat_heild_thkr"]] = np.nan
+    r.loc[r.n == 0, ["heildarmat_thkr", "midg_flm"]] = np.nan
     r["argerd"] = ARGERD
     return r[["argerd", "hopur", "tegund", "stig", "lykill", "heiti", "gata", "postnr", "matsvaedi_numer", "svfn", "svf",
-              "n", "n_kr_m2", "midg_kr_m2", "midg_mat_eign_thkr", "heildarmat_thkr", "midg_flm", "n_breyting", "breyting_pct"]]
+              "n", "n_kr_m2", "midg_kr_m2", "midg_mat_eign_thkr", "heildarmat_thkr", "midg_flm", "n_breyting", "breyting_pct",
+              "n_heild", "heildarmat_heild_thkr", "midg_mat_heild_thkr"]]
 
 
 def md5_df(df: pd.DataFrame) -> str:
@@ -313,11 +377,13 @@ def keyra(cur, safn: str, skrifa: bool, athugasemd: str = "") -> dict:
     if not skrifa and m.empty:
         raise RuntimeError("fasteignamat_argerd tóm — --dryrun þarf beitta migration + hleðslu, eða keyrðu innan --prof")
     e, talning = undirbua(p, m, f)
+    eH, th = heildarthydi(p, m, f)
+    talning.update(th)
     thekja = float((e.mat > 0).mean()) if len(e) else 0.0
     full = talning["trappa"]["3_fullmetid_matsstig_7_8"] / max(talning["trappa"]["1_ekki_afskrad"], 1)
     if full < LAGM_THEKJA:
         raise RuntimeError(f"þekjuvörn: aðeins {full:.1%} eininga með fullt mat {ARGERD}")
-    r = reikna(e)
+    r = reikna(e, eH)
     ut = {"arg_vorn": f"{jafnt}/{alls}", "talning": talning, "n_rodun": len(r), "md5": md5_df(r), "thekja": thekja}
     if skrifa:
         ut["keyrsla_id"] = skrifa_rodun(cur, r, talning, sott26, sott27, athugasemd)

@@ -32,8 +32,11 @@ def keyra(rows):
     p = pd.DataFrame(rows)
     m = pd.concat([p[["fastnum"]].assign(argerd=F.ARGERD, mat_thkr=p._mat),
                    p.loc[p._mat_b.notna(), ["fastnum"]].assign(argerd=F.ARGERD_BREYTING, mat_thkr=p._mat_b)])
-    e, tal = F.undirbua(p.drop(columns=["_mat", "_mat_b"]), m, FLOKKUN)
-    return F.reikna(e), tal
+    pp = p.drop(columns=["_mat", "_mat_b"])
+    e, tal = F.undirbua(pp, m, FLOKKUN)
+    eH, th = F.heildarthydi(pp, m, FLOKKUN)
+    tal.update(th)
+    return F.reikna(e, eH), tal
 
 
 def gotur(n, gata="Prófgata", **kw):
@@ -89,9 +92,16 @@ class Rodun(unittest.TestCase):
         rows = [eining(2000 + i, gata="Atv", nr=i, tegund="Verslun", fam=None, res=False, cc="EXCLUDE", flm=200.0) for i in range(5)]
         rows += [eining(3000 + i, gata="Atv", nr=20 + i, tegund="Skrifstofa", fam=None, res=False, cc="EXCLUDE", flm=200.0) for i in range(5)]
         r, _ = keyra(rows)
-        self.assertEqual(set(r.hopur), {"verslun", "skrifstofa"})
+        self.assertEqual(set(r.hopur), {"verslun", "skrifstofa", "atvinnu"})   # cc288-v3: atvinnu = samanlagt
         self.assertNotIn("atvinnu_allt", set(r.hopur))
         self.assertEqual(set(r[r.hopur != "ibud"].tegund), {"allt"})
+        a = r[r.hopur == "atvinnu"]
+        # kr/m², mat á eign og breyting eru ALDREI til fyrir atvinnu samanlagt (Á7) — aðeins samtalan
+        self.assertTrue((a.n == 0).all() and (a.n_kr_m2 == 0).all() and (a.n_breyting == 0).all())
+        self.assertTrue(a.midg_kr_m2.isna().all() and a.midg_mat_eign_thkr.isna().all() and a.breyting_pct.isna().all())
+        g = a[a.stig == "gata"].iloc[0]
+        self.assertEqual(int(g.n_heild), 10)
+        self.assertAlmostEqual(g.heildarmat_heild_thkr, 10 * 50000)
 
     def test_svf_heiti_btrimud(self):
         rows = gotur(3, "Agata", svf="Akraneskaupstaður", svfn=3000) + gotur(3, "Bgata", svf="Akraneskaupstaður      ", svfn=3000)
@@ -137,6 +147,60 @@ class Geymslubil(unittest.TestCase):
             self.assertEqual(int(r[(r.hopur == "idnadur_lager") & (r.stig == "gata")].iloc[0].n), 6)
         finally:
             F.GEYMSLUBIL_M2 = gamalt
+
+
+class Samanlagt(unittest.TestCase):
+    """cc288-v3: summa fasteignamats allra eininga götunnar; hvert fastanúmer einu sinni; víða þýðið."""
+
+    def test_summa_n_midgildi(self):
+        rows = [eining(11000 + i, gata="Summugata", nr=i + 1, mat=10000 * (i + 1)) for i in range(5)]
+        r, _ = keyra(rows)
+        g = r[(r.hopur == "ibud") & (r.tegund == "allt") & (r.stig == "gata")].iloc[0]
+        self.assertEqual(int(g.n_heild), 5)
+        self.assertAlmostEqual(g.heildarmat_heild_thkr, 150000)
+        self.assertAlmostEqual(g.midg_mat_heild_thkr, 30000)
+
+    def test_vida_thydid_oskipt_og_i_byggingu(self):
+        """Heilt fjölbýli á einu fastanúmeri (2.000 m²) og eining í byggingu (matsstig 4) teljast í samtölunni,
+        hvort um sig EINU sinni — en ekki í síaða þýðinu (kr/m², mat á eign)."""
+        rows = gotur(5, "Vidgata") + [eining(12001, gata="Vidgata", nr=40, flm=2000.0, mat=900000),
+                                       eining(12002, gata="Vidgata", nr=41, matsstig="4", mat=8000)]
+        r, _ = keyra(rows)
+        g = r[(r.hopur == "ibud") & (r.tegund == "allt") & (r.stig == "gata")].iloc[0]
+        self.assertEqual(int(g.n), 5)
+        self.assertEqual(int(g.n_heild), 7)
+        self.assertAlmostEqual(g.heildarmat_heild_thkr, 5 * 50000 + 900000 + 8000)
+
+    def test_geymslubil_utan_samtolu(self):
+        rows = [eining(13000 + i, gata="Geymgata", nr=i, tegund="Iðnaður", fam=None, res=False, cc="EXCLUDE", flm=26.0) for i in range(6)]
+        rows += [eining(14000 + i, gata="Geymgata", nr=20 + i, tegund="Iðnaður", fam=None, res=False, cc="EXCLUDE", flm=200.0) for i in range(5)]
+        r, tal = keyra(rows)
+        g = r[(r.hopur == "idnadur_lager") & (r.stig == "gata")].iloc[0]
+        self.assertEqual(int(g.n_heild), 5)
+        self.assertEqual(tal["geymslubil_heild"], 6)
+
+    def test_atvinnu_samanlagt_yfir_flokka(self):
+        rows = [eining(15000 + i, gata="Blandg", nr=i, tegund="Verslun", fam=None, res=False, cc="EXCLUDE", mat=20000) for i in range(3)]
+        rows += [eining(16000 + i, gata="Blandg", nr=10 + i, tegund="Skrifstofa", fam=None, res=False, cc="EXCLUDE", mat=40000) for i in range(3)]
+        r, _ = keyra(rows)
+        a = r[(r.hopur == "atvinnu") & (r.stig == "gata")].iloc[0]
+        self.assertEqual(int(a.n_heild), 6)                       # 3 + 3: raðast samanlagt …
+        self.assertAlmostEqual(a.heildarmat_heild_thkr, 180000)
+        v = r[(r.hopur == "verslun") & (r.stig == "gata")].iloc[0]
+        self.assertTrue(np.isnan(v.heildarmat_heild_thkr))        # … en hvor flokkur einn (n=3) raðast ekki
+
+    def test_fals_tvitalning_oskipts_fastanumers(self):
+        """Sama fastanúmer tvisvar í inntaki (t.d. heilt fjölbýli tvíhlaðið) VERÐUR að fella heildarþýðið."""
+        rows = gotur(5, "Tvigata") + [eining(17001, gata="Tvigata", nr=50, flm=2000.0, mat=900000)]
+        rows.append(dict(rows[-1]))
+        with self.assertRaises(RuntimeError):
+            keyra(rows)
+
+    def test_fals_gata_n4_radast_ekki(self):
+        r, _ = keyra([eining(18000 + i, gata="Fjogurgata", nr=i + 1, mat=999999) for i in range(4)])
+        g = r[(r.hopur == "ibud") & (r.tegund == "allt") & (r.stig == "gata")].iloc[0]
+        self.assertEqual(int(g.n_heild), 4)
+        self.assertTrue(np.isnan(g.heildarmat_heild_thkr) and np.isnan(g.midg_mat_heild_thkr))
 
 
 class Fals(unittest.TestCase):
