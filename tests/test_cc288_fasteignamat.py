@@ -109,6 +109,36 @@ class Rodun(unittest.TestCase):
         self.assertEqual(tal["trappa"]["3_fullmetid_matsstig_7_8"], 5)
 
 
+class Geymslubil(unittest.TestCase):
+    """cc288-v2: eining í iðnaði/lager undir 50 m² er geymslubil — talin, ekki raðað; regla á stærð, ekki heimilisfang."""
+
+    def _idn(self, fn, nr, flm, gata="Bilgata"):
+        return eining(fn, gata=gata, nr=nr, tegund="Iðnaður", fam=None, res=False, cc="EXCLUDE", flm=flm, mat=12000)
+
+    def test_undir_50_ut_50_inni(self):
+        rows = [self._idn(6000 + i, i, 26.0) for i in range(8)] + [self._idn(7000 + i, 20 + i, 50.0) for i in range(5)]
+        r, tal = keyra(rows)
+        g = r[(r.hopur == "idnadur_lager") & (r.stig == "gata")].iloc[0]
+        self.assertEqual(int(g.n), 5)                  # 50 m² stendur (mörkin eru < 50)
+        self.assertEqual(tal["geymslubil"], 8)
+
+    def test_adrir_flokkar_osnortnir(self):
+        rows = [eining(8000 + i, gata="Smaversl", nr=i, tegund="Verslun", fam=None, res=False, cc="EXCLUDE", flm=30.0) for i in range(5)]
+        r, tal = keyra(rows)
+        self.assertEqual(int(r[(r.hopur == "verslun") & (r.stig == "gata")].iloc[0].n), 5)
+        self.assertEqual(tal["geymslubil"], 0)
+
+    def test_fals_mork_virka(self):
+        gamalt = F.GEYMSLUBIL_M2
+        try:
+            F.GEYMSLUBIL_M2 = 0
+            r, tal = keyra([self._idn(9000 + i, i, 26.0) for i in range(6)])
+            self.assertEqual(tal["geymslubil"], 0)
+            self.assertEqual(int(r[(r.hopur == "idnadur_lager") & (r.stig == "gata")].iloc[0].n), 6)
+        finally:
+            F.GEYMSLUBIL_M2 = gamalt
+
+
 class Fals(unittest.TestCase):
     """Stökkbreytingar sem reglan VERÐUR að fella."""
 

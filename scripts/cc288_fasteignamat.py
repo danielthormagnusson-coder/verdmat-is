@@ -28,12 +28,13 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-REGLA = "cc288-v1"
+REGLA = "cc288-v2"
 ARGERD = 2026
 ARGERD_BREYTING = 2027
 LAGMARK_N = 5
 IBUD_M2 = (60, 150)          # stærðarbil aðalröðunar íbúða (Á2)
 IBUD_GILD_M2 = (20, 500)     # hreinsun: jarðir bera land í einflm, heil fjölbýli á einu fastanúmeri
+GEYMSLUBIL_M2 = 50           # cc288-v2: eining í iðnaði/lager undir 50 m² = geymslubil → talin, ekki raðað (D:/_audit/cc288_fasteignamat/d2_mork.out)
 RADAFLOKKAR = ("verslun", "skrifstofa", "idnadur_lager", "gisting")
 FJOLBYLI = ("APT_FLOOR", "APT_STANDARD", "APT_BASEMENT", "APT_ATTIC")
 SERBYLI = ("SFH_DETACHED", "ROW_HOUSE", "SEMI_DETACHED")
@@ -120,6 +121,11 @@ def undirbua(p: pd.DataFrame, m: pd.DataFrame, f: pd.DataFrame):
     e = e[e.einflm > 0]; trappa["4_flatarmal"] = len(e)
     lo, hi = IBUD_GILD_M2
     e = e[(e.flokkur != "ibud") | e.einflm.between(lo, hi)]; trappa["5_ibud_20_500_m2"] = len(e)
+    # cc288-v2 (ákv. Danna 31.10): geymslubil sem skráð eru iðnaður/lager (Móhella, Desjamýri o.fl.) — regla á tegund+stærð,
+    # aldrei á heimilisföng. Talin í talning["geymslubil"], aldrei raðað.
+    gb = (e.flokkur == "idnadur_lager") & (e.einflm < GEYMSLUBIL_M2)
+    talning["geymslubil"] = int(gb.sum())
+    e = e[~gb]; trappa["6_geymslubil_ut"] = len(e)
     talning["trappa"] = trappa
     talning["thydi"] = {k: int(v) for k, v in e.flokkur.value_counts().items()}
     e["hopur"] = e.flokkur
