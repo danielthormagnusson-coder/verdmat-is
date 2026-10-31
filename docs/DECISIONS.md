@@ -4,6 +4,22 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-10-31 — Ný tafla fær engin anon-réttindi sjálfkrafa; www-lestur krefst GRANT í sömu migration (cc284) — **GO Danna/arkitekts 31.10; migrations 20261031120000 (fasi A) og 20261031130000 (sjálfgefin réttindi) BEITTAR 11:06/11:08; fasi B og C í cc285**
+
+**Hvað**: `ALTER DEFAULT PRIVILEGES FOR ROLE postgres` í `public`, `semantic` og `scraper` afturkallar ÖLL réttindi `anon` og `authenticated` á NÝJUM töflum, sýnum, MV, runum og föllum, og EXECUTE til PUBLIC á nýjum föllum (altækt, því skema-bundið REVOKE nær ekki innbyggða sjálfgildinu). Núverandi hlutir óbreyttir. Migration `20261031130000_cc284d_sjalfgefin_rettindi` (+ rollback).
+
+**Reglan (læst):** Hver ný tafla, sýn, MV eða fall sem www á að lesa (anon eða authenticated) fær **GRANT sérstaklega í sinni migration**, t.d. `grant select on semantic.x to anon, authenticated;` eða `grant execute on function public.f(...) to anon;`. Engin réttindi fást lengur „óvart“. Þetta er fæðingarreglan (RLS + þröng réttindi í sömu migration og CREATE) gerð að sjálfgildi.
+
+**Af hverju**: Fyrir cc284 gaf `pg_default_acl` postgres í `public` hverri nýrri töflu `anon=arwdDxtm` og `authenticated=arwdDxtm`. Þess vegna báru handgerð afrit (t.d. `valuation_tiers_thinflag_pre_cc152`) og `dm_domar`/`dm_fasteignamal` skrif-réttindi anon. Aðeins mánaðarskriftirnar (`monthly_rent_level_restep.py`, `monthly_cpi_reanchor.py`) afturkölluðu sjálfar. Supabase-póstur 27.10.
+
+**Gildra:** `supabase_admin` ber sínar eigin sjálfgildisfærslur í `public` (anon=arwdDxtm), utan valds postgres. Þær gilda um hluti sem supabase_admin býr til (extension-hlutir), ekki migrations okkar.
+
+**Prófun**: prófunartafla/-sýn/-runa/-fall í hverju schema, í færslu sem rúllað var til baka: 0 réttindi til anon/authenticated eftir migration; falspróf án migrationar: anon fær réttindi í `public`.
+
+**Fasi A samhliða (20261031120000):** anon/authenticated afturkallað á 13 ólesnum hlutum (0 köll 24.–31.10), dálkaréttindum á `predictions`/`ats_lookup` og `dm_leit*`. Skrif-réttindi anon á `dm_domar`, `dm_fasteignamal`, `valuation_tiers_thinflag_pre_cc152` farin. www 14/14, 0 frávik fyrir/eftir. Lesflöturinn (`v_current_predictions`, `v_eign_myndir`, sjö SECURITY DEFINER-sýnir í public) lokast í fasa B (cc285) eftir að SSR fer á service_role. Skil: `D:\_audit\cc284_anon_rettindi\SKIL_CC284.md`.
+
+---
+
 ## 2026-10-27 — /nybyggingar: þrískipting í stað „óseldra“; forsala ósýnileg í kaupskrá; frysting afhendinga (cc283) — **GO Danna/arkitekts 27.10 á þrískiptingu, athugun og frystingu; grein cc283 (app + verdmat-ai), ópushað (HALT fyrir push); migration 20261027120000 skrifuð og sönnuð (--prof), EKKI beitt**
 
 1. **Þrjár stöður per íbúð** (cc224-v9): „þinglýst seld“ / „auglýst“ / „óþekkt staða (ekki þinglýst, ekki auglýst)“. „Óseld“ er hvergi tala í úttaki. `n_oseldar`, `n_oseldar_oauglystar`, `hradi_oseldar`, `man_i_uppselt` og `oseldar_upphafi` eru ekki skrifuð, og staðan `oseld` heitir `othekkt`. Ástæða: cc282 — VB dró 130 „óseldar“ á Heklureit af 182 − 52 úr okkar gögnum, en 100 þeirra voru á L170 þar sem kaupskrá getur ekki sýnt forsölu.
