@@ -336,6 +336,11 @@ def main() -> int:
             c.set_session(readonly=True)
         c.autocommit = False
         cur = c.cursor()
+        if a.skrifa:
+            # Pooler-gildran (CLAUDE.md, WORKING_PROTOCOL (h)): bakendi getur borið lekið session-SET
+            # default_transaction_read_only=on — rollback FYRST, svo SET TRANSACTION READ WRITE (cc288: féll á þessu 31.10).
+            c.rollback()
+            cur.execute("SET TRANSACTION READ WRITE")
         cur.execute("SET LOCAL lock_timeout = '10s'"); cur.execute("SET LOCAL statement_timeout = '300s'")
         ut = keyra(cur, a.safn, skrifa=a.skrifa)
         if a.skrifa:
