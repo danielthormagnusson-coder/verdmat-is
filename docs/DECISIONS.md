@@ -4,6 +4,14 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-01 — Forgangur mynda: lifandi auglýsing á undan safni (cc292b) — **GO Danna 01.11; migration 20261101140000 BEITT 12:33:02**
+
+`v_eign_myndir` velur EITT myndasett per eign: (1) lifandi auglýsing með myndum, nýjust fyrst; (2) annars safnið; (3) annars óvirk auglýsing (R1). Mælt í `--prof`: 2.839 eignir á sölu skipta úr safni í lifandi myndir; ártalsmerki 37.797 → 36.596 af 48.610; 0 eignir misstu myndir; ~2 ms á eign (`valin` NOT MATERIALIZED — efnisgerð CTE gaf 60 s á eign).
+
+**Frávik frá forskrift:** „nýrra safn á undan eldra“ fyrir ÓVIRKAR auglýsingar var ekki beitt. Þá hefðu 1.940 eignir farið úr safni í óvirka auglýsingu, 1.289 af þeim mbl (withdrawn), og 7/19 mbl í HEAD-úrtaki skiluðu 404, því mbl harð-eyðir. Óvirkar auglýsingar víkja áfram fyrir safni þar til hægt er að birta bætin okkar (R2) í stað upprunans. HALT: `D:\_audit\cc292_myndir\SKIL_CC292.md` §7.
+
+---
+
 ## 2026-11-01 — Myndalag eignasíðu: óvirkar auglýsingar, dagsetning mynda, `_extra`-slóðir (cc292) — **GO Danna 01.11; migration 20261101130000 BEITT 10:31:27**
 
 1. **`v_eign_myndir` les líka óvirkar auglýsingar** (R1). Virk auglýsing hefur forgang. Myndlaus auglýsing (tómt fylki) víkur fyrir eldri auglýsingu með myndum. Safnið (`property_images`) hefur áfram forgang yfir auglýsingu. Áhrif mæld í `--prof`: þýði (íbúðir með `augl_id_latest`, 53.173) 48.023 → 48.147 með mynd. 0 eignir misstu myndir og 0 breyttu um myndamengi. Kostnaður ~2 ms á eign.
