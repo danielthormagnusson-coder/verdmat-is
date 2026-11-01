@@ -4,6 +4,16 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-01 — Myndalag eignasíðu: óvirkar auglýsingar, dagsetning mynda, `_extra`-slóðir (cc292) — **GO Danna 01.11; migration 20261101130000 BEITT 10:31:27**
+
+1. **`v_eign_myndir` les líka óvirkar auglýsingar** (R1). Virk auglýsing hefur forgang. Myndlaus auglýsing (tómt fylki) víkur fyrir eldri auglýsingu með myndum. Safnið (`property_images`) hefur áfram forgang yfir auglýsingu. Áhrif mæld í `--prof`: þýði (íbúðir með `augl_id_latest`, 53.173) 48.023 → 48.147 með mynd. 0 eignir misstu myndir og 0 breyttu um myndamengi. Kostnaður ~2 ms á eign.
+2. **`augl_dags`** (nýr dálkur í sýninni) = dags auglýsingarinnar sem myndin kemur úr. Fyrir safn kemur hann úr `public.eign_myndir_augl`: hæsta dags EIGIN evalue-auglýsingar sem ber ≥1 slóð eignarinnar, annars NULL. Fyrir auglýsingu er hann `first_seen_at`. Taflan er lesin aðeins gegnum sýnina (SECURITY DEFINER) og fær engin anon/authenticated-réttindi (cc284-reglan). NULL = ekkert ártalsmerki.
+3. **`CF_RE`** (`audit/image_archive.py`) grípur `_extra/<augl_id>/`. Sú tala er auglýsinganúmer, svo myndin skráist á eignina sem auglýsti, sama venja og pakkar 1–5. Próf: `tests/test_cc292_cf_re.py` með falsprófi gegn gamla mynstrinu.
+
+Skil: `D:\_audit\cc292_myndir\SKIL_CC292.md`.
+
+---
+
 ## 2026-10-31 — Ný tafla fær engin anon-réttindi sjálfkrafa; www-lestur krefst GRANT í sömu migration (cc284) — **GO Danna/arkitekts 31.10; migrations 20261031120000 (fasi A) og 20261031130000 (sjálfgefin réttindi) BEITTAR 11:06/11:08; fasi B og C í cc285**
 
 **Hvað**: `ALTER DEFAULT PRIVILEGES FOR ROLE postgres` í `public`, `semantic` og `scraper` afturkallar ÖLL réttindi `anon` og `authenticated` á NÝJUM töflum, sýnum, MV, runum og föllum, og EXECUTE til PUBLIC á nýjum föllum (altækt, því skema-bundið REVOKE nær ekki innbyggða sjálfgildinu). Núverandi hlutir óbreyttir. Migration `20261031130000_cc284d_sjalfgefin_rettindi` (+ rollback).

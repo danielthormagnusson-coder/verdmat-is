@@ -34,7 +34,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from weekend_run_status import get_writer  # noqa: E402
 from image_archive import (  # noqa: E402
-    INDEX_DB_PATH, CANONICAL_IMAGE_ROOT, CF_RE,
+    INDEX_DB_PATH, CANONICAL_IMAGE_ROOT, CF_RE, cf_source_fastnum,
     download_image_to_disk,
 )
 
@@ -90,9 +90,10 @@ def discover_urls_from_stage_a(idx_conn, sw):
             continue
         blob = json.dumps(inner, ensure_ascii=False, default=str)
         seen_urls = set()
-        for src_fn_str, basename in CF_RE.findall(blob):
-            src_fn = int(src_fn_str)
-            url = f"https://d1u57vh96em4i1.cloudfront.net/{src_fn_str}/{basename}"
+        for mappa, basename in CF_RE.findall(blob):
+            # cc292: mappa getur verið `_extra/<augl_id>` — skráist á auglýsandi eign
+            src_fn = cf_source_fastnum(mappa, fn_referencing)
+            url = f"https://d1u57vh96em4i1.cloudfront.net/{mappa}/{basename}"
             if url in seen_urls:
                 continue
             seen_urls.add(url)

@@ -31,11 +31,33 @@ from pathlib import Path
 CANONICAL_IMAGE_ROOT = Path(r"D:\Gagnapakkar\images")
 INDEX_DB_PATH = Path(r"D:\Gagnapakkar\image_index.db")
 
-# Cloudfront URL pattern; group 1 = source_fastnum, group 2 = original basename
+# Cloudfront URL pattern; group 1 = MAPPA (folder segment), group 2 = original basename.
+# Mappan er annaðhvort tala (`/2352932/`) EÐA `_extra/<augl_id>` (`/_extra/1120478/`).
+# cc292 (01.11.2026): áður `(\d+)/` eingöngu — `_extra`-slóðir fundust ALDREI, svo
+# 464.952 slóðir í stage_a fóru aldrei í image_index (D:\_audit\cc292_myndir §0.6).
+# `_extra`-talan er AUGLÝSINGANÚMER, ekki fastanúmer (25.535/25.535 = augl-id sömu
+# raðar) — sjá cf_source_fastnum(): slík mynd skráist á eignina sem auglýsti hana,
+# sama venja og pakkar 1–5 (t.d. 2294806 ← _extra/1120478).
 CF_RE = re.compile(
-    r"https://d1u57vh96em4i1\.cloudfront\.net/(\d+)/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))",
+    r"https://d1u57vh96em4i1\.cloudfront\.net/((?:_extra/)?\d+)/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))",
     re.IGNORECASE,
 )
+
+
+def cf_source_fastnum(mappa, referencing_fastnum=None):
+    """Fastanúmerið sem myndin skráist á í image_index.
+
+    Talnamappa → talan sjálf (óbreytt hegðun). `_extra/<augl_id>` → eignin sem
+    auglýsti (referencing_fastnum); augl_id má ALDREI lenda í fastnum-dálki.
+    Skilar None ef `_extra` og engin eign er gefin — kallandi verður að sleppa slóðinni.
+    """
+    if mappa.isdigit():
+        return int(mappa)
+    if mappa.lower().startswith("_extra/") and mappa[7:].isdigit():
+        return int(referencing_fastnum) if referencing_fastnum is not None else None
+    raise ValueError(f"óþekkt CloudFront-mappa: {mappa!r}")
+
+
 IMG_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 IMAGE_TIMEOUT = 30
 
@@ -48,18 +70,24 @@ def open_index_db():
     return conn
 
 
-def parse_cf_urls(text):
+def parse_cf_urls(text, referencing_fastnum=None):
     """Extract (source_fastnum:int, basename:str, full_url:str) tuples
     in first-occurrence order from a JSON-string-or-blob.
+
+    `_extra/<augl_id>/`-slóðir fá source_fastnum = referencing_fastnum (cc292);
+    án hennar er þeim sleppt, því augl_id er ekki fastanúmer.
     """
     seen = set()
     out = []
-    for source_fn, basename in CF_RE.findall(text):
-        url = f"https://d1u57vh96em4i1.cloudfront.net/{source_fn}/{basename}"
+    for mappa, basename in CF_RE.findall(text):
+        url = f"https://d1u57vh96em4i1.cloudfront.net/{mappa}/{basename}"
         if url in seen:
             continue
         seen.add(url)
-        out.append((int(source_fn), basename, url))
+        source_fn = cf_source_fastnum(mappa, referencing_fastnum)
+        if source_fn is None:
+            continue
+        out.append((source_fn, basename, url))
     return out
 
 
@@ -182,7 +210,7 @@ def download_property_images_v2(idx_conn, property_fastnum, augl_payload):
                 "bytes": 0, "cross_refs": 0}
 
     blob = json.dumps(inner, ensure_ascii=False, default=str)
-    triples = parse_cf_urls(blob)
+    triples = parse_cf_urls(blob, property_fastnum)
     counts = {"n_urls": len(triples), "downloaded": 0, "cached": 0,
               "failed": 0, "bytes": 0, "cross_refs": 0}
     for source_fn, basename, url in triples:
