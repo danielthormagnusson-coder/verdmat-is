@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -61,10 +62,23 @@ import psycopg2
 sys.stdout.reconfigure(encoding="utf-8") if hasattr(sys.stdout, "reconfigure") else None
 
 HERE = Path(__file__).resolve().parent
-PRECOMPUTE_DIR = r"D:/verdmat-is/precompute"
+# cc313: umhverfisbreytur til að prófa grein precompute og kandídat í aðskildri geymslu; sjálfgefið óbreytt.
+PRECOMPUTE_DIR = os.environ.get("VERDMAT_PRECOMPUTE_DIR", r"D:/verdmat-is/precompute")
 DBCONFIG = Path(r"D:\verdmat-is\.dbconfig")
-ARTIFACT_ROOT = Path(r"D:\model_artifacts")
+ARTIFACT_ROOT = Path(os.environ.get("VERDMAT_ARTIFACT_ROOT", r"D:\model_artifacts"))
 TRAINING_PKL = Path(r"D:\training_data_v2.pkl")
+_MV = None   # cc313: líkanið sem hliðið mælir (stillt í main; rebuild-leiðin les manifest þess)
+
+
+def _stilla_cc313(mv: str) -> None:
+    """cc313: kandídat með `feature_build` í manifest → þjálfunarþekja og flokkavörpun úr SÖMU pkl og
+    hann var þjálfaður á. Eldri líkön: óbreytt (D:\\training_data_v2.pkl)."""
+    global TRAINING_PKL, _MV
+    _MV = mv
+    mp = ARTIFACT_ROOT / mv / f"{mv}_manifest.json"
+    m = json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else {}
+    if m.get("feature_build"):
+        TRAINING_PKL = Path(m["data_path"])
 HMS_PKL = Path(r"D:\hms_classification_v1.pkl")
 HMS_SHA16 = "16d78e39d57cfcad"
 URTAK_CC244 = Path(r"D:\_audit\cc244_haed\m01_urtak.json")
@@ -227,6 +241,7 @@ def athuga_X(X: pd.DataFrame, canonical_code: pd.Series, model_version: str,
     X = main-raðir (SUMMERHOUSE utan), dálkar = feature-listi main_mean. Skilar 0 ef ekkert
     stöðvandi fall, annars 1. Kallandinn á að stöðva án skrifa á rc ≠ 0.
     leyfa_thekkt=True beitir THEKKT_FRAVIK[model_version] — tómur listi fyrir hverja aðra útgáfu."""
+    _stilla_cc313(model_version)   # cc313: þjálfunarþekja úr pkl kandídats ef manifest ber feature_build
     try:
         feats, gain = _gain(model_version)
     except Exception:          # útgáfa án artifacts (t.d. söguleg iter4a á D:\) — gain aðeins til birtingar
@@ -251,7 +266,11 @@ def athuga_X(X: pd.DataFrame, canonical_code: pd.Series, model_version: str,
 def x_rebuild(feats, cat_map, fastnums=None):
     R = _prod()
     R.HMS_PKL = str(HMS_PKL)       # framleiðslan keyrir með --hms-pkl (156 features)
+    if _MV and hasattr(R, "stilla_ur_manifest"):          # cc313: sama X-smíð og skorunin
+        R.stilla_ur_manifest(ARTIFACT_ROOT / _MV)
     resi = R.build_master_frame()
+    if hasattr(R, "festa_haed_bilsk"):
+        resi = R.festa_haed_bilsk(resi)
     resi = resi[~resi["canonical_code"].eq("SUMMERHOUSE")].reset_index(drop=True)
     if fastnums is not None:
         resi = resi[resi["fastnum"].astype("int64").isin(fastnums)].reset_index(drop=True)
@@ -384,6 +403,7 @@ def main() -> int:
     a = ap.parse_args()
 
     mv = a.model or (PROF_UTGAFA if a.sjalfsprof else read_model_version())
+    _stilla_cc313(mv)
     feats, gain = _gain(mv)
     log(f"ÞEKJUHLIÐ · líkan {mv} main_mean · {len(feats)} features · "
         f"regla: (a) þjálfun ≥ {THR_HALF:.0f} % og rekstur < {THR_HALF:.0f} %, (b) |Δ| > {THR_DELTA:.0f} pp")

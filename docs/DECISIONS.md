@@ -4,6 +4,33 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-02 — Endurþjálfun desember 2026: H2 = (b), D4, data_end 30.11, D1–D6 (cc313) — **GO Danna 02.11 (flokkur B, GO-1: smíð og þjálfun kandídats, EKKERT flipp); smíð á greinum `cc313` (precompute + app), ekkert þjálfað fyrir 01.12**
+
+**GO Danna orðrétt (borið af master 02.11):** „O-1 í cc313: smíð og þjálfun kandídats, ekkert flipp. H2 = (b) íbúðar-matseining. D4 = 0 þar sem eign er skráð, autt þar sem skráningu vantar. data_end 30.11.2026, þjálfun eftir 01.12. D1–D6 fara í DECISIONS og WORKING_PROTOCOL í fyrsta smíða-commitinu."
+
+1. **H2 = (b) — hæð úr íbúðar-matseiningu, í þjálfun OG rekstri.** Sama regla og `ibudarHaed` í verdmat-ai `lib/ibudarnumer.ts` (cc263b): matseiningar eigin fastnúmers, 6 stafa merking, notkun ber „íbúð"; hæð ef allar slíkar bera sömu hæð, annars autt. Sérbýli fá autt (engin íbúðar-matseining). `building_max_floor` = hámark yfir öll fnr. sömu landeignar. Lindin er `properties.matseiningar`, **fryst** í parquet með sha (`precompute/export_haed_bilsk.py`) og nafngreind í manifest kandídats — sama mynstur og `hms_classification_v1.pkl`. Mælt 02.11 (þurrútflutningur, 232.887 fnr.): hæð íbúðar-matseiningar = eldri merkingarhæð á **99,91 %** þar sem báðar eru til (129.550); `landeign_nr` = `landnum` á 99,86 %. Leysir cc244 (a) og cc263 f.2 lið 1 í einu.
+2. **D4 — eiginleiki sem lýsir fjarveru fær 0 þar sem eign er skráð, autt þar sem skráningu vantar.** `reg_bilskur_m2` (summa matseininga „Bílskúr", skilgreining cc226 q04b) og `aukarymi_m2` (EINFLM − íbúðarrými, skilgreining cc226 q08; ≤ 0,5 m² → 0). „Skráð" = eignin ber ≥ 1 matseiningu (99,57 %). Rök: autt fyrir 87 % fjölbýlis myndi endurtaka NaN-greinargildru cc244. Í þjálfun eru bílskúrsliðirnir autt þar sem stærð við sölu víkur > 1 m² frá stærð í dag (skráningin lýsir þá ekki seldu eigninni); engin sala tekin út.
+3. **data_end 30.11.2026, 6-mán OOS-kvörðun (train_end 31.05.2026), 30 % frátekt, þjálfun eftir 01.12.2026.** `endurthjalfun_cc313.py` neitar að keyra fyrr. Kandídat fer í aðskilda geymslu `D:\model_artifacts_cc313\`; lifandi líkan, `D:\training_data_v2.pkl`, `D:\model_artifacts` og `public.predictions` eru ósnert. Flipp er sér GO (GO-2).
+4. **Eldri líkön fá ALDREI fyllingu.** rebuild og adapter fylla hæð/bílskúr aðeins ef manifest kandídats ber `haed_bilsk` (og `feature_build`); þá kemur flokkavörpun líka úr þjálfunar-pkl manifestsins (sha-hliðað). Aðhvarfspróf 02.11: þekjuhlið á `iter4r_20260805_reglaR_strukt` með nýja kóðanum gefur bæti-eins niðurstöðu (rc 1, sömu 4 föll).
+
+**D1 — skipting þjálfunar er skyldurök.** `retrain_sales_model.py` neitar án `--calib-months`, `--train-end` og `--holdout-frac`, og HALT-ar ef train_end víkur > 31 d frá data_end − calib-months. Gömlu sjálfgefnu gildin (3 mán, 0 % frátekt) víkja frá læstum stöðlum (2026-07-04, 2026-07-16), og skipunin í RETRAIN_RUNBOOK §2 hefði gefið ógildan kandídat. Eiginleika-útgáfa (`--feature-build d2|haed1+bilsk1`) ræður væntum fjölda (156 / 158).
+
+**D2 — kveikjan „cov80 < 76 % tvo mánuði í röð" er mæld á mánaðarglugga ferska jaðarsins** (sölur þinglýstar í mánuðinum), ekki á uppsafnaðri tölu frá data_end. Mælt 02.11 (leitt af 13 vikukeyrslum): ágúst 76,9 · september 77,6 · október 74,7 % (± 0,3) á bak við uppsafnað 76,4 %. VÉL-1 á að skrifa mánaðarlínu í `model_metrics` með n og SE (n ≈ 500 → SE ≈ 1,9 pp). Smíði þeirrar línu er sér verk.
+
+**D3 — efri tímamörk þjálfunargagna koma úr data_end, ekki föstu ártali.** `build_training_data.py:174` (`between(2006, 2026)`) hefði sleppt öllum 2027-sölum í hljóði. Lagað í afritinu `precompute/build_training_data_cc313.py`; frumskráin á `D:\` er óbreytt.
+
+**D4** — sjá lið 2 hér að ofan.
+
+**D5 og D6** eru verklagsreglur: WORKING_PROTOCOL (r) og (s).
+
+**CPI 2026-11 og 2026-12 eru birt gildi, ekki spá.** `D:\cpi_verdtrygging.csv` kemur úr töflu Hagstofu VIS01004 „Vísitala neysluverðs til verðtryggingar" (https://px.hagstofa.is/pxis/api/v1/is/Efnahagur/visitolur/1_vnv/1_vnv/VIS01004.px). Bein fyrirspurn 02.11 gaf 2026M11 = 697,3 og 2026M12 = 700,4, sömu gildi og skráin. 2026-12 kom fyrst inn í sókn 01.11 04:00 (ekki í sókn 25.10), svo það var birt á bilinu 25.10–01.11. Merkingin er **verðtryggingarmánuður** (VNV mæld tveimur mánuðum fyrr): 2025-12 = 661,4 = VNV október 2025. Akkerið `sales_history_anchor_ym = 2026-12` og CPI-akkeri nýrrar pkl (`cpi.factor`, hæsti mánuður skrárinnar) eru því birt gildi; G4 δ̂ er reiknað á þeim. Útgáfudagsetning Hagstofu sjálfrar fékkst ekki úr API (`updated` í lýsigögnum segir 2015-09-23, augljóslega úrelt).
+
+**Þurrkeyrsla 02.11 (data_end 31.10, 20 umferðir á úrtaki, allt í `D:\_audit\cc313_endurthjalfun\thurrkeyrsla\`, ógildur kandídat):** leiðslan gekk skref 2–4 (158 eiginleikar, train_end 30.04); **þekjuhlið strangt STENST á kandídatsramma** í rebuild og adapter (rc 0, has_extraction_data = 1 á 0,0 %) — hæðin berst nú í rekstur; prófhlið P5 fellur á þurrkandídatnum eins og á að gera (MdAPE +4,9 pp) og stenst sjálfspróf (lifandi gegn sjálfu sér, Δ 0,0). **Opið fyrir 01.12:** skrifta framreiðslulags 3.3 er ekki á diski (aðeins `D:\cc98_33_serving_recal.log`); hún verður endurgerð og sönnuð með því að endurskapa `…_conformal_serving_v1.json` lifandi líkans (sha `6e736a47b82d9130`).
+
+**Heimild:** `D:\_audit\cc313_endurthjalfun\SKIL_CC313.md` (§0–§8), `m06_ferskur_jadar_vikur.txt`, `m08_cpi_hagstofa.txt`, `s01_adhvarf_thekjuhlid.txt`, `s03_thekjuhlid_thurr.txt`, `s05_p5_thurr/`; precompute grein `cc313`.
+
+---
+
 ## 2026-11-01 — GO-flokkar A/B, tímagluggar og möppuregla (arkitekt 01.11 23:45; Danni 01.11) — **bókað af cc306 úr SKIL; reglutextinn er í WORKING_PROTOCOL (j)–(k)**
 
 Flokkur A (texti/merki/framendi án gagnabreytinga, eitt `git revert`) fær „GO arkitekts" eftir lestur SKIL af diski; flokkur B (migration, eyðing, lyklar, Task Scheduler/keðja, ný notendavirkni) fær GO Danna. Master session gefur aldrei GO. Ekkert push/ff/migration og engar þungar DB-fyrirspurnir 01:00–07:30; push á verdmat-ai eitt í einu í röð arkitekts. Lota skrifar aðeins í eigin `D:\_audit\ccNNN_*` og eigið vinnutré (regla Danna 01.11 eftir að skrifta cc295 skrifaði yfir `cc218_september\q11_fullnusta.json`).

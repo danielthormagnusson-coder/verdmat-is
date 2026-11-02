@@ -312,3 +312,11 @@ Migration `20261031130000_cc284d_sjalfgefin_rettindi` breytti `ALTER DEFAULT PRI
 ### (q) NÆTURKEÐJAN: ff Á `app` main ER VIRKJUN (cc263, cc268, cc275, cc281)
 
 Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push eitt virkjar ekkert en ff á staðbundnum `app` main virkjar frá næstu nótt** (`D:\_audit\cc275_kedja\SKIL_CC275.md`). Ekkert ff meðan bash-keðja keyrir og engin migration meðan sópur með gömlum kóða keyrir (`D:\_audit\cc281_app_samthaetting\SKIL_CC281.md`). Tímaþak verks verður að vera stærra en biðhlið + keyrsla (`D:\_audit\cc260_naeturverk\SKIL_CC260.md`). Gagnalagsbreyting sem hreyfir lifandi tölu fer fyrst á prófunarútgáfu sem framendinn flettir yfir á í push-committinu (`D:\_audit\cc224_nybyggingar\SKIL_CC224_1.md` §11.7).
+
+### (r) NÝR EIGINLEIKI: REKSTRARAFLEIÐSLA OG ÞEKJUHLIÐ Á UNDAN ÞJÁLFUN (Danni 02.11.2026, cc313 D5)
+
+**Ekkert feature fer í þjálfun nema afleiðsla þess í rekstri sé til í rebuild OG adapter úr einu sameiginlegu falli, og þekjuhlið strangt standist á kandídatsramma ÁÐUR en þjálfun keyrir — ekki aðeins fyrir flipp.** Fallið er eitt (t.d. `precompute/haed_bilsk.py`) og kallað frá þjálfun, `rebuild_predictions_iter4` og `phase_d3_score_extract`; afrit í hverri skrá er bannað. Lindin er fryst og sha-hliðuð í manifest kandídats. **Raundæmi:** cc244 — hæð var þjálfuð frá 21.04.2026 en aldrei leidd í rekstri (100 % NaN í öllum skorunarleiðum); cc226 — bílskúrs-features voru GO í cc12 en fóru aldrei í rekstur. Heimild: `D:\_audit\cc313_endurthjalfun\SKIL_CC313.md` §6; DECISIONS 2026-11-02.
+
+### (s) psycopg2-HJÚPUR MEÐ statement_timeout: commit EFTIR SET (Danni 02.11.2026, cc313 D6)
+
+**Hjúpur sem setur `statement_timeout` á psycopg2-tengingu verður að `commit`-a eftir `SET` áður en `set_session(readonly=True, autocommit=True)` er kallað.** `SET` opnar færslu, og `set_session` innan færslu fellur á „set_session cannot be used inside a transaction" — sem lítur út eins og gagnavilla í kallandi skriftu (thekjuhlid skilaði rc 2, „X ekki smíðað"). Röðin er: connect → `SET statement_timeout` → `commit()` → `set_session(readonly=True, autocommit=True)`. **Raundæmi:** cc313 m04, fyrsta tilraun (02.11). Heimild: `D:\_audit\cc313_endurthjalfun\m04_thekjuhlid_tilraun1_hjupvilla.txt`.

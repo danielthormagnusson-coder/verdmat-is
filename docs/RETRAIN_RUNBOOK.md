@@ -41,6 +41,12 @@ cd D:\verdmat-is\precompute
 python retrain_sales_model.py --version iter4r_<YYYYMMDD>
 ```
 
+> **cc313 D1 (02.11.2026):** skipunin hér að ofan er ÚRELT og skriftan neitar henni nú. Skiptingin er
+> skyldurök: `--calib-months 6 --train-end <data_end − 6 mán> --holdout-frac 0.3 --holdout-seed 20260716`
+> (+ `--data-end`, `--feature-build`). Hringurinn í desember 2026 keyrir í heild um
+> `precompute/endurthjalfun_cc313.py` (stimpill + audit trail í `D:\model_artifacts_cc313\keyrslur\`).
+> Sjá DECISIONS 2026-11-02.
+
 - Þjálfar 12 boostera (main+summer × mean+5 kvantílar), EXACT iter4a-hyperparams
   og features (154, ENGINN FASTEIGNAMAT). Replica-sönnun aðferðarinnar:
   `RETRAIN_CADENCE.md` §1 (endurgerði held MAPE 8,19%/medAPE 5,54% upp á 0,01 pp).

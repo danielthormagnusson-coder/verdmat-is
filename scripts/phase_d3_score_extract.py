@@ -32,6 +32,7 @@ cycle per POST_HMS_RECOVERY_PLAN §5).
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -72,7 +73,9 @@ CATEGORICALS = ["canonical_code", "matsvaedi_bucket", "region_tier", "unit_categ
 #
 # ÁN artifact_dir er hegðunin ÓBREYTT bæti fyrir bæti (D3-lotan sögulega, 2026-04,
 # symmetrískur conformal m/global-fallback, stimplar 'iter4_final_v1').
-PRECOMPUTE_DIR = r"D:/verdmat-is/precompute"
+PRECOMPUTE_DIR = os.environ.get("VERDMAT_PRECOMPUTE_DIR", r"D:/verdmat-is/precompute")
+# cc313: umhverfisbreytan er AÐEINS til að prófa grein precompute (vinnutré) áður en hún fer inn;
+# sjálfgefið óbreytt.
 
 
 def _prod():
@@ -152,8 +155,29 @@ def load_models(artifact_dir=None, serving_json=None, hms_pkl=None,
     out["feature_names"] = out["main_mean"].feature_name()
     print(f"  feature count: {len(out['feature_names'])}")
 
+    # cc313: kandídat með `feature_build` í manifest → flokkavörpun úr SÖMU pkl og hann var þjálfaður
+    # á (sha-hliðað) og haed_bilsk-eiginleikar úr frosnu lindinni sem manifest nefnir. Sama fall og
+    # rebuild (precompute/haed_bilsk.py), ekki afrit. Eldri líkön: óbreytt.
+    training_pkl = TRAINING_PKL
+    if ad:
+        mp = ad / f"{ver}_manifest.json"
+        manifest = json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else {}
+        if manifest.get("feature_build"):
+            import hashlib
+            if PRECOMPUTE_DIR not in sys.path:
+                sys.path.insert(0, PRECOMPUTE_DIR)
+            import haed_bilsk as HB  # noqa: E402
+            training_pkl = Path(manifest["data_path"])
+            sha = hashlib.sha256(training_pkl.read_bytes()).hexdigest()[:16]
+            if sha != manifest.get("data_sha256_16"):
+                raise SystemExit(f"HALT: þjálfunar-pkl sha {sha} != manifest {manifest.get('data_sha256_16')}")
+            lind = HB.manifest_lind(manifest)
+            if lind:
+                out["haed_bilsk"] = HB.features_ur_lind(HB.lesa_lind(*lind))
+                print(f"  haed_bilsk {HB.FEATURE_BUILD_VERSION}: {lind[0]} (sha {lind[1]} OK)")
+
     print("Loading CPI lookup + categorical mappings from training_data_v2 ...")
-    td = pd.read_pickle(TRAINING_PKL)
+    td = pd.read_pickle(training_pkl)
     td["_yr"] = pd.to_datetime(td["THINGLYSTDAGS"]).dt.year
     td["_mn"] = pd.to_datetime(td["THINGLYSTDAGS"]).dt.month
     cpi_lookup = td.groupby(["_yr", "_mn"])["cpi_factor"].first().to_dict()
@@ -215,6 +239,16 @@ def build_X_matrix(scor: pd.DataFrame, feat_names: list[str],
         # ekki í líkaninu, svo báðar hliðar lykkjunnar sleppa þeim.
         "n_ibudareininga": "n_ibudareininga",
         "flm_hlutfall": "flm_hlutfall",
+        # cc313 (haed1+bilsk1, GO Danna 02.11): hæð úr íbúðar-matseiningu + bílskúr/aukarými (D4).
+        # Í col_map svo þau teljist STRÚKTÚR (_structural hér að neðan, cc244 H-c): annars settu
+        # þau has_extraction_data=1 á grunnlínunni í hljóði. Dálkarnir eru aðeins í `scor` þegar
+        # load_models fann `haed_bilsk` í manifest kandídats — eldri líkön fá enga fyllingu.
+        "merking_floor": "merking_floor",
+        "building_max_floor": "building_max_floor",
+        "is_top_floor": "is_top_floor",
+        "floor_fraction": "floor_fraction",
+        "reg_bilskur_m2": "reg_bilskur_m2",
+        "aukarymi_m2": "aukarymi_m2",
     }
     for feat_col, src_col in col_map.items():
         if feat_col not in feat_names or src_col not in scor.columns:
@@ -317,6 +351,11 @@ def mirror_derived_dims(scor: pd.DataFrame, models: dict) -> pd.DataFrame:
     msv = pd.to_numeric(out["matsvaedi_numer"], errors="coerce").astype("Int64")
     out["region_tier"] = msv.map(models["region_tier_map"]).fillna("Country").astype(object)
     out["matsvaedi_bucket"] = ("M" + msv.astype(str)).astype(object)
+    # cc313: hæð + bílskúr (aðeins ef kandídat ber þá — sjá load_models). Hér, af því að ÖLL þrjú
+    # köllin (score(), phase_d3_apply, thekjuhlid) fara um þetta fall í artifact-ham.
+    if models.get("haed_bilsk") is not None:
+        import haed_bilsk as HB  # noqa: E402  (PRECOMPUTE_DIR á sys.path úr load_models)
+        out = HB.attach(out, models["haed_bilsk"], fastnum_col="fastnum")
     return out
 
 
