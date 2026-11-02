@@ -2575,3 +2575,43 @@ Scraper-merki gegnum `public.ops_scraper_signals()` RPC (LEIÐ 2, sjá DECISIONS
 Top 5 stofur 2026-08 (fjöldi, deilt sæti): Lind 50 · RE/MAX 50 · TORG 28 · Miklaborg 18 · Kasa 14. Vörumerkjakortið sameinaði Miklaborg 617+844 og færði hana úr jafntefli á 14 í 4. sæti.
 
 **OPIÐ:** (1) staðfesta að sala-gólfið sé N / eignaðar-stofu (ekki N / M); (2) skrá `verdmat_fasteignasala_manudur` (16. kl. 04:30) úr hækkaðri skel; (3) 4 salar með `uppruni='netfang_ovarpad'` í `semantic.sali_kort` — einn í 2. sæti veltu 2026-07 — þarf handvirka vörpun fyrir fasa 2; (4) vörumerkjakortið er allt óstaðfest (`stadfest_af` NULL, 134 raðir), m.a. Fasteignalausnir/Heima; (5) fasi 2: kassi á forsíðu, sér-síða per mánuð, aðferðafræði með fjórum nafnlausum stofum.
+
+### VIÐAUKI cc215–cc305 (29.09–02.11) — STAÐA EFTIR FIMM VIKUR ÁN STATE-UPPFÆRSLU
+
+**Heimildir:** SKIL-skrár lotanna (slóð í hverri línu, allar undir `D:\_audit\`) + DECISIONS 2026-09-30…2026-11-01. Samantekt cc306 (02.11.2026); tölur eru úr SKIL, ekki endurmældar. Engin mappa er til fyrir cc214 (stöðumerki, sjá viðauka cc212–cc213), cc285, cc289 eða cc300.
+
+**Markaðsgögn og skýrslur**
+- Septemberskýrslan (2026-09) í loftinu 30.09; vísitalan flippuð, regla cc218-v1; heimildir kafla 6 staðfestar gegn frumtexta (276/340 staðfestar, 13 atriði út) — `cc218_september\SKIL_CC218_A.md`, `…_B_STADFEST.md`, `…_D.md`.
+- Verðvaktin v2 (dagsetning úr eigin sókn, nefnari per stað, svæðissía) lifandi 09.10 — `cc219_verdvakt\SKIL_CC219_3.md`, `cc225_svaedi\SKIL_CC225.md`.
+- Púlsinn lagaður (−18,1 % → −14,4 %) og mánaðarsala á móti sama mánuði í fyrra lifandi; verk `verdmat_manadarsala_yoy` 05:15 — `cc251_manadarsala\SKIL_CC251.md`.
+- Sölutími endurskilgreindur (fyrsta auglýsing → kaupsamningsdagur) — `cc232_solutimi\SKIL_CC232.md`.
+- /markadur ferskt til 30.10; fallregla síðasta fjórðungs, R-H, götusía (cc286-v1) lifandi 31.10; óháð staðfesting stóðst — `cc286_markadur\SKIL_CC286.md`, `cc287_fable_stadfesting\SKIL_CC287.md`.
+- Fasteignamat á /markadur (cc288-v2 geymslubil, cc288-v3 samanlagt mat götu) lifandi, www 44/44 — `cc288_fasteignamat\SKIL_CC288.md`.
+- Auglýsingagatið er **ágúst 2025 – maí 2026**; `scraper.listing_sessions_v2` beitt 01.11 — `cc290_auglysingagat\SKIL_CC290.md`.
+- Mánaðarskýrslur júní–sept birtanlegar með „Leiðrétt 01.11.2026"-merkjum, kafli 13 ómældur — `cc293_manadarskyrsla\SKIL_CC293.md`. /markadur-lagfæringar pushaðar 23:41 (`6af3810..cc71eba`), /fasteignasolur beið skyndiminnis — `cc298_markadur\SKIL_CC298.md`.
+- **Októberskýrslan:** aðeins drög (cc295b beitti H1–H5 arkitekts 01.11 23:50); ekkert birt — `cc295_manadarskyrsla_okt\SKIL_CC295.md`, `cc296_stadfesting_okt\SKIL_CC296.md`.
+
+**/nybyggingar**
+- Gagnalag (verkefni = landeign, v2…v9) og síða lifandi frá 09.–11.10; næturverk `verdmat_nybygging_verkefni` 07:00 — `cc224_nybyggingar\SKIL_CC224_1.md`, `cc228_pakkasamningar\SKIL_CC228.md`, `cc229_nefnarar\SKIL_CC229.md`, `cc234_leiguaugl\SKIL_CC234.md`.
+- Söluhraði per verkefni lifandi (gagnvirkt graf) — `cc243_soluhradi\SKIL_CC243_F2.md`…`_F5.md`. Brot söluhraða í lok 2024 mælt og stenst aldursleiðréttingu (read-only) — `cc237_soluhradi\SKIL_CC237.md`, `cc238_samsetning\SKIL_CC238.md`.
+- Þrískipting „þinglýst seld / auglýst / óþekkt staða" í stað „óseldra" lifandi 31.10 (Heklureitur 52 af 82) — `cc283_nybyggingar_thriskipting\SKIL_CC283.md`, `cc282_heklureitur\SKIL_CC282.md`.
+- Afhendingar til VB/Péturs (`cc239`, `cc245`, `cc259`) liggja tilbúnar á disk, **ósendar**; Danni sendir.
+
+**Eignasíða og verðmatskrass**
+- Krassið („Þitt mat") smíðað v1→v2 (cc246–cc273) en **falið** á www frá 26.10 (`SYNA_KRASS=false`); eignasíðan einfölduð — `cc279_einfold_sida\SKIL_CC279.md`, `cc280_samthaetting\SKIL_CC280.md`.
+- Leigumatskort: „um 12,5 %*" neðanmál (n = 791) og „Vænt auglýst leiguverð" — `cc274_leigubil\SKIL_CC274.md`, `cc291_vaent_auglyst\SKIL_CC291.md`.
+- Íbúðarnúmer úr íbúðar-matseiningu lifandi — `cc262_merking_myndir\SKIL_CC262.md`. Myndalag eignasíðu (`v_eign_myndir`, forgangur lifandi auglýsingar) beitt 01.11 — `cc292_myndir\SKIL_CC292.md`.
+- Hæðar-features tóm í rekstri; lagað í næsta retrain-hring; skylduskref 0 (þekjuhlið) fyrir hvert flipp — `cc244_haed\SKIL_CC244_F3_PUSH.md`.
+- Stuðlaskrá v1.2→v1.4 (allar línur endurmældar utan úrtaks) — `cc226b_oof\SKIL_CC226B.md`.
+
+**Næturkeðja og rekstur**
+- Tvítök mbl (13.824 raðir) í sóttkví, nú sem tafla `scraper.tvitok_falin` (migration 20261026090000 beitt 31.10) — `cc267_tvitok\SKIL_CC267.md`, `cc276_sottkvi_tafla\SKIL_CC276.md`.
+- Keðjan fékk mjúkan sóknarfrest 05:30, lokamerkishlið, vakt 07:00 með pósti (`verdmat-daily-kedjuvakt`) og Job Object (fyrsta nótt 02.11) — `cc268_kedja\SKIL_CC268.md`, `cc281_app_samthaetting\SKIL_CC281.md`. Tímaþök verka hækkuð eftir PT1H-stöðvanir — `cc260_naeturverk\SKIL_CC260.md`, `cc265_deltakedja\SKIL_CC265.md`.
+- Vikulegt lífsmark vaktar á grein `cc299` (`122cdd0`), **bíður GO (flokkur B)** — `cc299_lifsmark\SKIL_CC299.md`.
+- **Ferskleiki:** ekkert dagskrárverk uppfærir mat eða comps; `predictions` óbreytt frá 01.07 (0/167.503 frávik í þurrkeyrslu 25.10). Runbók að mánaðarverki liggur fyrir, ekkert skráð — `cc278_ferskleiki\SKIL_CC278.md`.
+
+**Öryggi og réttindi**
+- anon-réttindi á ónotuðum hlutum afturkölluð og sjálfgefin réttindi breytt (31.10); 41 afritatafla í parquet á R2 (`db_afrit/cc284_20261031/`) og DROP-uð (−1,62 GB) — `cc284_anon_rettindi\SKIL_CC284.md`. Fasar B/C (cc304) eru drög, óbeitt.
+- Skýrslur/sala falin á bak við rofa, söfnun lokuð (persónuvernd) — `cc236_fela\SKIL_CC236_f2b.md`.
+
+**Opið 02.11 (ópushað / bíður GO)** — sjá SKIL hverrar lotu: cc297 (`d096d01`, A), cc303 (A + K2 migration B), cc301 (úttekt, A), cc305 (`d7b6e7b`, A; gagnalagsdrög B), cc304 (B), cc294 (B), cc299 (B). Afrit og skráning: `cc306_afrit_skraning\SKIL_CC306.md` — `D:\_audit` (~9,8 GiB) er ekki í næturafritinu; drög að breytingu bíða GO Danna.

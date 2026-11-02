@@ -262,3 +262,53 @@ Bætt við eftir sannleiks-úttekt sem fann eina nefnara-villu (92,8% vs 31,1% �
 ### (i) WORKTREE MEÐ `node_modules`-JUNCTION ER ALDREI FJARLÆGT MEÐ `--force` (added 2026-10-11, cc233)
 
 **`git worktree remove --force` á Windows fylgir `node_modules`-junction (mklink /J) og tæmir skotmarkið — `node_modules` aðaltrésins.** Röðin er: fjarlægja tengilinn einan fyrst (`cmd /c rmdir <wt>\node_modules`), staðfesta að `D:\verdmat-is\verdmat-ai\node_modules` standi, **svo** `git worktree remove` án `--force`. Betra: ekkert junction — keyra tsc aðaltrésins með `--project` og byggja aldrei í worktree (Turbopack hafnar junction sem vísar út fyrir verkefnisrót hvort eð er). **Raundæmi 2026-10-10 (cc221):** `node_modules` aðaltrésins tæmdist (0 færslur) meðan aðrar lotur keyrðu á því; `npm ci` endurheimti 705 pakka. Heimild: `D:\_audit\cc221_svaedi\SKIL_CC221.md` § ATVIK — node_modules aðaltrésins tæmt.
+
+---
+
+## Lotu-, push- og DB-reglur (added 2026-11-02, cc306)
+
+Samantekt reglna sem lotur cc223–cc298 settu á disk en voru ekki komnar hingað. Hver liður vísar í SKIL-skrána sem ber hann; orðalag reglu er tekið þaðan.
+
+### (j) GO-FLOKKAR A/B OG TÍMAGLUGGAR (arkitekt 01.11.2026 23:45; gildir í framkvæmd frá þeim tíma)
+
+Heimild: `D:\_audit\master_verklag\WORKING_PROTOCOL_drog_flokkar_AB.md` (drögin nefna `D:\WORKING_PROTOCOL.md`; kanóníska skjalið er þetta, sbr. Changelog 2026-05-06).
+
+- **GO-beiðni:** lota HALT-ar með beiðni á mannamáli, 2–4 línur: hvað breytist, hvar það sést, hvernig er bakkað.
+- **Flokkur A** — texti, merki, framendi án gagnabreytinga; bakkað með einu `git revert`. Arkitekt les SKIL af diski og gefur „GO arkitekts". Lotan ýtir sjálf, staðfestir á www og skrifar LOKIÐ. Danni getur alltaf stöðvað með „bíddu".
+- **Flokkur B** — migration, eyðing, lyklar, Task Scheduler/keðja, ný notendavirkni, allt sem ekki er bakkað með einu revert. GO frá Danna. Lotan framkvæmir sjálf eftir GO; Danni keyrir aðeins sjálfur það sem krefst stjórnanda-PowerShell eða mælaborðs.
+- **Master session gefur aldrei GO sjálf;** hún ber GO áfram og heldur stöðutöflu (lota, staða, hver á næsta skref).
+- **Tímagluggar:** ekkert push/ff/migration 01:00–07:30 og engar þungar DB-fyrirspurnir 01:00–07:30. Push á verdmat-ai eitt í einu, í röð sem arkitekt ákveður; hver lota fetchar, endurgrunnar og keyrir próf aftur á undan (`git log HEAD..origin/main` tómt, sbr. `D:\_audit\cc293_manadarskyrsla\SKIL_CC293.md`). Aðeins eitt migration beitt í einu.
+- Arkitekt les SKIL beint af diski; um möppur sjá (k).
+
+### (k) ALDREI SKRIFA Í MÖPPU ANNARRAR LOTU (Danni 01.11.2026, cc295)
+
+**Lota skrifar aðeins í eigin möppu `D:\_audit\ccNNN_*` og eigið vinnutré. Lestu úr möppu annarrar lotu, afritaðu í þína möppu og skrifaðu þar.** **Raundæmi 01.11 (cc295):** skrifta cc295 skrifaði yfir frumgagnaskrána `cc218_september\q11_fullnusta.json` (endurgerð úr stdout) og önnur úttaksskrá (`q10_velta.json`) lenti í cc218-möppunni. Staðfesting eftir á: `find D:\_audit -newer SKIL_ccNNN.md` sýnir aðeins eigin möppu. Heimild: `D:\_audit\cc295_manadarskyrsla_okt\SKIL_CC295.md` §6 liður 5; sami texti í (j)-drögunum, liður f.
+
+### (l) DDL Á LIFANDI SÝN: STUTTUR LÁS, ENGIN MÆLING Í SÖMU FÆRSLU (Danni 01.11.2026, cc292)
+
+Orðrétt úr `D:\_audit\cc292_myndir\SKIL_CC292.md` §7.0:
+1. `SET LOCAL lock_timeout = '5s'` og `statement_timeout` á hverja skipun í `--prof`/`--beita`.
+2. Engin þung mæling í sömu færslu og DDL á sýn sem www les. Ný skilgreining er mæld sem sér sýn með öðru nafni (t.d. `v_eign_myndir_cc292b_prof`) í lesfærslu. `--prof`/`--beita` gera aðeins CREATE OR REPLACE og punktathuganir, svo COMMIT eða ROLLBACK innan sekúndna.
+3. Lástími CREATE OR REPLACE er mældur áður en beitt er.
+
+**Raundæmi 01.11 (cc292):** `--prof` keyrði CREATE OR REPLACE VIEW á `v_eign_myndir` og síðan þungar mælingar í sömu færslu; AccessExclusiveLock hélst ~12:05–12:18 og ~12:20–12:32 og lesbeiðnir www biðu. Eftir regluna: DDL 69–102 ms, lás 197–229 ms. Grunnurinn undir þessu (eldri lotur): DDL fer um psycopg2 með `lock_timeout`/`statement_timeout`, `--prof` (ROLLBACK) á undan `--beita`, rollback-SQL skrifað fyrst — aldrei MCP `apply_migration`, sem hefur engin tímamörk (`D:\_audit\cc223_nybyggingarofi\SKIL_CC223.md`; `D:\_audit\cc251_manadarsala\SKIL_CC251.md`).
+
+### (m) NÝR HLUTUR FÆR ENGIN anon-RÉTTINDI SJÁLFKRAFA; GRANT Í SÖMU MIGRATION (cc284, BEITT 31.10.2026)
+
+Migration `20261031130000_cc284d_sjalfgefin_rettindi` breytti `ALTER DEFAULT PRIVILEGES` fyrir `postgres`: nýjar töflur, runur og föll í `public`/`semantic` fá ekki lengur `anon`/`authenticated`-réttindi, og PUBLIC-EXECUTE á föllum er tekið altækt. **Því gildir: hver ný tafla/sýn/fall sem www á að lesa fær GRANT sérstaklega í sinni migration.** Núverandi hlutir eru óbreyttir; áhrifin ná aðeins til nýrra hluta. Sýn sem www les og er endurgerð skal bera saman heimildir anon/authenticated/service_role fyrir og eftir (`D:\_audit\cc272_sitemap\SKIL_CC272.md`), og föll í `scraper` fá REVOKE EXECUTE því skemað er opið í PostgREST (`D:\_audit\cc276_sottkvi_tafla\SKIL_CC276.md`). Heimild: `D:\_audit\cc284_anon_rettindi\SKIL_CC284.md` §7.3 og §8; DECISIONS 2026-10-31.
+
+### (n) FALSPRÓF NOTAR RAUNVERULEGT INNSTREYMI (arkitekt 01.11.2026 23:50, cc296 H5)
+
+**Falspróf á mælingu sem fer eftir tíma (sölutími, endurkomur, lifun) hermir raunverulega skekkjuvaldinn — raunverulegt daglegt innstreymi, stýfingu við upphaf vöktunar — ekki jafnt innstreymi.** Prófið telst aðeins standast ef það getur fallið. **Raundæmi 01.11:** falspróf cc295 (F1/F2) gerði ráð fyrir jöfnu innstreymi; með föstum raunsölutíma (lognormal, miðgildi 60 d) og raunverulegu nýskráningarsniði endurskapaði jafngluggamælingin birta mynstrið 41/50/35/36 — „Jafngluggatalan hefur því ekkert afl, hvorki til að segja „lengist" né „lengist ekki"." Staðalfalsprófið (sölulíkur 35 %, vinstri stýfing 27.06, fræ 2952) er skilyrði: skrifta skrifar ekki hópatölu nema `falsprof.stenst = true`. Heimild: `D:\_audit\cc296_stadfesting_okt\SKIL_CC296.md` §0 (H5) og §2.4; `D:\_audit\cc295_manadarskyrsla_okt\SKIL_CC295.md` §8.2.
+
+### (o) `unstable_cache`: HÆKKA ÚTGÁFULYKIL Í SAMA COMMITI (arkitekt 01.11.2026 23:58, cc298)
+
+**Breytist strengur eða snið sem er búið til inni í `unstable_cache`, skal hækka útgáfulykil skyndiminnisins (t.d. `FS_CACHE_UTGAFA`, `EIGN_CACHE_UTGAFA`) í sama commiti.** Annars sýnir www gömul gögn í allt að TTL, því ný dreifing hreinsar ekki gagnaskyndiminnið. Allar lotur sem breyta framenda athuga þetta fyrir push. **Raundæmi:** cc298 (01.11) — `/fasteignasolur`-töflur sýndu gamla strenginn undir lykli `"cc286"` í ≤ 1 klst eftir push; cc258 (17.10) — `unit_category` bættist í select án hækkunar `EIGN_CACHE_UTGAFA`, og eignir opnaðar fyrir deploy fengu hæð null. Heimild: `D:\_audit\cc298_markadur\SKIL_CC298.md` § Lærdómur; `D:\_audit\cc258_krass_v2\SKIL_CC258.md`.
+
+### (p) PUSH Á app-REPO ER EKKI LOKIÐ FYRR EN STAÐBUNDIÐ `app` main ER ff-AÐ (Danni 02.11.2026)
+
+**„Lota sem ýtir á app-repo er ekki LOKIÐ fyrr en staðbundið app main er ff-að á origin/main og staðfest með fetch (utan 01:00–07:30), nema GO segi annað."** Staðfesting: `git -C D:\verdmat-is\app fetch` og síðan `git -C D:\verdmat-is\app status -sb` sýnir `## main...origin/main` án `[ahead …]`/`[behind …]`. **Raundæmi 02.11:** `D:\verdmat-is\app` stóð á `8f00ba9` frá kvöldi 01.11 til 08:04 02.11, svo nóttin keyrði án `a3262e7` (cc292), `a68d8f3` (cc290) og `d517bd8` (cc292b), sem voru þegar á origin/main. Það skipti ekki máli í það sinn (engin næturskrifta notar þær skrár; DDL var þegar beitt), en hefði gert það ef breytingin hefði snert keðjuna. Heimild: `D:\_audit\cc299_lifsmark\SKIL_CC299.md` §4; `D:\_audit\cc306_afrit_skraning\SKIL_CC306.md` §5.
+
+### (q) NÆTURKEÐJAN: ff Á `app` main ER VIRKJUN (cc263, cc268, cc275, cc281)
+
+Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push eitt virkjar ekkert en ff á staðbundnum `app` main virkjar frá næstu nótt** (`D:\_audit\cc275_kedja\SKIL_CC275.md`). Ekkert ff meðan bash-keðja keyrir og engin migration meðan sópur með gömlum kóða keyrir (`D:\_audit\cc281_app_samthaetting\SKIL_CC281.md`). Tímaþak verks verður að vera stærra en biðhlið + keyrsla (`D:\_audit\cc260_naeturverk\SKIL_CC260.md`). Gagnalagsbreyting sem hreyfir lifandi tölu fer fyrst á prófunarútgáfu sem framendinn flettir yfir á í push-committinu (`D:\_audit\cc224_nybyggingar\SKIL_CC224_1.md` §11.7).

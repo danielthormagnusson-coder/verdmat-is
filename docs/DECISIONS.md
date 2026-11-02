@@ -4,6 +4,64 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-01 — GO-flokkar A/B, tímagluggar og möppuregla (arkitekt 01.11 23:45; Danni 01.11) — **bókað af cc306 úr SKIL; reglutextinn er í WORKING_PROTOCOL (j)–(k)**
+
+Flokkur A (texti/merki/framendi án gagnabreytinga, eitt `git revert`) fær „GO arkitekts" eftir lestur SKIL af diski; flokkur B (migration, eyðing, lyklar, Task Scheduler/keðja, ný notendavirkni) fær GO Danna. Master session gefur aldrei GO. Ekkert push/ff/migration og engar þungar DB-fyrirspurnir 01:00–07:30; push á verdmat-ai eitt í einu í röð arkitekts. Lota skrifar aðeins í eigin `D:\_audit\ccNNN_*` og eigið vinnutré (regla Danna 01.11 eftir að skrifta cc295 skrifaði yfir `cc218_september\q11_fullnusta.json`).
+
+**Heimild:** `D:\_audit\master_verklag\WORKING_PROTOCOL_drog_flokkar_AB.md`; `D:\_audit\cc295_manadarskyrsla_okt\SKIL_CC295.md` §6 liður 5.
+
+## 2026-11-01 — Októberskýrslan: jafngluggamæling sölutíma ógild, íbúðasía, vöktun frá 27.06.2026, staðalfalspróf (arkitekt 01.11 23:50, H1–H5 úr cc296) — **beitt í drögum cc295b; ekkert birt**
+
+- **H1:** jafngluggamiðgildi sölutíma (41/50/40,5/36) sýnir ekki breytingu — gripur úr innstreymi. Taflan og fullyrðingar um „lengingu" fara út; hópatafla (F30/F45) með orðalaginu „engin mælanleg lenging" kemur í staðinn.
+- **H2:** „íbúðasamningar" náðu líka yfir atvinnuhúsnæði og sumarhús → allar íbúðatölur endurreiknaðar með einni íbúðasíu (508/626, −18,8 %).
+- **H3/H4:** „−16,3 % frá sept. 2025 (688)"; upphaf lifandi vöktunar er **27.06.2026** alls staðar.
+- **H5:** falspróf með raunverulegu innstreymi er skilyrði fyrir hópatölu (`falsprof.stenst = true`), sjá WORKING_PROTOCOL (n).
+
+**Heimild:** `D:\_audit\cc296_stadfesting_okt\SKIL_CC296.md` §0 og §2.4; `D:\_audit\cc295_manadarskyrsla_okt\SKIL_CC295.md` §8.
+
+## 2026-11-01 — Myndir eignasíðna af eigin R2, leið (a) (cc294) — **GO Danna 01.11 á leið; ekkert beitt (bíður mælaborðsskrefa A–C og GO á afritun)**
+
+Myndir eignasíðna verða birtar úr fötunni `verdmat-myndir` um `myndir.verdmat.ai` (til frá cc224b). Tómir hlutir eru skráðir `engin_baeti`. Afritun fer með þröngum lykli `r2myndir:` bundnum við eina fötu (lesinn með `Read-Host`, aldrei í spjall eða `_audit`), ekki með reikningsvíða `r2backup:`. Kanarí-falspróf á aðrar fötur á undan.
+
+**Heimild:** `D:\_audit\cc294_myndir_r2\SKIL_CC294.md` §7.
+
+## 2026-11-01 — Mánaðarskýrslur: leiðréttingarmerki, auglýsingagatið til maí 2026, kafli 13 ómældur (cc293) — **GO Danna 01.11; pushað verdmat-ai `dcb76f4..6af3810`, www 115/115**
+
+Merki „Leiðrétt 01.11.2026" standa við hlið upprunalegrar tölu (frumrit ósnert) á sölutíma júlí–sept (cc286-tvítalning). Auglýsingagatið nær **ágúst 2025 – maí 2026** (ekki febrúar 2026). Kafli 13 (september) fær „Endurmælingu lauk ekki; talan í þessum kafla er ekki staðfest." — mælingin er ekki til (inntak cc218 glataðist, sbr. WORKING_PROTOCOL (f)). Nýr rofi `SYNA_MANADARSKYRSLUR`.
+
+**Heimild:** `D:\_audit\cc293_manadarskyrsla\SKIL_CC293.md` § Framhald 01.11.
+
+## 2026-11-01 — Auglýsingalotur v2: evalue ∪ lifandi mbl; lifandi mbl gildir; Wayback aðeins krossprófun (cc290 D1–D4) — **migration 20261101120000 BEITT 01.11 10:16; app `a68d8f3`, verdmat-ai `dcb76f4`**
+
+- **D1 (31.10):** `scraper.listing_sessions_v2` = evalue-safnið (frosið 2026-04-15) ∪ lifandi mbl, sameinað á mbl-id. Gamla `scraper.listing_sessions` (cc85) ósnert. RLS á, REVOKE ALL frá anon/authenticated; www les ekkert þaðan.
+- **D2 (01.11):** 475 mbl-id bera annað fastanúmer í lifandi sókn en í evalue → lifandi fastanúmerið ræður.
+- **D3 (31.10):** evalue — engin frekari sókn eða probe.
+- **D4:** Wayback-vísir eingöngu sem óháð krossprófun; staðreyndareitir fara í audit-möppu, aldrei í DB.
+- Bilsía endurkomu 14–365 d (í reynd 91–365 d); loforðið „tveggja vikna" tekið út.
+
+**Heimild:** `D:\_audit\cc290_auglysingagat\DECISIONS_drog_cc290.md`; `D:\_audit\cc290_auglysingagat\SKIL_CC290.md` §V2.
+
+## 2026-10-31/11-01 — Fasteignamat á /markadur: geymslubil utan röðunar (cc288-v2) og samanlagt mat götu (cc288-v3) — **migrations 20261101090000 (31.10 12:44) og 20261101110000 (01.11) BEITTAR; www 44/44**
+
+- Lágmark **n ≥ 5** á hverri röð (CHECK í gagnalagi). anon fær SELECT aðeins á `v_fasteignamat_*`. Ekkert snertir líkan, comps eða þrep.
+- **cc288-v2:** eining í iðnaði/lager undir 50 m² er geymslubil — talin (819) og birt í neðanmáli, aldrei raðað. Regla á tegund og stærð, engin heimilisföng.
+- **cc288-v3:** summa fasteignamats 2026 allra eininga götu/svæðis; hvert fastnúmer talið einu sinni (tvítalning kastar villu); „atvinnu samanlagt" aðeins summa, aldrei kr/m².
+
+**Heimild:** `D:\_audit\cc288_fasteignamat\SKIL_CC288.md` (regla 13; § v2; § v3).
+
+## 2026-10-31 — Vísitala og fasteignasölu-röðun: fallregla síðasta fjórðungs, R-H, jafntefli innan dags, götusía (cc286) — **ákvarðanir Danna 31.10; migration 20261101100000 BEITT 31.10 13:45; app `a69f68f..025ef13`, verdmat-ai `b7bb78c..c6acc95`**
+
+- **Á-V1 NEI:** Púlsinn sýnir ekki ófullgerðan fjórðung. **Á-F1–F3 JÁ** (útfærsla í kóðalotu síðar).
+- **Fallregla vísitölu:** síðasti fjórðungur birtist aðeins ef fullnusta ≥ 95 % OG fjórðungi lauk ≥ 1 mán fyrir keyrsludag (31.10 → 2026Q3). cc218-v1 (≥ 90 % og fjórðungur liðinn) er ekki notuð.
+- **R-H JÁ:** Fjölbýli með samningsflöt > 500 m² = heildarkaup fjölbýlishúss, utan röðunar (talið í nefnara).
+- **Jafntefli innan dags:** auglýsingar í sama þrepi sem hófust sama dag teljast jafnar; fjöldi óskiptur, velta skipt jafnt.
+- **Götusía:** `semantic.v_street_prices` notar skynsemismörk 50.000–2.500.000 kr/m² í stað 1.–99. hundraðshlutamarks.
+- Ný `regla_version` (cc286-v1) í stað yfirskriftar.
+
+**Heimild:** `D:\_audit\cc286_markadur\SKIL_CC286.md` §6 og §8; óháð staðfesting `D:\_audit\cc287_fable_stadfesting\SKIL_CC287.md`.
+
+---
+
 ## 2026-11-01 — Forgangur mynda: lifandi auglýsing á undan safni (cc292b) — **GO Danna 01.11; migration 20261101140000 BEITT 12:33:02**
 
 `v_eign_myndir` velur EITT myndasett per eign: (1) lifandi auglýsing með myndum, nýjust fyrst; (2) annars safnið; (3) annars óvirk auglýsing (R1). Mælt í `--prof`: 2.839 eignir á sölu skipta úr safni í lifandi myndir; ártalsmerki 37.797 → 36.596 af 48.610; 0 eignir misstu myndir; ~2 ms á eign (`valin` NOT MATERIALIZED — efnisgerð CTE gaf 60 s á eign).
