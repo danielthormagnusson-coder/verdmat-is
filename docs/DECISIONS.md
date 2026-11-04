@@ -4,7 +4,7 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
-## 2026-11-04 — Eigindi úr auglýsingareitum á eignasíðu, áfangi 1 (cc316) — **GO Danna 04.11; verdmat-ai 828da58 á main; migration 20261104230000 beitt 23:05; handhleðsla 23:05 (5.992 raðir); verkið verdmat-nightly-auglysing-eigindi 06:40 er ekki skráð (Register-ScheduledTask hafnað, HRESULT 0x80070005), bíður Danna. Garður, hjólastóll og rafbíll bíða áfanga 2 (ákvörðun Danna)**
+## 2026-11-04 — Eigindi úr auglýsingareitum á eignasíðu, áfangi 1 (cc316) — **GO Danna 04.11; verdmat-ai 828da58 á main; migration 20261104230000 beitt 23:05; handhleðsla 23:05 (5.992 raðir); verkið verdmat-nightly-auglysing-eigindi skráð 04.11 fyrir 23:16 af Danna eða master (S4U, 06:40, þak 10 mín., `--skrifa`; skilgreining staðfest 23:17, sú sem lögð var til), fyrsta keyrsla 05.11. Garður, hjólastóll og rafbíll bíða áfanga 2 (ákvörðun Danna)**
 
 1. **Regla (gildir strax um allar lotur): 0/false úr reit í mbl-auglýsingu er ekki „nei".** Reitirnir `lyfta` og `bilskur` eru aldrei NULL í hráum farmi. Hinir sex eru NULL í 0,4–6,6 % en false greinir samt ekki nei: í 50 auglýsinga slembiúrtaki segir texti já við 7 af 16 false á `svalir`. Þessi reitur birtist aldrei sem „nei".
 2. **Aðeins „já" birtist, og aðeins á lyftu, svölum og bílskúr/stæði.** Garður, hjólastóll og rafbíll bíða áfanga 2: garður er já á 84,5 % íbúða en 77,7 % einbýla og 22,5–100 % eftir fasteignasölu; hjólastólsaðgengi er staðfest í 0 af 22 já; rafbíll er staðfestur í 5 af 20 og 4 af 15 í viðbótarúrtaki eru aðeins lagnaleið eða möguleiki.
