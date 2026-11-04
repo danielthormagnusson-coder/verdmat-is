@@ -4,6 +4,19 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-04 — Eigindi úr auglýsingareitum á eignasíðu, áfangi 1 (cc316) — **tillaga: bíður GO Danna (flokkur B); verdmat-ai cc316 74709cd (grein cc316, wt_cc316), ópushað; migration d01 og hleðari d02 óbeitt**
+
+1. **Regla (gildir strax um allar lotur): 0/false úr reit í mbl-auglýsingu er ekki „nei".** Reitirnir `lyfta` og `bilskur` eru aldrei NULL í hráum farmi. Hinir sex eru NULL í 0,4–6,6 % en false greinir samt ekki nei: í 50 auglýsinga slembiúrtaki segir texti já við 7 af 16 false á `svalir`. Þessi reitur birtist aldrei sem „nei".
+2. **Aðeins „já" birtist, og aðeins á lyftu, svölum og bílskúr/stæði.** Garður, hjólastóll og rafbíll bíða ákvörðunar Danna: garður er já á 84,5 % íbúða en 77,7 % einbýla og 22,5–100 % eftir fasteignasölu; hjólastólsaðgengi er staðfest í 0 af 22 já; rafbíll er staðfestur í 5 af 20 og 4 af 15 í viðbótarúrtaki eru aðeins lagnaleið eða möguleiki.
+3. **Reitur mbl `bilskur` er ekki bílskúr.** Hann nær líka yfir stæði í bílageymslu (fasteignaskrá segir stæði í bílakjallara á 1.680 eignum með bilskur=1). Hann birtist sem „Bílskúr eða stæði í bílageymslu".
+4. **Röðun: reiturinn fyllir aðeins tóma röð.** Skráð gildi úr hvaða lind sem er (notandi, staðfest, auglýsing, extraction, skráargögn) gengur fyrir. Ósamræmi milli virkra auglýsinga sömu eignar, eða fjöleiningar-fastnúmer, gefur Óþekkt. Röðin sýnir alltaf eitt gildi.
+5. **Sér tafla, ekki `property_attributes`.** `getAttributes`, leiðrétting, sviðsmynd og spjall lesa þetta ekki, svo γ-frost brúarinnar (§5D-3, cc136) stendur ósnert.
+6. **„Nýjar íbúðaauglýsingar":** virk mbl-söluauglýsing á íbúð með fastanúmeri, fyrst séð 01.08.2026 eða síðar (föst dagsetning). Mælt 04.11: 4.210 eignir eftir að fjöleiningar-fastnúmer falla út, 3.236 fá að minnsta kosti eitt nýtt gildi.
+
+Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md`.
+
+---
+
 ## 2026-11-01 — GO-flokkar A/B, tímagluggar og möppuregla (arkitekt 01.11 23:45; Danni 01.11) — **bókað af cc306 úr SKIL; reglutextinn er í WORKING_PROTOCOL (j)–(k)**
 
 Flokkur A (texti/merki/framendi án gagnabreytinga, eitt `git revert`) fær „GO arkitekts" eftir lestur SKIL af diski; flokkur B (migration, eyðing, lyklar, Task Scheduler/keðja, ný notendavirkni) fær GO Danna. Master session gefur aldrei GO. Ekkert push/ff/migration og engar þungar DB-fyrirspurnir 01:00–07:30; push á verdmat-ai eitt í einu í röð arkitekts. Lota skrifar aðeins í eigin `D:\_audit\ccNNN_*` og eigið vinnutré (regla Danna 01.11 eftir að skrifta cc295 skrifaði yfir `cc218_september\q11_fullnusta.json`).
