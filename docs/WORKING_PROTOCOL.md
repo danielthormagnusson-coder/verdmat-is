@@ -316,3 +316,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 ### (t) JÁ ÚR LLM ER ÁLYKTUN ÞAR TIL ÞAÐ ER MÆLT GEGN TEXTANUM; RÖÐ SKREFA ER BUNDIN VIÐ NIÐURSTÖÐU (Danni 05.11.2026, cc316)
 
 **Reitur eða útdráttur birtist ekki sem staðreynd fyrr en hann er mældur á blindu úrtaki gegn textanum sjálfum, per eigind.** „Ekki nefnt" og 0/false úr auglýsingareit eru aldrei „nei". Já úr `listing_extractions` v0.2.2 er ályktun líkans: já án nokkurs orðstofns í hráum texta er 15,5 % á lyftu og 11,6 % á svölum (mælt á 2.588 íbúðum). **Keðja skrifa, hleðslu og push er bundin við niðurstöðu hvers skrefs**, svo fallið skref stöðvi það næsta. **Raundæmi:** cc316 áfangi 1 (04.11), push fór af stað 17 sek. áður en hleðsla tókst. Heimild: `D:\_audit\cc316_eigindi\SKIL_CC316.md`.
+
+### (u) HART KOSTNAÐARÞAK ER BÓKHALD FYRIR HVERT KALL, EKKI SAMTALA EFTIR Á (Danni 05.11.2026, cc316c)
+
+**Þak á líkanskostnað stendur í kóða: hámarkskostnaði kalls er haldið í skrá sem er flush-uð ÁÐUR en kallið fer, og það gert upp eftir svar. Summa skrárinnar er eina heimildin.** Hrun skilur hald eftir, svo endurræsing kemst ekki yfir þakið. Fyrri kostnaður verksins telst með. Stöðvun skilur eftir gild gögn og segir hve langt var komist. **Falspróf með gervi-API áður en keyrt er.** Raundæmi: `a2/prof_thak.py` í cc316c fann að hald á kall var lægra en versta kall. Heimild: `D:\_audit\cc316_eigindi\SKIL_CC316.md`.

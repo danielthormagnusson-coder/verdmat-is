@@ -4,6 +4,17 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-05 — Eigindi úr lýsingu: einskiptis lestur á virkum auglýsingum, hart þak $20; varanlegur lestur bíður samanburðar (cc316c) — **ákvörðun Danna 05.11, gengur framar GO næstu færslu á undan um verk og nýja texta**
+
+1. **Einskiptis lestur:** lyfta, svalir, geymsla, verönd/pallur og garður á VIRKUM íbúðaauglýsingum, nýjustu fyrst eftir `first_seen_at` og aftur í tímann, hart þak $20 á API-lykli næturkeðjunnar. Fyrri kostnaður verksins á lyklinum ($5,657) telst með. Merkt „Úr lýsingu auglýsingar, dags.". Geymsla: HMS-skrá ræður þar sem hún hefur gildi.
+2. **Virk:** `scraper.v_eign_virk_auglysing` með `withdrawn_at` tómt. Ekki `last_seen_at`, sem er ekki líf. Íbúðir einar, af því að nákvæmnin var mæld á þeim (regla (t)); önnur íbúðarhús eru opin spurning til Danna.
+3. **Verk kl. 05:30 er fellt úr gildi** og var aldrei skráð. Varanlegur lestur: ódýrasta líkan sem stenst rangt já ≤ 2 % á hverju eigindi, hámark $2 á dag með hörðu þaki; ef ekkert stenst fer ekkert í loftið. HALT með samanburðartöflu áður en verk er skráð. „Aðeins nýjar auglýsingar" og vikubið falla niður.
+4. **Hart þak í kóða:** hald á kall er skráð í bókhald áður en kallið fer og gert upp eftir svar. Hrun skilur hald eftir, svo endurræsing kemst ekki yfir þakið. `--bridge` er áfram slökkt.
+
+Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316c).
+
+---
+
 ## 2026-11-05 — Eigindi úr lýsingu, áfangi 2: `--bridge` ekki kveikt; Haiku 5.5 á prompti eigindalagsins (cc316b) — **GO Danna 05.11; regla í WORKING_PROTOCOL (t)**
 
 1. **Ákvörðun Danna:** ekki kveikja á `--bridge`. Prompt eigindalagsins á Haiku 5.5, API-lykill næturkeðjunnar, verk kl. 05:30. Birt: lyfta, svalir, geymsla, verönd/pallur og garður, merkt „Úr lýsingu auglýsingar, dags.". Aðeins nýir textar núna; eldri textar (4.181) koma eftir viku ef engin frávik verða, og aðeins með rofanum `--baklisti`.
