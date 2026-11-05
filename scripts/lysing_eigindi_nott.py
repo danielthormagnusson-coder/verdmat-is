@@ -192,6 +192,8 @@ def main():
     if a.stoppa_kl:
         h, m = map(int, a.stoppa_kl.split(":"))
         stopp = D.datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
+        if stopp <= D.datetime.now():  # klukkan er þegar liðin í dag: átt er við næsta sólarhring
+            stopp += D.timedelta(days=1)
     c = psycopg2.connect(Path(a.dbconfig).read_text(encoding="utf-8-sig").strip())
     c.rollback()
     k = c.cursor()
