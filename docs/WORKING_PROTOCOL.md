@@ -324,3 +324,10 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 ### (v) RAMMI FRÁ ÞRIÐJA AÐILA: STAÐFEST MEÐ LESTRI RAMMANS, LYKILL AÐEINS VIÐ SMELL, ENDAPUNKTUR TEKUR AUÐKENNI (arkitekt 05.11.2026, cc318)
 
 **`iframe` í DOM sannar ekki að ramminn hafi hlaðist: rammi sem CSP lokar lítur eins út. Staðfest er með því að lesa texta rammans eða taka skjámynd.** Lykill sem hlýtur að sjást í slóð rammans fer til vafrans aðeins við smell, í svari með `no-store`, og endapunkturinn tekur auðkenni (fastanúmer) en aldrei frjáls hnit, svo opinn stiki geti ekki beint sameiginlegum lykli hvert sem er. **Lyklaskönnun þarf jákvæða viðmiðun:** byggt er með merkistreng í stað lykils, HTML og JS-pakkar skannaðir, og sama skönnun á að finna strenginn í svari endapunktsins. Annars sannar 0 hittar ekkert. **Raundæmi:** cc318, þar sem villutexti Google í rammanum sýndi að ekkert lokar honum og merkistrengurinn fannst 0 sinnum í 66 static-skrám en 1 sinni í svarinu; á www birtist raunmynd og sama skönnun með raunlykli í breytu fann hann 0 sinnum í HTML og JS-pökkum. Heimild: `D:\_audit\cc318_gotumynd\SKIL_CC318.md`.
+### (w) ORÐSTOFNSHLIÐ ÞARF STAÐARHEITAPRÓF; ÚRSKURÐUR KEMUR Á EFTIR BLINDRI TÖLU (Danni 05.11.2026, cc316d)
+
+**Stofn getur hitt staðarheiti: „garð" hitti Garðabæ og bæinn Garð, svo já á garð slapp í gegnum hliðið og taldist „óljóst".** Lestu tilvikin sem falla ekki í „rétt", ekki aðeins teljarann. **Blind tala stendur fremst í töflu; úrskurður eftir á er sýndur sér.** Raundæmi: geymsla 0/148 var 1/148 blint, og Sonnet 5 2/151 var 4/151. Heimild: `D:\_audit\cc316_eigindi\SKIL_CC316.md`.
+
+### (x) NÆTURVERK SEM HÁÐ ER KEÐJUNNI LES NÆTURLOGG DAGSINS, EKKI KLUKKUNA (Danni 05.11.2026, cc316d)
+
+**Hliðið les síðustu CHAIN-línu í `night_YYYYMMDD.log`, dagsetta þann dag, svo gamalt CHAIN CLEAN opni ekki.** Keðja í gangi: endanleg bið sem endar fyrir 06:55. Annars sleppt með ástæðu í eigið logg, eigin rc og engin köll. Tímaþak verks er stærra en bið + keyrsla (q). Falspróf: hrein keðja, keðja með villu, vantar logg, logg gærdagsins, keðja enn í gangi (`a3/prof_kedjuhlid.py`).

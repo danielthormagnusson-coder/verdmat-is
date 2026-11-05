@@ -34,6 +34,17 @@ Skil: `D:\_audit\cc317_utdrattur_af\SKIL_CC317.md`.
 
 ---
 
+## 2026-11-05 — Varanlegur lestur Haiku 5.5, næturverk 06:10 á CHAIN CLEAN, einbýli og raðhús (cc316d) — **GO Danna 05.11; reglur í WORKING_PROTOCOL (w), (x); verkið skráir Danni sjálfur**
+
+1. **Haiku 5.5 les nýjar auglýsingar varanlega, hart $2 dagsþak** (íbúðir; hvort einbýli og raðhús fylgja er spurning til Danna).
+2. **Verk kl. 06:10 keyrir aðeins ef næturloggur dagsins endar á CHAIN CLEAN.** Síðasta CHAIN-lína, dagsett þann dag. Keðja í gangi: bíður til 06:45. Annars sleppt með línu í eigið logg og rc 7, engin köll. Köll hætta 06:53.
+3. **Einbýli og raðhús (ekki sumarhús, ekki fjöleiningar):** blint úrtak 120 á hvora tegund. Svalir, geymsla, verönd/pallur og garður standast á báðum (rangt já 0 af 38–81). Lyfta er ómælanleg (0 já) og birtist ekki þar. Lestur innan $20-þaksins. Geymsla: HMS-skrá ræður áfram.
+4. **Leiðrétting (Danni spurði):** á íbúðaúrtaki er blind tala á geymslu Haiku 5.5 1/148, ekki 0/148. 0/148 var eftir úrskurð minn á A085. Sami úrskurður gaf Sonnet 5 2/151 í stað blindu tölunnar 4/151 og brúnni 0/87 í stað 2/87, svo á blindum tölum fellur Sonnet 5 líka á geymslu og brúin á geymslu. Niðurstaða um Haiku 5.5 breytist ekki.
+
+Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316d).
+
+---
+
 ## 2026-11-05 — Eigindi úr lýsingu: einskiptis lestur á virkum auglýsingum, hart þak $20; varanlegur lestur bíður samanburðar (cc316c) — **ákvörðun Danna 05.11, gengur framar GO næstu færslu á undan um verk og nýja texta**
 
 1. **Einskiptis lestur:** lyfta, svalir, geymsla, verönd/pallur og garður á VIRKUM íbúðaauglýsingum, nýjustu fyrst eftir `first_seen_at` og aftur í tímann, hart þak $20 á API-lykli næturkeðjunnar. Fyrri kostnaður verksins á lyklinum ($5,657) telst með. Merkt „Úr lýsingu auglýsingar, dags.". Geymsla: HMS-skrá ræður þar sem hún hefur gildi.

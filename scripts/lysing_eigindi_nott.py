@@ -7,13 +7,15 @@ Sjálfgefið ÞURRKEYRSLA: telur biðröð, stöðu bókhalds og áætlun; engin
 `--skrifa`: nýir textar eingöngu (fyrst fundnir >= NYIR_FRA), hart dagsþak DAGSTHAK_USD. EKKI SKRÁÐ Í VERK: bíður svars Danna.
 `--urtak N`: kallar á N texta og prentar raðir; ekkert skrifað í gagnagrunn (telst í bókhaldi).
 `--stoppa-kl HH:MM`: hættir hreint á þessum tíma (t.d. fyrir 01:00); gögn standa gild.
+`--kedjuhlid`: (verkið) keyrir aðeins ef næturloggur dagsins endar á CHAIN CLEAN; bíður til BID_TIL ef keðjan er í gangi,
+    annars sleppir nóttinni og skráir ástæðu, án kalla (rc 7). Köll hætta HARD_STOPP svo ekkert snerti 06:55–07:05.
 
 Bókhald: skrá BOK er eina heimildin um eyðslu. Fyrir hvert kall er haldi (hámarkskostnaði) bætt við ÁÐUR en kallið fer,
 og það gert upp eftir svar. Hrun skilur haldið eftir, svo summan vanmetur aldrei og endurræsing kemst ekki yfir þak.
 Birting: aðeins HVITLISTI, aðeins já (`til:true`), og orðstofn verður að standa í texta.
-rc: 0 lokið / 2 lykill vantar / 3 villa / 4 hlið felldi birtingu / 6 þak eða tími stöðvaði: biðröð eftir.
+rc: 0 lokið / 2 lykill vantar / 3 villa / 4 hlið felldi birtingu / 6 þak eða tími stöðvaði: biðröð eftir / 7 keðjuhlið sleppti nóttinni.
 """
-import argparse, collections, datetime as D, html, json, re, sys, threading, os
+import argparse, collections, datetime as D, html, json, re, sys, threading, os, time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -31,6 +33,9 @@ HALD_USD = 0.0075      # hámark á kall: 8.192 úttaks-tákn + 20 þús. skyndi
 KOSTN_AETLUN = 0.0018  # mælt: 0,00184 á 160 og 0,00180 á 62 köllum
 FYRRI = [("Sonnet 5, úrtak 160", 5.241), ("Haiku 5.5, úrtak 160", 0.295), ("Haiku 5.5, --urtak 3", 0.009), ("Haiku 5.5, 62 nýir textar", 0.112)]
 TOL = 15
+NIGHT = Path("D:/verdmat-is/scraper_data/night_logs")
+BID_TIL = (6, 45)      # keðja enn í gangi: bíða í mesta lagi til þessa
+HARD_STOPP = (6, 53)   # engin köll eftir þetta; 06:55–07:05 er vaktarinnar
 P = json.loads((Path(__file__).parent / "data" / "eigindi_prompt_v3.json").read_text(encoding="utf-8"))
 LOGG = Path("D:/verdmat-is/scraper_data/logs")
 BOK = LOGG / "lysing_eigindi_kostnadur.jsonl"
@@ -89,6 +94,40 @@ class Bokhald:
                 self.verk += m
 
 
+def kedjustada(dags, moppa=NIGHT):
+    """Staða næturkeðju þessa dags úr eigin loggi: (stada, skýring). Aðeins síðasta CHAIN-línan gildir, og hún verður að vera
+    dagsett þennan dag, svo gamalt CHAIN CLEAN opni ekki hliðið."""
+    leid = moppa / f"night_{dags:%Y%m%d}.log"
+    if not leid.exists():
+        return "vantar", f"{leid.name} er ekki til"
+    sidasta = None
+    for lina in leid.read_text(encoding="utf-8", errors="replace").splitlines():
+        m = re.match(r"(\d{4}-\d{2}-\d{2}) \S+ === CHAIN (\S+)", lina)
+        if m:
+            sidasta = m
+    if sidasta is None:
+        return "i_gangi", "engin CHAIN-lína enn"
+    if sidasta.group(1) != dags.isoformat():
+        return "gamalt", f"síðasta CHAIN-lína dagsett {sidasta.group(1)}"
+    if sidasta.group(2) != "CLEAN":
+        return "villa", f"CHAIN {sidasta.group(2)}"
+    return "hrein", "CHAIN CLEAN"
+
+
+def kedjuhlid(nu=D.datetime.now, moppa=NIGHT, sofa=time.sleep, bid_sek=60):
+    """Skilar (opið?, skýring). Bíður aðeins ef keðjan er í gangi, og endanlega: til BID_TIL."""
+    while True:
+        n = nu()
+        stada, skyring = kedjustada(n.date(), moppa)
+        if stada == "hrein":
+            return True, skyring
+        if stada != "i_gangi":
+            return False, f"{stada}: {skyring}"
+        if (n.hour, n.minute) >= BID_TIL:
+            return False, f"i_gangi: keðja ekki búin kl. {BID_TIL[0]:02d}:{BID_TIL[1]:02d}"
+        sofa(bid_sek)
+
+
 def hreinn(t):
     t = html.unescape(html.unescape(t or ""))
     t = re.sub(r"<\s*(br|/p|/div|/li)[^>]*>", chr(10), t, flags=re.I)
@@ -97,14 +136,22 @@ def hreinn(t):
     return re.sub(r"\n\s*\n+", chr(10), t).strip()
 
 
+# Hlið per tegund og eigind (regla (t)): tegund er aðeins lesin og lykill aðeins birtur ef mælt.
+# Lyfta á einbýli og raðhúsum: 0 já í 240 auglýsingum, ómælanleg, svo hún birtist ekki þar.
+_AN_LYFTU = ("svalir", "geymsla", "verond_pallur", "gardur")
+TEGUND_LYKLAR = {"apartment": HVITLISTI, "house": _AN_LYFTU, "townhouse": _AN_LYFTU}
+NOTT_TEGUNDIR = ("apartment",)  # varanlegur lestur: íbúðir einar þar til Danni segir annað (einskiptis nær til allra í TEGUND_LYKLAR)
+STADARHEITI = re.compile(r"Garðab\w*|Garðat\w*|Garðast\w*|Grandagarð\w*|\bí Garði\b|\b250 Garð\w*|\bGarði,|\bGarður,")  # regla (w)
+
+
 def rammi(k):
     """Virk: v_eign_virk_auglysing (status active, enginn withdrawn_confirmed/confirmed_absent, ekki tvítak), auk withdrawn_at tómt.
     last_seen_at er ekki notað: það er ekki líf. Fulltrúi eignar: nýjasta auglýsing eftir first_seen_at, ekki listed_at."""
-    k.execute("""select v.fastnum,l.source_listing_id,l.first_seen_at,l.listed_at,l.lysing,substr(md5(l.lysing),1,12),v.listing_id
+    k.execute("""select v.fastnum,l.source_listing_id,l.first_seen_at,l.listed_at,l.lysing,substr(md5(l.lysing),1,12),v.listing_id,l.sub_type
       from scraper.v_eign_virk_auglysing v join scraper.listings l using(listing_id)
-      where v.source='mbl' and v.tenure='sale' and v.category='residential' and l.sub_type='apartment'
+      where v.source='mbl' and v.tenure='sale' and v.category='residential' and l.sub_type=any(%s)
         and l.withdrawn_at is null and v.fastnum is not null and l.lysing is not null and length(l.lysing)>=300
-        and v.fastnum not in (select fastnum from public.v_fjoleining_fastnum)""")
+        and v.fastnum not in (select fastnum from public.v_fjoleining_fastnum)""", (list(TEGUND_LYKLAR),))
     by = collections.defaultdict(list)
     for r in k.fetchall():
         by[r[0]].append(r)
@@ -142,8 +189,9 @@ def kall(klient, bok, t, h, texti):
     return h, json.loads(next(b.text for b in s.content if b.type == "text")), ko
 
 
-def radir_ur_svari(svar, texti):
-    return [a for a in HVITLISTI if svar.get(a) == "ja" and re.search(STOFN[a], texti, re.I)]
+def radir_ur_svari(svar, texti, tegund="apartment"):
+    texti = STADARHEITI.sub(" ", texti)  # staðarheiti eru ekki garður
+    return [a for a in TEGUND_LYKLAR[tegund] if svar.get(a) == "ja" and re.search(STOFN[a], texti, re.I)]
 
 
 def rw(c):
@@ -161,7 +209,7 @@ def uppfaera_birtingu(c, R, til):
         svar = til.get(r[5])
         if svar:
             dags = (r[3] or r[2]).date().isoformat()
-            radir += [(f, key, '{"til":true}', r[5], P["skema_utgafa"], dags) for key in radir_ur_svari(svar, hreinn(r[4]))]
+            radir += [(f, key, '{"til":true}', r[5], P["skema_utgafa"], dags) for key in radir_ur_svari(svar, hreinn(r[4]), r[7])]
     k = rw(c)
     k.execute("select count(*) from public.lysing_eigindi")
     nu = k.fetchone()[0]
@@ -186,6 +234,7 @@ def main():
     ap.add_argument("--einskiptis", action="store_true")
     ap.add_argument("--urtak", type=int, default=0)
     ap.add_argument("--stoppa-kl", default=None)
+    ap.add_argument("--kedjuhlid", action="store_true")
     ap.add_argument("--dbconfig", default=r"D:\verdmat-is\.dbconfig")
     a = ap.parse_args()
     stopp = None
@@ -194,6 +243,17 @@ def main():
         stopp = D.datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
         if stopp <= D.datetime.now():  # klukkan er þegar liðin í dag: átt er við næsta sólarhring
             stopp += D.timedelta(days=1)
+    if a.kedjuhlid:
+        opid, skyring = kedjuhlid()
+        if not opid:
+            skra(f"SLEPPT nótt, engin köll: {skyring}")
+            print("SLEPPT:", skyring)
+            return 7
+        stopp = D.datetime.now().replace(hour=HARD_STOPP[0], minute=HARD_STOPP[1], second=0, microsecond=0)
+        if D.datetime.now() >= stopp:
+            skra("SLEPPT nótt, engin köll: of seint")
+            print("SLEPPT: of seint")
+            return 7
     c = psycopg2.connect(Path(a.dbconfig).read_text(encoding="utf-8-sig").strip())
     c.rollback()
     k = c.cursor()
@@ -203,10 +263,12 @@ def main():
     k.execute("select lysing_hash,svar from scraper.lysing_eigindi_svar where skema_utgafa=%s", (P["skema_utgafa"],))
     til = dict(k.fetchall())
     # Nýjast fyrst eftir first_seen_at; jafntefli brotið með auglýsingarnúmeri svo röðin sé fall.
-    allt = {r[5]: r[4] for r in sorted(R.values(), key=lambda r: (r[2], r[6]), reverse=True) if r[5] not in til}
+    rod = sorted(R.values(), key=lambda r: (r[2], r[6]), reverse=True)
+    allt = {r[5]: r[4] for r in rod if r[5] not in til}
+    nott_h = {r[5] for r in rod if r[7] in NOTT_TEGUNDIR}
     fs = fyrst_fundid(k, allt) if allt else {}
     c.rollback()
-    nyir = {h: t for h, t in allt.items() if fs.get(h) and fs[h] >= NYIR_FRA}
+    nyir = {h: t for h, t in allt.items() if fs.get(h) and fs[h] >= NYIR_FRA and h in nott_h}
     bid = allt if a.einskiptis else nyir
     bok = Bokhald(BOK)
     tegund = "urtak" if a.urtak else "einskiptis" if a.einskiptis else "nott"
