@@ -331,3 +331,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 ### (x) NÆTURVERK SEM HÁÐ ER KEÐJUNNI LES NÆTURLOGG DAGSINS, EKKI KLUKKUNA (Danni 05.11.2026, cc316d)
 
 **Hliðið les síðustu CHAIN-línu í `night_YYYYMMDD.log`, dagsetta þann dag, svo gamalt CHAIN CLEAN opni ekki.** Keðja í gangi: endanleg bið sem endar fyrir 06:55. Annars sleppt með ástæðu í eigið logg, eigin rc og engin köll. Tímaþak verks er stærra en bið + keyrsla (q). Falspróf: hrein keðja, keðja með villu, vantar logg, logg gærdagsins, keðja enn í gangi (`a3/prof_kedjuhlid.py`).
+
+### (y) SÍMAPRÓF MÆLIR Í MINNSTU STUDDU BREIDD OG BER STAK SAMAN VIÐ SPJALDIÐ SITT (arkitekt 05.11.2026, cc318)
+
+**Mæling á láréttu skruni í einni breidd sér ekki stak sem stendur út fyrir spjaldið sitt en innan gluggans.** Símapróf keyrir í raunverulegri gluggabreidd (tækjahermir, ekki `iframe`) í minnstu studdu breidd, 375 px eða minna, og ber hvert stak líka saman við spjaldið. Nýr texti í föstu merki er prófaður með lengsta gildinu. **Raundæmi:** cc316b prófaði í iPhone 13 (390 px); merki sem endaði í 383 px gaf 0 skrun þar, þótt það stæði 13 px út fyrir spjaldið og ylli skruni í 375 px. Heimild: `D:\_audit\cc318_gotumynd\SKIL_CC318.md`.

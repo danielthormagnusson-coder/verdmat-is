@@ -4,6 +4,16 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-05 — Merkið á eigindum brotnar í línur; símapróf mæla í minnstu breidd (cc318) — **GO arkitekts 05.11, flokkur A; verdmat-ai e2b785f á main og www; regla í WORKING_PROTOCOL (y)**
+
+1. **Lagfæring:** `.vm-eigind-pilla` fer úr `white-space: nowrap` í `normal`. Merkið „Úr lýsingu auglýsingar, dags. …" (cc316b) náði út í 383 px og olli láréttu skruni í 375 px. Eingöngu CSS, svo `EIGN_CACHE_UTGAFA` stendur (regla (o)).
+2. **Mælt á www, 21 eign, fyrir og eftir:** 375 px skrun á 6 eignum, síðan 0. Einnig 0 frávik í WebKit 375 og Chromium 320, 360 og 390 px. Tölva 1280 px: 21 spjald pixla-eins.
+3. **„Þín skráning" ekki prófuð:** sést aðeins innskráðum.
+
+Skil: `D:\_audit\cc318_gotumynd\SKIL_CC318.md`.
+
+---
+
 ## 2026-11-05 — Götumynd og loftmynd á eignasíðum, Google Maps Embed, ekkert geymt (cc318) — **forskrift Danna og arkitekts 05.11; GO Danna 05.11; verdmat-ai 8921eef á main og www**
 
 1. **Ákvörðun:** eignasíður fá hnappana „Götumynd" og „Loftmynd". Ramminn hleðst aðeins við smell og slóð hans kemur frá þjóni við smell. Merkingin er „Götumynd Google næst hnitum eignarinnar" og „Loftmynd Google", aldrei „Mynd af eigninni" (regla 13).
