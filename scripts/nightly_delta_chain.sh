@@ -49,7 +49,10 @@ NIGHTLOGS=$DATA/night_logs
 MODELOGS=$DATA/logs
 DELTA_MAX_PAGES=100          # per-mode cap; bounds the night at 4x100 pages worst case
 NIGHT_BUDGET=900             # §6-A.5 margin under the §0.5 <1000 pages/24h cap
-EXTRACT_FORWARD=200          # Haiku-hrinan: ný lysingar sem eru útdregnar í nótt
+# cc317 (ákvörðun Danna 05.11) — HAIKU SLÖKKT. 0 = engin Haiku-köll; verðmatsskrefið (ekkert API-kall)
+# heldur áfram á eldri útdráttum. BAKKLEIÐ Í EINNI LÍNU: settu EXTRACT_FORWARD=200 aftur.
+# Sjá D:\_audit\cc317_utdrattur_af\SKIL_CC317.md.
+EXTRACT_FORWARD=0            # Haiku-hrinan: ný lysingar sem eru útdregnar í nótt (0 = slökkt)
 # cc173 (24.08) — DAGÞAK HAIKU-HRINUNNAR LÆKKAÐ $10 -> $2. Þakið var aldrei sent
 # héðan og sjálfgefna $10-gildið í run_extraction.py (--daily-cap-usd) gilti; nú
 # er það sent BERUM ORÐUM. Með PER_CALL_USD_EST=0.0225 gefur $2 budget_calls=88,
@@ -396,7 +399,17 @@ run_extract() {
   # cc113: rökin eru byggð EINU SINNI og notuð af BÁÐUM greinum. Áður var þurrkeyrslu-
   # línan handskrifaður strengur við hliðina á raunkallinu — hún gat því sagt eitt meðan
   # nóttin gerði annað, og þurrkeyrsla sem sannar ekki raunkallið sannar ekki neitt.
-  local xargs=(--forward "$EXTRACT_FORWARD" --daily-cap-usd "$EXTRACT_DAILY_CAP_USD" --confirm)
+  # cc317 — GILDRA: `--forward 0` einn og sér sleppir LÍKA verðmatinu þegjandi, því run_extraction
+  # verðmetur aðeins með `--forward` eða `--value-seeded`. Slökkt Haiku sendir því `--value-seeded`,
+  # sem kallar aldrei á Haiku og les ekki lykilinn. Merkið fer í næturloggið svo stöðvunin sé sýnileg:
+  # failed helst 0 og keðjan segir CHAIN CLEAN, svo ekkert annað segir frá henni.
+  local xargs
+  if [ "$EXTRACT_FORWARD" -gt 0 ]; then
+    xargs=(--forward "$EXTRACT_FORWARD" --daily-cap-usd "$EXTRACT_DAILY_CAP_USD" --confirm)
+  else
+    xargs=(--value-seeded --confirm)
+    say "extraction: HAIKU SLÖKKT (EXTRACT_FORWARD=0, ákvörðun Danna 05.11, cc317) — aðeins verðmat á eldri útdráttum"
+  fi
   # cc121 — PÁSAN ER ÞÝDD HÉR, EKKI SEND NIÐUR SEM 0. MÆLT 08.08: `--value-limit 0` er
   # ÓTAKMARKAÐ, ekki ekkert — fetch_extracted_listings_to_value sleppir LIMIT-liðnum á
   # falsy limit (`if limit`, extraction_engine.py:188), svo limit=0 skilaði sömu 18.734
@@ -432,7 +445,8 @@ run_extract() {
   # hætt eða sían hætt að bíta — hvort tveggja er frétt. Dómsdagur ~7 nætur.
   local k2line
   k2line=$(grep -oE "forward-k2: bidrod_fyrir=[0-9]+ k2_felld=[0-9]+ bidrod_eftir=[0-9]+ keyptir_lyklar=[0-9]+" "$xlog" | tail -1)
-  say "sia1-k2: ${k2line:-<engin k2-lina i loggnum>}"
+  # cc317: engin Haiku-hrina = engin K2-mæling, og það er ekki frétt.
+  if [ "$EXTRACT_FORWARD" -gt 0 ]; then say "sia1-k2: ${k2line:-<engin k2-lina i loggnum>}"; fi
   if [ $rc -ne 0 ]; then
     say "ABORT extraction (exit $rc) — NO RETRY (abort-not-retry); promote/raw/layers untouched"
     return 1

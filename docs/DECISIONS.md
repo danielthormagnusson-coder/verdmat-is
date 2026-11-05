@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-05 — Haiku-næturútdráttur slökktur, verðmat án líkans heldur áfram (cc317) — **ákvörðun og GO Danna 05.11 (flokkur B)**
+
+1. **Ákvörðun Danna 05.11:** slökkva á næturútdrættinum (Haiku, `listing_extractions`); verðmatsskref án líkans heldur áfram ef það er notað; Ástand-flipinn á /markadur fær stöðumerki „síðast uppfært …" (regla 13).
+2. **Regla (gildir strax): `--forward 0` er ekki slökkt á Haiku heldur slökkt á báðum þrepum.** `run_extraction` verðmetur aðeins með `--forward` eða `--value-seeded`, og `haiku_stodvud` (þak náð) sleppir verðmatinu líka. Slökkt Haiku sendir því `--value-seeded --confirm`. Próf: `tests/test_cc317_haiku_slokkt.py`.
+3. **Regla (gildir strax): stöðvun sem veldur engu falli verður að skrifa eigin línu í næturloggið.** Án Haiku helst `failed` 0 og keðjan segir CHAIN CLEAN, svo engin vakt segir frá. Keðjan skrifar „HAIKU SLÖKKT".
+4. **Mælt:** enginn notendaflötur les `listing_extractions` eða `listing_valuations`; lifandi mat notar `has_extraction_data=0`. Ástand-flipinn les `llm_aggregates_quarterly`, útflutning frá 27.04.2026 sem ekkert verk uppfærir, og er óháður keðjunni.
+
+5. **GO Danna 05.11, orðrétt:** „GO frá Danna: (1) slökkva á Haiku-útdrættinum og push á merkinu á Ástand-flipanum, fyrir 01:00 eða eftir 07:30. (2) Verðmatsskrefið heldur áfram, því það er ókeypis. (3) Já, merktu /ops-stimpilinn „stöðvað að ákvörðun Danna 05.11.2026“ svo rautt þýði áfram bilun.“
+6. **Regla (gildir strax): stöðvun að ákvörðun á ekki að mála vakt rauða.** Merkið á /ops gildir aðeins um stimpla fram að stöðvun: nýrri útdráttur eða stimpill sem vantar fellur á venjuleg mörk (`lib/ops-stodvun.js`).
+
+Skil: `D:\_audit\cc317_utdrattur_af\SKIL_CC317.md`.
+
+---
+
 ## 2026-11-05 — Eigindi úr lýsingu: einskiptis lestur á virkum auglýsingum, hart þak $20; varanlegur lestur bíður samanburðar (cc316c) — **ákvörðun Danna 05.11, gengur framar GO næstu færslu á undan um verk og nýja texta**
 
 1. **Einskiptis lestur:** lyfta, svalir, geymsla, verönd/pallur og garður á VIRKUM íbúðaauglýsingum, nýjustu fyrst eftir `first_seen_at` og aftur í tímann, hart þak $20 á API-lykli næturkeðjunnar. Fyrri kostnaður verksins á lyklinum ($5,657) telst með. Merkt „Úr lýsingu auglýsingar, dags.". Geymsla: HMS-skrá ræður þar sem hún hefur gildi.
