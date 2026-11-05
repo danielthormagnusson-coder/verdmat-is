@@ -4,7 +4,7 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
-## 2026-11-05 — Götumynd og loftmynd á eignasíðum, Google Maps Embed, ekkert geymt (cc318) — **forskrift Danna og arkitekts 05.11; flokkur B, push bíður GO Danna**
+## 2026-11-05 — Götumynd og loftmynd á eignasíðum, Google Maps Embed, ekkert geymt (cc318) — **forskrift Danna og arkitekts 05.11; GO Danna 05.11; verdmat-ai 8921eef á main og www**
 
 1. **Ákvörðun:** eignasíður fá hnappana „Götumynd" og „Loftmynd". Ramminn hleðst aðeins við smell og slóð hans kemur frá þjóni við smell. Merkingin er „Götumynd Google næst hnitum eignarinnar" og „Loftmynd Google", aldrei „Mynd af eigninni" (regla 13).
 2. **Staðsetning:** áberandi í tóma myndareitnum og þegar allar myndir brotna (cc309 (6)). Á eign með myndir er spjald neðar á síðunni.
@@ -14,7 +14,9 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 6. **Skyndiminni (regla (o)):** farmur eignasíðu ber nú `lat` og `lng`, svo `EIGN_CACHE_UTGAFA` fer í `cc318` í sama commiti.
 7. **Persónuvernd:** ný lína á `/personuvernd` segir að vafrinn tali við Google við smell. Hún var ekki í forskrift og er bókuð hér svo hún sjáist við GO.
 
-Ný regla: WORKING_PROTOCOL (v). Kóði: verdmat-ai grein `cc318`. Skil: `D:\_audit\cc318_gotumynd\SKIL_CC318.md`.
+8. **Logg, mælt á www 05.11:** `key=` og `streetview` skila 0 færslum í runtime-loggum 30 mín. eftir prófin. Sú leit sýnir aðeins úttak falla; útkallayfirlit Vercel var ekki skoðað.
+
+Ný regla: WORKING_PROTOCOL (v). Kóði: verdmat-ai `8921eef`. Skil: `D:\_audit\cc318_gotumynd\SKIL_CC318.md`.
 
 ---
 
