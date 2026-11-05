@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-05 — Götumynd og loftmynd á eignasíðum, Google Maps Embed, ekkert geymt (cc318) — **forskrift Danna og arkitekts 05.11; flokkur B, push bíður GO Danna**
+
+1. **Ákvörðun:** eignasíður fá hnappana „Götumynd" og „Loftmynd". Ramminn hleðst aðeins við smell og slóð hans kemur frá þjóni við smell. Merkingin er „Götumynd Google næst hnitum eignarinnar" og „Loftmynd Google", aldrei „Mynd af eigninni" (regla 13).
+2. **Staðsetning:** áberandi í tóma myndareitnum og þegar allar myndir brotna (cc309 (6)). Á eign með myndir er spjald neðar á síðunni.
+3. **Endapunktur:** `GET /api/eign-rammi/[fastnum]?tegund=gata|loft` tekur fastanúmer, aldrei hnit, og flettir hnitunum upp sjálfur, því lykillinn er sameiginlegur með öðru verkefni. Hraðatakmörk eru engin í kóðagrunninum og engin bætt við hér. Metadata-kall Google er gjaldfrjálst samkvæmt skjölum Google.
+4. **Ekkert geymt:** engar myndir né lýsigögn í DB, R2 eða CDN. Svarið ber `Cache-Control: private, no-store` og leiðin er `force-dynamic`. Metadata-kallið er `cache: "no-store"`.
+5. **Hnit:** `properties.lat`/`lng` (dálkurinn heitir `lng`, ekki `lon`). Mælt 05.11: 227.044 af 232.887 eignum hafa gild hnit (97,49 %); 5.843 án hnita; 0 núllsett og 0 utan Íslands. Hnitin eru á staðfangi eða byggingu, ekki íbúð: 113.910 eignir deila hnitum með annarri eign (mest 100 á sama punkti). Þess vegna segir merkingin „næst hnitum eignarinnar".
+6. **Skyndiminni (regla (o)):** farmur eignasíðu ber nú `lat` og `lng`, svo `EIGN_CACHE_UTGAFA` fer í `cc318` í sama commiti.
+7. **Persónuvernd:** ný lína á `/personuvernd` segir að vafrinn tali við Google við smell. Hún var ekki í forskrift og er bókuð hér svo hún sjáist við GO.
+
+Ný regla: WORKING_PROTOCOL (v). Kóði: verdmat-ai grein `cc318`. Skil: `D:\_audit\cc318_gotumynd\SKIL_CC318.md`.
+
+---
+
 ## 2026-11-05 — Haiku-næturútdráttur slökktur, verðmat án líkans heldur áfram (cc317) — **ákvörðun og GO Danna 05.11 (flokkur B)**
 
 1. **Ákvörðun Danna 05.11:** slökkva á næturútdrættinum (Haiku, `listing_extractions`); verðmatsskref án líkans heldur áfram ef það er notað; Ástand-flipinn á /markadur fær stöðumerki „síðast uppfært …" (regla 13).
