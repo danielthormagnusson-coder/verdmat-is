@@ -1,0 +1,381 @@
+{
+ "skema_utgafa": 3,
+ "prompt": "Þú ert nákvæmt útdráttarkerfi fyrir íslensk fasteignasöluyfirlit. Þér er fenginn auglýsingatexti EINNAR eignar. Dragðu út eigindin hér að neðan NÁKVÆMLEGA eins og textinn segir — engar ályktanir umfram það sem stendur í textanum.\n\nGRUNNREGLA — \"ekki nefnt\" er EKKI \"nei\": Söluyfirlitstexti nefnir kosti eignar, ekki skort. Fyrir svalir, lyftu, geymslu, bílskúr/stæði, sérinngang, verönd/pall, lofthæð, heitan pott, garð, arin, opið rými, hjólastólsaðgengi, hleðslustöð, endaeiningu og lóðargerð skilarðu ALDREI neikvæðu gildi. Ef eigindin er ekki nefnd — EÐA textinn segir beinlínis að hún sé ekki til staðar (t.d. \"inngangur er sameiginlegur\", \"sameiginleg lóð\") — skilarðu \"ekki_nefnt\". Fjarvera úr svarinu þínu er túlkuð sem \"óþekkt\", aldrei sem \"nei\".\n\nUNDANTEKNING FRÁ GRUNNREGLUNNI — astand_eignar: heildarástand eignarinnar er RAÐTALA, ekki já/nei, og neikvæða þrepið er raunverulegt merki sem söluyfirlit ber stundum (\"þarfnast standsetningar\", \"eign í niðurníðslu\", \"selst í núverandi ástandi\"). Þar skilarðu því neikvæða þrepinu þegar textinn segir það — sjá regluna hér að neðan.\n\nÁSTAND (eldhus_astand og badherbergi_astand):\n- \"uppgert\": rýmið hefur verið ENDURNÝJAÐ eftir byggingu eignar (\"nýlega uppgert baðherbergi\", \"eldhús endurnýjað 2019\", \"ný innrétting\").\n- \"ad_hluta\": endurnýjun að hluta (\"tæki endurnýjuð en upprunaleg innrétting\").\n- \"ouppgert\": textinn lýsir rýminu sem óendurnýjuðu, upprunalegu eða komnu til ára sinna (\"falleg gömul innrétting\", \"þarfnast standsetningar\").\n- \"nytt_fra_byggingu\": nýbygging eða skilalýsing — rýmið er nýtt frá byggingu, EKKI endurnýjun eldri eignar. Á líka við þegar nýbygging afhendist ófrágengin eða án innréttinga: skel er hvorki \"uppgert\" né \"ouppgert\" heldur \"nytt_fra_byggingu\".\n- MÖRK: almenn setning um endurnýjun íbúðar í heild (\"nýlega endurnýjuð íbúð\") smitast EKKI á eldhús/bað — skilaðu \"ekki_nefnt\" fyrir rýmið nema það sé nefnt sérstaklega, EÐA textinn segi ótvírætt að öll íbúðin hafi verið tekin í gegn að innan (þá \"uppgert\" á bæði).\n\nBILSKUR_STAEDI: \"bilskur\" | \"staedi_bilakjallara\" | \"staedi\" | \"ekki_nefnt\".\n- MÖRK: bílskúr sem hefur verið innréttaður sem íbúðarrými/stúdíó/herbergi er EKKI nothæfur bílskúr → \"ekki_nefnt\" (rýmið má þó telja í herbergi_i_texta ef textinn gerir það).\n\nGEYMSLA: \"ja\" þegar geymsla er nefnd; staðsetning \"innan\" (innan íbúðar) eða \"utan\" (í sameign/kjallara/sér) ef hún kemur fram; fermetrar ef þeir eru nefndir.\n\nSVALIR: \"ja\" AÐEINS þegar textinn notar orðið svalir (eða ótvírætt upphækkað útirými, t.d. þaksvalir).\n- MÖRK: sérafnotaréttur, sérafnotareitur, verönd, sólpallur eða garður á jarðhæð eru EKKI svalir → \"ekki_nefnt\". Fermetrar svala aðeins ef nefndir.\n- SVALIR_STAERD: orðin stærð svalanna EINS OG TEXTINN LÝSIR HENNI: \"storar\" (\"stórar svalir\", \"rúmgóðar svalir\", \"miklar svalir\"), \"litlar\" (\"litlar svalir\", \"svalahorn\", \"franskar svalir\"), \"medal\" þegar textinn lýsir stærðinni hvorki upp né niður en nefnir svalir. \"ekki_nefnt\" ef svalir eru ekki nefndar. ÁLYKTAÐU ALDREI stærðarorðið út frá fermetratölu — ef textinn gefur aðeins fermetra og ekkert stærðarorð skilarðu \"medal\".\n\nLYFTA: \"ja\" þegar lyfta/lyftuhús er nefnt.\n\nSERINNGANGUR: \"ja\" þegar sérinngangur er nefndur.\n\nVEROND_PALLUR: \"ja\" þegar verönd, sólpallur, pallur, timburverönd eða sólverönd er nefnd. Sérafnotareitur eða sérafnotaréttur á jarðhæð telst MEÐ hér ef textinn lýsir honum sem verönd/palli; annars \"ekki_nefnt\".\n\nLOFTHAED: \"ja\" AÐEINS þegar textinn nefnir aukna/mikla lofthæð sérstaklega (\"mikil lofthæð\", \"lofthæð 3,2 m\", \"hátt til lofts\", \"rishæð með mikilli lofthæð\"). Venjuleg lofthæð eða engin umfjöllun → \"ekki_nefnt\".\n\nHEITUR_POTTUR: \"ja\" þegar heitur pottur, nuddpottur eða skjólgóður pottur á lóð/verönd er nefndur.\n\nGARDUR: \"ja\" þegar garður, gróin lóð, ræktaður garður eða garðsvæði eignarinnar er nefnt. Sameiginlegt grænt svæði án tengingar við eignina → \"ekki_nefnt\".\n\nARINN: \"ja\" þegar arinn, kamína, viðarofn eða eldstæði í íbúðarrými er nefnt.\n\nOPID_RYMI: \"ja\" þegar textinn lýsir opnu rými, alrými, opnu skipulagi eða stofu/eldhúsi í einu rými (\"stofa og eldhús í opnu rými\", \"opið skipulag\").\n\nADGENGI_HJOLASTOLS: \"ja\" þegar textinn nefnir hjólastólsaðgengi, aðgengi fyrir hreyfihamlaða, þröskuldalaust aðgengi eða rampa.\n\nEV_HLEDSLA: \"ja\" þegar hleðslustöð/hleðslustæði fyrir rafbíl er nefnt (líka \"undirbúið fyrir hleðslustöð\" ef stöðin er sögð til staðar; áform ein og sér → \"ekki_nefnt\").\n\nENDAEINING: \"ja\" þegar eignin er sögð endaraðhús, endaíbúð, endaeining eða \"í enda raðhúsalengju\".\n\nTHVOTTAHUS: \"innan\" þegar þvottahús/þvottaaðstaða er INNAN íbúðarinnar; \"utan\" þegar þvottahúsið er í sameign, kjallara eða sérrými utan íbúðar; \"ekki_nefnt\" annars. ATH: þetta er ÞVOTTAHÚS, ekki geymsla — geymsla er sér eigindi og má ekki lesast hingað.\n\nUTSYNI: listi þeirra útsýnistegunda sem textinn nefnir: \"sjor\" (sjávarútsýni, útsýni yfir sundin, að hafi), \"fjoll\" (fjallasýn, Esjan, Snæfellsjökull), \"borg\" (borgarútsýni, yfir bæinn, yfir miðborgina), \"takmarkad\" (textinn segir útsýni takmarkað eða skert). Tómur listi ef ekkert útsýni er nefnt. Almennt hrós um \"gott útsýni\" án tegundar → tómur listi.\n\nLODARGERD: \"serlod\" þegar lóðin er sögð sérlóð; \"einkalod\" þegar hún er sögð einkalóð; \"ekki_nefnt\" annars — LÍKA þegar textinn segir lóðina sameiginlega (grunnreglan gildir).\n\nLODARAT: átt lóðar/garðs/veröndar eins og textinn segir: \"sudur\" (suður, suðvestur, suðaustur), \"austur_vestur\" (austur eða vestur), \"blondud\" (textinn nefnir fleiri en eina átt, t.d. \"suður- og vesturlóð\"), \"nordur\" (norður, eða lóð sögð skuggsæl). \"ekki_nefnt\" ef engin átt kemur fram. ATH: átt SVALA telst ekki með — þetta er átt lóðarinnar.\n\nGOLFEFNI: listi þeirra sem textinn nefnir: \"parket\", \"flisar\", \"teppi\", \"annad\" (annad = t.d. dúkur, epoxy, steinteppi, korkur). Tómur listi ef ekkert gólfefni er nefnt.\n\nGOLFEFNI_ASTAND: ÁSTAND gólfefnanna, aðgreint frá tegund þeirra. Sömu þrep og eldhús/bað: \"uppgert\" (\"ný gólfefni\", \"gólfefni endurnýjuð 2020\"), \"ad_hluta\" (\"ný gólfefni að hluta\"), \"ouppgert\" (\"upprunaleg gólfefni\", \"gólfefni komin til ára sinna\"), \"nytt_fra_byggingu\", \"ekki_nefnt\". Tegund ein og sér segir EKKERT um ástand — \"parket á gólfum\" er \"ekki_nefnt\".\n\nASTAND_EIGNAR: heildarástand eignarinnar.\n- \"uppgert\": textinn segir eignina í heild endurnýjaða/tekna í gegn (\"íbúðin hefur öll verið tekin í gegn\", \"gagnger endurnýjun 2021\").\n- \"ad_hluta\": endurnýjun að hluta á eigninni í heild.\n- \"ouppgert\": eignin er UPPRUNALEG/óendurnýjuð en heil — ekkert er sagt bilað eða óíbúðarhæft (\"upprunaleg íbúð\", \"í upprunalegu horfi\").\n- \"tharfnast_vidgerda\": textinn segir eignina KREFJAST viðgerða eða framkvæmda (\"þarfnast standsetningar\", \"þarfnast töluverðra endurbóta\", \"selst í núverandi ástandi\", \"eignin er í niðurníðslu\", \"leki/mygla ólagfærð\").\n- \"nytt_fra_byggingu\": nýbygging/skilalýsing.\n- \"ekki_nefnt\": textinn segir ekkert um heildarástand.\n- ⚠ MÖRK SEM MÁ ALDREI RUGLA: \"ouppgert\" og \"tharfnast_vidgerda\" eru TVEIR ÓLÍKIR HLUTIR. Upprunaleg en heil eign er \"ouppgert\". Aðeins eign sem textinn segir þurfa viðgerðir/endurbætur er \"tharfnast_vidgerda\". Í vafa velurðu \"ouppgert\".\n- MÖRK: ástand EINSTAKS rýmis smitast ekki hingað — \"uppgert baðherbergi\" gerir eignina ekki uppgerða í heild.\n\nHERBERGI_I_TEXTA: heildarfjöldi herbergja samkvæmt texta (\"4ra herbergja íbúð\" → 4; \"tvö svefnherbergi og stofa\" → 3).\n- MÖRK: ef titill gefur BIL (\"3ja-4ra herbergja\") skaltu telja upptalin rými (stofa + svefnherbergi); ef talningin er ekki ótvíræð skilarðu 0. Aldrei giska.\n\nBADHERBERGI_I_TEXTA: fjöldi baðherbergja samkvæmt texta (\"tvö baðherbergi\" → 2; \"baðherbergi og gestasalerni\" → 2 — salerni telst með; \"baðherbergi\" eitt nefnt → 1).\n- MÖRK: aðeins ótvíræð talning úr texta; annars 0. Aldrei giska.\n\nOSKRADIR_FM: fermetrar sem textinn segir BEINLÍNIS að séu óskráðir / utan birtrar fermetratölu (\"auk þess ca 20 fm óskráð rými í kjallara\", \"ris sem er ekki inni í fermetratölu, um 15 fm\").\n- MÖRK: AÐEINS þegar textinn kveður skýrt á um að rýmið sé óskráð eða utan skráðrar stærðar. Rými sem er einfaldlega nefnt án fermetra eða án óskráð-fullyrðingar → 0. oskradir_fm_lysing = stutt lýsing rýmisins (\"ris\", \"kjallararými\"), annars tómur strengur.\n\nANNAD_PUNKTAR: EIN stutt setning (hámark ~120 stafir) með verðmats-verðugum atriðum sem falla EKKI undir hin eigindin — t.d. gólfhiti, aukaíbúð, sólstofa, nýlegt þak/lagnir, gufubað, ónýttur byggingarréttur. Tómur strengur ef ekkert slíkt er nefnt. Aldrei endurtaka það sem hin eigindin fanga — arinn, heitur pottur, verönd, garður, útsýni og lofthæð eiga NÚ sín eigin svið og mega ekki koma hingað líka.\n\nTALNAREGLA: 0 í talnareit þýðir \"ekki hægt að ákvarða úr texta\" — aldrei raunveruleg tala.\n\nFyrir hvert eigindi sem er ekki \"ekki_nefnt\"/0/tómt skaltu skila stuttu ORÐRÉTTU textabroti (brot-reitirnir) sem sannar gildið; annars tómum streng í brot-reitinn. Ef þú ert óviss um eitthvert gildi skaltu lýsa óvissunni stuttlega í \"ovissa\", annars skila tómum streng þar.",
+ "skema": {
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+   "eldhus_astand",
+   "eldhus_brot",
+   "badherbergi_astand",
+   "badherbergi_brot",
+   "bilskur_staedi",
+   "bilskur_brot",
+   "geymsla",
+   "geymsla_stadsetning",
+   "geymsla_m2",
+   "geymsla_brot",
+   "svalir",
+   "svalir_staerd",
+   "svalir_m2",
+   "svalir_brot",
+   "lyfta",
+   "lyfta_brot",
+   "serinngangur",
+   "serinngangur_brot",
+   "golfefni",
+   "golfefni_brot",
+   "herbergi_i_texta",
+   "herbergi_brot",
+   "badherbergi_i_texta",
+   "badherbergi_fjoldi_brot",
+   "oskradir_fm_m2",
+   "oskradir_fm_lysing",
+   "oskradir_fm_brot",
+   "astand_eignar",
+   "astand_eignar_brot",
+   "golfefni_astand",
+   "golfefni_astand_brot",
+   "verond_pallur",
+   "verond_pallur_brot",
+   "lofthaed",
+   "lofthaed_brot",
+   "heitur_pottur",
+   "heitur_pottur_brot",
+   "gardur",
+   "gardur_brot",
+   "arinn",
+   "arinn_brot",
+   "opid_rymi",
+   "opid_rymi_brot",
+   "adgengi_hjolastols",
+   "adgengi_hjolastols_brot",
+   "ev_hledsla",
+   "ev_hledsla_brot",
+   "endaeining",
+   "endaeining_brot",
+   "thvottahus",
+   "thvottahus_brot",
+   "utsyni",
+   "utsyni_brot",
+   "lodargerd",
+   "lodargerd_brot",
+   "lodarat",
+   "lodarat_brot",
+   "annad_punktar",
+   "ovissa"
+  ],
+  "properties": {
+   "eldhus_astand": {
+    "type": "string",
+    "enum": [
+     "uppgert",
+     "ad_hluta",
+     "ouppgert",
+     "nytt_fra_byggingu",
+     "ekki_nefnt"
+    ]
+   },
+   "eldhus_brot": {
+    "type": "string"
+   },
+   "badherbergi_astand": {
+    "type": "string",
+    "enum": [
+     "uppgert",
+     "ad_hluta",
+     "ouppgert",
+     "nytt_fra_byggingu",
+     "ekki_nefnt"
+    ]
+   },
+   "badherbergi_brot": {
+    "type": "string"
+   },
+   "bilskur_staedi": {
+    "type": "string",
+    "enum": [
+     "bilskur",
+     "staedi_bilakjallara",
+     "staedi",
+     "ekki_nefnt"
+    ]
+   },
+   "bilskur_brot": {
+    "type": "string"
+   },
+   "geymsla": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "geymsla_stadsetning": {
+    "type": "string",
+    "enum": [
+     "innan",
+     "utan",
+     "ekki_nefnt"
+    ]
+   },
+   "geymsla_m2": {
+    "type": "number"
+   },
+   "geymsla_brot": {
+    "type": "string"
+   },
+   "svalir": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "svalir_staerd": {
+    "type": "string",
+    "enum": [
+     "litlar",
+     "medal",
+     "storar",
+     "ekki_nefnt"
+    ]
+   },
+   "svalir_m2": {
+    "type": "number"
+   },
+   "svalir_brot": {
+    "type": "string"
+   },
+   "lyfta": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "lyfta_brot": {
+    "type": "string"
+   },
+   "serinngangur": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "serinngangur_brot": {
+    "type": "string"
+   },
+   "golfefni": {
+    "type": "array",
+    "items": {
+     "type": "string",
+     "enum": [
+      "parket",
+      "flisar",
+      "teppi",
+      "annad"
+     ]
+    }
+   },
+   "golfefni_brot": {
+    "type": "string"
+   },
+   "herbergi_i_texta": {
+    "type": "integer"
+   },
+   "herbergi_brot": {
+    "type": "string"
+   },
+   "badherbergi_i_texta": {
+    "type": "integer"
+   },
+   "badherbergi_fjoldi_brot": {
+    "type": "string"
+   },
+   "oskradir_fm_m2": {
+    "type": "number"
+   },
+   "oskradir_fm_lysing": {
+    "type": "string"
+   },
+   "oskradir_fm_brot": {
+    "type": "string"
+   },
+   "astand_eignar": {
+    "type": "string",
+    "enum": [
+     "uppgert",
+     "ad_hluta",
+     "ouppgert",
+     "tharfnast_vidgerda",
+     "nytt_fra_byggingu",
+     "ekki_nefnt"
+    ]
+   },
+   "astand_eignar_brot": {
+    "type": "string"
+   },
+   "golfefni_astand": {
+    "type": "string",
+    "enum": [
+     "uppgert",
+     "ad_hluta",
+     "ouppgert",
+     "nytt_fra_byggingu",
+     "ekki_nefnt"
+    ]
+   },
+   "golfefni_astand_brot": {
+    "type": "string"
+   },
+   "verond_pallur": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "verond_pallur_brot": {
+    "type": "string"
+   },
+   "lofthaed": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "lofthaed_brot": {
+    "type": "string"
+   },
+   "heitur_pottur": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "heitur_pottur_brot": {
+    "type": "string"
+   },
+   "gardur": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "gardur_brot": {
+    "type": "string"
+   },
+   "arinn": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "arinn_brot": {
+    "type": "string"
+   },
+   "opid_rymi": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "opid_rymi_brot": {
+    "type": "string"
+   },
+   "adgengi_hjolastols": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "adgengi_hjolastols_brot": {
+    "type": "string"
+   },
+   "ev_hledsla": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "ev_hledsla_brot": {
+    "type": "string"
+   },
+   "endaeining": {
+    "type": "string",
+    "enum": [
+     "ja",
+     "ekki_nefnt"
+    ]
+   },
+   "endaeining_brot": {
+    "type": "string"
+   },
+   "thvottahus": {
+    "type": "string",
+    "enum": [
+     "innan",
+     "utan",
+     "ekki_nefnt"
+    ]
+   },
+   "thvottahus_brot": {
+    "type": "string"
+   },
+   "utsyni": {
+    "type": "array",
+    "items": {
+     "type": "string",
+     "enum": [
+      "sjor",
+      "fjoll",
+      "borg",
+      "takmarkad"
+     ]
+    }
+   },
+   "utsyni_brot": {
+    "type": "string"
+   },
+   "lodargerd": {
+    "type": "string",
+    "enum": [
+     "serlod",
+     "einkalod",
+     "ekki_nefnt"
+    ]
+   },
+   "lodargerd_brot": {
+    "type": "string"
+   },
+   "lodarat": {
+    "type": "string",
+    "enum": [
+     "sudur",
+     "austur_vestur",
+     "blondud",
+     "nordur",
+     "ekki_nefnt"
+    ]
+   },
+   "lodarat_brot": {
+    "type": "string"
+   },
+   "annad_punktar": {
+    "type": "string"
+   },
+   "ovissa": {
+    "type": "string"
+   }
+  }
+ }
+}
