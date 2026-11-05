@@ -4,12 +4,14 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
-## 2026-11-05 — Eigindi úr lýsingu, áfangi 2: brúin stenst ekki, tillaga um Haiku 5.5 á pípu eigindalagsins (cc316b) — **tillaga: bíður GO Danna (flokkur B); grein cc316b í báðum repoum, ópushuð; migration 20261105090000 óbeitt, næturskref og verk óskráð**
+## 2026-11-05 — Eigindi úr lýsingu, áfangi 2: `--bridge` ekki kveikt; Haiku 5.5 á prompti eigindalagsins (cc316b) — **GO Danna 05.11; regla í WORKING_PROTOCOL (t)**
 
-1. **Regla (gildir strax): já úr `listing_extractions` v0.2.2 er ekki staðreynd úr texta.** Haiku 4.5 ályktar. Á 2.588 íbúðum er já án nokkurs orðstofns í hráum texta: lyfta 15,5 %, svalir 11,6 %, lofthæð 30,5 %, verönd 20,5 %, hjólastóll 22,0 %. Slíkt já má ekki merkja sem „úr lýsingu". Vélrænt, óháð lesurum (`a2/q29.txt`).
-2. **`--bridge` er ekki kveikt, og tillagan er að svo verði áfram.** Á blindu úrtaki (100 auglýsingar) er rangt já > 2 % á 16 af 19 eigindum. Geymsla stenst; rafbíll hefur 0 rangt en 14 af 29 aðeins lagnaleið; arinn hefur engin gögn. Ástand rýma 75–80 % rangt, því nýbyggingar lesast sem „uppgert". Brúin skrifar beint í `property_attributes`: ber merkið „Virk auglýsing ÁR", gengur framar skráargögnum á öllum 23 lyklum (655 gerðir bílskúrs/stæðis ólíkar skrá) og fer í leiðréttingarleiðina ef hún opnast (γ-frost §5D-3 og §5D-6 stendur).
-3. **Tillaga: prompt eigindalagsins á Haiku 5.5 í sér töflu.** Birt aðeins lyfta, svalir, geymsla, verönd/pallur og garður, með orðstofnshliði: rangt já 0–1,4 %. Bílskúr/stæði, ástand, þvottahús, lóð og útsýni falla. Hjólastóll og rafbíll bíða: óbeint aðgengi og lagnaleið lásust sem já.
-4. **Forgangur (arkitekt 04.11):** notandi → staðfest → lýsing → skráargögn → auglýsingareitur → Óþekkt. Fyrirliggjandi AI-raðir í `property_attributes` (466) standa ofan lýsingar. Merki „Úr lýsingu auglýsingar, dags.". Aldrei verðleiðrétting: `getAttributes` les ekki töfluna.
+1. **Ákvörðun Danna:** ekki kveikja á `--bridge`. Prompt eigindalagsins á Haiku 5.5, API-lykill næturkeðjunnar, verk kl. 05:30. Birt: lyfta, svalir, geymsla, verönd/pallur og garður, merkt „Úr lýsingu auglýsingar, dags.". Aðeins nýir textar núna; eldri textar (4.181) koma eftir viku ef engin frávik verða, og aðeins með rofanum `--baklisti`.
+2. **Geymsla (breyting Danna):** þar sem HMS-skrá hefur geymslu skráða ræður skráin og lýsingin fyllir aðeins þar sem skráin þegir. Þetta gildir líka um eldri AI-raðir: `getAttributes` lætur skráargögn ganga framar `extraction`/`auglysing` á geymslu (7 eignir breytast í birtingu, allar með já báðum megin).
+3. **Af hverju ekki brúin:** á blindu úrtaki (100 auglýsingar) er rangt já > 2 % á 16 af 19 eigindum. Geymsla stenst; rafbíll hefur 0 rangt en 14 af 29 aðeins lagnaleið; arinn hefur engin gögn. Ástand rýma er 75–80 % rangt, því nýbyggingar lesast sem „uppgert". Brúin skrifar beint í `property_attributes`: ber merkið „Virk auglýsing ÁR", gengur framar skráargögnum á öllum 23 lyklum (655 gerðir bílskúrs/stæðis ólíkar skrá) og fer í leiðréttingarleiðina ef hún opnast. γ-frost §5D-3 og §5D-6 stendur.
+4. **Nákvæmni Haiku 5.5 með orðstofnshliði, 160 auglýsingar:** lyfta 0/54, svalir 2/108, geymsla 1/148, verönd 0/32, garður 0/16. Bílskúr/stæði, ástand, þvottahús, lóð og útsýni falla. Hjólastóll og rafbíll birtast ekki: óbeint aðgengi og lagnaleið lásust sem já. Ekkert efra Wilson-mark er undir 2 %.
+5. **Forgangur:** notandi → staðfest → lýsing → skráargögn → auglýsingareitur → Óþekkt (geymsla: skrá á undan lýsingu). Fyrirliggjandi AI-raðir í `property_attributes` standa ofan lýsingar á öðrum lyklum. Aldrei verðleiðrétting: tafla `public.lysing_eigindi` er utan `getAttributes`.
+6. **Kostnaður:** $0,00184 á kall mælt, um $0,11 á nótt (þak $1, 400 köll).
 
 Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (áfangi 2).
 

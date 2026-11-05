@@ -1,9 +1,11 @@
 #!/usr/bin/env python
-"""cc316b — næturskref: LLM-lestur eiginda úr lýsingu nýrra íbúðaauglýsinga. DRÖG, ótengd keðjunni, bíður GO Danna.
+"""cc316b — næturskref: LLM-lestur eiginda úr lýsingu nýrra íbúðaauglýsinga (GO Danna 05.11.2026).
 
 Sjálfgefið ÞURRKEYRSLA: telur biðröð og kostnað, engin köll, engin skrif.
 `--skrifa`: kaupir svör fyrir nýja texta, innan þaks, og uppfærir public.lysing_eigindi.
 `--urtak N`: (með þurrkeyrslu) kallar á N texta og prentar varpaðar raðir; ekkert skrifað.
+`--baklisti`: tekur líka texta sem sáust fyrst fyrir NYIR_FRA. Án þessa rofa eru þeir aldrei keyptir
+(Danni 05.11: baklisti kemur eftir viku ef engin frávik verða). Verkið sendir hann ekki.
 
 Rammi: sami og cc316 áfangi 1 (virk mbl-söluauglýsing á íbúð, fastnúmer, ekki fjöleining, fyrst séð >= FRA).
 Idempotens: scraper.lysing_eigindi_svar er lykluð á (lysing_hash, skema_utgafa), svo sami texti er keyptur einu sinni.
@@ -18,6 +20,9 @@ import psycopg2
 from psycopg2.extras import Json, execute_values
 
 FRA = D.datetime(2026, 8, 1, tzinfo=D.timezone.utc)
+# Texti er nýr ef skrapinn uppgötvaði hann fyrst þennan dag eða síðar (discovered_at er skrifað einu sinni).
+# first_seen_at dugar ekki: mbl-dagsetning auglýsingar, sólarhring á undan promote.
+NYIR_FRA = D.datetime(2026, 11, 5, tzinfo=D.timezone.utc)
 MODEL = "claude-haiku-5-5"
 VERD = dict(i=0.10, o=0.50, cr=0.01, cw=0.125)  # USD per MTok, 5m skyndiminni
 HVITLISTI = ("lyfta", "svalir", "geymsla", "verond_pallur", "gardur")
@@ -59,6 +64,16 @@ def rammi(k):
     return ut
 
 
+def fyrst_sed(k, hashar):
+    """Hvenær TEXTINN fannst fyrst, í hvaða auglýsingu sem er: endurbirting gerir texta ekki nýjan.
+    Röð með NULL discovered_at er eldri en dálkurinn, svo slíkur texti telst aldrei nýr (fail-closed)."""
+    k.execute("""select substr(md5(lysing),1,12),
+        case when bool_and(discovered_at is not null) then min(discovered_at) end
+      from scraper.listings
+      where source='mbl' and lysing is not null and substr(md5(lysing),1,12)=any(%s) group by 1""", (list(hashar),))
+    return dict(k.fetchall())
+
+
 def kall(klient, h_texti):
     h, texti = h_texti
     s = klient.messages.create(
@@ -87,6 +102,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--skrifa", action="store_true")
     ap.add_argument("--urtak", type=int, default=0)
+    ap.add_argument("--baklisti", action="store_true")
     ap.add_argument("--dbconfig", default=r"D:\verdmat-is\.dbconfig")
     a = ap.parse_args()
     c = psycopg2.connect(Path(a.dbconfig).read_text(encoding="utf-8-sig").strip())
@@ -101,10 +117,13 @@ def main():
         til = dict(k.fetchall())
     else:
         til = {}
+    allt = {r[5]: r[4] for r in sorted(R.values(), key=lambda r: r[2], reverse=True) if r[5] not in til}
+    fs = fyrst_sed(k, allt) if allt else {}
     c.rollback()
-    bid = {r[5]: r[4] for r in sorted(R.values(), key=lambda r: r[2], reverse=True) if r[5] not in til}
-    print(json.dumps(dict(rammi_eignir=len(R), textar_til=len(til), bidrod=len(bid),
-                          aaetlun_usd=round(len(bid) * KOSTN_AETLUN, 2)), ensure_ascii=False))
+    nyir = {h: t for h, t in allt.items() if fs.get(h) and fs[h] >= NYIR_FRA}
+    bid = allt if a.baklisti else nyir
+    print(json.dumps(dict(rammi_eignir=len(R), textar_til=len(til), nyir_textar=len(nyir), eldri_textar=len(allt) - len(nyir),
+                          baklisti_rofi=a.baklisti, kaupa=len(bid), aaetlun_usd=round(len(bid) * KOSTN_AETLUN, 2)), ensure_ascii=False))
     if not a.skrifa and not a.urtak:
         print("ÞURRKEYRSLA: engin köll, ekkert skrifað")
         return 0
@@ -160,7 +179,7 @@ def main():
     k.execute("set local lock_timeout='5s'")
     k.execute("select count(*) from public.lysing_eigindi")
     nu = k.fetchone()[0]
-    if len(radir) < 0.6 * nu:
+    if nu >= 200 and len(radir) < 0.6 * nu:  # lítil tafla sveiflast eðlilega; hlið aðeins þegar hún er orðin stór
         c.rollback()
         skra(f"HLIÐ: {len(radir)} raðir, {nu} í töflu; birting óbreytt")
         return 4

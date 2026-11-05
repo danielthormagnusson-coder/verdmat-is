@@ -1,4 +1,4 @@
--- cc316b — DRÖG, ÓBEITT. Bíður GO Danna. Tvær nýjar töflur; snertir enga lifandi töflu, sýn eða fall.
+-- cc316b (GO Danna 05.11.2026). Tvær nýjar töflur; snertir enga lifandi töflu, sýn eða fall.
 -- Beiting um psycopg2 með lock_timeout, rollback sannaður fyrst (CLAUDE.md, cc231).
 begin;
 set local lock_timeout='5s';

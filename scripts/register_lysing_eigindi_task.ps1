@@ -1,8 +1,8 @@
-# Register-ScheduledTask for verdmat-nightly-lysing-eigindi (cc316b). DRÖG: EKKI KEYRA ÁN GO DANNA.
+# Register-ScheduledTask for verdmat-nightly-lysing-eigindi (cc316b, GO Danna 05.11.2026).
 # Run from an ELEVATED PowerShell if S4U registration is refused. Re-running is idempotent.
 #
-# Schedule: DAILY 05:30 local (== UTC on this box). After promote on a normal night (chain ends 02:40-04:50);
-#           on the worst night (~06:30) it uses the previous night's ads, one day late. 10 min cap keeps it
+# Schedule: DAILY 05:30 local (== UTC on this box), per GO. Measured 03-05.11: promote stamps discovered_at at ~05:36,
+#           so 05:30 runs BEFORE that night's promote and new ads reach the page a day later. 10 min cap keeps it
 #           clear of 06:55-07:05, and of the 06:40 task, which reads a different table.
 # Exit:     0 ok / 2 no key / 3 error / 4 gate refused the write. public.lysing_eigindi stands unchanged on 3 and 4.
 

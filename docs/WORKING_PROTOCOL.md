@@ -312,3 +312,7 @@ Migration `20261031130000_cc284d_sjalfgefin_rettindi` breytti `ALTER DEFAULT PRI
 ### (q) NÆTURKEÐJAN: ff Á `app` main ER VIRKJUN (cc263, cc268, cc275, cc281)
 
 Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push eitt virkjar ekkert en ff á staðbundnum `app` main virkjar frá næstu nótt** (`D:\_audit\cc275_kedja\SKIL_CC275.md`). Ekkert ff meðan bash-keðja keyrir og engin migration meðan sópur með gömlum kóða keyrir (`D:\_audit\cc281_app_samthaetting\SKIL_CC281.md`). Tímaþak verks verður að vera stærra en biðhlið + keyrsla (`D:\_audit\cc260_naeturverk\SKIL_CC260.md`). Gagnalagsbreyting sem hreyfir lifandi tölu fer fyrst á prófunarútgáfu sem framendinn flettir yfir á í push-committinu (`D:\_audit\cc224_nybyggingar\SKIL_CC224_1.md` §11.7).
+
+### (t) JÁ ÚR LLM ER ÁLYKTUN ÞAR TIL ÞAÐ ER MÆLT GEGN TEXTANUM; RÖÐ SKREFA ER BUNDIN VIÐ NIÐURSTÖÐU (Danni 05.11.2026, cc316)
+
+**Reitur eða útdráttur birtist ekki sem staðreynd fyrr en hann er mældur á blindu úrtaki gegn textanum sjálfum, per eigind.** „Ekki nefnt" og 0/false úr auglýsingareit eru aldrei „nei". Já úr `listing_extractions` v0.2.2 er ályktun líkans: já án nokkurs orðstofns í hráum texta er 15,5 % á lyftu og 11,6 % á svölum (mælt á 2.588 íbúðum). **Keðja skrifa, hleðslu og push er bundin við niðurstöðu hvers skrefs**, svo fallið skref stöðvi það næsta. **Raundæmi:** cc316 áfangi 1 (04.11), push fór af stað 17 sek. áður en hleðsla tókst. Heimild: `D:\_audit\cc316_eigindi\SKIL_CC316.md`.
