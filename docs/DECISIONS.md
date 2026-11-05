@@ -24,6 +24,7 @@ Skil: `D:\_audit\cc317_utdrattur_af\SKIL_CC317.md`.
 2. **Virk:** `scraper.v_eign_virk_auglysing` með `withdrawn_at` tómt. Ekki `last_seen_at`, sem er ekki líf. Íbúðir einar, af því að nákvæmnin var mæld á þeim (regla (t)); önnur íbúðarhús eru opin spurning til Danna.
 3. **Verk kl. 05:30 er fellt úr gildi** og var aldrei skráð. Varanlegur lestur: ódýrasta líkan sem stenst rangt já ≤ 2 % á hverju eigindi, hámark $2 á dag með hörðu þaki; ef ekkert stenst fer ekkert í loftið. HALT með samanburðartöflu áður en verk er skráð. „Aðeins nýjar auglýsingar" og vikubið falla niður.
 4. **Hart þak í kóða:** hald á kall er skráð í bókhald áður en kallið fer og gert upp eftir svar. Hrun skilur hald eftir, svo endurræsing kemst ekki yfir þakið. `--bridge` er áfram slökkt.
+5. **Niðurstaða 05.11:** 4.881 köll, 0 villur, verk alls $13,997 af $20; 10.883 já á 4.847 eignum. Samanburður á 160 auglýsingum: Haiku 5.5 stenst á öllum fimm ($0,10 á meðaldegi, þak hefði bitið 0 af 31 degi), Sonnet 5 fellur á verönd. **Bíður svars Danna um verk.** Ef $2-þakið næst (Danni): textar bíða til næstu nætur, nýjustu fyrst, á meðan stendur Óþekkt, aldrei nei.
 
 Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316c).
 
