@@ -4,6 +4,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-06 — Niðurgrafnar 00-íbúðir: tafla á samanburðarskýrslu desemberlíkansins, ekkert merki (cc321) — **ákvörðun Danna 06.11; ekkert birt, mat óbreytt**
+
+**Ákvörðun Danna orðrétt (borin af master):** „A: bæta töflu með sömu hópum við samanburðarskýrslu desemberlíkansins (cc313). B aðeins ef A sýnir enn +2 % eða meira, og þá með sér GO. Ekkert merki á eignasíðu. Bóka ákvörðunina í DECISIONS og ljúka."
+
+1. **Mælingin.** Sölur á hæð 00 með auglýsingu fyrir kaupsamning (≤ 365 d), skipt eftir texta í hópa sem voru frystir með sha256 áður en mat var tengt við þá. N = niðurgrafin/kjallari, J = jarðhæð/sérinngangur/garður. OOF cc226b (annað líkan, rekstrarhamur, 2015+): N−J **+3,24 % [+2,13; +4,47]**, n = 1.101 / 1.421, falspróf p = 0,001. Lifandi `iter4r_20260805_reglaR_strukt`, þinglýst eftir 15.01: **+0,37 % [−4,29; +9,15]**, n = 25 / 57, undir frystum n-mörkum (30). Dómur eftir frystum viðmiðum: stenst á OOF, ósannað á lifandi líkani.
+2. **Liður A (samþykktur):** tafla með sömu hópum (N, J, E, frávik frá 01–03 í sellu, þekja) fer á samanburðarskýrslu desemberkandídats cc313. **Frosinn flokkari: `D:\_audit\cc321_nidurgrafnar\flokkari.py`, sha256 `d38a76f9cacd8050fc675505470a157146deb0e5a22e76087e630d3e04a80abf`.** Skilgreiningar á hópum, pörun og sellum: `FRYSTING.md` í sömu möppu. Flokkaranum er ekki breytt fyrir mælinguna; breyting er ný frysting. Skráin er aðeins á diski, svo cc313 afritar hana og ber saman sha.
+3. **Liður B (skilyrtur):** iter5-próba á breytu úr texta (SKIL §6) kemur aðeins til ef A sýnir N−J ≥ +2 % á kandídat, og þá með **sér GO**. Sjálfgefið fer engin ný breyta í desemberþjálfunina.
+4. **Ekkert merki á eignasíðu.** Engin breyting á mati, engin ný breyta í líkani.
+5. **Ekki lesið sem:** niðurstaða um ástand eignar eða sönnun á orsök. Flokkunin les orðalag fasteignasala, ekki eignina, og hún gildir aðeins um auglýstar sölur. Víxlpróf (WP (aa)): líkanið fær hæð og HMS-flokk (00 → 01 +3,07 %), en þær rásir skilja hópana ekki að (APT_BASEMENT 77 % af N, 74 % af J).
+
+**Heimild:** `D:\_audit\cc321_nidurgrafnar\SKIL_CC321.md`.
+
+---
+
 ## 2026-11-06 — Staðbundið próf er skilyrði fyrir push á framenda (eftir cc319) — **ákvörðun Danna 06.11; regla í WORKING_PROTOCOL (ac)**
 
 **Ákvörðun Danna orðrétt:** „cc319 prófaði staðbundið eftir push. Bættu í WORKING_PROTOCOL: staðbundið próf er skilyrði fyrir push, aldrei á eftir. Næsta lota sem breytir framenda skráir tímastimpil beggja prófa í skilin."
