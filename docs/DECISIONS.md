@@ -27,6 +27,19 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-06 — /leit: registur flytur í eigin gagnagrunn, síðan RPC; efnissýn sett til hliðar (cc322) — **ákvörðun Danna 06.11; ekkert beitt**
+
+**Ákvörðun Danna orðrétt (borin af master):** „Ekki beita d01/d02. Registur flytur í eigin gagnagrunn. Eftir flutninginn: endurmæla /leit (kalt og heitt, sami rammi). Síðan smíða RPC-leiðina (eina mælda leiðin, án tafar) á grein: migration + rollback, staðbundið próf fyrir push, GO frá mér á migration. Efnissýnin er sett til hliðar.“
+
+1. **Mælingin.** Aðalfyrirspurn /leit á `v_leit_listings` tók 1,07 s heit og allt að 14,3 s köld, þak 8 s (`exec_ms = 852 + 0,257 × read`, R² 0,956, n = 11). Registur bar 64,6–86,2 % af lestri af diski í glugganum 20:36–21:26 UTC. Það er ein kvöldstund; föllin 02:19 eru óskýrð.
+2. **Röðin.** (a) Registur flyst; cc322 snertir það ekki og master segir til þegar flutningi er lokið. (b) cc322 endurmælir í sama ramma og skýrir áhrifin. (c) RPC á grein: rollback fyrst, migration og framendi, staðbundið próf fyrir push samkvæmt reglu (ac). Migration beitist aðeins með GO Danna.
+3. **Hvað er mælt á RPC-leiðinni.** Frumgerð SELECT á sjálfgefinni síu: 255–281 ms heitt, 665 ms kalt, á móti 1,1 s nú. Svæðissíur eru ómældar og þurfa `properties`-tengingu.
+4. **Sett til hliðar.** Drög d01–d03 (efnissýn og framendi) standa á disk, óbeitt.
+
+Heimild: `D:\_audit\cc322_leit\SKIL_CC322.md`.
+
+---
+
 ## 2026-11-06 — Niðurgrafnar 00-íbúðir: tafla á samanburðarskýrslu desemberlíkansins, ekkert merki (cc321) — **ákvörðun Danna 06.11; ekkert birt, mat óbreytt**
 
 **Ákvörðun Danna orðrétt (borin af master):** „A: bæta töflu með sömu hópum við samanburðarskýrslu desemberlíkansins (cc313). B aðeins ef A sýnir enn +2 % eða meira, og þá með sér GO. Ekkert merki á eignasíðu. Bóka ákvörðunina í DECISIONS og ljúka."
