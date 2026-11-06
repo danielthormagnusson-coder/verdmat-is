@@ -50,6 +50,13 @@ Skil: `D:\_audit\cc317_utdrattur_af\SKIL_CC317.md`.
 2. **`NOTT_TEGUNDIR`: íbúð, einbýli, raðhús;** sumarhús utan, prófað: 0 í ramma. Verkið þarf ekki nýja skráningu: það les skriftuna úr `D:\verdmat-is\app`. Kostnaður um $0,15 á meðaldegi og $0,29 á versta degi síðustu 31 daga, innan $2.
 
 Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316f).
+## 2026-11-06 — Ástandseigindi úr lýsingu, þriðji áfangi: lesið án birtingar (cc316e) — **tillaga: bíður GO Danna; ekkert á www, í birtingartöflu eða næturverki; regla í WORKING_PROTOCOL (z)**
+
+1. **Lestur án birtingar:** eldhús, baðherbergi, gólfefni, gluggar, lagnir, þak, almennt og óskráð rými á 6.856 textum virkra íbúða, einbýla og raðhúsa, sér kall með Haiku 5.5, $4,668 af hörðu $15-þaki. Svör undir skema 101 í `scraper.lysing_eigindi_svar`; enginn les þau. Aldrei verðleiðrétting.
+2. **Niðurstaða (blint, tvö úrtök):** með reglunni „aðeins `endurnyjad`" standast 12 af 21 sellu á rangt já, 4 á rangt ár; óskráð rými stenst á einbýli og raðhúsum en fellur á íbúðum (12 %). `ad_hluta` er að mestu viðhald og fellur. Reglan var valin eftir á, á sömu gögnum.
+3. **Ef þetta verður birt:** óskráðir fermetrar mega aldrei fara í `property_attributes` né lykilinn `oskradir_fm`, sem `lib/krass.ts` les, og mega aldrei snerta stærð, verð á m² eða nefnara.
+
+Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316e).
 
 ---
 

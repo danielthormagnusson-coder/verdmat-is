@@ -335,3 +335,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 ### (y) SÍMAPRÓF MÆLIR Í MINNSTU STUDDU BREIDD OG BER STAK SAMAN VIÐ SPJALDIÐ SITT (arkitekt 05.11.2026, cc318)
 
 **Mæling á láréttu skruni í einni breidd sér ekki stak sem stendur út fyrir spjaldið sitt en innan gluggans.** Símapróf keyrir í raunverulegri gluggabreidd (tækjahermir, ekki `iframe`) í minnstu studdu breidd, 375 px eða minna, og ber hvert stak líka saman við spjaldið. Nýr texti í föstu merki er prófaður með lengsta gildinu. **Raundæmi:** cc316b prófaði í iPhone 13 (390 px); merki sem endaði í 383 px gaf 0 skrun þar, þótt það stæði 13 px út fyrir spjaldið og ylli skruni í 375 px. Heimild: `D:\_audit\cc318_gotumynd\SKIL_CC318.md`.
+
+### (z) STIG LESTURS ER SÉR MÆLING: „AÐ HLUTA" ER VIÐHALD, OG REGLA VALIN EFTIR Á ÞARF STAÐFESTINGU (Danni 06.11.2026, cc316e)
+
+**Þegar líkan flokkar í stig skal mæla hvert stig sér áður en þau eru lögð saman í „já".** Í cc316e voru nær öll rangt já `ad_hluta` á málun eða viðhaldi. **Birtingarregla sem valin er eftir að villur sjást er tilgáta á þeim gögnum, og það er sagt í skilum með tillögu um staðfestingarúrtak.** Ártal er sér hlið á eftir já: textar telja upp mörg ár, og rangt ár er villa í birtu gildi þótt já standist. Heimild: `D:\_audit\cc316_eigindi\SKIL_CC316.md`.
