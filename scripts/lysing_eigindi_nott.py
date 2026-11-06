@@ -349,6 +349,14 @@ def main():
             c.rollback()
             skra(f"ástand nótt VILLA {type(e).__name__}: {e}")
             rc = max(rc, 3)
+        # Viðbót (cc319): engin köll, $0 á sama þaki. Les það sem ástand var að skrifa. Bilun fellir ekki það sem þegar er skrifað.
+        import lysing_vidbot
+        try:
+            rc = max(rc, lysing_vidbot.nott(c))
+        except Exception as e:
+            c.rollback()
+            skra(f"viðbót nótt VILLA {type(e).__name__}: {e}")
+            rc = max(rc, 3)
     return rc
 
 
