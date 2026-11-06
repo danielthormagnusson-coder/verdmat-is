@@ -347,3 +347,9 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 ### (ab) HLIÐ Á TILVITNUN, EKKI Á ALLAN TEXTA (Danni 06.11.2026, cc319)
 
 **Þegar líkan skilar svari með orðréttri tilvitnun skal hlið lesa tilvitnunina, ekki allan textann, áður en nýtt kall er keypt.** Í cc319 lágu kerfisbundnar villur Haiku í því hvað svarið var látið þýða: „tengi fyrir þvottavél" varð þvottahús, lagnaleið varð hleðslustöð, orðstofn einhvers staðar í texta dugði sem staðfesting. Hlið á `brot` stóðst á 34 sellum af óháðu blindu úrtaki, án eins nýs kalls. Tvö skilyrði: hliðin eru frosin á disk áður en úrtak er dregið, og afrit þeirra í kóða er borið saman við frosnu útgáfuna á öllum ramma. Skrá: `D:\_audit\cc319_eigindi\SKIL_CC319.md`.
+
+### (ac) STAÐBUNDIÐ PRÓF ER SKILYRÐI FYRIR PUSH, ALDREI Á EFTIR (Danni 06.11.2026, eftir cc319)
+
+**Lota sem breytir framenda keyrir staðbundið próf (bygging úr eigin vinnutré og `next start` á lausu porti) og fær hreina niðurstöðu ÁÐUR en hún ýtir á verdmat-ai. Próf á www eftir push kemur til viðbótar, ekki í staðinn.** Í skilum stendur tímastimpill beggja prófa og á hvaða þjóni hvort var keyrt, svo röðin sést. Fyrsta lotan sem þetta gildir um er næsta lota sem breytir framenda.
+
+**Raundæmi:** cc319 ýtti `533d2a8` og prófaði á www, en staðbundna prófið var keyrt á eftir. Niðurstaðan var hrein, en það bætti engu við vörn fyrir push.

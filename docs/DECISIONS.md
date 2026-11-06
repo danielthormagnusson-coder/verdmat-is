@@ -4,6 +4,12 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-06 — Staðbundið próf er skilyrði fyrir push á framenda (eftir cc319) — **ákvörðun Danna 06.11; regla í WORKING_PROTOCOL (ac)**
+
+**Ákvörðun Danna orðrétt:** „cc319 prófaði staðbundið eftir push. Bættu í WORKING_PROTOCOL: staðbundið próf er skilyrði fyrir push, aldrei á eftir. Næsta lota sem breytir framenda skráir tímastimpil beggja prófa í skilin."
+
+---
+
 ## 2026-11-06 — Fleiri eigindi úr lýsingu: 34 sellur og 4 ártalssellur, hlið á tilvitnun, ný tafla (cc319) — **forskrift arkitekts 06.11; GO Danna 06.11 („birta allar sellur sem standast, saman"); regla í WORKING_PROTOCOL (ab)**
 
 1. **Ákvörðun:** 26 eigindasellur, 8 ástandssellur og 4 ártalssellur (eigind × tegund) birtast úr keyptum svörum (skema 3 og 101), merkt „Úr lýsingu auglýsingar, dags.". Hlið: rangt já ≤ 2 % og birt ≥ 15 á óháðu blindu úrtaki (729 + 216 textar). Listi í `scripts/lysing_vidbot.py`, tölur í `D:\_audit\cc319_eigindi\SKIL_CC319.md` §1. Sella sem er ekki á listanum birtist ekki.
