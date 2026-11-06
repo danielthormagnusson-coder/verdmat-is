@@ -44,6 +44,15 @@ Skil: `D:\_audit\cc317_utdrattur_af\SKIL_CC317.md`.
 
 ---
 
+## 2026-11-06 — Garður staðfestur á óháðu úrtaki; varanlegur lestur nær til einbýla og raðhúsa (cc316f) — **ákvörðun Danna 06.11**
+
+1. **Garður stendur á www.** Stofn frosinn í `e4d0dc1` áður en úrtak var dregið, nýtt fræ, 400 fastanúmer fyrri úrtaka útilokuð, blindir lesarar, enginn úrskurður: rangt já 0/30 á einbýli [0–11,4] og 0/36 á raðhúsum [0–9,6]. Óljóst 2 (lóð ein) á einbýli.
+2. **`NOTT_TEGUNDIR`: íbúð, einbýli, raðhús;** sumarhús utan, prófað: 0 í ramma. Verkið þarf ekki nýja skráningu: það les skriftuna úr `D:\verdmat-is\app`. Kostnaður um $0,15 á meðaldegi og $0,29 á versta degi síðustu 31 daga, innan $2.
+
+Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316f).
+
+---
+
 ## 2026-11-05 — Varanlegur lestur Haiku 5.5, næturverk 06:10 á CHAIN CLEAN, einbýli og raðhús (cc316d) — **GO Danna 05.11; reglur í WORKING_PROTOCOL (w), (x); verkið skráir Danni sjálfur**
 
 1. **Haiku 5.5 les nýjar auglýsingar varanlega, hart $2 dagsþak** (íbúðir; hvort einbýli og raðhús fylgja er spurning til Danna).

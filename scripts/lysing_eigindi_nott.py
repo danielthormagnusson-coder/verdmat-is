@@ -140,7 +140,7 @@ def hreinn(t):
 # Lyfta á einbýli og raðhúsum: 0 já í 240 auglýsingum, ómælanleg, svo hún birtist ekki þar.
 _AN_LYFTU = ("svalir", "geymsla", "verond_pallur", "gardur")
 TEGUND_LYKLAR = {"apartment": HVITLISTI, "house": _AN_LYFTU, "townhouse": _AN_LYFTU}
-NOTT_TEGUNDIR = ("apartment",)  # varanlegur lestur: íbúðir einar þar til Danni segir annað (einskiptis nær til allra í TEGUND_LYKLAR)
+NOTT_TEGUNDIR = ("apartment", "house", "townhouse")  # Danni 06.11: varanlegur lestur líka á einbýli og raðhúsum; sumarhús utan
 STADARHEITI = re.compile(r"Garðab\w*|Garðat\w*|Garðast\w*|Grandagarð\w*|\bí Garði\b|\b250 Garð\w*|\bGarði,|\bGarður,")  # regla (w)
 
 
