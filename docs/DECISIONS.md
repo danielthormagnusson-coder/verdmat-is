@@ -4,6 +4,23 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-06 — Ekkert merki um hæð á eignasíðum 00-íbúða; ásett verð endurmælt eftir endurþjálfun (cc313) — **ákvörðun Danna 06.11; ekkert birt grunnmat breytt, ekkert á www**
+
+**Ákvörðun Danna orðrétt (borin af master):** „cc313: (a), ekkert merki. Endurmæla ásett verð á 00-íbúðum eftir endurþjálfunina í desember"
+
+1. **Mælingin.** Líkan `iter4r_20260805_reglaR_strukt`, sölur þinglýstar 01.08–05.11, fjölbýli, einn FASTNUM á skjali og EINFLM ±5 %. Hæð 00: mat/kaupverð 1,009 [0,984; 1,056], þekja 80 %-bils 43/55 = 78,2 % [65,6; 87,1]. Allt fjölbýli: 1,014 [1,009; 1,020], 947/1.246 = 76,0 % [73,6; 78,3]. Munur 00 frá 01–03 í sama matsvæði, sölur frá 16.01: +0,02 % [−1,8; +1,2], n = 170. OOF-spár annars líkans með sömu forskrift: +1,04 % [+0,7; +1,4], n = 6.085. 00-íbúðir eru því ekki kerfisbundið ofmetnar í sölum; umframskekkjan er í mesta lagi um 1–3 %. Hópurinn sem Bárugata 22 tilheyrir (00, HMS „Íbúð á hæð") er of fámennur til að dæma: n = 2 á ferskum jaðri, n = 20 frá 16.01.
+2. **Líkanið fær hæðina.** `unit_category` (merking[:4]) ber hana með 99,93 % þekju í rekstri. Víxl 00 → 01 á sama X hækkar mat um +3,2 % (APT_FLOOR, n = 661) og +3,1 % (APT_BASEMENT, n = 3.545) að miðgildi. Fjögur sérstök hæðarfeatures eru samt tóm í rekstri (færsla 2026-10-15). Textinn „Líkanið tekur enn ekki tillit til hæðar" má því ekki birtast. Sjá D7 og WORKING_PROTOCOL (aa).
+3. **„Íbúð á hæð" er texti HMS.** Notkunarkóði 501 → regla R → APT_FLOOR → `formatSegment`. Íbúðarnúmerið kemur úr merkingunni, og tvær HMS-staðhæfingar standa þar hlið við hlið. Það á við 614 af 4.343 virkum 00-íbúðum með mat. Staðreyndamerki um þetta (kostur (b)) var hafnað með vali á (a).
+4. **Endurmæling (skylduliður endurþjálfunar).** Ásett verð í virkum mbl-auglýsingum fjölbýlis, án nýbygginga, er oftar undir neðri mörkum 80 %-bils á 00 en á öllu: 47/190 = 24,7 % á móti 609/4.439 = 13,7 %, mælt 06.11. Sölurnar staðfesta það ekki (verð undir bili 16,4 % á móti 17,7 %), og skýringin er ómæld. `h05_asett.py` er keyrð aftur eftir endurþjálfun í desember, sjá PLANNING_BACKLOG. Bárugata 22 er eitt dæmi um ásett verð og sannar ekkert ein.
+
+**D7 — fullyrðing um að líkan hunsi eiginleika þarf víxlpróf.** Reglutextinn er í WORKING_PROTOCOL (aa).
+
+**Ath. um númer:** D1–D6 og reglur (r) og (s) eru á grein `cc313` (app `8fcf932`), sem er ekki á main fyrr en flipp-lota sameinar hana. D7 er bókuð hér sér, því hún hefur ekki áhrif á keyrslu.
+
+**Heimild:** `D:\_audit\cc313_endurthjalfun\SKIL_CC313_HAED.md`; `h\h01.txt`, `h\h02.txt`, `h\h03.txt`, `h\h05.txt` í sömu möppu.
+
+---
+
 ## 2026-11-05 — Merkið á eigindum brotnar í línur; símapróf mæla í minnstu breidd (cc318) — **GO arkitekts 05.11, flokkur A; verdmat-ai e2b785f á main og www; regla í WORKING_PROTOCOL (y)**
 
 1. **Lagfæring:** `.vm-eigind-pilla` fer úr `white-space: nowrap` í `normal`. Merkið „Úr lýsingu auglýsingar, dags. …" (cc316b) náði út í 383 px og olli láréttu skruni í 375 px. Eingöngu CSS, svo `EIGN_CACHE_UTGAFA` stendur (regla (o)).

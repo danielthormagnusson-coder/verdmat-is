@@ -1916,3 +1916,8 @@ sé endurvakinn á skoðun einni.
     1. Hreinsa við uppruna (`properties.sveitarfelag = btrim(...)` + hleðsluskriftur, eða CHECK).
     2. Eða `svfn` í stað nafns í `agent-tools`.
     3. Endurgera MV-in sem bera bilin.
+
+- **cc313 — ENDURMÆLA ÁSETT VERÐ Á 00-ÍBÚÐUM EFTIR ENDURÞJÁLFUN (bókað 06.11, ákvörðun Danna; skylduliður hringsins í desember 2026).** Keyra `D:\_audit\cc313_endurthjalfun\h\h05_asett.py` aftur á nýju líkani og bera saman við mælinguna 06.11 á `iter4r_20260805_reglaR_strukt`: ásett undir neðri mörkum 80 %-bils á 00 47/190 = 24,7 % á móti 609/4.439 = 13,7 % á öllu fjölbýli.
+  - **Tímasetning:** skriftan les `public.predictions`, svo hún mælir nýja líkanið aðeins eftir flipp. Fyrir flipp þarf að lesa kandídatsskorun úr staging eða CSV; það þarf að breyta skriftunni, og hún á þá að skrá `model_version`.
+  - **Samhliða:** endurmæla sölur eftir hæð (`h\h01_haed_skekkja.py`), því ásett verð eitt sannar ekki ofmat. Ef halinn stendur en sölur staðfesta hann ekki enn: skýra hann (val auglýsinga, ástand) áður en nokkuð er birt.
+  - **Merki:** Danni valdi ekkert merki 06.11; nýtt merki krefst nýrrar ákvörðunar. Fundur: `D:\_audit\cc313_endurthjalfun\SKIL_CC313_HAED.md` §4 og §6; DECISIONS 2026-11-06.

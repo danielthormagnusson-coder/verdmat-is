@@ -339,3 +339,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 ### (z) STIG LESTURS ER SÉR MÆLING: „AÐ HLUTA" ER VIÐHALD, OG REGLA VALIN EFTIR Á ÞARF STAÐFESTINGU (Danni 06.11.2026, cc316e)
 
 **Þegar líkan flokkar í stig skal mæla hvert stig sér áður en þau eru lögð saman í „já".** Í cc316e voru nær öll rangt já `ad_hluta` á málun eða viðhaldi. **Birtingarregla sem valin er eftir að villur sjást er tilgáta á þeim gögnum, og það er sagt í skilum með tillögu um staðfestingarúrtak.** Ártal er sér hlið á eftir já: textar telja upp mörg ár, og rangt ár er villa í birtu gildi þótt já standist. Heimild: `D:\_audit\cc316_eigindi\SKIL_CC316.md`.
+
+### (aa) FULLYRÐING UM AÐ LÍKAN HUNSI EIGINLEIKA ÞARF VÍXLPRÓF (Danni 06.11.2026, cc313 D7)
+
+**Áður en sagt er að líkan taki ekki tillit til eiginleika er eiginleikinn víxlaður í rekstrar-X og matið mælt. Autt feature sannar ekki að upplýsingarnar vanti, því annar eiginleiki getur borið þær.** Þetta gildir sérstaklega um texta sem notendur sjá. **Raundæmi 06.11:** `merking_floor` og þrjú önnur hæðarfeatures eru 100 % NaN í rekstri, og cc313 skrifaði því „hæð íbúða er ekki notuð í matinu". Víxl 00 → 01 í `unit_category` hækkaði mat um +3 % að miðgildi, svo fullyrðingin var röng, og hún var á leið í merki á eignasíðum. Heimild: `D:\_audit\cc313_endurthjalfun\SKIL_CC313_HAED.md` §2 og §5.
