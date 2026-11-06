@@ -4,6 +4,19 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-06 — Fleiri eigindi úr lýsingu: 34 sellur og 4 ártalssellur, hlið á tilvitnun, ný tafla (cc319) — **forskrift arkitekts 06.11; GO Danna 06.11 („birta allar sellur sem standast, saman"); regla í WORKING_PROTOCOL (ab)**
+
+1. **Ákvörðun:** 26 eigindasellur, 8 ástandssellur og 4 ártalssellur (eigind × tegund) birtast úr keyptum svörum (skema 3 og 101), merkt „Úr lýsingu auglýsingar, dags.". Hlið: rangt já ≤ 2 % og birt ≥ 15 á óháðu blindu úrtaki (729 + 216 textar). Listi í `scripts/lysing_vidbot.py`, tölur í `D:\_audit\cc319_eigindi\SKIL_CC319.md` §1. Sella sem er ekki á listanum birtist ekki.
+2. **$0:** ekkert nýtt kall. Hliðin (`scripts/lysing_hlid.py`, `lysing_hlid2.py`) eru afrit af frosnum skrám, borin saman á öllum ramma með 0 frávikum. Breyting á þeim krefst nýrrar mælingar.
+3. **Forgangur (Danni):** skrá HMS og skráð gildi ganga fyrir, líka á fjölda herbergja og baðherbergja. Hleðarinn býr ekki til röð ef virk röð er í `property_attributes` eða `properties.fjherb` er til; www fyllir aðeins tóma röð. Þetta er strangara en `lysing_eigindi` og `lysing_astand`, þar sem lýsing gengur framar skráargögnum (nema geymsla). Eldri sellur eru óbreyttar.
+4. **Ný tafla `public.lysing_vidbot` í stað þess að víkka `lysing_astand` (frávik frá SKIL §4):** næturverkið á main eyðir hverri röð í `lysing_astand` sem gamla `raðir()` býr ekki til, svo nýjar raðir þar hefðu horfið 07.11. Ný tafla snertir enga lifandi töflu og næturverkið mátti ekki breytast fyrir lestur fyrstu raunkeyrslu. Ártöl eru `ar:*` raðir sem bætast aðeins við röð sem `lysing_astand` fyllti; þau búa aldrei til röð.
+5. **Regla 11:** `urAuglysingu` er aðeins lesið í `components/eign/Eigindi.tsx`. `getAttributes`, leiðrétting, krass, samanburður og spjall sjá ekkert. CHECK hafnar `oskradir_fm`, `til:false`, `gerd:ekkert` og lyklum utan lista.
+6. **Næturverk:** `lysing_vidbot.nott` keyrir á eftir ástandi á sama $2-þaki, viðbótarkostnaður $0. Bætist við eftir að línan `ástand nótt:` dagsett 07.11 og rc hafa verið lesin; eigin commit.
+7. **Fellur eða ómælt, óbreytt „Óþekkt":** m.a. óskráð rými á íbúðum (16/33), gólfefni á íbúð, bílskúr á íbúð, herbergi og baðherbergisfjöldi á einbýli. Baðherbergisfjöldi er ekki til sem skráarreitur á `properties`, svo þar ræður aðeins `property_attributes`.
+8. **Bakfærsla:** `SYNA_LYSINGARVIDBOT = false` og ný útgáfa; eða rollback-SQL. www þolir fjarveru töflunnar. Skyndiminni: `EIGN_CACHE_UTGAFA = cc319` (o).
+
+---
+
 ## 2026-11-06 — Ekkert merki um hæð á eignasíðum 00-íbúða; ásett verð endurmælt eftir endurþjálfun (cc313) — **ákvörðun Danna 06.11; ekkert birt grunnmat breytt, ekkert á www**
 
 **Ákvörðun Danna orðrétt (borin af master):** „cc313: (a), ekkert merki. Endurmæla ásett verð á 00-íbúðum eftir endurþjálfunina í desember"

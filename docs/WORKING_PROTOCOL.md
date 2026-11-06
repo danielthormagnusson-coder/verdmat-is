@@ -343,3 +343,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 ### (aa) FULLYRÐING UM AÐ LÍKAN HUNSI EIGINLEIKA ÞARF VÍXLPRÓF (Danni 06.11.2026, cc313 D7)
 
 **Áður en sagt er að líkan taki ekki tillit til eiginleika er eiginleikinn víxlaður í rekstrar-X og matið mælt. Autt feature sannar ekki að upplýsingarnar vanti, því annar eiginleiki getur borið þær.** Þetta gildir sérstaklega um texta sem notendur sjá. **Raundæmi 06.11:** `merking_floor` og þrjú önnur hæðarfeatures eru 100 % NaN í rekstri, og cc313 skrifaði því „hæð íbúða er ekki notuð í matinu". Víxl 00 → 01 í `unit_category` hækkaði mat um +3 % að miðgildi, svo fullyrðingin var röng, og hún var á leið í merki á eignasíðum. Heimild: `D:\_audit\cc313_endurthjalfun\SKIL_CC313_HAED.md` §2 og §5.
+
+### (ab) HLIÐ Á TILVITNUN, EKKI Á ALLAN TEXTA (Danni 06.11.2026, cc319)
+
+**Þegar líkan skilar svari með orðréttri tilvitnun skal hlið lesa tilvitnunina, ekki allan textann, áður en nýtt kall er keypt.** Í cc319 lágu kerfisbundnar villur Haiku í því hvað svarið var látið þýða: „tengi fyrir þvottavél" varð þvottahús, lagnaleið varð hleðslustöð, orðstofn einhvers staðar í texta dugði sem staðfesting. Hlið á `brot` stóðst á 34 sellum af óháðu blindu úrtaki, án eins nýs kalls. Tvö skilyrði: hliðin eru frosin á disk áður en úrtak er dregið, og afrit þeirra í kóða er borið saman við frosnu útgáfuna á öllum ramma. Skrá: `D:\_audit\cc319_eigindi\SKIL_CC319.md`.
