@@ -201,5 +201,131 @@ def main():
     return 6 if (thak or timi) and eftir else 0
 
 
+# ---- Birting og næturlestur (GO Danna 06.11, staðfestingarúrtak a6, SKIL_CC316 cc316g) ----
+# Aðeins sellur sem stóðust blint staðfestingarúrtak. Sella sem féll birtist ekki; ártal aðeins þar sem það stóðst.
+STOFN = {"eldhus": "eldh|innrétt", "golfefni": "gólf|parket|flís|teppi", "gluggar": "glugg|gler", "thak": "þak",
+         "almennt": "endurnýj|uppger|standsett|uppgert|tekin í gegn|taka í gegn"}
+BIRT = {"apartment": ("eldhus", "golfefni", "gluggar", "thak", "almennt"), "house": ("eldhus", "almennt"), "townhouse": ("golfefni", "thak")}
+AR_BIRT = {("apartment", "gluggar"), ("apartment", "thak"), ("townhouse", "thak")}
+OSKRAD_BIRT = ("house", "townhouse")
+
+
+def er_nybygging(p, ar):
+    """Grunnregla 5 + ákvörðun Danna 06.11: FULLBUID=0, byggt innan 2 ára, eða bæði gildi vantar."""
+    fb, by = p if p else (None, None)
+    return fb == 0 or (by is not None and by >= ar - 2) or (fb is None and by is None)
+
+
+def raðir(R, P, S):
+    ut = []
+    for f, r in R.items():
+        s = S.get(r[3])
+        if not s or er_nybygging(P.get(f), r[1].year):
+            continue
+        t = hreinn(r[2])
+        dags = r[1].date().isoformat()
+        for k_ in BIRT[r[5]]:
+            h = s.get(k_) or {}
+            if h.get("stada") == "endurnyjad" and re.search(STOFN[k_], t, re.I):
+                ar = h.get("ar") if (r[5], k_) in AR_BIRT and h.get("ar") and str(h["ar"]) in t else None
+                ut.append((f, k_, "endurnyjad", ar, None, r[3], dags))
+        if r[5] in OSKRAD_BIRT and s.get("oskrad") == "ja":
+            ut.append((f, "oskrad", "nefnt", None, s.get("oskrad_m2") or None, r[3], dags))
+    return ut
+
+
+def uppfaera(c, rows):
+    q = rw(c)
+    q.execute("select count(*) from public.lysing_astand")
+    nu = q.fetchone()[0]
+    if nu >= 200 and len(rows) < 0.6 * nu:
+        c.rollback()
+        skra(f"ástand HLIÐ: {len(rows)} raðir, {nu} í töflu; birting óbreytt")
+        return None
+    q.execute("create temp table n(fastnum bigint,attr_key text,stada text,ar int,m2 numeric,lysing_hash text,source_date date) on commit drop")
+    if rows:
+        execute_values(q, "insert into n values %s", rows, page_size=1000)
+    q.execute("delete from public.lysing_astand t where not exists(select 1 from n where n.fastnum=t.fastnum and n.attr_key=t.attr_key)")
+    q.execute("""insert into public.lysing_astand(fastnum,attr_key,stada,ar,m2,lysing_hash,source_date) select * from n
+      on conflict(fastnum,attr_key) do update set stada=excluded.stada,ar=excluded.ar,m2=excluded.m2,
+      lysing_hash=excluded.lysing_hash,source_date=excluded.source_date,hladid_at=now()""")
+    c.commit()
+    return len(rows)
+
+
+def lesa_allt(c):
+    c.rollback()
+    k = c.cursor()
+    k.execute("set transaction read only")
+    k.execute("set local statement_timeout='120s'")
+    R = rammi(k)
+    k.execute("select fastnum,fullbuid,byggar from public.properties where fastnum=any(%s)", (list(R),))
+    P = {a: (b, d) for a, b, d in k.fetchall()}
+    k.execute("select lysing_hash,svar from scraper.lysing_eigindi_svar where skema_utgafa=%s", (SKEMA_ASTAND,))
+    S = dict(k.fetchall())
+    c.rollback()
+    return R, P, S
+
+
+class _Dagur:
+    """Sama $2-dagsbókhald og eigindin: halda/gera upp fara í bókhald næturskrefsins."""
+    def __init__(self, bok): self.bok = bok
+    def halda(self): return self.bok.halda("nott")
+    def gera_upp(self, raun): self.bok.gera_upp("nott", raun)
+
+
+def nott(c, bok, stopp, nyir_fra, fyrst_fundid):
+    """Næturhluti: kaupir nýja texta sem ekki eru nýbyggingar, nýjustu fyrst, innan sama dagsþaks; uppfærir birtingu. rc 0/6."""
+    import anthropic
+    R, P, S = lesa_allt(c)
+    rod = sorted(R.values(), key=lambda r: (r[1], r[4]), reverse=True)
+    bid = {}
+    for r in rod:
+        if r[3] not in S and not er_nybygging(P.get(r[0]), r[1].year):
+            bid.setdefault(r[3], r[2])
+    k = c.cursor()
+    k.execute("set transaction read only")
+    fs = fyrst_fundid(k, bid) if bid else {}
+    c.rollback()
+    bid = {h: t for h, t in bid.items() if fs.get(h) and fs[h] >= nyir_fra}
+    klient = anthropic.Anthropic(api_key=lykill(), max_retries=4)
+    verk, keypt, kostn, thak, timi = [(h, hreinn(t)) for h, t in bid.items()], 0, 0.0, False, False
+    d = _Dagur(bok)
+    with ThreadPoolExecutor(5) as ex:
+        for i in range(0, len(verk), 5):
+            if stopp and D.datetime.now() >= stopp:
+                timi = True
+                break
+            ny = []
+            for f in [ex.submit(kall, klient, d, h, t) for h, t in verk[i:i + 5]]:
+                x = f.result()
+                if x is None:
+                    thak = True
+                else:
+                    ny.append(x)
+            if ny:
+                q = rw(c)
+                execute_values(q, """insert into scraper.lysing_eigindi_svar(lysing_hash,skema_utgafa,model,svar,kostnadur_usd)
+                  values %s on conflict do nothing""", [(h, SKEMA_ASTAND, MODEL, Json(s), ko) for h, s, ko in ny], page_size=200)
+                c.commit()
+                S.update({h: s for h, s, _ in ny})
+                keypt += len(ny)
+                kostn += sum(x[2] for x in ny)
+            if thak:
+                break
+    n = uppfaera(c, raðir(R, P, S))
+    eftir = len(verk) - keypt
+    skra(f"ástand nótt: köll {keypt}, ${kostn:.3f}, dagur ${bok.dagur:.3f}, biðröð eftir {eftir}, þak {thak}, tími {timi}, raðir {n}")
+    return 6 if (thak or timi) and eftir else 0
+
+
 if __name__ == "__main__":
+    if "--birta" in sys.argv:
+        _c = psycopg2.connect(Path(r"D:\verdmat-is\.dbconfig").read_text(encoding="utf-8-sig").strip())
+        _R, _P, _S = lesa_allt(_c)
+        _rows = raðir(_R, _P, _S)
+        print("raðir", len(_rows), collections.Counter((_R[x[0]][5], x[1]) for x in _rows))
+        if "--skrifa" in sys.argv:
+            print("skrifað", uppfaera(_c, _rows))
+        sys.exit(0)
     sys.exit(main())

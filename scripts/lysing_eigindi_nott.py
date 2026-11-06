@@ -339,7 +339,17 @@ def main():
     if n is None:
         return 4
     print("skrifað", n, "biðröð eftir", eftir, flush=True)
-    return 6 if (thak or timi) and eftir else 0
+    rc = 6 if (thak or timi) and eftir else 0
+    if tegund == "nott":
+        # Ástand (cc316g): sér kall á sama $2-dagsbókhaldi, á eftir eigindum. Bilun þar fellir ekki eigindin sem þegar eru skrifuð.
+        import lysing_astand
+        try:
+            rc = max(rc, lysing_astand.nott(c, bok, stopp, NYIR_FRA, fyrst_fundid))
+        except Exception as e:
+            c.rollback()
+            skra(f"ástand nótt VILLA {type(e).__name__}: {e}")
+            rc = max(rc, 3)
+    return rc
 
 
 if __name__ == "__main__":

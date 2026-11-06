@@ -50,6 +50,17 @@ Skil: `D:\_audit\cc317_utdrattur_af\SKIL_CC317.md`.
 2. **`NOTT_TEGUNDIR`: íbúð, einbýli, raðhús;** sumarhús utan, prófað: 0 í ramma. Verkið þarf ekki nýja skráningu: það les skriftuna úr `D:\verdmat-is\app`. Kostnaður um $0,15 á meðaldegi og $0,29 á versta degi síðustu 31 daga, innan $2.
 
 Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316f).
+## 2026-11-06 — Ástand úr lýsingu á www eftir staðfestingu (cc316g) — **GO Danna 06.11; gengur framar færslunni hér á eftir um birtingu**
+
+1. **Staðfestingarúrtak (blint, 112 textar utan fyrri úrtaka, enginn úrskurður) réð.** Birt: íbúð: eldhús, gólfefni, gluggar, þak, almennt; einbýli: eldhús, almennt; raðhús: gólfefni, þak. Ár: íbúð gluggar og þak, raðhús þak; annars „Endurnýjað, ár óþekkt". Óskráð rými: einbýli og raðhús, orðað „Auglýsing nefnir óskráð rými (X m²)". Felldar: íbúð baðherbergi; raðhús eldhús, baðherbergi, almennt.
+2. **Nýbygging = grunnregla 5 eða bæði FULLBUID og byggingarár vantar** (Danni). Aðeins `endurnyjad` birtist; `ad_hluta` er að mestu viðhald.
+3. **Tafla `public.lysing_astand`,** hvorki `property_attributes` né `oskradir_fm`. Ekkert í verðleiðréttingu, stærð, verð á m² né nefnara.
+4. **Næturverk:** ástand keyrir á eftir eigindum á sama $2-dagsbókhaldi og sama CHAIN CLEAN-hliði. Engin ný skráning.
+
+Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316g).
+
+---
+
 ## 2026-11-06 — Ástandseigindi úr lýsingu, þriðji áfangi: lesið án birtingar (cc316e) — **tillaga: bíður GO Danna; ekkert á www, í birtingartöflu eða næturverki; regla í WORKING_PROTOCOL (z)**
 
 1. **Lestur án birtingar:** eldhús, baðherbergi, gólfefni, gluggar, lagnir, þak, almennt og óskráð rými á 6.856 textum virkra íbúða, einbýla og raðhúsa, sér kall með Haiku 5.5, $4,668, undir hörðu $15-þaki (Danni heimilaði $25 síðar; ekki þörf). Svör undir skema 101 í `scraper.lysing_eigindi_svar`; enginn les þau. Aldrei verðleiðrétting.
