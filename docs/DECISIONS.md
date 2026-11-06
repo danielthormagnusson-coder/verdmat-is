@@ -52,8 +52,8 @@ Skil: `D:\_audit\cc317_utdrattur_af\SKIL_CC317.md`.
 Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316f).
 ## 2026-11-06 — Ástandseigindi úr lýsingu, þriðji áfangi: lesið án birtingar (cc316e) — **tillaga: bíður GO Danna; ekkert á www, í birtingartöflu eða næturverki; regla í WORKING_PROTOCOL (z)**
 
-1. **Lestur án birtingar:** eldhús, baðherbergi, gólfefni, gluggar, lagnir, þak, almennt og óskráð rými á 6.856 textum virkra íbúða, einbýla og raðhúsa, sér kall með Haiku 5.5, $4,668 af hörðu $15-þaki. Svör undir skema 101 í `scraper.lysing_eigindi_svar`; enginn les þau. Aldrei verðleiðrétting.
-2. **Niðurstaða (blint, tvö úrtök):** með reglunni „aðeins `endurnyjad`" standast 12 af 21 sellu á rangt já, 4 á rangt ár; óskráð rými stenst á einbýli og raðhúsum en fellur á íbúðum (12 %). `ad_hluta` er að mestu viðhald og fellur. Reglan var valin eftir á, á sömu gögnum.
+1. **Lestur án birtingar:** eldhús, baðherbergi, gólfefni, gluggar, lagnir, þak, almennt og óskráð rými á 6.856 textum virkra íbúða, einbýla og raðhúsa, sér kall með Haiku 5.5, $4,668, undir hörðu $15-þaki (Danni heimilaði $25 síðar; ekki þörf). Svör undir skema 101 í `scraper.lysing_eigindi_svar`; enginn les þau. Aldrei verðleiðrétting.
+2. **Niðurstaða (blint, tvö úrtök, nýbyggingar út eftir grunnreglu 5, Danni 06.11):** með reglunni „aðeins `endurnyjad`" standast 13 af 21 sellu á rangt já, 4 á rangt ár; óskráð rými stenst á einbýli og raðhúsum en fellur á íbúðum (12 %). `ad_hluta` er að mestu viðhald og fellur. Reglan var valin eftir á, á sömu gögnum.
 3. **Ef þetta verður birt:** óskráðir fermetrar mega aldrei fara í `property_attributes` né lykilinn `oskradir_fm`, sem `lib/krass.ts` les, og mega aldrei snerta stærð, verð á m² eða nefnara.
 
 Skil: `D:\_audit\cc316_eigindi\SKIL_CC316.md` (cc316e).
