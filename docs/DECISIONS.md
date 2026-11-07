@@ -10,7 +10,7 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 **Frávik sem lesin voru í kóða 07.11 og eru ekki leyst í þessari færslu (engu breytt, hluthafar er annað verkefni):**
 
-1. **Tími endurnýjunar.** `D:\hluthafar\dbfrita_nott.py:105` endurnýjar efnissýnina í verkinu `Hluthafar_Afrit`, sem er skráð 04:00 (næst 08.11), með `statement_timeout` 900 s. Það er innan 01:00–07:30, svo reglan hér að ofan stenst ekki fyrr en verkið færist eða endurnýjunin fer úr því. Verkið les líka úr verdmat á sama tíma.
+1. **Tími endurnýjunar.** `D:\hluthafar\db\afrita_nott.py:105` endurnýjar efnissýnina í verkinu `Hluthafar_Afrit`, sem er skráð 04:00 (næst 08.11), með `statement_timeout` 900 s. Það er innan 01:00–07:30, svo reglan hér að ofan stenst ekki fyrr en verkið færist eða endurnýjunin fer úr því. Verkið les líka úr verdmat á sama tíma.
 2. **Aðgangur hluthafar er víðari en SELECT.** `registur_afrit` er aðeins með USAGE og SELECT, en endurnýjunin keyrir sem eigandi um `VERDMAT_EIGANDI_URL` í `.env` hluthafar, og þar eru líka `VERDMAT_DATABASE_URL` og `VERDMAT_SUPABASE_SERVICE_ROLE_KEY`. Gildin voru ekki opnuð, aðeins nöfnin lesin.
 
 **Heimild:** `D:\hluthafar\docs\FLUTNINGUR_STADA.md` (skipt 7.11 09:47, skref 10 lokið).
