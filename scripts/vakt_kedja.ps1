@@ -136,11 +136,20 @@ if (-not $Prof -and -not $Thurrt) {
 }
 $rc = $(if ($stada -eq 'LOKID') { 0 } else { 2 })
 $lifsmarkStada = 'nei'
-$postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and $stada -ne 'LOKID')
+# cc324: sópunarvakt. Sópunin fellur ekki á rc: kort-lotan stóð í 15+ daga með rc 0. Les aðeins; ekkert í status-logg.
+# rc 1 = FALL, 3 = mæling mistókst; hvort tveggja fer í póst. Breytir ekki rc keðjunnar (biðhliðin lesa hann).
+$sopun = @(); $sopunRc = 0
+if (-not $Prof) {
+    try {
+        $sopun = @(& 'C:\Python314\python.exe' (Join-Path $PSScriptRoot 'sopunarvakt.py') 2>&1 | ForEach-Object { "$_" })
+        $sopunRc = $LASTEXITCODE
+    } catch { $sopun = @('SOPUNARVAKT: MÆLING MISTÓKST (ræsing)'); $sopunRc = 3 }
+}
+$postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and ($stada -ne 'LOKID' -or $sopunRc -ne 0))
 
 function Skra-Vakt([int]$r) {
     if ($Prof -or $Thurrt) { return }
-    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada"
+    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc"
     try {
         $m = Split-Path -Parent $VaktLog
         if ($m -and -not (Test-Path $m)) { New-Item -ItemType Directory -Force $m | Out-Null }
@@ -160,9 +169,11 @@ $vika = $null
 if ($lifsmarkNu) { $vika = Get-Vikusamantekt }
 if ($Prof) { $efni = "[PRÓF] verdmat-vakt: $texti" + $(if ($lifsmarkNu) { ' + lífsmark' } else { '' }) }
 elseif ($stada -ne 'LOKID') { $efni = "verdmat-vakt: $texti — ÓLOKIÐ" + $(if ($lifsmarkNu) { ' · vikulegt lífsmark' } else { '' }) }
+elseif ($sopunRc -ne 0) { $efni = "verdmat-vakt: SÓPUN svelt eða ómæld — $($sopun[-1])" + $(if ($lifsmarkNu) { ' · vikulegt lífsmark' } else { '' }) }
 else { $efni = "verdmat-vakt lífsmark: $($vika.Lokid)/7 nætur lokið — vika til $($Nu.ToString('dd.MM'))" }
 
 $meginmal = "$texti`n"
+if ($sopun.Count) { $meginmal += "`nSópun (cc324):`n" + ($sopun -join "`n") + "`n" }
 if ($lifsmarkNu) {
     $meginmal += "`nVikulegt lífsmark vaktarinnar (cc299). Þessi póstur kemur á mánudagsmorgni hver sem staðan er;`n" +
         "berist hann ekki er vaktin (verdmat-daily-kedjuvakt) dauð eða pósturinn bilaður.`n`n" +

@@ -109,6 +109,10 @@ WRITE_BACKOFF_S = (2, 8, 30) # cc43: reconnect delays for write_events; 3 retrie
 CARD_MIN_AGE_H = 24          # endurathuga kort-auðkenni aðeins ef síðasta staðfesting (delta last_seen_at
                              # eða kort-lota) er eldri en þetta — sparar beiðnir á nýstaðfestum
 CARD_ROUND_RESERVE = 120     # beiðnir/dag fráteknar fyrir sölu-hring í gangi/á gjalddaga (rest -> kort)
+RENT_RUN_RESERVE = 100       # cc324: þak á frátekningu leigu per keyrslu. Leigulota er nú hringur með bendli (eins og
+                             # sala), svo frátekning er aldrei stærri en þetta og kort-lotan svelt ekki (sjá run_scheduled)
+CARD_MIN_RUN = 50            # cc324: kortlota fær alltaf min(fjárhagur, 50): engin frátekning getur aftur skilið hana eftir með 0
+RUN_LOG_NAME = "lifecycle_sweep_runs.jsonl"  # cc324: ein lína per keyrsla; stdout verksins er ekki geymt
 POR_SENTINEL = 1             # cc170 C2: promote_mbl.PRICE_SENTINEL — verd=0 ("tilboð")
                              # geymist sem price_amount=1 + is_price_on_request
 
@@ -644,48 +648,52 @@ def run_scheduled(conn, dry_run, log=print, budget_cap=None):
     # fyrst. Tveggja-strika reglan er ÓBREYTT: kort-auðkenni bera enga confirmed_absent_1 (skv.
     # skilgreiningu viewsins), svo kort-lotan skrifar aðeins fyrsta strik eða price_changed;
     # annað strikið kemur úr næsta sölu-hring eins og áður.
-    reserve = 0
-    if _due(state["rent"].get("last_completed_at"), now, RENT_CADENCE_DAYS):
-        reserve += -(-len(load_active_ids(conn, "rent")) // PAGE)
-    sale_st = state["sale"]
-    if sale_st.get("enabled") and (
-            (sale_st.get("round_file") and sale_st.get("cursor", 0) < sale_st.get("round_total", 0))
-            or _due(sale_st.get("last_completed_at"), now, SALE_CADENCE_DAYS)):
-        reserve += CARD_ROUND_RESERVE
-    card_budget = max(0, budget - reserve)
-    log("[card] budget=%d (heild %d - frátekið %d)" % (card_budget, budget, reserve))
-    budget -= _card_pass(conn, transport, state, card_budget, record, log, dry_run)
-
-    # ---- RENT: atomic full lota, weekly ----
+    # cc324: frátekning leigu er ÞÖKUÐ við RENT_RUN_RESERVE. Áður tók hún alla lotuna (atómísk): þegar hún fór yfir
+    # það sem ein keyrsla rúmar (tvítakahrina 16.-18.10: 234 -> 411+ beiðnir > 345-355) fór leigan aldrei af stað og
+    # frátekningin skildi eftir card_budget=0 frá 24.10. Sjá D:/_audit/cc324_sopun/SKIL_CC324.md.
     rent = state["rent"]
-    if not _due(rent.get("last_completed_at"), now, RENT_CADENCE_DAYS):
+    rent_active = None          # sama frysting sótt aðeins einu sinni í keyrslu
+    rent_left = 0
+    rent_in_flight = bool(rent.get("round_file")) and rent.get("cursor", 0) < rent.get("round_total", 0)
+    rent_is_due = _due(rent.get("last_completed_at"), now, RENT_CADENCE_DAYS)
+    if rent_in_flight:
+        rent_left = -(-(rent["round_total"] - rent["cursor"]) // PAGE)
+    elif rent_is_due:
+        rent_active = load_active_ids(conn, "rent")
+        rent_left = -(-len(rent_active) // PAGE)
+    reserve = min(rent_left, RENT_RUN_RESERVE)
+    sale_st = state["sale"]
+    sale_active = bool(sale_st.get("enabled") and (
+        (sale_st.get("round_file") and sale_st.get("cursor", 0) < sale_st.get("round_total", 0))
+        or _due(sale_st.get("last_completed_at"), now, SALE_CADENCE_DAYS)))
+    sale_reserve = CARD_ROUND_RESERVE if sale_active else 0
+    reserve += sale_reserve
+    card_budget = max(0, budget - reserve, min(budget, CARD_MIN_RUN))
+    log("[card] budget=%d (heild %d - frátekið %d, þar af leiga %d)" % (card_budget, budget, reserve, reserve - sale_reserve))
+    n_card = _card_pass(conn, transport, state, card_budget, record, log, dry_run)
+    budget -= n_card
+
+    # ---- RENT: vikulegur hringur með bendli (cc324; áður atómísk lota) ----
+    n_rent = 0
+    rent_budget = max(0, budget - sale_reserve)   # kort-afgangur má fara í leigu; sölufrátekning stendur
+    if not (rent_in_flight or rent_is_due):
         nxt = RENT_CADENCE_DAYS - (now - _parse(rent["last_completed_at"])).total_seconds() / 86400.0
         log("[rent] not due (last=%s, next in %.1fd)" % (rent.get("last_completed_at"), nxt))
+    elif dry_run:
+        log("[rent] %s — %d requests left; budget this run=%d"
+            % ("round IN FLIGHT" if rent_in_flight else "DUE", rent_left, rent_budget))
+    elif rent_budget <= 0:
+        log("[rent] no budget remaining this run")
     else:
-        active = load_active_ids(conn, "rent")
-        need = -(-len(active) // PAGE)
-        if dry_run:
-            log("[rent] DUE — would sweep %d ids (%d requests); budget=%d" % (len(active), need, budget))
-        elif budget < need:
-            log("[rent] due but budget %d < need %d — deferring to next run" % (budget, need))
-        else:
-            rent_ts = now_utc()
-            prior = load_prior_absent_set(conn, "rent", rent_ts)
-            sid = "%s_rent_%s" % (SWEEP_VERSION, rent_ts.strftime("%Y%m%dT%H%M%SZ"))
-            results = []
-            for b in range(need):
-                batch = active[b * PAGE:(b + 1) * PAGE]
-                data = transport.gql(in_query(SLICES["rent"], [x[0] for x in batch])); record()
-                returned = {str(r[SLICES["rent"]["pk"]]): r for r in data["data"][SLICES["rent"]["root"]]}
-                results.extend(classify_batch(SLICES["rent"], batch, returned, prior, sid, "rent", rent_ts))
-            events = results_to_events(results, rent_ts)
-            write_events(conn, events, log, found=results_to_found(results, rent_ts))
-            rent["last_completed_at"] = _iso(rent_ts)
-            if not rent.get("epoch"):
-                rent["epoch"] = _iso(rent_ts)
+        if not rent_in_flight:
+            rf = get_scraper_data_dir() / ("lifecycle_rent_round_%s.json" % now.strftime("%Y%m%dT%H%M%SZ"))
+            rf.write_text(json.dumps(rent_active), encoding="utf-8")
+            rent.update({"round_file": str(rf), "round_started_at": _iso(now),
+                         "cursor": 0, "round_total": len(rent_active)})
             save_sweep_state(state)
-            budget -= need
-            log("[rent] done: %d ids, %d events, epoch=%s" % (len(active), len(events), rent["epoch"]))
+            log("[rent] new round: %d ids frozen -> %s" % (len(rent_active), rf.name))
+        n_rent = _process_rent_chunk(conn, transport, state, rent_budget, record, log)
+        budget -= n_rent
 
     # ---- SALE: weekly round, resumed nightly over ~2 days ----
     sale = state["sale"]
@@ -729,8 +737,60 @@ def run_scheduled(conn, dry_run, log=print, budget_cap=None):
 
     if not dry_run:
         save_sweep_state(state)
+        _skra_keyrslu(now, state, card_budget, reserve, n_card, n_rent, transport.request_count, used, delta, log)
     log("requests_this_run=%d" % transport.request_count)
     return 0
+
+
+def _skra_keyrslu(now, state, card_budget, reserve, n_card, n_rent, n_all, used, delta, log):
+    """cc324: ein JSON-lína per keyrsla, svo svelti sést án dagbókar (stdout verksins er ekki geymt).
+    Best-effort: logg má aldrei fella keyrslu sem er búin að skrifa atburði."""
+    try:
+        rent, sale, card = state["rent"], state["sale"], state.get("card", {})
+        lina = {"at": _iso(now), "lok": _iso(now_utc()), "requests": n_all, "card": n_card, "rent": n_rent,
+                "sale": n_all - n_card - n_rent, "card_budget": card_budget, "reserve": reserve,
+                "used_24h": used, "delta_24h": delta,
+                "card_due": (card.get("last_run") or {}).get("due_n"),
+                "rent_cursor": rent.get("cursor", 0), "rent_total": rent.get("round_total", 0),
+                "sale_cursor": sale.get("cursor", 0), "sale_total": sale.get("round_total", 0)}
+        with open(get_scraper_data_dir() / RUN_LOG_NAME, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(lina, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        log("VILLA keyrsluskrá: %s" % exc)
+
+
+def _process_rent_chunk(conn, transport, state, budget, record, log):
+    """cc324: leigu-hringur með bendli, sama snið og _process_sale_chunk: atburðir + bendill + ríki vistuð per lotu,
+    svo dráp tapar mest einni lotu. `prior` = fyrri strik fyrir upphaf hrings, svo strik hringsins sjálfs verði
+    ekki annað strik. Skilar fjölda beiðna."""
+    rent = state["rent"]
+    round_ids = json.loads(Path(rent["round_file"]).read_text(encoding="utf-8"))
+    round_start = _parse(rent["round_started_at"])
+    prior = load_prior_absent_set(conn, "rent", round_start)
+    sid = "%s_rent_%s" % (SWEEP_VERSION, round_start.strftime("%Y%m%dT%H%M%SZ"))
+    done = 0
+    while rent["cursor"] < rent["round_total"] and done < budget:
+        i = rent["cursor"]
+        batch = [tuple(x) for x in round_ids[i:i + PAGE]]
+        obs = now_utc()
+        data = transport.gql(in_query(SLICES["rent"], [x[0] for x in batch])); record()
+        returned = {str(r[SLICES["rent"]["pk"]]): r for r in data["data"][SLICES["rent"]["root"]]}
+        res = classify_batch(SLICES["rent"], batch, returned, prior, sid, "rent", obs)
+        write_events(conn, results_to_events(res, obs), log=lambda *_a, **_k: None, found=results_to_found(res, obs))
+        rent["cursor"] = i + len(batch)
+        done += 1
+        save_sweep_state(state)
+    if rent["cursor"] >= rent["round_total"]:
+        rent["last_completed_at"] = _iso(now_utc())
+        if not rent.get("epoch"):
+            rent["epoch"] = rent["round_started_at"]
+        rent.update({"round_file": None, "cursor": 0, "round_total": 0})
+        save_sweep_state(state)
+        log("[rent] ROUND COMPLETE (%d beiðnir í þessari keyrslu)" % done)
+    else:
+        log("[rent] round paused at cursor %d/%d (%d beiðnir í þessari keyrslu)"
+            % (rent["cursor"], rent["round_total"], done))
+    return done
 
 
 def _exclude_cards_from_round(conn, state, log):
