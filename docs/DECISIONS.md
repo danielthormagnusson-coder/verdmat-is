@@ -4,6 +4,16 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-07 — Sýnin `registur_utflutningur.v_atvinnu_flokkun` (B2, cc330)
+
+**Ákvörðun arkitekts 07.11, GO Danna:** B2 (sýn á `semantic.atvinnu_flokkun` í brúna til hluthafar) er samþykkt. B1 er hafnað að sinni og bíður cc314.
+
+**Ákvörðun arkitekts 07.11:** sýnin læsir dálkagerðum `semantic.atvinnu_flokkun`. Breyting þar krefst DROP/CREATE sýnar í sömu migration.
+
+Migration `supabase/migrations/20261107234500_cc330_v_atvinnu_flokkun.sql`, rollback `supabase/rollback/20261107234500_cc330_v_atvinnu_flokkun_rollback.sql`. **Ákvörðun Danna 08.11 (í lotuglugga cc330):** „GO Danna: beittu B2“. Beitt 08.11. Próf og tölur: `D:\_audit\cc330_registur_b2\SKIL_CC330.md`.
+
+---
+
 ## 2026-11-08 — Regla: ekkert ff á app main meðan sópun eða næturkeðja keyrir (cc320)
 
 **Ákvörðun arkitekts 08.11:** „Ný regla í WORKING_PROTOCOL (næsta lausa bókstaf, ekki ae): ekkert ff á app main meðan sópun eða næturkeðja keyrir.“ Skráð sem WP (ah). Tilefni: `D:\_audit\cc320_voktun\SKIL_CC320.md` §D.3.
