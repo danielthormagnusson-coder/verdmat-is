@@ -358,6 +358,8 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 
 **(a)** Ekki breyta eða eyða `registur_utflutningur` eða `registur_afrit` án GO Danna. **(b)** Láta Danna vita áður en dálkum er breytt í `public.lb_auglysingar`, `public.sales_history` eða `public.property_images`, því brúin les þá. **(c)** Önnur verkefni beita aldrei migration á verdmat-grunninn. Breyting sem þau þurfa fer til verdmat-lotu, með staðbundnu prófi og GO Danna.
 
+**(d) Lestur hluthafar (Danni 07.11.2026):** Hluthafar (D:\hluthafar) má LESA kóða í D:\verdmat-is til að endurnýta lausnir og afritar með tilvísun í uppruna (skrá + commit). Hluthafar skrifar ekkert hér, keyrir ekkert hér og gerir engar git-aðgerðir hér. Verdmat-lotur bera enga skyldu gagnvart afrituðum kóða: breytingar hér berast ekki sjálfkrafa til hluthafar. Nýjar sýnir í registur_utflutningur eru migration á verdmat-grunninn (flokkur B): aðeins eftir beiðni sem Danni áframsendir og með GO frá honum, smíðaðar af verdmat-lotu.
+
 **Raundæmi:** hluthafar skrifaði migration á `search_properties_grouped` undir nafninu cc323, útgáfa `20261107223000`. Hún var tekin af hluthafar og sameinuð verdmat-megin.
 
 ### (ae) PÓSTUR Á BAK VIÐ ROFA FER AÐEINS UM HVÍTLISTA Á ÞJÓNI; ATBURÐUR Á EIGN MÆLIST Á FASTANÚMERI (cc320, 07.11.2026)
