@@ -4,6 +4,12 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-08 — Vistuð leit: sellutafla `public.vistud_leit_sella` (cc329)
+
+**Ákvörðun Danna 08.11 (í lotu cc329):** „GO Danna: beittu migration V0, 22 raðir, án bílskúrsskrár (V1)“. Migration `supabase/migrations/20261107230000_cc329_vistud_leit.sql`, rollback `supabase/rollback/20261107230000_cc329_vistud_leit_rollback.sql`. Beitt 08.11. Skrá HMS er ekki lind í vistaðri leit. Opnun vistaðrar leitar (`SYNA_VISTADA_LEIT`) er ekki hluti af þessari ákvörðun. Greining og próf: `D:\_audit\cc329_vistud_leit\SKIL_CC329.md`.
+
+---
+
 ## 2026-11-07 — Sýnin `registur_utflutningur.v_atvinnu_flokkun` (B2, cc330)
 
 **Ákvörðun arkitekts 07.11, GO Danna:** B2 (sýn á `semantic.atvinnu_flokkun` í brúna til hluthafar) er samþykkt. B1 er hafnað að sinni og bíður cc314.

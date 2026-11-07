@@ -35,7 +35,15 @@ GRUNN = os.environ.get("VOKTUN_GRUNNSLOD", "https://www.verdmat.ai")
 FRA = "verdmat.ai <vakt@verdmat.ai>"
 MAT_REIKNAD = {"iter4r_20260805_reglaR_strukt": dt.date(2026, 8, 6)}  # sama og lib/matsdagsetning.js
 VIKUDAGAR = ["mánudag", "þriðjudag", "miðvikudag", "fimmtudag", "föstudag", "laugardag", "sunnudag"]
-EIGIND_HEITI = {"lyfta": "lyfta", "svalir": "svalir", "bilskur": "bílskúr", "eldhus": "endurnýjað eldhús"}
+# cc329: vistuð leit. Heiti eru speglun lib/vistud-leit.ts (prófað í D:\_audit\cc329_vistud_leit\prof_samraemi.py).
+EIGIND_HEITI = {"lyfta": "lyfta", "svalir": "svalir", "bilskur": "bílskúr eða stæði í bílageymslu", "verond": "verönd eða pallur",
+                "gardur": "garður", "serinngangur": "sérinngangur", "eldhus": "endurnýjað eldhús", "bad": "endurnýjað baðherbergi"}
+TEG_HEITI = {"apartment": "íbúð", "house": "einbýli", "townhouse": "raðhús"}
+SELLU_TOFLUR = ("auglysing_eigindi", "lysing_eigindi", "lysing_vidbot", "lysing_astand")
+# cc329: endurbirting. Eign telst EKKI ný í vistaðri leit ef önnur mbl-söluauglýsing á sama fastnúmeri sást áður (hvenær sem er
+# í gögnum okkar; elstu raðir eru um 6 mánaða). Mælt á nýjum lotum sl. 30 d: 149/913 = 16,3 % falla út (SKIL_CC329 §3).
+# Auk þess: sama fastnúmer fer aldrei tvisvar í sömu áskrift.
+HAMARK_POSTA_A_NETFANG_DAG = 1
 UMR = {"þ": "th", "æ": "ae", "ð": "d", "ö": "o", "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ý": "y"}
 
 
@@ -376,11 +384,16 @@ def hluti_askriftar(s, atb):
     if s["tegund"] == "leit":
         ja = [a for a in atb if a.get("_passar")]
         ov = [a for a in atb if not a.get("_passar")]
+        slod = utm(leit_slod(s["skilyrdi"]), her) if s.get("skilyrdi") else utm("/leit", her)
         if ja:
-            ut += f"<p><strong>{len(ja)} nýjar auglýsingar sem passa.</strong></p>"
+            ut += f"<p><strong>{len(ja)} {'ný eign passar' if len(ja) == 1 else 'nýjar eignir passa'} við leitina.</strong></p>"
             ut += "<ul style='padding-left:18px;margin:6px 0'>" + "".join(f"<li>{lina(a, her)}</li>" for a in ja[:HAMARK_LINA]) + "</ul>"
+            if len(ja) > HAMARK_LINA:
+                ut += f'<p>… {len(ja) - HAMARK_LINA} í viðbót. <a href="{slod}" style="color:#8D3E23">Sjá leitina</a>.</p>'
         if ov:
-            ut += f"<p>{len(ov)} til viðbótar passa við svæði og verðmat, en eigind er óþekkt. Lýsingar nefna ekki alltaf allt, svo óþekkt þýðir ekki að eigindina vanti.</p>"
+            ut += (f"<p>{len(ov)} {'ný eign' if len(ov) == 1 else 'nýjar eignir'} á svæðinu {'gæti' if len(ov) == 1 else 'gætu'} líka passað, en auglýsingin segir ekki "
+                   "frá öllu sem þú valdir (eða stærð eða verð vantar). Þær eru ekki taldar með, því óþekkt þýðir ekki að það vanti. "
+                   f'<a href="{slod}" style="color:#8D3E23">Sjá allar á leitarsíðunni</a>.</p>')
     else:
         ut += "<ul style='padding-left:18px;margin:6px 0'>" + "".join(f"<li>{lina(a, her)}</li>" for a in atb[:HAMARK_LINA]) + "</ul>"
         if len(atb) > HAMARK_LINA:
@@ -388,8 +401,10 @@ def hluti_askriftar(s, atb):
     return ut
 
 
-def velja(s, allt_t, eigindi, mat):
-    """Atburðir sem eiga við áskrift, ósendir, fundnir eftir staðfestingu. Einn samningur = einn atburður á götu og póstnúmeri."""
+def velja(s, allt_t, leitargogn=None):
+    """Atburðir sem eiga við áskrift, ósendir, fundnir eftir staðfestingu. Einn samningur = einn atburður á götu og póstnúmeri.
+    Leit (cc329): aðeins ný lota, ekki endurbirt, hvert fastnúmer einu sinni á áskrift; _passar segir hvort öll skilyrði eru þekkt."""
+    leitargogn = leitargogn or {}
     t, lyk, val = s["tegund"], s["lykill"], set(s["atburdir"])
     ut = []
     if t == "eign":
@@ -412,46 +427,99 @@ def velja(s, allt_t, eigindi, mat):
                     ut.append(a)
     elif t == "leit":
         sk = s["skilyrdi"]
+        sent = set(s.get("_sent_fastnum") or ())
         for a in allt_t:
-            if a["tegund"] != "ny" or a["postnr"] != sk["postnr"]:
+            if a["tegund"] != "ny" or a["postnr"] != sk["postnr"] or not a["fastnum"] or a["fastnum"] in sent:
                 continue
-            m = mat.get(a["fastnum"])
-            if sk.get("mat_fra") and (m is None or m < sk["mat_fra"] * 1e6):
-                continue
-            if sk.get("mat_til") and (m is None or m > sk["mat_til"] * 1e6):
-                continue
-            b = dict(a)
-            b["_passar"] = all(e in eigindi.get(a["fastnum"], ()) for e in sk.get("eigindi", []))
-            ut.append(b)
+            gg = leitargogn.get(a["fastnum"])
+            if gg is None or gg["endurbirt"]:
+                continue  # endurbirt: önnur auglýsing á sama fastnúmeri hefur sést áður (cc329)
+            fl = flokka_leit(sk, gg)
+            if fl:
+                ut.append(dict(a, _passar=fl == "passar"))
+                sent.add(a["fastnum"])
     return ut
 
 
-def lesa_eigindi(c, fastnum):
-    """Leit: aðeins já. Óþekkt er aldrei nei. Lindir: skráð gildi og sellur sem stóðust blint úrtak (cc319). Regla 11 víkkuð í D20; engin áhrif á mat."""
-    if not fastnum:
-        return {}, {}
-    fn = list(map(int, fastnum))
-    r = les(c, """
-      select fastnum, k from (
-        select fastnum, case when attr_key='lyfta' and value->>'til'='true' then 'lyfta' when attr_key='svalir' and value->>'til'='true' then 'svalir'
-                             when attr_key='bilskur_staedi' and value->>'gerd' like 'bilskur%%' then 'bilskur'
-                             when attr_key='eldhus_astand' and value->>'stada'='endurnyjad' then 'eldhus' when attr_key='eldhus_astand' and value->>'astand'='uppgert' then 'eldhus' end k
-        from (select fastnum,attr_key,value from public.property_attributes where superseded_at is null and fastnum=any(%(f)s)
-              union all select fastnum,attr_key,value from public.auglysing_eigindi where fastnum=any(%(f)s)
-              union all select fastnum,attr_key,value from public.lysing_eigindi where fastnum=any(%(f)s)
-              union all select fastnum,attr_key,value from public.lysing_vidbot where fastnum=any(%(f)s)) u
-        union all select fastnum,'eldhus' from public.lysing_astand where attr_key='eldhus' and stada='endurnyjad' and fastnum=any(%(f)s)
-      ) x where k is not null""", {"f": fn})
-    e = {}
+def lesa_sellur(c, skra=None):
+    """cc329: sellur sem stóðust blint úrtak, úr public.vistud_leit_sella (eina lind; www speglar listann).
+    skra = slóð á migration-skrá: aðeins fyrir þurrkeyrslu áður en migration er beitt (les INSERT-raðirnar úr skránni)."""
+    if skra:
+        t = open(skra, encoding="utf-8").read()
+        r = [dict(eigind=m[0], tegund=m[1], tafla=m[2], attr_key=m[3], skilyrdi=json.loads(m[4]))
+             for m in re.findall(r"\('([a-z_]+)','([a-z]+)','([a-z_]+)','([a-z_]+)','(\{[^']*\})','[^']*'\)", t)]
+    else:
+        r = les(c, "select eigind, tegund, tafla, attr_key, skilyrdi from public.vistud_leit_sella order by 1,2,3,4")
     for x in r:
-        e.setdefault(x["fastnum"], set()).add(x["k"])
-    m = {x["fastnum"]: float(x["real_pred_mean"]) for x in les(c, "select p.fastnum,p.real_pred_mean from public.v_current_predictions p join public.valuation_tiers t using(fastnum) where t.tier in ('T1','T2','T3','T4') and p.fastnum=any(%(f)s)", {"f": fn})}
-    return e, m
+        if x["tafla"] not in SELLU_TOFLUR:
+            raise SystemExit(f"sella: óþekkt tafla {x['tafla']}")
+    return r
+
+
+def lesa_leitargogn(c, atb, sellur):
+    """cc329: fyrir 'ny'-atburði: tegund, stærð og ásett verð nýjustu auglýsingar á fastnúmeri, hvort önnur auglýsing á sama
+    fastnúmeri hafi sést áður (endurbirting), og já-eigindi úr staðfestum sellum. Óþekkt er aldrei nei."""
+    fn = sorted({int(a["fastnum"]) for a in atb if a["tegund"] == "ny" and a["fastnum"]})
+    if not fn:
+        return {}
+    g = {}
+    for x in les(c, """
+      select distinct on (n.fastnum) n.fastnum, n.sub_type, n.size_sqm, n.price_amount, n.is_price_on_request, n.first_seen_at,
+        exists (select 1 from scraper.listings o where o.source='mbl' and o.tenure='sale' and o.fastnum=n.fastnum and o.listing_id<>n.listing_id
+                  and o.first_seen_at < n.first_seen_at and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=o.listing_id)) endurbirt
+      from scraper.listings n
+      where n.source='mbl' and n.tenure='sale' and n.fastnum = any(%(f)s)
+        and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=n.listing_id)
+      order by n.fastnum, n.first_seen_at desc, n.listing_id desc""", {"f": fn}):
+        g[x["fastnum"]] = dict(tegund=x["sub_type"], staerd=float(x["size_sqm"]) if x["size_sqm"] else None,
+                               verd=None if x["is_price_on_request"] or not x["price_amount"] or x["price_amount"] <= 1 else float(x["price_amount"]),
+                               endurbirt=bool(x["endurbirt"]), first_seen_at=x["first_seen_at"], eigindi=set())
+    for s_ in sellur:
+        if s_["tafla"] == "lysing_astand":
+            sql = "select distinct fastnum from public.lysing_astand where attr_key=%(k)s and jsonb_build_object('stada', stada) @> %(s)s::jsonb and fastnum=any(%(f)s)"
+        else:
+            sql = f"select distinct fastnum from public.{s_['tafla']} where attr_key=%(k)s and value @> %(s)s::jsonb and fastnum=any(%(f)s)"
+        for x in les(c, sql, {"k": s_["attr_key"], "s": json.dumps(s_["skilyrdi"]), "f": fn}):
+            if x["fastnum"] in g and g[x["fastnum"]]["tegund"] == s_["tegund"]:
+                g[x["fastnum"]]["eigindi"].add(s_["eigind"])
+    return g
+
+
+def flokka_leit(sk, gg):
+    """cc329: 'passar' | 'othekkt' | None. othekkt = ekkert þekkt skilyrði fellur, en eitthvert er óþekkt (eigind án já-raðar,
+    stærð eða verð vantar). Hreint fall; prófað í prof_verk_leit.py."""
+    if gg is None:
+        return None
+    if sk.get("teg") and gg["tegund"] != sk["teg"]:
+        return None
+    othekkt = False
+    for lyk, gildi, kv in (("staerd", gg["staerd"], 1), ("verd", gg["verd"], 1_000_000)):
+        fra, til = sk.get(lyk + "_fra"), sk.get(lyk + "_til")
+        if fra is None and til is None:
+            continue
+        if gildi is None:
+            othekkt = True
+        elif (fra is not None and gildi < fra * kv) or (til is not None and gildi > til * kv):
+            return None
+    if not set(sk.get("eigindi") or []) <= gg["eigindi"]:
+        othekkt = True
+    return "othekkt" if othekkt else "passar"
+
+
+def leit_slod(sk):
+    q = [f"pnr={sk['postnr']}"]
+    for lyk, u in (("teg", "teg"), ("verd_fra", "vmin"), ("verd_til", "vmax"), ("staerd_fra", "smin"), ("staerd_til", "smax")):
+        if sk.get(lyk) is not None:
+            q.append(f"{u}={sk[lyk]}")
+    return "/leit?" + "&".join(q)
 
 
 def fyrirsogn(hlutar):
     if len(hlutar) == 1:
         s, atb = hlutar[0]
+        if s["tegund"] == "leit":
+            n = sum(1 for a in atb if a.get("_passar"))
+            return f"{s['heiti']}: {n} {'ný eign passar' if n == 1 else 'nýjar eignir passa'}"
         if s["einu_sinni"]:
             return f"{eign_nafn(atb[0])} seldist á {kr(atb[0]['gogn']['verd'])}" if atb[0]["gogn"].get("stk", 1) == 1 else f"{eign_nafn(atb[0])}: þinglýst sala"
         return f"{s['heiti']}: {len(atb)} {'atburður' if len(atb) == 1 else 'atburðir'}"
@@ -476,8 +544,9 @@ def vidvorun_magn(c):
     return n
 
 
-def samkeyra_og_senda(c, thurrt):
+def samkeyra_og_senda(c, thurrt, sellu_skra=None):
     nu = dt.datetime.now(dt.timezone.utc)
+    sellur = None
     vd = dt.date.today().isoweekday()
     ask = les(c, "select id, netfang from public.voktun_askrifandi where stadfest_at is not null order by id")
     leyft = E.get("ABENDING_MOTTAKANDI", "").strip().lower()
@@ -488,6 +557,10 @@ def samkeyra_og_senda(c, thurrt):
         if a in utan:
             continue
         subs = les(c, "select * from public.voktun_askrift where askrifandi_id=%s and stadfest_at is not null and tegund not in ('frettabref','eignin_min','manadarskyrsla') order by stofnad, id", (a["id"],))
+        # cc329: hámark HAMARK_POSTA_A_NETFANG_DAG póstur á netfang á dag (allar áskriftir í einum pósti); ver gegn tvíkeyrslu sama dag.
+        if sum(1 for s in subs if s["sidast_sent"] and s["sidast_sent"].date() >= nu.date()) >= HAMARK_POSTA_A_NETFANG_DAG:
+            print("áskrifandi fékk póst í dag: sleppt")
+            continue
         hlutar = []
         for s in subs:
             if s["tidni"] == "vikuleg" and s["vikudagur"] != vd:
@@ -503,8 +576,16 @@ def samkeyra_og_senda(c, thurrt):
             atb = les(c, f"""select e.id,e.tegund,e.fastnum,e.gata_lykill,e.postnr,e.gogn,e.atburdar_at,e.fundid_at from public.voktun_atburdur e
                              where {sia} and e.fundid_at > %s and not exists (select 1 from public.voktun_sendur v where v.askrift_id=%s and v.atburdur_id=e.id)
                              order by e.atburdar_at desc, e.id""", (arg, s["stadfest_at"], s["id"]))
-            eig, mat = lesa_eigindi(c, {x["fastnum"] for x in atb if x["fastnum"]}) if s["tegund"] == "leit" else ({}, {})
-            v = velja(s, atb, eig, mat)
+            gg = {}
+            if s["tegund"] == "leit":
+                if sellur is None:
+                    sellur = lesa_sellur(c, sellu_skra)
+                gg = lesa_leitargogn(c, atb, sellur)
+                s = dict(s, _sent_fastnum={x["fastnum"] for x in les(c, """select distinct e.fastnum from public.voktun_sendur v join public.voktun_atburdur e on e.id=v.atburdur_id
+                                                                         where v.askrift_id=%s and e.fastnum is not null""", (s["id"],))})
+            v = velja(s, atb, gg)
+            if s["tegund"] == "leit" and not any(x["_passar"] for x in v):
+                v = []  # cc329: enginn póstur um það eitt að óþekktar eignir bættust við; þær bíða og teljast með í næsta pósti
             if v:
                 hlutar.append((s, v))
         if not hlutar:
@@ -634,7 +715,8 @@ def synishorn(c):
         "Eign, selst": [(S(tegund="eign", heiti=f"{a['sala']['gogn'].get('heimilisfang')}"), [a["sala"]])],
         "Söluverð, eitt skipti": [(S(tegund="eign", einu_sinni=True, heiti=f"{a['sala']['gogn'].get('heimilisfang')}"), [a["sala"]])],
         "Póstnúmer, vikuleg samantekt": [(S(tegund="postnr", heiti=f"{pn}"), [x for x in allt if x["tegund"] in ("ny", "sala") or x["gogn"].get("stefna") == "laekkun"])],
-        "Vistuð leit": [(S(tegund="leit", heiti=f"{pn}, lyfta"), [dict(x, _passar=i < 2) for i, x in enumerate([y for y in allt if y["tegund"] == "ny"][:6])])],
+        "Vistuð leit": [(S(tegund="leit", heiti=f"{pn}, íbúð, lyfta", skilyrdi={"postnr": pn, "teg": "apartment", "eigindi": ["lyfta"]}),
+                         [dict(x, _passar=i < 2) for i, x in enumerate([y for y in allt if y["tegund"] == "ny"][:6])])],
     }
     n = 0
     for nafn, hl in p.items():
@@ -659,7 +741,10 @@ def main():
     ap.add_argument("--thurrt", action="store_true")
     ap.add_argument("--synishorn", action="store_true")
     ap.add_argument("--hunsa-kedju", action="store_true", help="aðeins handkeyrt próf: sleppir biðhliði á keðjuloggi")
+    ap.add_argument("--sellur-ur-skra", help="aðeins með --thurrt, fyrir migration cc329: les sellur úr migration-skrá í stað töflu")
     a = ap.parse_args()
+    if a.sellur_ur_skra and not a.thurrt:
+        raise SystemExit("--sellur-ur-skra aðeins með --thurrt")
     h = dt.datetime.now().hour + dt.datetime.now().minute / 60
     if 1.0 <= h < 7.5:
         raise SystemExit("voktun: engin keyrsla 01:00-07:30")
@@ -673,7 +758,7 @@ def main():
         return 0
     skra_atburdi(c, a.thurrt)
     frysta_seldist(c, a.thurrt)
-    samkeyra_og_senda(c, a.thurrt)
+    samkeyra_og_senda(c, a.thurrt, a.sellur_ur_skra)
     frettabref(c, a.thurrt)
     tiltekt(c, a.thurrt)
     if not a.thurrt:
