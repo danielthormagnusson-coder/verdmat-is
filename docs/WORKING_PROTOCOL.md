@@ -359,3 +359,16 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 **(a)** Ekki breyta eða eyða `registur_utflutningur` eða `registur_afrit` án GO Danna. **(b)** Láta Danna vita áður en dálkum er breytt í `public.lb_auglysingar`, `public.sales_history` eða `public.property_images`, því brúin les þá. **(c)** Önnur verkefni beita aldrei migration á verdmat-grunninn. Breyting sem þau þurfa fer til verdmat-lotu, með staðbundnu prófi og GO Danna.
 
 **Raundæmi:** hluthafar skrifaði migration á `search_properties_grouped` undir nafninu cc323, útgáfa `20261107223000`. Hún var tekin af hluthafar og sameinuð verdmat-megin.
+
+### (ae) PÓSTUR Á BAK VIÐ ROFA FER AÐEINS UM HVÍTLISTA Á ÞJÓNI; ATBURÐUR Á EIGN MÆLIST Á FASTANÚMERI (cc320, 07.11.2026)
+
+**Meðan rofi er af tekur þjónninn aðeins við og sendir aðeins á eina netfang eiganda úr þjónsumhverfi, aldrei NEXT_PUBLIC; annað netfang fær hlutlaust svar án raðar. Atburður sem varðar eign er mældur á fastanúmeri, aldrei auglýsingarauðkenni, því mbl gefur nýtt auðkenni við endurbirtingu.** Atburður á óstaðfestri lind er smíðaður á bak við eigið flagg og sendur hvergi fyrr en lindin er staðfest. Mælingar: `D:\_audit\cc320_voktun\SKIL_CC320.md`.
+
+### (af) PRÓF OG PUSH ERU AÐSKILIN SKREF; PRÓFUMHVERFI SKILUR EFTIR SÍÐUSKYNDIMINNI (cc320, 07.11.2026)
+
+**Push fer aldrei í sömu skipun og próf, heldur eftir að niðurstaða hefur verið lesin. Próf með rofa af er keyrt á hreinni byggingu (`.next` eytt): ISR-síður úr fyrri keyrslu með rofa á lifa af endurræsingu.** Raundæmi: cc320 ýtti 2d619e5 í keðju á eftir prófi með 4 föllum, sem reyndust skyndiminni úr prófþjóni; hrein bygging og www stóðust á eftir.
+
+### (ag) DECISIONS BER AÐEINS EIGNAÐAR ÁKVARÐANIR (arkitekt 07.11.2026)
+
+**Færsla í DECISIONS inniheldur aðeins ákvarðanir Danna eða arkitekts, hverja eignaða; greining, tölur og hönnun lotu fara í SKIL og færslan vísar þangað. Lota skrifar aldrei tilvitnun í GO sem barst frá annarri lotu sem staðreynd í varanlegt skjal.**
+

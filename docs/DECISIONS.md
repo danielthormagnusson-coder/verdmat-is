@@ -4,6 +4,14 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-07 — Tölvupóstvöktun (cc320): migration og smíð á bak við rofa
+
+**Ákvörðun Danna 07.11, í lotu cc320:** beita migration `20261107130000_cc320_voktun` og halda áfram með áfanga B. Opnun rofans `SYNA_VOKTUN` er aðeins með GO Danna.
+
+Hönnun, mælingar, val lotunnar og það sem bíður ákvörðunar: `D:\_audit\cc320_voktun\SKIL_CC320.md`. Bakkað: rofi af, `Unregister-ScheduledTask verdmat-daily-voktun`, `supabase/rollback/20261107130000_cc320_voktun_rollback.sql`.
+
+---
+
 ## 2026-11-07 — Sópun: lagfæring á sveltri kortlotu (cc324)
 
 * Ákvörðun Danna: lagfæring sópunar beitt (leigulota skipt á daga, sópunarvakt). Hraðari söluhringur (valkostur B): nei.

@@ -24,7 +24,7 @@
 #   (d) póstumferð/idempotens (email_sent_at) óbreytt.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy')]
+    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy', 'voktun')]
     [string]$Verk,
     [switch]$Thurrt
 )
@@ -83,6 +83,14 @@ $Verkin = @{
     # CSV-úttak í logs-möppu, ekki audit-möppu. Ein færsla; teljaraathugun gegn DataFrame fyrir COMMIT.
     # --revalidate (cc224 fasi 2): POST á /api/nybyggingar/endurnyja eftir COMMIT; fall þar = rc 0, síðan á TTL.
 # --hlada-myndir (cc224b): nýjar handvaldar forsíðumyndir (720 px WebP) á opinbera fötu verdmat-myndir (myndir.verdmat.ai).
+    # cc320: vöktun með tölvupósti, 08:00. Biðhlið á keðju í skriftunni líka. Hvítlisti meðan VOKTUN_OPID er ekki 1.
+    voktun = @{
+        Skrift = 'D:\verdmat-is\app\scripts\voktun_verk.py'
+        Rok    = @()
+        Thurr  = @('--thurrt')
+        WD     = 'D:\verdmat-is\app'
+        Bida   = $true
+    }
     nybygging_verkefni = @{
         Skrift = 'D:\verdmat-is\app\scripts\cc224_nybygging_verkefni.py'
         Rok    = @('--skrifa', '--ut', 'D:\verdmat-is\logs\nybygging_verkefni', '--revalidate', '--hlada-myndir', 'r2backup:verdmat-myndir')
