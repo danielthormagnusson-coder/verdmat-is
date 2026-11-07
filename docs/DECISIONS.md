@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-07 — Efnissýnin `utflutt_eign_myndir` endurnýjast verdmat-megin kl. 07:35 (cc325) — **GO Danna 07.11 („GO cc325“, flokkur B); fyrsta áætlaða keyrsla 08.11 07:35, ósönnuð**
+
+1. **Verkið.** `verdmat-daily-utflutt-myndir` keyrir `scripts/cc325_endurnyja_utflutt_myndir.py` daglega 07:35, S4U, þak 30 mín. Það endurnýjar þessa einu sýn sem eigandi. Skema og réttindum er ekki breytt. Skriftan neitar 00:45–07:30 UTC: banntíminn er 01:00–07:30, og 15 mín. bætast framan við svo 900 s þak nái ekki inn í hann. Log: `D:\verdmat-is\logs\utflutt_myndir.log`.
+2. **Raunkeyrsla 07.11 13:18:54–13:22:05 UTC (handvirkt, ekki sem verk).** REFRESH 186,2 s. Raðir 2.707.290 fyrir og eftir. WAL 428 MB á kerfinu öllu, á móti um 17 MB á jafnlöngum tíma á undan. `/` óbreytt (miðgildi 0,2 s, allt 200). **`/leit` hægðist:** miðgildi 2,0 → 6,1 s, hámark 9,35 s, allt HTTP 200, n = 9 á meðan. Efni svara var ekki lesið, svo 200 sannar ekki að leitin hafi skilað niðurstöðum. Falspróf: með lás á sýninni féll keyrslan á `lock_timeout` með 55P03 og rc=6, og sýnin stóð óbreytt.
+3. **Afleiðing fyrir /leit.** Í 3 mínútur á dag er /leit um þrefalt hægari. Þetta er ekki nýtt álag: `Hluthafar_Afrit` gerir sömu endurnýjun. Verkið má færa síðar ef umferð kl. 07:35 reynist meiri en á öðrum tíma utan banns; hún var ekki mæld.
+4. **Stöðukóðar.** `verdmat_status_probe.ps1` telur rc 0 og 3 gott, svo skriftan notar 4, 5, 6, 7 og 9. Fyrsta morguninn sýnir probe 07:30 `utflutt-myndir=0x41303` (hefur ekki keyrt) sem frávik, því fyrsta keyrsla er 07:35. Það hverfur 09.11.
+5. **Leiðrétting á færslunum hér á eftir.** `Hluthafar_Afrit` var við mælingu 07.11 skráð **07:45**, ekki 04:00, svo frávik 1 um tíma er þegar úr gildi. Hún endurnýjar enn sýnina sjálf sem eigandi, svo 08.11 keyrir endurnýjunin tvisvar, 07:35 og 07:45. **Frávik 2 um aðgang stendur** þar til hluthafar lýkur `D:\hluthafar\docs\BRU_VERDMAT_LOK.md`. Sú lota beitir því, ekki cc325, og aðeins eftir að 08.11 07:35 er staðfest.
+
+Heimild: `D:\_audit\cc325_utflutt_myndir\SKIL_CC325.md`.
+
+---
+
 ## 2026-11-07 — Verdmat-grunnurinn og hluthafar: brúarreglur, endurnýjun verdmat-megin, ein breyting á leitarfallinu — **arkitekt 07.11 12:45, borið af Danna; regla í WORKING_PROTOCOL (ad)**
 
 1. **Migration hluthafar á `search_properties_grouped`** (cc323, `D:\_audit\cc323_leit`) beitist ekki af hluthafar. Verdmat tekur við henni. Hún er sameinuð cc312 d01 (röðun eftir stærð götu) og RPC-leið cc322 í eina breytingu á fallinu, ef cc322 velur RPC. Staðbundið próf og GO Danna á migration. Ekkert DDL fyrr en mæling cc322 liggur fyrir.
