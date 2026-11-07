@@ -6,6 +6,8 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ## 2026-11-07 — Efnissýnin `utflutt_eign_myndir` endurnýjast verdmat-megin kl. 07:35 (cc325) — **GO Danna 07.11 („GO cc325“, flokkur B); fyrsta áætlaða keyrsla 08.11 07:35, ósönnuð**
 
+**Staða við bókun: verkið er EKKI skráð.** Heimildakerfi lotunnar hafnaði skráningunni 07.11 („[Unauthorized Persistence]“). Skriftan og skráningarskriftan eru á main. Danni keyrir skráninguna: `D:\_audit\cc325_utflutt_myndir\SKIL_CC325.md` §0. Hluthafar breytir engu fyrr en verkið er skráð og keyrsla staðfest.
+
 1. **Verkið.** `verdmat-daily-utflutt-myndir` keyrir `scripts/cc325_endurnyja_utflutt_myndir.py` daglega 07:35, S4U, þak 30 mín. Það endurnýjar þessa einu sýn sem eigandi. Skema og réttindum er ekki breytt. Skriftan neitar 00:45–07:30 UTC: banntíminn er 01:00–07:30, og 15 mín. bætast framan við svo 900 s þak nái ekki inn í hann. Log: `D:\verdmat-is\logs\utflutt_myndir.log`.
 2. **Raunkeyrsla 07.11 13:18:54–13:22:05 UTC (handvirkt, ekki sem verk).** REFRESH 186,2 s. Raðir 2.707.290 fyrir og eftir. WAL 428 MB á kerfinu öllu, á móti um 17 MB á jafnlöngum tíma á undan. `/` óbreytt (miðgildi 0,2 s, allt 200). **`/leit` hægðist:** miðgildi 2,0 → 6,1 s, hámark 9,35 s, allt HTTP 200, n = 9 á meðan. Efni svara var ekki lesið, svo 200 sannar ekki að leitin hafi skilað niðurstöðum. Falspróf: með lás á sýninni féll keyrslan á `lock_timeout` með 55P03 og rc=6, og sýnin stóð óbreytt.
 3. **Afleiðing fyrir /leit.** Í 3 mínútur á dag er /leit um þrefalt hægari. Þetta er ekki nýtt álag: `Hluthafar_Afrit` gerir sömu endurnýjun. Verkið má færa síðar ef umferð kl. 07:35 reynist meiri en á öðrum tíma utan banns; hún var ekki mæld.
