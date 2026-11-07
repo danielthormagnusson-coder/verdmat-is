@@ -4,6 +4,14 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-07 — Sópun: lagfæring á sveltri kortlotu (cc324)
+
+* Ákvörðun Danna: lagfæring sópunar beitt (leigulota skipt á daga, sópunarvakt). Hraðari söluhringur (valkostur B): nei.
+* Ákvörðun arkitekts: „fer af sölu“ í vöktun (cc320) bíður þess að sópunin sé staðfest í lagi: vaktin hrein 3 morgna í röð og ekkert kort-auðkenni óathugað lengur en 7 daga.
+* Ákvörðun Danna: nóvemberskýrslan segir frá leiðréttingunni á framboðstölum.
+* Októberskýrslan ber merkið „Leiðrétt 07.11.2026“.
+* Greining, tölur og bakkun: D:_audit\cc324_sopun\SKIL_CC324.md.
+
 ## 2026-11-07 — Efnissýnin `utflutt_eign_myndir` endurnýjast verdmat-megin kl. 07:35 (cc325) — **GO Danna 07.11 („GO cc325“, flokkur B); fyrsta áætlaða keyrsla 08.11 07:35, ósönnuð**
 
 **Staða við bókun: verkið er EKKI skráð.** Heimildakerfi lotunnar hafnaði skráningunni 07.11 („[Unauthorized Persistence]“). Skriftan og skráningarskriftan eru á main. Danni keyrir skráninguna: `D:\_audit\cc325_utflutt_myndir\SKIL_CC325.md` §0. Hluthafar breytir engu fyrr en verkið er skráð og keyrsla staðfest.
