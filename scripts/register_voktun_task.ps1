@@ -1,4 +1,4 @@
-# register_voktun_task.ps1 — cc320. Skráir verdmat-daily-voktun 08:00. Rollback: Unregister-ScheduledTask -TaskName verdmat-daily-voktun -Confirm:$false
+﻿# register_voktun_task.ps1 — cc320. Skráir verdmat-daily-voktun 08:00. Rollback: Unregister-ScheduledTask -TaskName verdmat-daily-voktun -Confirm:$false
 # 08:00: eftir keðju (05:30), Verðvakt (06:45), vakt og nybygging (07:00), þekjupróf (07:15), status (07:30), cvakt (07:45). Ekkert annað verk 08:00.
 # Póstur fer aðeins á ABENDING_MOTTAKANDI nema VOKTUN_OPID=1 (opnun, GO Danna). -Thurrt = þurrpróf, skráir ekkert.
 param([switch]$Thurrt)
