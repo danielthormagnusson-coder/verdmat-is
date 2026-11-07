@@ -353,3 +353,9 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 **Lota sem breytir framenda keyrir staðbundið próf (bygging úr eigin vinnutré og `next start` á lausu porti) og fær hreina niðurstöðu ÁÐUR en hún ýtir á verdmat-ai. Próf á www eftir push kemur til viðbótar, ekki í staðinn.** Í skilum stendur tímastimpill beggja prófa og á hvaða þjóni hvort var keyrt, svo röðin sést. Fyrsta lotan sem þetta gildir um er næsta lota sem breytir framenda.
 
 **Raundæmi:** cc319 ýtti `533d2a8` og prófaði á www, en staðbundna prófið var keyrt á eftir. Niðurstaðan var hrein, en það bætti engu við vörn fyrir push.
+
+### (ad) BRÚIN TIL HLUTHAFAR OG MIGRATION ANNARRA VERKEFNA (arkitekt 07.11.2026, eftir flutning registur)
+
+**(a)** Ekki breyta eða eyða `registur_utflutningur` eða `registur_afrit` án GO Danna. **(b)** Láta Danna vita áður en dálkum er breytt í `public.lb_auglysingar`, `public.sales_history` eða `public.property_images`, því brúin les þá. **(c)** Önnur verkefni beita aldrei migration á verdmat-grunninn. Breyting sem þau þurfa fer til verdmat-lotu, með staðbundnu prófi og GO Danna.
+
+**Raundæmi:** hluthafar skrifaði migration á `search_properties_grouped` undir nafninu cc323, útgáfa `20261107223000`. Hún var tekin af hluthafar og sameinuð verdmat-megin.

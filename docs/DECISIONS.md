@@ -4,6 +4,16 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-07 — Verdmat-grunnurinn og hluthafar: brúarreglur, endurnýjun verdmat-megin, ein breyting á leitarfallinu — **arkitekt 07.11 12:45, borið af Danna; regla í WORKING_PROTOCOL (ad)**
+
+1. **Migration hluthafar á `search_properties_grouped`** (cc323, `D:\_audit\cc323_leit`) beitist ekki af hluthafar. Verdmat tekur við henni. Hún er sameinuð cc312 d01 (röðun eftir stærð götu) og RPC-leið cc322 í eina breytingu á fallinu, ef cc322 velur RPC. Staðbundið próf og GO Danna á migration. Ekkert DDL fyrr en mæling cc322 liggur fyrir.
+2. **Efnissýnin `registur_utflutningur.utflutt_eign_myndir`** endurnýjast í nýju verki verdmat-megin eftir vakt (t.d. 07:35), sem eigandi verdmat. Þá getur hluthafar tekið verdmat-lyklana úr sinni `.env`. Þetta leysir bæði frávikin í færslunni hér á eftir, en aðeins þegar verkið er skráð og endurnýjunin komin úr `afrita_nott.py`. **Staða við bókun: hvorugt gert.** Skráning verks er flokkur B.
+3. **Reglur:** WORKING_PROTOCOL (ad) og `CLAUDE.md`.
+4. **Nafn:** sópunarlotan heitir cc324, því hluthafar notaði cc323. „Fer af sölu“ í cc320 bíður hennar. Biðtíminn 7 dagar stendur nema mæling í cc320 sýni annað.
+5. **Afritatöflur** (~690 MB: `sales_history_real_backup_*`, `*_pre_*`, `predictions_iter3v2`): sér lota síðar, flutt á R2 fyrst eins og í cc284, eyðing með GO.
+
+---
+
 ## 2026-11-07 — Brúin til hluthafar: `registur_utflutningur` stendur á verdmat — **ákvörðun Danna 07.11; flokkur A, aðeins skjöl; tvö frávik opin**
 
 **Ákvörðun (arkitekt 07.11 12:00, borin af master):** skemað `registur_utflutningur` stendur. Hlutverkið `registur_afrit` (login, aðeins SELECT) les `v_sales_history`, `v_property_images` og `v_lb_auglysingar` fyrir hluthafar-verkefnið. Efnissýnin `utflutt_eign_myndir` (322 MB) endurnýjast ekki 01:00–07:30. Lykilorð aðeins hjá hluthafar. Álag vaktað í vikulegu STATE-lotunni (pg_stat_statements per hlutverk).
