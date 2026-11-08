@@ -1340,7 +1340,7 @@ def main() -> int:
                             "paired_oos", m["n"], m["mape"], m["med_ape"], m["bias"],
                             m["cov80"], m["cov95"], json.dumps(extra) if extra else None))
         url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-        conn_w = psycopg2.connect(url); conn_w.autocommit = False
+        conn_w = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); conn_w.autocommit = False
         try:
             with conn_w.cursor() as cur:
                 cur.execute("SET TRANSACTION READ WRITE")

@@ -251,7 +251,7 @@ def sweep_withdrawn(pg, active_ids, run_max_dt):
 def run(dry_run, log=print):
     sq = sqlite3.connect(str(get_raw_db_path(SOURCE)))
     sq.row_factory = sqlite3.Row
-    pg = psycopg2.connect(DBCONFIG.read_text(encoding="utf-8-sig").strip())
+    pg = psycopg2.connect(DBCONFIG.read_text(encoding="utf-8-sig").strip(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     if dry_run:
         pg.set_session(readonly=True, autocommit=True)
     t0 = time.perf_counter()

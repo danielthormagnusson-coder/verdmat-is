@@ -83,6 +83,7 @@ from __future__ import annotations
 
 import argparse
 import calendar
+import contextlib
 import hashlib
 import html as htmlmod
 import json
@@ -91,6 +92,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import traceback
 from datetime import datetime, timezone
@@ -193,7 +195,13 @@ def nu():
 
 def log(s):
     lina = "%s  %s" % (nu().strftime("%Y-%m-%dT%H:%M:%SZ"), s)
-    print(lina, flush=True)
+    # cc332: stdout er pípa keyrarans (cc193_keyra_verk.ps1). Drepi Task Scheduler
+    # keyrarann á tímaþaki lifir python áfram (þakið drepur aðeins rótarferlið) og
+    # print á brotna pípu kastar OSError — það mætti ekki fella pöntun í vinnslu.
+    try:
+        print(lina, flush=True)
+    except (OSError, ValueError):
+        pass
     try:
         LOGG.parent.mkdir(parents=True, exist_ok=True)
         with LOGG.open("a", encoding="utf-8") as f:
@@ -202,11 +210,93 @@ def log(s):
         pass  # loggun má aldrei fella keyrslu
 
 
+# cc332: PID 5232 hékk 31.10–08.11 í psycopg2.connect án tímamarka (ræstur 26 s
+# áður en grunnurinn endurræsti sig). connect_timeout ver uppsetningu tengingar;
+# keepalives greina dauðan endapunkt á opinni tengingu. ATH: keepalives_count er
+# hunsað á Windows (fast 10 könnunarpakkar), svo dauð tenging greinist á ~30+10*10 s.
+# statement_timeout er EKKI sett í `options`: transaction-pooler (6543) hunsar
+# það þegjandi (mælt cc332: options='-c statement_timeout=1500', pg_sleep(4)
+# kláraðist). Þjónninn ber þegar statement_timeout = 2min (source=configuration file).
+DB_TIMAMORK = dict(connect_timeout=15, keepalives=1, keepalives_idle=30,
+                   keepalives_interval=10, keepalives_count=3)
+
+
 def db():
     # .dbconfig er UTF-8 MEÐ BOM — utf-8-sig, aldrei plain utf-8.
-    conn = psycopg2.connect(DBCONFIG.read_text(encoding="utf-8-sig").strip())
+    conn = psycopg2.connect(DBCONFIG.read_text(encoding="utf-8-sig").strip(),
+                            application_name="fable_worker", **DB_TIMAMORK)
     conn.autocommit = False
     return conn
+
+
+# ── cc332: heildarþak á --once án pöntunar ───────────────────────────────────
+# Keyrsla sem hefur EKKI gripið pöntun innan BID_THAK_SEK loggar og hættir
+# (os._exit úr varðþræði — aðalþráðurinn getur setið fastur í C-kalli sem
+# hvorki merki né undantekning nær til). Um leið og pöntun er gripin er vaktin
+# afvopnuð: vinnsla pöntunar má taka lengri tíma (q11-tímamörkin standa).
+# Krítísk svæði (grip pöntunar = UPDATE+commit, sending kaupandapósts) eru
+# aldrei rofin af 60-s þakinu, svo vaktin skilur aldrei eftir pöntun í
+# 'generating' né sendan póst án email_sent_at. Hangi krítískt svæði sjálft
+# rýfur hörð bakstoð (BID_BAKSTOD_SEK frá vopnun) það samt.
+BID_THAK_SEK = 60
+BID_BAKSTOD_SEK = 600
+VAKT_RC = 5
+
+
+class _Vakt:
+    def __init__(self):
+        self._las = threading.Lock()
+        self._frestur = None   # time.monotonic()-frestur, None = afvopnuð
+        self._vopnud = None
+        self._astaeda = ""
+        self._kritiskt = 0
+        self._thradur = None
+
+    def vopna(self, sek, astaeda):
+        with self._las:
+            self._vopnud = time.monotonic()
+            self._frestur = self._vopnud + sek
+            self._astaeda = astaeda
+        if self._thradur is None:
+            self._thradur = threading.Thread(target=self._lykkja, name="cc332-vakt",
+                                             daemon=True)
+            self._thradur.start()
+
+    def afvopna(self):
+        with self._las:
+            self._frestur = None
+
+    @contextlib.contextmanager
+    def kritiskt(self):
+        with self._las:
+            self._kritiskt += 1
+        try:
+            yield
+        finally:
+            with self._las:
+                self._kritiskt -= 1
+
+    def _lykkja(self):
+        while True:
+            time.sleep(0.5)
+            with self._las:
+                frestur, vopnud = self._frestur, self._vopnud
+                kritiskt, astaeda = self._kritiskt, self._astaeda
+            if frestur is None:
+                continue
+            klukka = time.monotonic()
+            if klukka < frestur:
+                continue
+            if kritiskt and klukka < vopnud + BID_BAKSTOD_SEK:
+                continue
+            log("TÍMAÞAK cc332: %s — engin pöntun gripin innan %d s%s; hætt (rc %d)."
+                % (astaeda, BID_THAK_SEK,
+                   " (krítískt svæði hékk %d s, bakstoð)" % int(klukka - vopnud)
+                   if kritiskt else "", VAKT_RC))
+            os._exit(VAKT_RC)
+
+
+VAKT = _Vakt()
 
 
 def env_ai(lykill):
@@ -725,8 +815,9 @@ def posta_afhentar(conn, order_id=None, dry=False, prof_netfang=None):
     send = 0
     for rod in radir:
         log("PÓSTUR á pöntun %s" % rod["order_id"])
-        if senda_kaupandapost(conn, rod, dry=dry, prof_netfang=prof_netfang):
-            send += 1
+        with VAKT.kritiskt():   # cc332: sending + bókun email_sent_at er aldrei rofin á 60 s
+            if senda_kaupandapost(conn, rod, dry=dry, prof_netfang=prof_netfang):
+                send += 1
     return send
 
 
@@ -893,7 +984,12 @@ def ein_umferd(leyfa_fable, dry, order_id=None, adeins_postur=False, prof_netfan
             log("STOPP_FABLE til (%s) — Fable-köll SLEPPT í þessu polli; %d greidd röð/raðir "
                 "bíða. Pollun og póstumferð keyrðu áfram." % (STOPP_FABLE, n))
             return {"stada": "STOPP", "bida": n}
-        pontun = taka_pontun(conn, order_id=order_id, dry=dry, adeins_live=adeins_live)
+        # cc332: grip (UPDATE -> generating + commit) er krítískt svæði; gripin
+        # pöntun afvopnar 60-s þakið svo vinnslan má taka sinn tíma.
+        with VAKT.kritiskt():
+            pontun = taka_pontun(conn, order_id=order_id, dry=dry, adeins_live=adeins_live)
+            if pontun:
+                VAKT.afvopna()
         if not pontun:
             log("engin greidd pöntun í biðröð.")
             return None
@@ -997,6 +1093,9 @@ def main():
         # raðir standa sem 'paid' og bíða næsta polls — bókað í logg.
         n_gert = 0
         while True:
+            # cc332: hver umferð fær 60 s til að grípa pöntun (tenging, póstumferð,
+            # kill-switch, grip); annars loggað og hætt með rc VAKT_RC.
+            VAKT.vopna(BID_THAK_SEK, "umferð %d" % (n_gert + 1))
             nid = ein_umferd(args.leyfa_fable, args.dry, order_id=args.order,
                              adeins_postur=args.adeins_postur, prof_netfang=args.prof_netfang,
                              adeins_live=args.adeins_live)
@@ -1005,6 +1104,7 @@ def main():
                 break
             n_gert += 1
             if n_gert >= args.hamark:
+                VAKT.vopna(BID_THAK_SEK, "talning eftir hámark")
                 conn = db()
                 try:
                     bida = telja_greiddar(conn, args.adeins_live)
@@ -1014,6 +1114,7 @@ def main():
                     log("HÁMARK %d náð — %d greidd röð/raðir bíða næsta polls."
                         % (args.hamark, bida))
                 break
+        VAKT.afvopna()
     return 0
 
 

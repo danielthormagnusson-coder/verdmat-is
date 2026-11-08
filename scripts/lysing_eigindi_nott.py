@@ -254,7 +254,7 @@ def main():
             skra("SLEPPT nótt, engin köll: of seint")
             print("SLEPPT: of seint")
             return 7
-    c = psycopg2.connect(Path(a.dbconfig).read_text(encoding="utf-8-sig").strip())
+    c = psycopg2.connect(Path(a.dbconfig).read_text(encoding="utf-8-sig").strip(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     c.rollback()
     k = c.cursor()
     k.execute("set transaction read only")

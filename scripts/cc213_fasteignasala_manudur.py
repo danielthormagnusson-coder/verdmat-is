@@ -374,7 +374,7 @@ def main() -> int:
         print("[VILLA] enginn mánuður"); return 3
     print(f"kaupskrá: {len(k):,} línur · data_through {data_through} · sótt {kaupskra_sott:%Y-%m-%d %H:%M} · mánuðir {[str(m) for m in manudir]}")
 
-    conn = psycopg2.connect(DBCONFIG.read_text(encoding="utf-8-sig").strip())
+    conn = psycopg2.connect(DBCONFIG.read_text(encoding="utf-8-sig").strip(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     conn.autocommit = False
     cur = conn.cursor()
     try:

@@ -74,7 +74,7 @@ def gata_lykill(heimilisfang, postnr):
 
 def tengja():
     dsn = (BOTN / ".dbconfig").read_text(encoding="utf-8-sig").strip()
-    return psycopg2.connect(dsn)
+    return psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
 
 
 def les(c, sql, args=None, timeout=120):

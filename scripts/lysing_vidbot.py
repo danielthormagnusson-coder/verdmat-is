@@ -107,7 +107,7 @@ def nott(c):
 
 
 if __name__ == "__main__":
-    _c = psycopg2.connect(Path(r"D:\verdmat-is\.dbconfig").read_text(encoding="utf-8-sig").strip())
+    _c = psycopg2.connect(Path(r"D:\verdmat-is\.dbconfig").read_text(encoding="utf-8-sig").strip(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     _F, *_u = lesa(_c)
     _rows = radir(_F, *_u)
     _n = collections.Counter((_F[x[0]][5], x[1]) for x in _rows)

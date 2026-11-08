@@ -802,7 +802,7 @@ def main():
         return 0
     sq = sqlite3.connect(str(parsed_db_path()))
     dsn = open(r"D:\verdmat-is\.dbconfig", encoding="utf-8-sig").read().strip()
-    pg = psycopg2.connect(dsn)
+    pg = psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     if args.dry_run:
         pg.set_session(readonly=True, autocommit=True)
     print("promoter_version=%s table=%s slice=%s dry_run=%s limit=%s"

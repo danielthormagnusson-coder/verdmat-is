@@ -587,7 +587,7 @@ def main() -> int:
             return v
         rows = [tuple(py(x) for x in row) for row in rows]
         url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-        conn_w = psycopg2.connect(url)
+        conn_w = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
         conn_w.autocommit = False
         try:
             with conn_w.cursor() as cur:
@@ -638,7 +638,7 @@ def main() -> int:
             # Daglega umferðin skrifar AÐEINS í sales_history -> MV sem lesa hana eingöngu.
             to_refresh = mvs_touching({"public.sales_history"})
             skipped = [mv for mv in MV_LIST if mv not in to_refresh]
-            conn_r = psycopg2.connect(url)
+            conn_r = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
             conn_r.autocommit = True  # REFRESH ... CONCURRENTLY must be outside a txn block
             with conn_r.cursor() as cur:
                 # READ WRITE er ÁFRAM allra-fyrsta statement (pooler-default er read-only);

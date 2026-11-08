@@ -154,7 +154,7 @@ class ReconnectingConn:
         self._open()
 
     def _open(self):
-        self.conn = psycopg2.connect(self._url)
+        self.conn = psycopg2.connect(self._url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
         self.conn.autocommit = False
 
     def reconnect(self):

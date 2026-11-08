@@ -276,7 +276,7 @@ def ferskleika_vidvaranir(f):
 
 
 def write_row(dsn, m, beidnir, vidvorun, dags):
-    w = psycopg2.connect(dsn)
+    w = psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     try:
         with w.cursor() as c:
             c.execute("SET TRANSACTION READ WRITE")
@@ -313,7 +313,7 @@ def main():
     log("=== thekjuprof %s seed=%d no_db=%s ===" % (ADFERD, seed, args.no_db))
 
     dsn = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-    pg = psycopg2.connect(dsn)
+    pg = psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     pg.set_session(readonly=True, autocommit=True)
     tr = Transport(spacing=args.spacing, log=log)
     try:

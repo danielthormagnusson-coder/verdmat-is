@@ -236,7 +236,7 @@ def main() -> int:
         sid = start_step(conn_log, run_id, "gate", 2)
         vidx = read_visitala()
         url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-        conn_ro = psycopg2.connect(url)
+        conn_ro = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
         with conn_ro.cursor() as cur:
             cur.execute("""select count(*), count(distinct predicted_at), min(predicted_at),
                                   count(distinct model_version), min(model_version)
@@ -311,7 +311,7 @@ def main() -> int:
         # ---- Skref 5a: DRYRUN — UPDATE mælt í txn sem rúllar til baka ----
         if args.dryrun:
             sid = start_step(conn_log, run_id, "atomic_update", 5)
-            conn_w = psycopg2.connect(url); conn_w.autocommit = False
+            conn_w = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); conn_w.autocommit = False
             try:
                 with conn_w.cursor() as cur:
                     cur.execute("SET TRANSACTION READ WRITE")
@@ -366,7 +366,7 @@ def main() -> int:
         sid = start_step(conn_log, run_id, "preflight_backup", 5)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
         backup_table = f"predictions_rent_level_backup_{ts}"
-        conn_b = psycopg2.connect(url); conn_b.autocommit = False
+        conn_b = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); conn_b.autocommit = False
         try:
             with conn_b.cursor() as cur:
                 cur.execute("SET TRANSACTION READ WRITE")
@@ -394,7 +394,7 @@ def main() -> int:
 
         # ---- Skref 6: LIVE — ein atómísk txn m/rowcount-hliði ----
         sid = start_step(conn_log, run_id, "atomic_update", 6)
-        conn_w = psycopg2.connect(url); conn_w.autocommit = False
+        conn_w = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); conn_w.autocommit = False
         try:
             with conn_w.cursor() as cur:
                 cur.execute("SET TRANSACTION READ WRITE")

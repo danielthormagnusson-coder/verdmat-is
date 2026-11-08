@@ -54,7 +54,7 @@ def open_connection(dbconfig_path: Path = DBCONFIG_DEFAULT,
     if psycopg2 is None:
         raise RuntimeError("psycopg2 not installed")
     url = dbconfig_path.read_text(encoding="utf-8-sig").strip()
-    conn = psycopg2.connect(url)
+    conn = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     conn.autocommit = autocommit
     return conn
 

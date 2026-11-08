@@ -69,13 +69,13 @@ def dsn() -> str:
 
 
 def open_ro():
-    c = psycopg2.connect(dsn())
+    c = psycopg2.connect(dsn(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     c.set_session(isolation_level="REPEATABLE READ", readonly=True, autocommit=False)
     return c
 
 
 def open_w():
-    c = psycopg2.connect(dsn())
+    c = psycopg2.connect(dsn(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     c.autocommit = False
     return c
 

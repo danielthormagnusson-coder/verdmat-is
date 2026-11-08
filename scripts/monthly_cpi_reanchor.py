@@ -307,7 +307,7 @@ def main() -> int:
         if args.dryrun:
             sid = start_step(conn_log, run_id, "atomic_update", 5)
             url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-            conn_w = psycopg2.connect(url); conn_w.autocommit = False
+            conn_w = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); conn_w.autocommit = False
             try:
                 with conn_w.cursor() as cur:
                     cur.execute("SET TRANSACTION READ WRITE")
@@ -357,7 +357,7 @@ def main() -> int:
         # commits, the snapshot is the rollback net for kaupverd_real.
         sid = start_step(conn_log, run_id, "preflight_backup", 4)
         url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-        conn_b = psycopg2.connect(url); conn_b.autocommit = False
+        conn_b = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); conn_b.autocommit = False
         try:
             with conn_b.cursor() as cur:
                 cur.execute("SET TRANSACTION READ WRITE")
@@ -388,7 +388,7 @@ def main() -> int:
         sid = start_step(conn_log, run_id, "atomic_update", 5)
         cpi_upserts = csv_rows_at_or_after(cur_anchor)  # any months from old anchor forward
         url = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-        conn_w = psycopg2.connect(url); conn_w.autocommit = False
+        conn_w = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); conn_w.autocommit = False
         updated = 0; t0 = time.time()
         try:
             with conn_w.cursor() as cur:
@@ -436,7 +436,7 @@ def main() -> int:
             to_refresh = mvs_touching({"public.sales_history", "public.pipeline_config",
                                        "public.cpi_index"})
             skipped = [mv for mv in MV_LIST if mv not in to_refresh]
-            conn_r = psycopg2.connect(url); conn_r.autocommit = True
+            conn_r = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); conn_r.autocommit = True
             with conn_r.cursor() as cur:
                 # READ WRITE fyrst (pooler-default read-only); work_mem session-vís á eftir
                 # (sjá DECISIONS 2026-07-14, Disk-IO mótvægi).

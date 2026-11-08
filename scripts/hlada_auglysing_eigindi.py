@@ -38,7 +38,7 @@ def main():
     ap.add_argument("--dbconfig", default=r"D:\verdmat-is\.dbconfig")
     ap.add_argument("--ut", help="vista raðir sem JSON (þurrkeyrsla/próf)")
     a = ap.parse_args()
-    c = psycopg2.connect(Path(a.dbconfig).read_text(encoding="utf-8-sig").strip())
+    c = psycopg2.connect(Path(a.dbconfig).read_text(encoding="utf-8-sig").strip(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     # Lesháttur per færslu, aldrei set_session(readonly): hún lekur um 6543-pooler (cc231).
     c.rollback()
     k = c.cursor()

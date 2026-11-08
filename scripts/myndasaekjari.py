@@ -379,7 +379,7 @@ def lesa_auglysingar(lindir: list[str], log: Log):
     import psycopg2
     import psycopg2.extras
     dsn = open(DBCFG, encoding="utf-8-sig").read().strip()
-    conn = psycopg2.connect(dsn)
+    conn = psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     conn.set_session(readonly=True, autocommit=False)
     cur = conn.cursor(name="cc111_kanon", cursor_factory=psycopg2.extras.DictCursor)
     cur.itersize = 500

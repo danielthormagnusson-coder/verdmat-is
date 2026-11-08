@@ -131,7 +131,7 @@ def tengja(skrifa: bool):
     # `utf-8` skilur ﻿ eftir fremst í URI-inu og tengingin fellur á
     # ólæsilegri villu. Sama og myndasaekjari.py:381 gerir. Skjalfest í CLAUDE.md.
     uri = DBCFG.read_text(encoding="utf-8-sig").strip()
-    conn = psycopg2.connect(uri)
+    conn = psycopg2.connect(uri, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     conn.autocommit = False
     with conn.cursor() as cur:
         # FYRSTA STÆÐAN. Ekkert SELECT á undan — pooler-gildran (cc86/cc94/cc104).

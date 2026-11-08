@@ -326,7 +326,7 @@ def main():
     args = ap.parse_args()
     sq = sqlite3.connect(str(get_raw_db_path("myigloo")))
     dsn = open(r"D:\verdmat-is\.dbconfig", encoding="utf-8-sig").read().strip()
-    pg = psycopg2.connect(dsn)
+    pg = psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     if args.dry_run:
         pg.set_session(readonly=True, autocommit=True)   # belt-and-suspenders: no writes in dry-run
     print("promoter_version=%s  dry_run=%s" % (PROMOTER_VERSION, args.dry_run))

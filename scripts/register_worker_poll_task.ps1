@@ -9,8 +9,13 @@
 #        workerinn fær STANDANDI Fable-heimild á scheduler (DECISIONS-tillaga cc193) með girðingum:
 #        (a) aðeins status=paid ∧ paddle_env=live  (b) ≤3 Fable-köll per poll, umfram bíður (bókað)
 #        (c) kill-switch D:\verdmat-is\STOPP_FABLE  (d) póstur + idempotens (email_sent_at) óbreytt.
-# ÞAK:   50 mín (3 pantanir × ~8 mín mælt á ea5e517a 484 s + póstur); MultipleInstances=IgnoreNew
+# ÞAK:   30 mín (cc332, arkitekt 08.11; áður 50 mín: 3 pantanir × ~8 mín mælt á ea5e517a 484 s + póstur);
+#        MultipleInstances=IgnoreNew
 #        svo 5-mín-trigger tvíræsir aldrei ofan í keyrslu (FOR UPDATE SKIP LOCKED ver röðina líka).
+# cc332: ATH þakið drepur aðeins RÓTARFERLIÐ (powershell-keyrarann), ekki python-barnið. PID 5232
+#        (31.10) hékk í connect: keyrarinn var drepinn 15:15 eftir 50 mín, IgnoreNew sleppti 10 pollum,
+#        svo ræstust ný verk á meðan python lifði í 8 daga. Raunvörnin er í fable_worker.py sjálfum
+#        (connect_timeout 15 s + 60-s þak á --once án pöntunar, rc 5); þakið hér er aukavörn.
 # LOGON: S4U (Password-principal fellur þögult — CLAUDE.md). RunLevel Limited. Enginn WakeToRun
 #        (5-mín verk á ekki að vekja vél; AC-svefn er hvort eð er af).
 # ROLLBACK: Unregister-ScheduledTask -TaskName verdmat_worker_poll -Confirm:$false
@@ -33,7 +38,7 @@ $action = New-ScheduledTaskAction -Execute $PS `
 $start   = (Get-Date -Hour 0 -Minute 0 -Second 0 -Millisecond 0)
 $trigger = New-ScheduledTaskTrigger -Once -At $start -RepetitionInterval (New-TimeSpan -Minutes 5)
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType S4U -RunLevel Limited
-$settings  = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 50) `
+$settings  = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
     -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 
 "verk:      $TaskName"

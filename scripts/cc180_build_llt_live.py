@@ -98,7 +98,7 @@ def build():
 
     log("Querying scraper.listings (READ-ONLY) ...")
     dsn = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-    c = psycopg2.connect(dsn)
+    c = psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     c.set_session(isolation_level="REPEATABLE READ", readonly=True, autocommit=False)
     try:
         with c.cursor() as cur:

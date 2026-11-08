@@ -140,7 +140,7 @@ def main():
         stopp = D.datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
         if stopp <= D.datetime.now():
             stopp += D.timedelta(days=1)
-    c = psycopg2.connect(Path(r"D:\verdmat-is\.dbconfig").read_text(encoding="utf-8-sig").strip())
+    c = psycopg2.connect(Path(r"D:\verdmat-is\.dbconfig").read_text(encoding="utf-8-sig").strip(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     c.rollback()
     k = c.cursor()
     k.execute("set transaction read only")
@@ -321,7 +321,7 @@ def nott(c, bok, stopp, nyir_fra, fyrst_fundid):
 
 if __name__ == "__main__":
     if "--birta" in sys.argv:
-        _c = psycopg2.connect(Path(r"D:\verdmat-is\.dbconfig").read_text(encoding="utf-8-sig").strip())
+        _c = psycopg2.connect(Path(r"D:\verdmat-is\.dbconfig").read_text(encoding="utf-8-sig").strip(), connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
         _R, _P, _S = lesa_allt(_c)
         _rows = raðir(_R, _P, _S)
         print("raðir", len(_rows), collections.Counter((_R[x[0]][5], x[1]) for x in _rows))

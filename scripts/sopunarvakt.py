@@ -58,7 +58,7 @@ def meta(nu, riki_breytt, kort_sidast, leiga_lokid, sala_lokid, draugar, keyrslu
 
 def lesa_db(url):
     import psycopg2
-    c = psycopg2.connect(url)
+    c = psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
     try:
         with c.cursor() as cur:
             cur.execute("SET TRANSACTION READ ONLY")

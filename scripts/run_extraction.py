@@ -106,8 +106,8 @@ def _ekki_neikvaett(s):
 
 def _connect():
     dsn = DBCONFIG.read_text(encoding="utf-8-sig").strip()
-    ro = psycopg2.connect(dsn); ro.autocommit = True; ro.set_session(readonly=True)
-    rw = psycopg2.connect(dsn); rw.autocommit = False
+    ro = psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); ro.autocommit = True; ro.set_session(readonly=True)
+    rw = psycopg2.connect(dsn, connect_timeout=15, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3); rw.autocommit = False
     return ro, rw
 
 
