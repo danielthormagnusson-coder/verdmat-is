@@ -30,7 +30,7 @@ LOTU_BIL_DAGAR = 14
 DAGSTHAK = 80            # sendingarþak á dag; afgangur fer næsta dag (Resend Free: 100/dag, deilt með vakt og ábendingum)
 BENDILL_HAMARK_KLST = 10
 GRUNN = os.environ.get("VOKTUN_GRUNNSLOD", "https://www.verdmat.ai")
-FRA = "verðmat.ai <vakt@verdmat.ai>"
+FRA = "verdmat.ai <vakt@verdmat.ai>"
 MAT_REIKNAD = {"iter4r_20260805_reglaR_strukt": dt.date(2026, 8, 6)}  # sama og lib/matsdagsetning.js
 VIKUDAGAR = ["mánudag", "þriðjudag", "miðvikudag", "fimmtudag", "föstudag", "laugardag", "sunnudag"]
 EIGIND_HEITI = {"lyfta": "lyfta", "svalir": "svalir", "bilskur": "bílskúr", "eldhus": "endurnýjað eldhús"}
@@ -264,9 +264,9 @@ def rammi(efni_html, tak, efni_titill):
     return (f'<!doctype html><html lang="is"><head><meta charset="utf-8"><title>{H.escape(efni_titill)}</title></head>'
             '<body style="margin:0;padding:16px;background:#F7F2E9;font-family:Arial,Helvetica,sans-serif;color:#2B2620;font-size:15px;line-height:1.5">'
             '<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E4DCCB;border-radius:12px;padding:20px">'
-            '<div style="font-family:Georgia,serif;font-size:17px;margin-bottom:14px">verðmat<span style="color:#B14E2E">.ai</span></div>'
+            '<div style="font-family:Georgia,serif;font-size:17px;margin-bottom:14px">verdmat<span style="color:#B14E2E">.ai</span></div>'
             f'{efni_html}<hr style="border:0;border-top:1px solid #E4DCCB;margin:18px 0 10px"><div style="font-size:12px;color:#5C554A">'
-            f'Þú staðfestir þessa vöktun á verðmat.ai. <a href="{stilling}" style="color:#8D3E23">Breyta vali eða tíðni</a> · <a href="{afsk}" style="color:#8D3E23">Afskrá (eyðir netfanginu)</a></div></div></body></html>')
+            f'Þú staðfestir þessa vöktun á verdmat.ai. <a href="{stilling}" style="color:#8D3E23">Breyta vali eða tíðni</a> · <a href="{afsk}" style="color:#8D3E23">Afskrá (eyðir netfanginu)</a></div></div></body></html>')
 
 
 def sendi(til, efni, html, tak, lykill):
@@ -305,7 +305,7 @@ def lina(a, herferd):
 def heimild(atb):
     h = []
     if {"ny", "verd", "af_solu"} & atb:
-        h.append("söluauglýsingar á mbl.is (nætursókn verðmat.ai); ásett verð er ekki söluverð")
+        h.append("söluauglýsingar á mbl.is (nætursókn verdmat.ai); ásett verð er ekki söluverð")
     if "sala" in atb:
         h.append("kaupskrá HMS; síðustu þinglýsingardagar geta átt eftir að bætast við")
     return f"<p {HEIM}>Heimild: {'; '.join(h)}.</p>" if h else ""
@@ -484,7 +484,7 @@ def frettabref_html(t):
             f"<p><strong>Nýjar auglýsingar:</strong> {t['ny']} eignir sem ekki höfðu verið auglýstar síðustu 14 daga, síðustu 7 daga.</p>"
             f"<p><strong>Verðlækkanir:</strong> {t['laekkun']} í auglýsingum eða við endurbirtingu, síðustu 7 daga.</p>"
             f"<p><strong>Þinglýstar sölur:</strong> {t['samningar']} nothæfir samningar þinglýstir {dags(t['fra'])}–{dags(t['til'])}. Síðari dagar eru ekki fullskráðir á mánudagsmorgni.</p>"
-            f'<p {HEIM}>Heimildir: söluauglýsingar á mbl.is (nætursókn verðmat.ai) og kaupskrá HMS, gögn til {dags(t["gogn_til"])}. <a href="{utm("/markadur", "frettabref")}" style="color:#8D3E23">Allar tölur á /markadur</a>.</p>')
+            f'<p {HEIM}>Heimildir: söluauglýsingar á mbl.is (nætursókn verdmat.ai) og kaupskrá HMS, gögn til {dags(t["gogn_til"])}. <a href="{utm("/markadur", "frettabref")}" style="color:#8D3E23">Allar tölur á /markadur</a>.</p>')
 
 
 def frettabref(c, thurrt):
@@ -538,7 +538,7 @@ def tiltekt(c, thurrt):
         if E.get("VOKTUN_OPID") != "1" and a["netfang"] != leyft:
             continue
         tak = still_tak(a["id"])
-        efni = "Viltu halda áfram að fá póst frá verðmat.ai?"
+        efni = "Viltu halda áfram að fá póst frá verdmat.ai?"
         sendi(a["netfang"], efni, rammi(f'<h1 style="margin:0 0 8px;font-size:18px;font-family:Georgia,serif">{efni}</h1><p>Ár er liðið. Ef þú svarar ekki innan 30 daga eyðum við netfanginu. <a href="{GRUNN}/voktun/stillingar?t={tak}" style="color:#8D3E23">Opnaðu stillingarnar til að halda áfram</a>.</p>', tak, efni), tak, f"voktun-endurn/{a['id']}")
         skrifa(c, lambda cur: cur.execute("update public.voktun_askrifandi set endurnyjun_send=now() where id=%s", (a["id"],)))
 
@@ -571,7 +571,7 @@ def synishorn(c):
         time.sleep(0.5)
     sidan = les(c, "select min(fundid_at) d from public.voktun_atburdur")[0]["d"]
     efni = "[SÝNISHORN] Staðfesting skráningar"
-    sendi(leyft, efni, rammi(f'<h1 style="margin:0 0 8px;font-size:18px;font-family:Georgia,serif">Staðfestu: Dæmigata 1, 105 Reykjavík</h1><p>Þú færð póst um þá atburði sem þú valdir.</p><p><a href="{GRUNN}/voktun/stadfesta?t=synishorn" style="display:inline-block;background:#B14E2E;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">Staðfesta</a></p><p style="font-size:13px;color:#5C554A">Tengillinn gildir í 48 klukkustundir. Ef þú skráðir ekki netfangið: gerðu ekkert. Netfanginu er eytt eftir 48 klukkustundir.</p>', tak, efni), tak, hashlib.sha256((efni + str(dt.date.today())).encode()).hexdigest())
+    sendi(leyft, efni, rammi(f'<h1 style="margin:0 0 8px;font-size:18px;font-family:Georgia,serif">Staðfestu: Dæmigata 1, 105 Reykjavík</h1><p>Þú færð póst um þá atburði sem þú valdir.</p><p><a href="{GRUNN}/voktun/stadfesta?t=synishorn" style="display:inline-block;background:#B14E2E;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">Staðfesta</a></p><p style="font-size:13px;color:#5C554A">Tengillinn gildir í 48 klukkustundir. Ef þú skráðir ekki netfangið: gerðu ekkert, og netfanginu er eytt eftir 48 klukkustundir. <a href="{GRUNN}/voktun/afskra?t={tak}" style="color:#8D3E23">Eyða netfanginu strax</a></p>', tak, efni), tak, hashlib.sha256((efni + str(dt.date.today())).encode()).hexdigest())
     n += 1
     t = frettabref_tolur(c)
     efni = f"[SÝNISHORN] Markaðurinn í vikunni (atburðatafla frá {dags(sidan)}, tölur því lægri en í raun)"
