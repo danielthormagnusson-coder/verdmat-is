@@ -49,7 +49,7 @@ def env():
                     d[m.group(1)] = m.group(2).strip()
         except OSError:
             pass
-    d.update({k: v for k, v in os.environ.items() if k in ("VOKTUN_OPID", "RESEND_API_KEY", "ABENDING_MOTTAKANDI", "SUPABASE_SERVICE_ROLE_KEY")})
+    d.update({k: v for k, v in os.environ.items() if k in ("VOKTUN_OPID", "VOKTUN_LEYND", "RESEND_API_KEY", "ABENDING_MOTTAKANDI", "SUPABASE_SERVICE_ROLE_KEY")})
     return d
 
 
@@ -255,7 +255,11 @@ def utm(slod, herferd):
 
 
 def still_tak(askrifandi):
-    leynd = hashlib.sha256(("voktun-v1:" + E["SUPABASE_SERVICE_ROLE_KEY"]).encode()).digest()
+    # Sami lykill og www (lib/voktun/thjonn.ts). Án VOKTUN_LEYND passa tákn ekki við www (lykill Vercel er annar, mælt 08.11).
+    if E.get("VOKTUN_LEYND"):
+        leynd = hashlib.sha256(("voktun-v2:" + E["VOKTUN_LEYND"]).encode()).digest()
+    else:
+        leynd = hashlib.sha256(("voktun-v1:" + E["SUPABASE_SERVICE_ROLE_KEY"]).encode()).digest()
     sig = base64.urlsafe_b64encode(hmac.new(leynd, f"stillingar:{askrifandi}".encode(), hashlib.sha256).digest()).rstrip(b"=").decode()
     return f"{askrifandi}.{sig}"
 
@@ -275,6 +279,8 @@ def sendi(til, efni, html, tak, lykill):
     leyft = E.get("ABENDING_MOTTAKANDI", "").strip().lower()
     if E.get("VOKTUN_OPID") != "1" and til.lower() != leyft:
         raise PermissionError("hvítlisti")
+    if til.lower() != leyft and not E.get("VOKTUN_LEYND"):
+        raise PermissionError("VOKTUN_LEYND vantar: afskráningartenglar virka ekki á www án hans")
     r = requests.post("https://api.resend.com/emails", timeout=30, headers={"Authorization": "Bearer " + E["RESEND_API_KEY"], "Idempotency-Key": lykill},
                       json={"from": FRA, "to": [til], "subject": efni, "html": html, "headers": {
                           "List-Unsubscribe": f"<{GRUNN}/api/voktun/afskra?t={tak}>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}})
