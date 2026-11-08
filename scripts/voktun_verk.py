@@ -27,7 +27,9 @@ AF_SOLU_VIRKT = False
 AF_SOLU_KLUKKA_FRA = None
 BIDTIMI_AF_SOLU = 7
 LOTU_BIL_DAGAR = 14
-DAGSTHAK = 80            # sendingarþak á dag; afgangur fer næsta dag (Resend Free: 100/dag, deilt með vakt og ábendingum)
+DAGSTHAK = 80            # sendingarþak á dag (UTC), talið yfir allar keyrslur dagsins; afgangur fer næsta dag (Resend Free: 100/dag, deilt með vakt og ábendingum)
+VIDVORUN_VID = 60        # viðvörun í log og D:\verdmat_status.log (rás status-probe og kedjuvaktar) þegar sendir póstar dagsins ná þessu
+STATUS_LOG = Path(r"D:\verdmat_status.log")
 BENDILL_HAMARK_KLST = 10
 GRUNN = os.environ.get("VOKTUN_GRUNNSLOD", "https://www.verdmat.ai")
 FRA = "verdmat.ai <vakt@verdmat.ai>"
@@ -407,6 +409,24 @@ def fyrirsogn(hlutar):
     return f"Vöktun: {sum(len(a) for _, a in hlutar)} atburðir á {len(hlutar)} vöktunum"
 
 
+def sendir_i_dag(c):
+    """Póstar sendir í dag (UTC): einkvæm Resend-auðkenni í voktun_sendur. Einn póstur ber margar raðir."""
+    return les(c, "select count(distinct resend_id) n from public.voktun_sendur where sent_at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc'")[0]["n"]
+
+
+def vidvorun_magn(c):
+    n = sendir_i_dag(c)
+    if n >= VIDVORUN_VID:
+        lina = f"{dt.datetime.now(dt.timezone.utc):%Y-%m-%dT%H:%M:%SZ} !! VOKTUN-VIDVORUN: sendir póstar í dag {n} (viðvörun {VIDVORUN_VID}, þak {DAGSTHAK})"
+        print(lina)
+        try:
+            with open(STATUS_LOG, "a", encoding="utf-8") as f:
+                f.write(lina + "\n")
+        except OSError as e:
+            print("status-log skrifaðist ekki:", e)
+    return n
+
+
 def samkeyra_og_senda(c, thurrt):
     nu = dt.datetime.now(dt.timezone.utc)
     vd = dt.date.today().isoweekday()
@@ -414,7 +434,7 @@ def samkeyra_og_senda(c, thurrt):
     leyft = E.get("ABENDING_MOTTAKANDI", "").strip().lower()
     utan = [a for a in ask if E.get("VOKTUN_OPID") != "1" and a["netfang"] != leyft]
     print(f"áskrifendur staðfestir: {len(ask)}; utan hvítlista (fá ekkert): {len(utan)}")
-    send = 0
+    send = 0 if thurrt else sendir_i_dag(c)  # þakið er á dag, ekki á keyrslu
     for a in ask:
         if a in utan:
             continue
@@ -462,7 +482,7 @@ def samkeyra_og_senda(c, thurrt):
         skrifa(c, f)
         send += 1
         time.sleep(0.2)
-    print("póstar sendir:", send, "(þurrt)" if thurrt else "")
+    print("póstar sendir í dag:", send, "(þurrt)" if thurrt else "")
     return send
 
 
@@ -508,7 +528,10 @@ def frettabref(c, thurrt):
                      join public.voktun_samthykki m on m.askrifandi_id=a.id and m.tilgangur='markadsefni'
                      where s.tegund='frettabref' and s.stadfest_at is not null and not exists (select 1 from public.voktun_sendur v where v.askrift_id=s.id and v.atburdur_id=%s) order by s.id""", (at,))
     leyft = E.get("ABENDING_MOTTAKANDI", "").strip().lower()
-    for s in subs[:DAGSTHAK]:
+    for s in subs:
+        if sendir_i_dag(c) >= DAGSTHAK:
+            print("fréttabréf: dagsþak náð; afgangur næsta dag")
+            break
         if E.get("VOKTUN_OPID") != "1" and s["netfang"] != leyft:
             continue
         tak = still_tak(s["askrifandi"])
@@ -602,6 +625,8 @@ def main():
     samkeyra_og_senda(c, a.thurrt)
     frettabref(c, a.thurrt)
     tiltekt(c, a.thurrt)
+    if not a.thurrt:
+        vidvorun_magn(c)
     print(f"lokið á {time.time() - t0:.1f} s")
     return 0
 

@@ -4,6 +4,12 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-08 — Regla: ekkert ff á app main meðan sópun eða næturkeðja keyrir (cc320)
+
+**Ákvörðun arkitekts 08.11:** „Ný regla í WORKING_PROTOCOL (næsta lausa bókstaf, ekki ae): ekkert ff á app main meðan sópun eða næturkeðja keyrir.“ Skráð sem WP (ah). Tilefni: `D:\_audit\cc320_voktun\SKIL_CC320.md` §D.3.
+
+---
+
 ## 2026-11-07 — Tölvupóstvöktun (cc320): migration og smíð á bak við rofa
 
 **Ákvörðun Danna 07.11, í lotu cc320:** beita migration `20261107130000_cc320_voktun` og halda áfram með áfanga B. Opnun rofans `SYNA_VOKTUN` er aðeins með GO Danna.

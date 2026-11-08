@@ -374,3 +374,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 
 **Færsla í DECISIONS inniheldur aðeins ákvarðanir Danna eða arkitekts, hverja eignaða; greining, tölur og hönnun lotu fara í SKIL og færslan vísar þangað. Lota skrifar aldrei tilvitnun í GO sem barst frá annarri lotu sem staðreynd í varanlegt skjal.**
 
+### (ah) EKKERT FF Á APP MAIN MEÐAN SÓPUN EÐA NÆTURKEÐJA KEYRIR (arkitekt 08.11.2026)
+
+**Áður en `D:\verdmat-is\app` main er flýtt áfram (ff) er staða `verdmat-daily-lifecycle-sweep` og `verdmat-nightly-delta` lesin í Task Scheduler sem sér skref. Keyri annað hvort er ekkert ff gert fyrr en það lýkur.** Athugun og ff fara aldrei í sömu skipun. Raundæmi: cc320 flýtti main áfram 08.11 kl. 09:53 í sömu skipun og athugun sem sýndi sópun í gangi; breytingin snerti aðeins skrá sem sópunin hleður ekki. Skrá: `D:\_audit\cc320_voktun\SKIL_CC320.md` §E.
+
