@@ -293,9 +293,52 @@ H2 = 'style="margin:14px 0 6px;font-size:16px;font-family:Georgia,serif"'
 HEIM = 'style="font-size:13px;color:#5C554A;margin:8px 0"'
 
 
+IBUD = {}  # fastnum -> íbúðarnúmer, fyllt fyrir hverja sendingu (ibudarnumer)
+
+
+def ibudarnumer(c, fastnumer):
+    """Sama regla og lib/ibudarnumer.ts: íbúðar-matseining eigin fastanúmers (notkun ber „íbúð", merking 6 stafir), ein ólík;
+    forskeyti matshluta ef íbúðir staðfangs eru í > 1 matshluta. Aðeins þegar fleiri en ein íbúð er á staðfanginu."""
+    fn = [int(x) for x in set(fastnumer) if x]
+    if not fn:
+        return {}
+    st = les(c, "select distinct heimilisfang, postnr from public.properties where fastnum = any(%s) and heimilisfang is not null and postnr is not null", (fn,))
+    if not st:
+        return {}
+    radir = les(c, """select p.fastnum, p.heimilisfang, p.postnr, p.matseiningar from public.properties p
+                       join (select unnest(%s::text[]) h, unnest(%s::int[]) n) s on s.h=p.heimilisfang and s.n=p.postnr
+                       where coalesce(p.deregistered,false)=false""", ([x["heimilisfang"] for x in st], [x["postnr"] for x in st]))
+    hopar = {}
+    for r in radir:
+        hopar.setdefault((r["heimilisfang"], r["postnr"]), []).append(r)
+    ut = {}
+    for hopur in hopar.values():
+        mk = {}
+        for r in hopur:
+            m = {str(e.get("merking") or "").strip() for e in (r["matseiningar"] or []) if isinstance(e, dict)
+                 and str(e.get("fastnum")) == str(r["fastnum"]) and "íbúð" in str(e.get("notkun_texti") or "").lower()
+                 and re.fullmatch(r"\d{6}", str(e.get("merking") or "").strip())}
+            if len(m) == 1:
+                mk[r["fastnum"]] = m.pop()
+        if len(mk) < 2:
+            continue
+        med = len({x[:2] for x in mk.values()}) > 1
+        for f, x in mk.items():
+            ut[f] = f"{x[:2]}-{x[2:]}" if med else x[2:]
+    return {f: n for f, n in ut.items() if f in fn}
+
+
+def eign_nafn(a):
+    g = a["gogn"]
+    if not g.get("heimilisfang"):
+        return f"Fastanúmer {a['fastnum']}"
+    n = IBUD.get(a["fastnum"])
+    return f"{g['heimilisfang']}, íbúð {n}" if n else g["heimilisfang"]
+
+
 def lina(a, herferd):
     g, t = a["gogn"], a["tegund"]
-    teng = f'<a href="{utm("/eign/" + str(a["fastnum"]), herferd)}" style="color:#8D3E23">{H.escape(g.get("heimilisfang") or str(a["fastnum"]))}</a>'
+    teng = f'<a href="{utm("/eign/" + str(a["fastnum"]), herferd)}" style="color:#8D3E23">{H.escape(eign_nafn(a))}</a>'
     if t == "ny":
         v = kr(g["verd"]) if g.get("verd") and g["verd"] > 1 else "verð samkvæmt beiðni"
         return f"{teng}: ný auglýsing, ásett {v}, {dags(g['dags'])}."
@@ -410,7 +453,7 @@ def fyrirsogn(hlutar):
     if len(hlutar) == 1:
         s, atb = hlutar[0]
         if s["einu_sinni"]:
-            return f"{atb[0]['gogn'].get('heimilisfang')} seldist á {kr(atb[0]['gogn']['verd'])}" if atb[0]["gogn"].get("stk", 1) == 1 else f"{atb[0]['gogn'].get('heimilisfang')}: þinglýst sala"
+            return f"{eign_nafn(atb[0])} seldist á {kr(atb[0]['gogn']['verd'])}" if atb[0]["gogn"].get("stk", 1) == 1 else f"{eign_nafn(atb[0])}: þinglýst sala"
         return f"{s['heiti']}: {len(atb)} {'atburður' if len(atb) == 1 else 'atburðir'}"
     return f"Vöktun: {sum(len(a) for _, a in hlutar)} atburðir á {len(hlutar)} vöktunum"
 
@@ -469,6 +512,8 @@ def samkeyra_og_senda(c, thurrt):
         if send >= DAGSTHAK:
             print("sendingarþak náð; afgangur næsta dag")
             break
+        IBUD.clear()
+        IBUD.update(ibudarnumer(c, {x["fastnum"] for _, v in hlutar for x in v if x.get("fastnum")}))
         efni = fyrirsogn(hlutar)
         tegs = {x["tegund"] for _, v in hlutar for x in v}
         body = "".join(hluti_askriftar(s, v) for s, v in hlutar) + heimild(tegs)
