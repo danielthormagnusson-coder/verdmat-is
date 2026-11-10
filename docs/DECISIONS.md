@@ -10,7 +10,7 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 * **V4 (regla 11 víkkuð):** „Já, víkka: eigindi úr lýsingu má nota til að velja hvað fer í vöktunarpóst, aldrei í mat. Bóka í DECISIONS sem ákvörðun Danna.“ Lesandi: `scripts/voktun_verk.py` (`lesa_leitargogn`). `getAttributes`, leiðrétting, sviðsmynd, spjall og þjálfun eru óbreytt.
 * **V2:** „90 dagar. Eign sem kemur aftur á sölu eftir 90 daga er ný fyrir þann sem vaktar leit.“ (`ENDURBIRT_DAGAR = 90`.)
-* **V1:** „Já, skrá HMS gildir fyrir bílskúr (163 af 687 falla ranglega út). Skrifa migration með rollback, HALT fyrir GO.“ Migration `supabase/migrations/20261110213000_cc329b_vistud_leit_skra.sql` er ÓBEITT þar til GO Danna.
+* **V1:** „Já, skrá HMS gildir fyrir bílskúr (163 af 687 falla ranglega út). Skrifa migration með rollback, HALT fyrir GO.“ Migration `supabase/migrations/20261110213000_cc329b_vistud_leit_skra.sql` var beitt 10.11 kl. 23:16 UTC. **GO Danna:** framsent af master 10.11, „GO Danna: beittu V1 (þrjár sellur fyrir skrá HMS á bílskúr). Rollback fyrst, ein migration í einu, ekkert eftir 01:00.“ Beitingu var hafnað af heimildakerfi, og Danni staðfesti þá beint í lotu cc329 með orðinu „go“.
 * **V3:** „Halda 8 eigindum; bæta við eftir eftirspurn.“ **V5:** „Bíður. Sama orðalag og Vakta umferð 2 þegar hún er komin á www; opnast ekki á undan henni.“
 
 Greining og tölur: `D:\_audit\cc329_vistud_leit\SKIL_CC329.md`.
