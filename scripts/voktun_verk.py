@@ -39,10 +39,13 @@ VIKUDAGAR = ["mánudag", "þriðjudag", "miðvikudag", "fimmtudag", "föstudag",
 EIGIND_HEITI = {"lyfta": "lyfta", "svalir": "svalir", "bilskur": "bílskúr eða stæði í bílageymslu", "verond": "verönd eða pallur",
                 "gardur": "garður", "serinngangur": "sérinngangur", "eldhus": "endurnýjað eldhús", "bad": "endurnýjað baðherbergi"}
 TEG_HEITI = {"apartment": "íbúð", "house": "einbýli", "townhouse": "raðhús"}
-SELLU_TOFLUR = ("auglysing_eigindi", "lysing_eigindi", "lysing_vidbot", "lysing_astand")
-# cc329: endurbirting. Eign telst EKKI ný í vistaðri leit ef önnur mbl-söluauglýsing á sama fastnúmeri sást áður (hvenær sem er
-# í gögnum okkar; elstu raðir eru um 6 mánaða). Mælt á nýjum lotum sl. 30 d: 149/913 = 16,3 % falla út (SKIL_CC329 §3).
+# 'skraargogn' = public.property_attributes, source='skraargogn', superseded_at is null (cc329b, ákvörðun Danna 10.11 V1).
+SELLU_TOFLUR = ("auglysing_eigindi", "lysing_eigindi", "lysing_vidbot", "lysing_astand", "skraargogn")
+# cc329, ákvörðun Danna 10.11 (V2): eign telst EKKI ný í vistaðri leit ef önnur mbl-söluauglýsing á sama fastnúmeri sást
+# (fyrst eða síðast) innan ENDURBIRT_DAGAR fyrir first_seen_at nýju auglýsingarinnar. Eign sem kemur aftur eftir 90 d er ný.
+# Mælt á nýjum lotum sl. 30 d (07.11): 92/913 = 10,1 % falla út við 90 d (SKIL_CC329 §3).
 # Auk þess: sama fastnúmer fer aldrei tvisvar í sömu áskrift.
+ENDURBIRT_DAGAR = 90
 HAMARK_POSTA_A_NETFANG_DAG = 1
 UMR = {"þ": "th", "æ": "ae", "ð": "d", "ö": "o", "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ý": "y"}
 
@@ -443,9 +446,9 @@ def velja(s, allt_t, leitargogn=None):
 
 def lesa_sellur(c, skra=None):
     """cc329: sellur sem stóðust blint úrtak, úr public.vistud_leit_sella (eina lind; www speglar listann).
-    skra = slóð á migration-skrá: aðeins fyrir þurrkeyrslu áður en migration er beitt (les INSERT-raðirnar úr skránni)."""
+    skra = slóð(ir) á migration-skrár, aðskildar með ';': aðeins fyrir þurrkeyrslu áður en migration er beitt (les INSERT-raðirnar)."""
     if skra:
-        t = open(skra, encoding="utf-8").read()
+        t = chr(10).join(open(x, encoding="utf-8").read() for x in skra.split(";") if x)
         r = [dict(eigind=m[0], tegund=m[1], tafla=m[2], attr_key=m[3], skilyrdi=json.loads(m[4]))
              for m in re.findall(r"\('([a-z_]+)','([a-z]+)','([a-z_]+)','([a-z_]+)','(\{[^']*\})','[^']*'\)", t)]
     else:
@@ -458,7 +461,8 @@ def lesa_sellur(c, skra=None):
 
 def lesa_leitargogn(c, atb, sellur):
     """cc329: fyrir 'ny'-atburði: tegund, stærð og ásett verð nýjustu auglýsingar á fastnúmeri, hvort önnur auglýsing á sama
-    fastnúmeri hafi sést áður (endurbirting), og já-eigindi úr staðfestum sellum. Óþekkt er aldrei nei."""
+    fastnúmeri hafi sést innan ENDURBIRT_DAGAR (endurbirting), og já-eigindi úr sellutöflunni. Óþekkt er aldrei nei.
+    Eigindi úr lýsingu velja aðeins hvað fer í póst, aldrei í mat (ákvörðun Danna 10.11, V4)."""
     fn = sorted({int(a["fastnum"]) for a in atb if a["tegund"] == "ny" and a["fastnum"]})
     if not fn:
         return {}
@@ -466,16 +470,21 @@ def lesa_leitargogn(c, atb, sellur):
     for x in les(c, """
       select distinct on (n.fastnum) n.fastnum, n.sub_type, n.size_sqm, n.price_amount, n.is_price_on_request, n.first_seen_at,
         exists (select 1 from scraper.listings o where o.source='mbl' and o.tenure='sale' and o.fastnum=n.fastnum and o.listing_id<>n.listing_id
-                  and o.first_seen_at < n.first_seen_at and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=o.listing_id)) endurbirt
+                  and o.first_seen_at < n.first_seen_at
+                  and greatest(o.first_seen_at, coalesce(o.last_seen_at, o.first_seen_at)) > n.first_seen_at - make_interval(days => %(d)s)
+                  and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=o.listing_id)) endurbirt
       from scraper.listings n
       where n.source='mbl' and n.tenure='sale' and n.fastnum = any(%(f)s)
         and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=n.listing_id)
-      order by n.fastnum, n.first_seen_at desc, n.listing_id desc""", {"f": fn}):
+      order by n.fastnum, n.first_seen_at desc, n.listing_id desc""", {"f": fn, "d": ENDURBIRT_DAGAR}):
         g[x["fastnum"]] = dict(tegund=x["sub_type"], staerd=float(x["size_sqm"]) if x["size_sqm"] else None,
                                verd=None if x["is_price_on_request"] or not x["price_amount"] or x["price_amount"] <= 1 else float(x["price_amount"]),
                                endurbirt=bool(x["endurbirt"]), first_seen_at=x["first_seen_at"], eigindi=set())
     for s_ in sellur:
-        if s_["tafla"] == "lysing_astand":
+        if s_["tafla"] == "skraargogn":
+            sql = ("select distinct fastnum from public.property_attributes where source='skraargogn' and superseded_at is null "
+                   "and attr_key=%(k)s and value @> %(s)s::jsonb and fastnum=any(%(f)s)")
+        elif s_["tafla"] == "lysing_astand":
             sql = "select distinct fastnum from public.lysing_astand where attr_key=%(k)s and jsonb_build_object('stada', stada) @> %(s)s::jsonb and fastnum=any(%(f)s)"
         else:
             sql = f"select distinct fastnum from public.{s_['tafla']} where attr_key=%(k)s and value @> %(s)s::jsonb and fastnum=any(%(f)s)"

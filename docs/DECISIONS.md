@@ -4,6 +4,19 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-10 — Vistuð leit: eigindi úr lýsingu í vöktunarpósti, endurbirting 90 d, skrá HMS fyrir bílskúr (cc329)
+
+Ákvarðanir Danna 10.11, liður 3, orðrétt eins og master bar þær lotu cc329 10.11 (ekki staðfest af Danna í lotunni sjálfri):
+
+* **V4 (regla 11 víkkuð):** „Já, víkka: eigindi úr lýsingu má nota til að velja hvað fer í vöktunarpóst, aldrei í mat. Bóka í DECISIONS sem ákvörðun Danna.“ Lesandi: `scripts/voktun_verk.py` (`lesa_leitargogn`). `getAttributes`, leiðrétting, sviðsmynd, spjall og þjálfun eru óbreytt.
+* **V2:** „90 dagar. Eign sem kemur aftur á sölu eftir 90 daga er ný fyrir þann sem vaktar leit.“ (`ENDURBIRT_DAGAR = 90`.)
+* **V1:** „Já, skrá HMS gildir fyrir bílskúr (163 af 687 falla ranglega út). Skrifa migration með rollback, HALT fyrir GO.“ Migration `supabase/migrations/20261110213000_cc329b_vistud_leit_skra.sql` er ÓBEITT þar til GO Danna.
+* **V3:** „Halda 8 eigindum; bæta við eftir eftirspurn.“ **V5:** „Bíður. Sama orðalag og Vakta umferð 2 þegar hún er komin á www; opnast ekki á undan henni.“
+
+Greining og tölur: `D:\_audit\cc329_vistud_leit\SKIL_CC329.md`.
+
+---
+
 ## 2026-11-08 — Vistuð leit: sellutafla `public.vistud_leit_sella` (cc329)
 
 **Ákvörðun Danna 08.11 (í lotu cc329):** „GO Danna: beittu migration V0, 22 raðir, án bílskúrsskrár (V1)“. Migration `supabase/migrations/20261107230000_cc329_vistud_leit.sql`, rollback `supabase/rollback/20261107230000_cc329_vistud_leit_rollback.sql`. Beitt 08.11. Skrá HMS er ekki lind í vistaðri leit. Opnun vistaðrar leitar (`SYNA_VISTADA_LEIT`) er ekki hluti af þessari ákvörðun. Greining og próf: `D:\_audit\cc329_vistud_leit\SKIL_CC329.md`.
