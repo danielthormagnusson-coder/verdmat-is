@@ -29,6 +29,16 @@
 #       39/151 nætur voru DEGRADED án nokkurs pósts (t.d. Haiku-inneign búin í ~30 nætur, exit 0). rc helst 0
 #       (keðjan kláraði); vaktarlínan ber degr=<n>. Sé lokamerkið bæði CLEAN og DEGRADED (endurkeyrsla) ræður
 #       VERRA stigið, eins og í status-probe (cc94).
+#   cc337 (Danni/arkitekt 11.11) — PÓSTUR Á MANNAMÁLI: þrjú stig.
+#       í lagi       → „verdmat.ai í lagi – ekkert að gera“ (fer aðeins sem vikulegt lífsmark)
+#       að jafna sig → þekkt ástand sem lagast sjálft; framvinda og áætlaður lokadagur lesin ÚR GÖGNUNUM
+#                      (lifecycle_sweep_runs.jsonl: rent_cursor/sale_cursor á móti heildinni, hraði = færsla
+#                      milli tveggja síðustu keyrslna). Ekkert að gera.
+#       þarf athygli → „verdmat.ai ÞARF ATHYGLI – <hvað>“ + tilbúinn texti til að líma í master.
+#       Aðeins „þarf athygli“ notar orðið FALL. Tæknilínur (K0–K5, tímastimplar, frestslínur, lokamerki) standa
+#       neðst undir „Fyrir lotur“, óbreyttar að efni (í „að jafna sig“ er K-merkið FALL ritað „á eftir“).
+#   -SopunSkra <skrá>: les úttak sópunarvaktar úr skrá í stað þess að keyra hana (próf og sýnishorn).
+#   -SopunKeyrslur <skrá>: lifecycle_sweep_runs.jsonl (framvinda yfirferðar).
 #   -Lifsmark: þvingar lífsmarkið (hvaða dag sem er).  -Thurrt: prentar efni og meginmál, sendir EKKERT og skrifar
 #       EKKERT (hvorki status-logg né $VaktLog). Lykill aldrei prentaður, aðeins hvort hann fannst.
 param(
@@ -43,7 +53,9 @@ param(
     [string]$VaktLog = 'D:\verdmat-is\scraper_data\logs\kedjuvakt.log',
     [string]$EnvAi = 'D:\verdmat-is\verdmat-ai\.env.local',
     [string]$EnvRot = 'D:\env.local',
-    [datetime]$Nu = (Get-Date)          # prófanir senda inn tíma; raunkeyrsla notar núið
+    [datetime]$Nu = (Get-Date),         # prófanir senda inn tíma; raunkeyrsla notar núið
+    [string]$SopunSkra = '',
+    [string]$SopunKeyrslur = 'D:\verdmat-is\scraper_data\lifecycle_sweep_runs.jsonl'
 )
 
 function Get-KedjuStada {
@@ -155,7 +167,12 @@ $lifsmarkStada = 'nei'
 # rc 1 = FALL, 3 = mæling mistókst; hvort tveggja fer í póst. Breytir ekki rc keðjunnar (biðhliðin lesa hann).
 $sopun = @(); $sopunRc = 0
 # cc320 (11.11): -Prof keyrir líka sópunarvaktina (aðeins lestur), svo prófpósturinn sanni K0–K5-línurnar og UTF-8-lesturinn.
-if ($true) {
+if ($SopunSkra) {
+    $sopun = @(Get-Content -Encoding utf8 $SopunSkra)
+    $sl = ($sopun | Where-Object { $_ -match '^SOPUNARVAKT: ' } | Select-Object -Last 1)
+    $sopunRc = $(if ($sl -match ': OK') { 0 } elseif ($sl -match 'MISTÓKST') { 3 } else { 1 })
+}
+else {
     # cc320 (11.11): úttak Python er lesið sem UTF-8 í báða enda. Undir Task Scheduler er [Console]::OutputEncoding
     # OEM-síða (850/437) og „á" í K0–K5 kom út sem „├í" í pósti. Python skrifar UTF-8 (PYTHONUTF8), PowerShell les UTF-8.
     $fyrriKodun = [Console]::OutputEncoding; $fyrriPyUtf8 = $env:PYTHONUTF8
@@ -170,7 +187,93 @@ if ($true) {
         if ($null -eq $fyrriPyUtf8) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf8 }
     }
 }
-$postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and ($stada -ne 'LOKID' -or $sopunRc -ne 0 -or $degrN -gt 0))
+# ── cc337: stig á mannamáli ──────────────────────────────────────────────────────────────────────────
+$athygli = @()   # hver: @{ Stutt = '<3–5 orð>'; Hvad = '...'; Thydir = '...'; Master = '...' }
+$jafna = @()     # hver: @{ Stutt = '...'; Hvad = '...'; Thydir = '...' }
+$dagur = $Nu.ToString('dd.MM')
+switch ($stada) {
+    'FALL' { $athygli += @{ Stutt = 'næturuppfærsla stöðvaðist'
+        Hvad = 'Næturuppfærslan stöðvaðist áður en hún kláraðist.'
+        Thydir = 'Nýjar auglýsingar og verðbreytingar frá því í gær vantar á vefinn. Vefurinn er uppi og sýnir eldri gögn.'
+        Master = "verdmat-vakt $($dagur): næturkeðjan stöðvaðist (CHAIN FAIL). Finndu orsök í $nightLog, keyrðu keðjuna aftur ef það er öruggt og segðu mér hvað gerðist." } }
+    'ENGIN_RAESING' { $athygli += @{ Stutt = 'næturuppfærsla fór ekki af stað'
+        Hvad = 'Næturuppfærslan fór aldrei af stað í nótt.'
+        Thydir = 'Engin ný gögn bættust við í nótt. Vefurinn er uppi og sýnir gögn frá því í gær.'
+        Master = "verdmat-vakt $($dagur): næturkeðjan fór ekki af stað (enginn næturlogg eða ekkert upphafsmerki). Athugaðu verkið verdmat-nightly-delta og segðu mér hvað gerðist." } }
+    'I_GANGI' { $athygli += @{ Stutt = 'næturuppfærsla enn í gangi'
+        Hvad = "Næturuppfærslan var enn í gangi kl. $($Nu.ToString('HH:mm')) en á að vera búin."
+        Thydir = 'Nýjustu gögn næturinnar eru ekki enn komin á vefinn.'
+        Master = "verdmat-vakt $($dagur): næturkeðjan var enn í gangi kl. $($Nu.ToString('HH:mm')) (ekkert lokamerki). Athugaðu hvort hún hangir og segðu mér stöðuna." } }
+    'PROMOTE_LOKID' { $athygli += @{ Stutt = 'næturuppfærsla kláraðist ekki'
+        Hvad = "Nýjar auglýsingar komust inn í nótt, en seinni hluti uppfærslunnar var ekki búinn kl. $($Nu.ToString('HH:mm'))."
+        Thydir = 'Auglýsingarnar eru nýjar, en greining og verðmat nýjustu auglýsinga geta vantað.'
+        Master = "verdmat-vakt $($dagur): næturkeðjan náði promote en ekkert lokamerki kl. $($Nu.ToString('HH:mm')). Athugaðu seinni þrep keðjunnar og segðu mér stöðuna." } }
+}
+if ($degrN -gt 0) {
+    $athygli += @{ Stutt = 'næturgreining mistókst að hluta'
+        Hvad = "Næturuppfærslan kláraðist, en $degrN sjálfvirkar aðgerðir mistókust (oftast greining á texta auglýsinga)."
+        Thydir = 'Vefurinn er uppi og auglýsingar eru nýjar, en hluta nýrra auglýsinga vantar greiningu (t.d. ástand eða eigindi úr lýsingu).'
+        Master = "verdmat-vakt $($dagur): næturkeðjan endaði CHAIN DEGRADED:$degrN. Finndu hvað féll í $nightLog og leggðu til lagfæringu." }
+}
+# Sópun: K2/K3 (leigu-/söluyfirferð ekki lokið innan þaks) er „að jafna sig“ EF bendillinn færðist í síðustu keyrslu.
+$sopunFoll = @($sopun | Where-Object { $_ -match '^(K\d) FALL' } | ForEach-Object { ($_ -split ' ')[0] })
+$keyrslur = @()
+if (Test-Path $SopunKeyrslur) {
+    $keyrslur = @(Get-Content -Encoding utf8 $SopunKeyrslur | Where-Object { $_.Trim() } | Select-Object -Last 2 | ForEach-Object { $_ | ConvertFrom-Json })
+}
+function Tala([int]$n) { $n.ToString('N0', [Globalization.CultureInfo]::GetCultureInfo('is-IS')) }
+function Get-Framvinda([string]$teg) {
+    if ($keyrslur.Count -lt 2) { return $null }
+    $a = $keyrslur[0]; $b = $keyrslur[1]
+    $bendill = [int]$b."$($teg)_cursor"; $heild = [int]$b."$($teg)_total"; $fyrri = [int]$a."$($teg)_cursor"
+    $faersla = $bendill - $fyrri
+    if ($heild -le 0 -or $faersla -le 0) { return $null }
+    $eftir = [math]::Max(0, $heild - $bendill)
+    $keyrslurEftir = [math]::Ceiling($eftir / $faersla)
+    $lok = ([datetime]$b.at).ToUniversalTime().Date.AddDays($keyrslurEftir)
+    [pscustomobject]@{ Bendill = $bendill; Heild = $heild; Faersla = $faersla; Lok = $lok }
+}
+$heitiTeg = @{ K2 = @('rent', 'leiguauglýsinga', 'leiguyfirferð'); K3 = @('sale', 'söluauglýsinga', 'söluyfirferð') }
+$jafnaK = @()
+foreach ($k in $sopunFoll) {
+    if ($heitiTeg.ContainsKey($k)) {
+        $f = Get-Framvinda $heitiTeg[$k][0]
+        $ht = $heitiTeg[$k]
+        if ($f) {
+            $jafnaK += $k
+            $jafna += @{ Stutt = "$($ht[2]) klárast $($f.Lok.ToString('dd.MM'))"
+                Hvad = ("Yfirferð {0} (athugað hvort þær séu enn í birtingu) er á eftir áætlun en gengur: {1} af {2} búnar, um {3} á dag. Áætlað að hún klárist {4}." -f $ht[1], (Tala $f.Bendill), (Tala $f.Heild), (Tala $f.Faersla), $f.Lok.ToString('dd.MM.yyyy'))
+                Thydir = "Á meðan geta nokkrar $($ht[1].Replace('auglýsinga','auglýsingar')) sem eru farnar af auglýsingavefnum enn birst sem virkar. Annað á vefnum er óháð þessu." }
+        } else {
+            $athygli += @{ Stutt = "$($ht[2]) stopp"
+                Hvad = "Yfirferð $($ht[1]) hefur ekki lokið hring innan tímamarka og bendillinn hreyfðist ekki í síðustu keyrslu."
+                Thydir = "$($ht[1].Substring(0,1).ToUpper() + $ht[1].Substring(1).Replace('auglýsinga','auglýsingar')) sem eru farnar af markaði geta birst áfram sem virkar á verdmat.ai."
+                Master = "verdmat-vakt $($dagur): sópunarvakt $k FALL og bendill $($ht[0])_cursor hreyfist ekki (lifecycle_sweep_runs.jsonl). Finndu hvers vegna yfirferðin stendur og leggðu til lagfæringu." }
+        }
+    }
+}
+$sopunAnnad = @($sopunFoll | Where-Object { $jafnaK -notcontains $_ -and -not $heitiTeg.ContainsKey($_) })
+$sopunLysing = @{
+    K0 = 'Yfirferð auglýsinga keyrði ekki síðasta sólarhring.'
+    K1 = 'Yfirferðin hefur ekki skráð neina auglýsingu sem horfna eða selda í tvo sólarhringa.'
+    K4 = 'Óvenju margar auglýsingar sem eru horfnar af auglýsingavefnum birtast enn sem virkar.'
+    K5 = 'Yfirferðin sendi engar fyrirspurnir í tveimur keyrslum í röð, þótt verk biðu.'
+}
+if ($sopunAnnad.Count) {
+    $athygli += @{ Stutt = 'yfirferð auglýsinga í ólagi'
+        Hvad = (($sopunAnnad | ForEach-Object { $sopunLysing[$_] }) -join ' ')
+        Thydir = 'Auglýsingar sem eru farnar af markaði geta birst áfram sem virkar á verdmat.ai.'
+        Master = "verdmat-vakt $($dagur): sópunarvakt FALL ($($sopunAnnad -join ',')). Línurnar eru í póstinum undir Fyrir lotur. Finndu orsök og leggðu til lagfæringu." }
+}
+if ($sopunRc -eq 3) {
+    $athygli += @{ Stutt = 'vaktin gat ekki mælt'
+        Hvad = 'Vaktin gat ekki mælt yfirferð auglýsinga (tenging við gagnagrunn eða skrá vantaði).'
+        Thydir = 'Óvíst hvort yfirferðin gengur; vefurinn sjálfur er ekki endilega fyrir áhrifum.'
+        Master = "verdmat-vakt $($dagur): sópunarvakt MÆLING MISTÓKST (rc 3). Keyrðu scripts/sopunarvakt.py og segðu mér hvað brást." }
+}
+$stig = $(if ($athygli.Count) { 'athygli' } elseif ($jafna.Count) { 'jafna' } else { 'lagi' })
+
+$postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and $stig -ne 'lagi')
 
 function Skra-Vakt([int]$r) {
     if ($Prof -or $Thurrt) { return }
@@ -194,30 +297,73 @@ if ($fra -match '<([^<>\s]+@[^<>\s]+)>') { $fra = 'verdmat.ai <' + $Matches[1] +
 
 $vika = $null
 if ($lifsmarkNu) { $vika = Get-Vikusamantekt }
-if ($Prof) { $efni = "[PRÓF] verdmat-vakt: $texti" + $(if ($lifsmarkNu) { ' + lífsmark' } else { '' }) }
-elseif ($stada -ne 'LOKID') { $efni = "verdmat-vakt: $texti — ÓLOKIÐ" + $(if ($lifsmarkNu) { ' · vikulegt lífsmark' } else { '' }) }
-elseif ($degrN -gt 0) { $efni = "verdmat-vakt: keðja DEGRADED — $degrN köll féllu ($($Nu.ToString('dd.MM')))" + $(if ($lifsmarkNu) { ' · vikulegt lífsmark' } else { '' }) }
-elseif ($sopunRc -ne 0) { $efni = "verdmat-vakt: SÓPUN svelt eða ómæld — $($sopun[-1])" + $(if ($lifsmarkNu) { ' · vikulegt lífsmark' } else { '' }) }
-else { $efni = "verdmat-vakt lífsmark: $($vika.Lokid)/7 nætur lokið — vika til $($Nu.ToString('dd.MM'))" }
+$efni = switch ($stig) {
+    'athygli' { 'verdmat.ai ÞARF ATHYGLI – ' + $athygli[0].Stutt + $(if ($athygli.Count -gt 1) { ' o.fl.' } else { '' }) }
+    'jafna'   { 'verdmat.ai að jafna sig – ekkert að gera (' + (($jafna | ForEach-Object { $_.Stutt }) -join ', ') + ')' }
+    default   { 'verdmat.ai í lagi – ekkert að gera' }
+}
+if ($lifsmarkNu) { $efni += ' · vikuyfirlit' }
+if ($Prof) { $efni = '[PRÓF] ' + $efni }
 
-$meginmal = "$texti`n"
-if ($sopun.Count) { $meginmal += "`nSópun (cc324):`n" + ($sopun -join "`n") + "`n" }
+$m = @()
+if ($Prof) { $m += 'PRÓF — sýnishorn af vaktarpósti. Ekkert þarf að gera vegna þessa pósts.'; $m += '' }
+$m += switch ($stig) { 'athygli' { 'STAÐA: ÞARF ATHYGLI' } 'jafna' { 'STAÐA: AÐ JAFNA SIG (ekkert að gera)' } default { 'STAÐA: Í LAGI' } }
+$m += ''
+$m += 'Hvað gerðist:'
+if ($stig -eq 'lagi') { $m += '- Næturuppfærslan gekk eðlilega og yfirferð auglýsinga er á áætlun.' }
+foreach ($x in $athygli) { $m += '- ' + $x.Hvad }
+foreach ($x in $jafna) { $m += '- ' + $x.Hvad }
+if ($stig -ne 'lagi' -and $stada -eq 'LOKID' -and $degrN -eq 0) { $m += '- Næturuppfærslan sjálf gekk eðlilega.' }
+$m += ''
+$m += 'Hvað það þýðir fyrir vefinn:'
+if ($stig -eq 'lagi') { $m += '- Vefurinn er uppi með gögn næturinnar. Ekkert vantar.' }
+foreach ($x in $athygli) { $m += '- ' + $x.Thydir }
+foreach ($x in $jafna) { $m += '- ' + $x.Thydir }
+$m += ''
+$m += 'Hvað þú þarft að gera:'
+if ($stig -eq 'athygli') {
+    $m += '- Límdu textann hér að neðan í master-lotuna:'
+    $m += ''
+    $m += '----------'
+    foreach ($x in $athygli) { $m += $x.Master }
+    $m += '----------'
+} elseif ($stig -eq 'jafna') {
+    $m += '- Ekkert. Þetta lagast sjálft. Ef það hefur ekki gerst fyrir áætlaðan dag kemur póstur merktur ÞARF ATHYGLI.'
+} else {
+    $m += '- Ekkert.'
+}
 if ($lifsmarkNu) {
-    $meginmal += "`nVikulegt lífsmark vaktarinnar (cc299). Þessi póstur kemur á mánudagsmorgni hver sem staðan er;`n" +
-        "berist hann ekki er vaktin (verdmat-daily-kedjuvakt) dauð eða pósturinn bilaður.`n`n" +
-        $vika.Haus + "`n" + ($vika.Radir -join "`n") + "`n"
+    $okDagar = $vika.Lokid
+    $m += ''
+    $m += 'Vikuyfirlit:'
+    $m += "- Næturuppfærslan kláraðist $okDagar af síðustu 7 nóttum."
+    $m += '- Þessi póstur kemur alla mánudagsmorgna, líka þegar allt er í lagi. Komi hann ekki er vaktin sjálf biluð: segðu master frá því.'
+}
+# Fyrir lotur: tæknilínur, óbreyttar að efni.
+$m += ''
+$m += '______________________________'
+$m += 'Fyrir lotur (tæknilínur):'
+$m += $texti
+if ($sopun.Count) {
+    $s2 = $sopun
+    if ($stig -ne 'athygli') { $s2 = @($sopun | ForEach-Object { $_ -replace '^(K\d) FALL', '$1 á eftir' -replace '^SOPUNARVAKT: FALL', 'SOPUNARVAKT: á eftir' }) }
+    $m += ''; $m += 'Sópun (cc324):'; $m += $s2
+}
+if ($jafna.Count -and $keyrslur.Count) {
+    $m += ''; $m += 'Síðustu keyrslur sópunar (lifecycle_sweep_runs.jsonl):'
+    foreach ($r in $keyrslur) { $m += ('at={0} rent_cursor={1}/{2} sale_cursor={3}/{4} requests={5}' -f $r.at, $r.rent_cursor, $r.rent_total, $r.sale_cursor, $r.sale_total, $r.requests) }
 }
 if ($degrN -gt 0) {
-    # cc337: línurnar sem segja HVAÐ féll (DEGRADED-orsök) — keðjan skrifar þær með WARN/FAIL/féll/villa.
     $orsakir = @(Get-Content -Encoding utf8 $nightLog | Where-Object { $_ -match '(?i)(WARN|FAIL|féll|villa|error|DEGRADED)' } | Select-Object -Last 12)
-    if ($orsakir.Count) { $meginmal += "`nLínur um það sem féll ($nightLog):`n" + ($orsakir -join "`n") + "`n" }
+    if ($orsakir.Count) { $m += ''; $m += "Línur um það sem féll ($nightLog):"; $m += $orsakir }
 }
 if ($Prof -or $stada -ne 'LOKID') {
-    $hali = (Get-Content -Encoding utf8 $nightLog -Tail 8 -ErrorAction SilentlyContinue) -join "`n"
-    $meginmal += "`nSíðustu línur $nightLog`:`n$hali`n"
-    if ($frestad.Count) { $meginmal += "`nFrestslínur:`n" + ($frestad -join "`n") + "`n" }
+    $m += ''; $m += "Síðustu línur $($nightLog):"
+    $m += @(Get-Content -Encoding utf8 $nightLog -Tail 8 -ErrorAction SilentlyContinue)
 }
-if ($Prof) { $meginmal = "Prófsending vaktarinnar (cc268) — ekkert er að nema annað sjáist hér að neðan.`n`n" + $meginmal }
+if ($frestad.Count) { $m += ''; $m += 'Frestslínur:'; $m += $frestad }
+if ($lifsmarkNu) { $m += ''; $m += $vika.Haus; $m += $vika.Radir }
+$meginmal = ($m -join "`n") + "`n"
 
 if ($Thurrt) {
     Write-Output ("ÞURRT — ekkert sent, ekkert skrifað. staða={0} lífsmark={1} (síðasta skráða: {2})" -f $stada, $lifsmarkNu, $(if ($sidastaLifsmark) { $sidastaLifsmark.ToString('dd.MM') } else { 'ekkert' }))
