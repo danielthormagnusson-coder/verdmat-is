@@ -67,8 +67,13 @@ def file_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+EXCLUDED_DIRNAMES = {"__pycache__"}  # cc336b: aldrei í afrit (pyc ber afrit af lyklum, cc56)
+
+
 def is_excluded(path: Path, excluded_names: set, excluded_norm: list) -> bool:
     if path.name in excluded_names:
+        return True
+    if any(part in EXCLUDED_DIRNAMES for part in path.parts[:-1]):
         return True
     pn = str(path.resolve()).lower()
     for ex in excluded_norm:
@@ -161,7 +166,37 @@ def _make_item(local: Path, remote_rel: str, bucket: str) -> dict:
     }
 
 
-def rclone_sync_entry(entry: dict, bucket: str, ts: str, log_path: Path) -> tuple[int, str]:
+def _rclone_escape(name: str) -> str:
+    """Escape rclone glob metacharacters so a literal name matches only itself."""
+    return re.sub(r"([\\*?\[\]{}])", r"\\\1", name)
+
+
+def rclone_filter_flags(entry: dict, excluded_names: set, excluded_paths: list[str]) -> list[str]:
+    """cc336b: exclude_filenames/exclude_paths voru aðeins virt í preflight og
+    manifesti, aldrei af rclone. Reglurnar hér eru `--filter` í fastri röð
+    (fyrsta samsvörun ræður): útilokanir fyrst, svo glob-mynstur, svo `- **`."""
+    rules: list[str] = []
+    for n in sorted(excluded_names):
+        rules.append(f"- {_rclone_escape(n)}")          # nafn án '/' = hvaða stig sem er
+    for d in sorted(EXCLUDED_DIRNAMES):
+        rules.append(f"- {_rclone_escape(d)}/**")
+    root = os.path.normcase(os.path.abspath(entry["local_path"]))
+    for p in excluded_paths:
+        pn = os.path.normcase(os.path.abspath(p))
+        if pn.startswith(root + os.sep):
+            rel = os.path.relpath(pn, root).replace(os.sep, "/")
+            rules.append(f"- /{_rclone_escape(rel)}/**")
+    if entry["kind"] == "glob":
+        rules += [f"+ {pat}" for pat in entry["patterns"]] + ["- **"]
+    flags: list[str] = []
+    for r in rules:
+        flags += ["--filter", r]
+    return flags
+
+
+def rclone_sync_entry(entry: dict, bucket: str, ts: str, log_path: Path,
+                      excluded_names: set = frozenset(), excluded_paths: list[str] | None = None,
+                      dry_run: bool = False) -> tuple[int, str]:
     """Sync one include entry. Uses `rclone sync` for dirs/globs (so
     deletes propagate to archive) and `rclone copyto` for individual files
     (single-source/single-dest, --backup-dir still archives if overwritten)."""
@@ -184,22 +219,24 @@ def rclone_sync_entry(entry: dict, bucket: str, ts: str, log_path: Path) -> tupl
     if kind == "file":
         cmd = [str(RCLONE_EXE), "copyto", local, target_current, *common_flags]
     elif kind == "dir":
-        # Keep parents; sync the whole subtree. Excludes are enforced at the
-        # filesystem level above (no excluded files are queued), but we also
-        # mirror the filename excludes as rclone --exclude for safety.
-        cmd = [str(RCLONE_EXE), "sync", local, target_current, *common_flags]
+        # Keep parents; sync the whole subtree. Filename/path excludes are
+        # passed to rclone as --filter rules (cc336b; before that rclone
+        # never saw them and only preflight/manifest skipped them).
+        cmd = [str(RCLONE_EXE), "sync", local, target_current, *common_flags,
+               *rclone_filter_flags(entry, excluded_names, excluded_paths or [])]
         if not entry.get("recurse", True):
             cmd.extend(["--max-depth", "1"])
     elif kind == "glob":
-        # rclone sync with include patterns + max-depth 1 for top-level glob.
+        # rclone sync with filter rules (+ patterns, - **) + max-depth 1 for top-level glob.
         recurse = entry.get("recurse", False)
-        cmd = [str(RCLONE_EXE), "sync", local, target_current, *common_flags]
+        cmd = [str(RCLONE_EXE), "sync", local, target_current, *common_flags,
+               *rclone_filter_flags(entry, excluded_names, excluded_paths or [])]
         if not recurse:
             cmd.extend(["--max-depth", "1"])
-        for pat in entry["patterns"]:
-            cmd.extend(["--include", pat])
     else:
         return 99, f"unknown kind: {kind!r}"
+    if dry_run:
+        cmd.append("--dry-run")
 
     proc = subprocess.run(cmd, capture_output=True, text=True)
     tail = "\n".join((proc.stdout + proc.stderr).splitlines()[-30:])
@@ -304,7 +341,8 @@ def main() -> int:
     for entry in paths_config["include"]:
         label = entry["local_path"]
         print(f"  → syncing {label}")
-        rc, tail = rclone_sync_entry(entry, bucket, ts, log_path)
+        rc, tail = rclone_sync_entry(entry, bucket, ts, log_path,
+                                     excluded_names, paths_config.get("exclude_paths", []))
         if rc == 0:
             n_entries_ok += 1
             print(f"     OK")

@@ -4,6 +4,18 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-11 — Afrit: vikulegt pg_dump á R2 og viðbætur í næturafrit (cc336b)
+
+GO Danna 11.11, orðrétt í lotu cc336b: „GO Danna: G1 og G2. parsed_mbl.db fer EKKI í vikulega afritið. G3 bíður þar til ég er við tölvuna; G4 og G5 eftir G3. Ekkert 01:00–07:30.“
+
+* **G1:** Verkið `verdmat-weekly-db-afrit` keyrir sunnudaga kl. 10:00 og kallar á `scripts/backup_weekly_db.py`.
+  * **pg_dump** af `public`, `scraper`, `semantic`, `registur_utflutningur` og `supabase_migrations`. **`auth` er ekki með** (fyrirmæli master 11.11).
+  * **SQLite-skyndimyndir** með online backup af `raw_mbl`, `raw_myigloo`, `raw_visir` og `listing_images`. **`parsed_mbl.db` er ekki með** (ákvörðun Danna).
+  * **Geymsla:** á `r2backup:verdmat-backups/db_afrit/vikulegt/<dags>/`; 5 vikur haldast.
+  * **Bannfærsla:** skriftan neitar að keyra 01:00–07:30 UTC.
+* **G2:** Sjö nýjar færslur í `scripts/backup_paths.json`: `D:\model_artifacts`, smíðaskriftur á D:\-rót, `precompute\support`, `precompute\*.py`, `D:\cc143`, `C:\verdmat_vakt` og smáskrár í `scraper_data`. Viðbótin er +0,62 GB, svo heildin verður 12,71 GB. Samhliða er galli lagaður: `exclude_filenames` og `exclude_paths` voru aldrei send til rclone. Þau fara nú sem `--filter`-reglur, ásamt `__pycache__/**`.
+* **Bíður:** G3 (lykilorðaskipti) bíður þar til Danni er við tölvuna. G4 (R2-hreinsun cc56/cc58) og G5 (DB_URL-línur) koma eftir G3. Áætlun: `D:\_audit\cc336b_afrit\AAETLUN_LYKILORDASKIPTI.md`.
+
 ## 2026-11-10 — Vistuð leit: eigindi úr lýsingu í vöktunarpósti, endurbirting 90 d, skrá HMS fyrir bílskúr (cc329)
 
 Ákvarðanir Danna 10.11, liður 3, orðrétt eins og master bar þær lotu cc329 10.11 (ekki staðfest af Danna í lotunni sjálfri):

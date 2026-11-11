@@ -34,7 +34,14 @@
       "kind": "glob",
       "recurse": false,
       "patterns": ["*.pkl", "*.csv", "*.lgb", "*.parquet", "*.json", "*.sql"]
-    }
+    },
+    {"_comment": "cc336b: lifandi og eldri líkön (0,53 GB). Rollback cc313 §5.4 hvílir á þessu.", "local_path": "D:\\model_artifacts", "remote_subpath": "model_artifacts", "recurse": true, "kind": "dir"},
+    {"_comment": "cc336b: smíðaskriftur utan git (build_training_data*, classify_property, cpi, rules, cc102_weekly ...). Skannað: engin lykilorð.", "local_path": "D:\\", "remote_subpath": "D_root_skriftur", "kind": "glob", "recurse": false, "patterns": ["*.py", "*.ps1", "*.cmd", "*.sh"]},
+    {"_comment": "cc336b: comps/þrep-stoðgögn (óraktað, gitignored).", "local_path": "D:\\verdmat-is\\precompute\\support", "remote_subpath": "precompute_support", "recurse": true, "kind": "dir"},
+    {"_comment": "cc336b: óraktaðar precompute-skriftur (fetch_canon_support o.fl.) þar til þær fara í git.", "local_path": "D:\\verdmat-is\\precompute", "remote_subpath": "precompute_root_py", "kind": "glob", "recurse": false, "patterns": ["*.py"]},
+    {"_comment": "cc336b: vísitölugripur rs_live_kaupskra_v2 (undirmappa, utan D:\\ glob).", "local_path": "D:\\cc143", "remote_subpath": "cc143", "recurse": true, "kind": "dir"},
+    {"_comment": "cc336b: vaktarskrifta utan repo.", "local_path": "C:\\verdmat_vakt", "remote_subpath": "verdmat_vakt", "recurse": true, "kind": "dir"},
+    {"_comment": "cc336b: smærri scraper_data-skrár (state/json/logs); SQLite-gagnagrunnar fara í VIKULEGT afrit (online backup), ekki hér.", "local_path": "D:\\verdmat-is\\scraper_data", "remote_subpath": "scraper_data_smatt", "kind": "glob", "recurse": false, "patterns": ["*.json", "*.jsonl", "*.sh", "*.py", "*.md"]}
   ],
   "exclude_paths": [
     "D:\\Gagnapakkar\\images",
