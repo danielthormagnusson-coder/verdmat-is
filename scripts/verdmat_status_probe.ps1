@@ -1,7 +1,7 @@
 # LÍFTÍMASKILYRÐI (cc63 GO-bókun): cc65 fasi 1 (ops-vöktunarvélin) gleypir rökfræði
 # próbans síðar og AFSKRÁIR hann berum orðum í fasa 3 — tvö kerfi lifa aldrei samhliða.
 #
-# verdmat_status_probe.ps1 — daily one-line health summary of every verdmat-* scheduled
+# verdmat_status_probe.ps1 — daily one-line health summary of every verdmat* scheduled
 # task + the two nightly chain logs, appended to D:\verdmat_status.log. Third incident
 # (extraction ImportError, 6 silent nights 27.07-01.08) that a reader of LastTaskResult
 # would have caught on morning one — this is that reader. No mail; the file is the channel.
@@ -14,6 +14,12 @@
 # rent-restep guard). 267009 (0x41301 = still running) is neutral. EVERYTHING else is
 # loud — incl. 1/2 (chain abort / preflight or domsregla-HALT) and 267011 (0x41303 =
 # never ran; a registered task that never fires is a scheduler problem, not a no-op).
+# cc337 (#5): undantekning — 267011 er hlutlaust á verki sem hefur EINGÖNGU LogonTrigger
+# (t.d. cvakt-syna): það keyrir aðeins við innskráningu og „aldrei keyrt" er eðlilegt
+# ástand, ekki bilun. Það hélt probe í varanlegu VAKT (79/99 dagar) og drekkti raunviðvörunum.
+# Tímakveikt verk með 267011 er áfram hávært.
+# cc337 (#5): verk eru valin með -like 'verdmat*', svo 'verdmat_*'-verkin (llt_refresh,
+# worker_poll, verdvakt_refresh o.fl.) sjást líka; áður blind á þau (llt_refresh rc=2 í 17 d).
 # Chain logs: newest night_*.log / myigloo_night_*.log. Þrjú stig (cc94):
 #   CHAIN CLEAN (exit 0)      -> CLEAN
 #   CHAIN DEGRADED:n (exit 0) -> DEGRADED(n) — keðjan kláraði, n köll féllu. FLAGG.
@@ -34,12 +40,17 @@ $neutral    = @(267009)   # 0x41301 currently running
 $offenders = @()
 
 # ── scheduled tasks ──────────────────────────────────────────────────────────
-$taskBits = foreach ($t in (Get-ScheduledTask | Where-Object TaskName -like 'verdmat-*' |
+$neverRan   = 267011       # 0x41303
+$taskBits = foreach ($t in (Get-ScheduledTask | Where-Object TaskName -like 'verdmat*' |
                             Sort-Object TaskName)) {
     $info = $t | Get-ScheduledTaskInfo
     $rc = $info.LastTaskResult
     $short = $t.TaskName -replace '^verdmat-', ''
-    if (($okResults -notcontains $rc) -and ($neutral -notcontains $rc)) {
+    $trig = @($t.Triggers)
+    $adeinsInnskraning = $trig.Count -gt 0 -and
+        -not ($trig | Where-Object { $_.CimClass.CimClassName -ne 'MSFT_TaskLogonTrigger' })
+    $hlutlaust = ($neutral -contains $rc) -or (($rc -eq $neverRan) -and $adeinsInnskraning)
+    if (($okResults -notcontains $rc) -and -not $hlutlaust) {
         $offenders += ('{0}=0x{1:X}' -f $short, $rc)
     }
     '{0}=0x{1:X}' -f $short, $rc

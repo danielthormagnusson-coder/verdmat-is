@@ -24,6 +24,11 @@
 #       eða fyrsta keyrsla eftir uppsetningu) fer það í næstu keyrslu.
 #       Hver -Vakt-keyrsla (ekki -Prof/-Thurrt) skrifar eina línu í $VaktLog: stöðu, frestslínur, rc og lífsmark.
 #       Þaðan les samantektin rc vaktar; heitið er utan night_*.log-mynsturs status-probe.
+#   cc337 (#5): DEGRADED-NÓTT SENDIR PÓST. Biðhliðin telja CHAIN DEGRADED:n sem LOKID (keðjan kláraði) og það
+#       helst; en vaktin sendir nú póst (með -Senda) þegar lokamerki dagsins er DEGRADED:n (n köll féllu), því
+#       39/151 nætur voru DEGRADED án nokkurs pósts (t.d. Haiku-inneign búin í ~30 nætur, exit 0). rc helst 0
+#       (keðjan kláraði); vaktarlínan ber degr=<n>. Sé lokamerkið bæði CLEAN og DEGRADED (endurkeyrsla) ræður
+#       VERRA stigið, eins og í status-probe (cc94).
 #   -Lifsmark: þvingar lífsmarkið (hvaða dag sem er).  -Thurrt: prentar efni og meginmál, sendir EKKERT og skrifar
 #       EKKERT (hvorki status-logg né $VaktLog). Lykill aldrei prentaður, aðeins hvort hann fannst.
 param(
@@ -71,7 +76,16 @@ $utc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 $frestad = @()
 if (Test-Path $nightLog) { $frestad = @(Get-Content -Encoding utf8 $nightLog | Where-Object { $_ -match ' (FRESTAÐ|FRESTUR): ' }) }
 
+# cc337: DEGRADED:n á lokamerki dagsins (aðeins línur <= $Nu, sama regla og Get-KedjuStada).
+$degrN = 0
+if ($stada -eq 'LOKID' -and (Test-Path $nightLog)) {
+    $dl = Get-Content -Encoding utf8 $nightLog | Where-Object {
+        $_ -match '^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) .*=== CHAIN DEGRADED:(\d+) \(exit 0\) ===' -and
+        [datetime]::ParseExact($Matches[1], 'yyyy-MM-dd HH:mm:ss', $null) -le $Nu } | Select-Object -Last 1
+    if ($dl -and $dl -match 'CHAIN DEGRADED:(\d+)') { $degrN = [int]$Matches[1] }
+}
 $texti = "delta-keðja dagsins ($($Nu.ToString('dd.MM'))) kl. $($Nu.ToString('HH:mm')): staða $stada"
+if ($degrN -gt 0) { $texti += " — DEGRADED: $degrN köll féllu" }
 if ($frestad.Count) { $texti += " ($($frestad.Count) frestslínur)" }
 
 # ── cc299: saga vaktar ($VaktLog) og hvort lífsmark fer í þessari keyrslu ──
@@ -128,7 +142,8 @@ function Get-Vikusamantekt {
 }
 
 if (-not $Prof -and -not $Thurrt) {
-    if ($stada -eq 'LOKID') { Write-Output "$utc delta-vakt OK: $texti" }
+    if ($stada -eq 'LOKID' -and $degrN -gt 0) { Write-Output "$utc delta-vakt DEGRADED: $texti" }
+    elseif ($stada -eq 'LOKID') { Write-Output "$utc delta-vakt OK: $texti" }
     else {
         [IO.File]::AppendAllText($StatusFile, "$utc !! VAKT-VIDVORUN: $texti — ÓLOKIÐ`r`n", $Utf8)
         Write-Output "$utc !! $texti — ÓLOKIÐ"
@@ -155,11 +170,11 @@ if ($true) {
         if ($null -eq $fyrriPyUtf8) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf8 }
     }
 }
-$postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and ($stada -ne 'LOKID' -or $sopunRc -ne 0))
+$postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and ($stada -ne 'LOKID' -or $sopunRc -ne 0 -or $degrN -gt 0))
 
 function Skra-Vakt([int]$r) {
     if ($Prof -or $Thurrt) { return }
-    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc"
+    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc degr=$degrN"
     try {
         $m = Split-Path -Parent $VaktLog
         if ($m -and -not (Test-Path $m)) { New-Item -ItemType Directory -Force $m | Out-Null }
@@ -181,6 +196,7 @@ $vika = $null
 if ($lifsmarkNu) { $vika = Get-Vikusamantekt }
 if ($Prof) { $efni = "[PRÓF] verdmat-vakt: $texti" + $(if ($lifsmarkNu) { ' + lífsmark' } else { '' }) }
 elseif ($stada -ne 'LOKID') { $efni = "verdmat-vakt: $texti — ÓLOKIÐ" + $(if ($lifsmarkNu) { ' · vikulegt lífsmark' } else { '' }) }
+elseif ($degrN -gt 0) { $efni = "verdmat-vakt: keðja DEGRADED — $degrN köll féllu ($($Nu.ToString('dd.MM')))" + $(if ($lifsmarkNu) { ' · vikulegt lífsmark' } else { '' }) }
 elseif ($sopunRc -ne 0) { $efni = "verdmat-vakt: SÓPUN svelt eða ómæld — $($sopun[-1])" + $(if ($lifsmarkNu) { ' · vikulegt lífsmark' } else { '' }) }
 else { $efni = "verdmat-vakt lífsmark: $($vika.Lokid)/7 nætur lokið — vika til $($Nu.ToString('dd.MM'))" }
 
@@ -190,6 +206,11 @@ if ($lifsmarkNu) {
     $meginmal += "`nVikulegt lífsmark vaktarinnar (cc299). Þessi póstur kemur á mánudagsmorgni hver sem staðan er;`n" +
         "berist hann ekki er vaktin (verdmat-daily-kedjuvakt) dauð eða pósturinn bilaður.`n`n" +
         $vika.Haus + "`n" + ($vika.Radir -join "`n") + "`n"
+}
+if ($degrN -gt 0) {
+    # cc337: línurnar sem segja HVAÐ féll (DEGRADED-orsök) — keðjan skrifar þær með WARN/FAIL/féll/villa.
+    $orsakir = @(Get-Content -Encoding utf8 $nightLog | Where-Object { $_ -match '(?i)(WARN|FAIL|féll|villa|error|DEGRADED)' } | Select-Object -Last 12)
+    if ($orsakir.Count) { $meginmal += "`nLínur um það sem féll ($nightLog):`n" + ($orsakir -join "`n") + "`n" }
 }
 if ($Prof -or $stada -ne 'LOKID') {
     $hali = (Get-Content -Encoding utf8 $nightLog -Tail 8 -ErrorAction SilentlyContinue) -join "`n"
