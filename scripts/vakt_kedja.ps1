@@ -271,13 +271,32 @@ if ($sopunRc -eq 3) {
         Thydir = 'Óvíst hvort yfirferðin gengur; vefurinn sjálfur er ekki endilega fyrir áhrifum.'
         Master = "verdmat-vakt $($dagur): sópunarvakt MÆLING MISTÓKST (rc 3). Keyrðu scripts/sopunarvakt.py og segðu mér hvað brást." }
 }
+# cc340: dagleg Lögbirtingasókn (eigið verk verdmat-daily-logbirting, 05:40, ekki í keðjunni). Les aðeins Task
+# Scheduler-stöðu. Þarf athygli: keyrði ekki frá miðnætti, rc ekki 0, eða enn í gangi. Óskráð verk er aðeins nefnt.
+$lb = ''
+try {
+    $lbVerk = Get-ScheduledTask -TaskName 'verdmat-daily-logbirting' -ErrorAction Stop
+    $lbInfo = $lbVerk | Get-ScheduledTaskInfo
+    $lbRc = [uint32]$lbInfo.LastTaskResult
+    $lbHvad = $null
+    if ($lbVerk.State -eq 'Running') { $lb = 'Lögbirting: enn í gangi kl. ' + $Nu.ToString('HH:mm'); $lbHvad = "Sókn Lögbirtingablaðsins (05:40) var enn í gangi kl. $($Nu.ToString('HH:mm'))." }
+    elseif ($lbInfo.LastRunTime -lt $Nu.Date) { $lb = 'Lögbirting: keyrði ekki í dag (síðast ' + $lbInfo.LastRunTime.ToString('dd.MM HH:mm') + ')'; $lbHvad = 'Sókn Lögbirtingablaðsins (05:40) keyrði ekki í morgun.' }
+    elseif ($lbRc -ne 0) { $lb = ('Lögbirting: rc 0x{0:X} kl. {1:HH:mm} (logg D:\verdmat-is\logs\logbirting.log)' -f $lbRc, $lbInfo.LastRunTime); $lbHvad = "Sókn Lögbirtingablaðsins (05:40) mistókst (rc $lbRc)." }
+    else { $lb = 'Lögbirting: OK kl. ' + $lbInfo.LastRunTime.ToString('HH:mm') }
+    if ($lbHvad) {
+        $athygli += @{ Stutt = 'Lögbirtingasókn mistókst'
+            Hvad = $lbHvad
+            Thydir = 'Nýjar auglýsingar úr Lögbirtingablaðinu vantar í lb_auglysingar (hluthafar nota þær). Næsta keyrsla sækir síðustu 21 dag, svo gatið lokast sjálft þegar sóknin virkar á ný.'
+            Master = "verdmat-vakt $($dagur): $lb. Lestu D:\verdmat-is\logs\logbirting.log, finndu orsök og segðu mér hvað gerðist." }
+    }
+} catch { $lb = 'Lögbirting: verk ekki skráð' }
 $stig = $(if ($athygli.Count) { 'athygli' } elseif ($jafna.Count) { 'jafna' } else { 'lagi' })
 
 $postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and $stig -ne 'lagi')
 
 function Skra-Vakt([int]$r) {
     if ($Prof -or $Thurrt) { return }
-    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc degr=$degrN"
+    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc degr=$degrN lb=$(if ($lb -like 'Lögbirting: OK*' -or $lb -like '*ekki skráð') { 'ok' } else { 'FALL' })"
     try {
         $m = Split-Path -Parent $VaktLog
         if ($m -and -not (Test-Path $m)) { New-Item -ItemType Directory -Force $m | Out-Null }
@@ -349,6 +368,7 @@ if ($sopun.Count) {
     if ($stig -ne 'athygli') { $s2 = @($sopun | ForEach-Object { $_ -replace '^(K\d) FALL', '$1 á eftir' -replace '^SOPUNARVAKT: FALL', 'SOPUNARVAKT: á eftir' }) }
     $m += ''; $m += 'Sópun (cc324):'; $m += $s2
 }
+if ($lb) { $m += ''; $m += $lb }
 if ($jafna.Count -and $keyrslur.Count) {
     $m += ''; $m += 'Síðustu keyrslur sópunar (lifecycle_sweep_runs.jsonl):'
     foreach ($r in $keyrslur) { $m += ('at={0} rent_cursor={1}/{2} sale_cursor={3}/{4} requests={5}' -f $r.at, $r.rent_cursor, $r.rent_total, $r.sale_cursor, $r.sale_total, $r.requests) }

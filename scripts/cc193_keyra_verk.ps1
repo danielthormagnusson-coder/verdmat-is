@@ -24,7 +24,7 @@
 #   (d) póstumferð/idempotens (email_sent_at) óbreytt.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy', 'voktun')]
+    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy', 'voktun', 'logbirting')]
     [string]$Verk,
     [switch]$Thurrt
 )
@@ -90,6 +90,18 @@ $Verkin = @{
         Thurr  = @('--thurrt')
         WD     = 'D:\verdmat-is\app'
         Bida   = $true
+    }
+    # cc340: dagleg Lögbirtingasókn -> public.lb_auglysingar (áður skýjaverk). Repo logbirting á föstum commit í
+    # D:\verdmat-is\logbirting, eigið venv (pdfplumber). keyra_dagleg.py sækir síðustu 21 dag (tölublöð sem eru
+    # komin sleppt, upsert á numer) og ber eigið tímaþak sem drepur allt ferlatréð (þak verksins drepur aðeins
+    # þennan keyrara). Tenging um D:\verdmat-is\.dbconfig. rc 3 ekki notaður (status-probe telur 3 gott).
+    logbirting = @{
+        Skrift = 'D:\verdmat-is\logbirting\scraper\keyra_dagleg.py'
+        Rok    = @('--thak-min', '10')
+        Thurr  = @('--thak-min', '10', '--thurrt')
+        WD     = 'D:\verdmat-is\logbirting\scraper'
+        Bida   = $false
+        Python = 'D:\verdmat-is\logbirting\.venv\Scripts\python.exe'
     }
     nybygging_verkefni = @{
         Skrift = 'D:\verdmat-is\app\scripts\cc224_nybygging_verkefni.py'
@@ -179,6 +191,7 @@ if ($V.Bida) {
 }
 
 # ── 4. keyrsla ──────────────────────────────────────────────────────────────
+if ($V.ContainsKey('Python')) { $Python = $V.Python }   # cc340: verk með eigið venv
 if (-not (Test-Path $Python)) { Skrifa ('FALL: python vantar ' + $Python); exit 3 }
 if (-not (Test-Path $V.Skrift)) { Skrifa ('FALL: skrifta vantar ' + $V.Skrift); exit 3 }
 Set-Location $V.WD
