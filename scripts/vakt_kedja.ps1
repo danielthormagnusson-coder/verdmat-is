@@ -139,11 +139,21 @@ $lifsmarkStada = 'nei'
 # cc324: sópunarvakt. Sópunin fellur ekki á rc: kort-lotan stóð í 15+ daga með rc 0. Les aðeins; ekkert í status-logg.
 # rc 1 = FALL, 3 = mæling mistókst; hvort tveggja fer í póst. Breytir ekki rc keðjunnar (biðhliðin lesa hann).
 $sopun = @(); $sopunRc = 0
-if (-not $Prof) {
+# cc320 (11.11): -Prof keyrir líka sópunarvaktina (aðeins lestur), svo prófpósturinn sanni K0–K5-línurnar og UTF-8-lesturinn.
+if ($true) {
+    # cc320 (11.11): úttak Python er lesið sem UTF-8 í báða enda. Undir Task Scheduler er [Console]::OutputEncoding
+    # OEM-síða (850/437) og „á" í K0–K5 kom út sem „├í" í pósti. Python skrifar UTF-8 (PYTHONUTF8), PowerShell les UTF-8.
+    $fyrriKodun = [Console]::OutputEncoding; $fyrriPyUtf8 = $env:PYTHONUTF8
     try {
+        $env:PYTHONUTF8 = '1'
+        [Console]::OutputEncoding = $Utf8
         $sopun = @(& 'C:\Python314\python.exe' (Join-Path $PSScriptRoot 'sopunarvakt.py') 2>&1 | ForEach-Object { "$_" })
         $sopunRc = $LASTEXITCODE
     } catch { $sopun = @('SOPUNARVAKT: MÆLING MISTÓKST (ræsing)'); $sopunRc = 3 }
+    finally {
+        [Console]::OutputEncoding = $fyrriKodun
+        if ($null -eq $fyrriPyUtf8) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf8 }
+    }
 }
 $postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and ($stada -ne 'LOKID' -or $sopunRc -ne 0))
 
@@ -164,6 +174,8 @@ if (-not $lykill) { $lykill = Get-EnvGildi $EnvRot 'RESEND_API_KEY' }
 if (-not $Til) { $Til = Get-EnvGildi $EnvAi 'ABENDING_MOTTAKANDI' }
 $fra = Get-EnvGildi $EnvAi 'ABENDING_FRA'
 if (-not $fra) { $fra = 'verdmat.ai <onboarding@resend.dev>' }
+# cc320 (11.11): sendandanafn er „verdmat.ai" í öllum pósti; ABENDING_FRA gefur aðeins netfangið (staðfest lén).
+if ($fra -match '<([^<>\s]+@[^<>\s]+)>') { $fra = 'verdmat.ai <' + $Matches[1] + '>' } elseif ($fra -match '^\s*([^<>\s]+@[^<>\s]+)\s*$') { $fra = 'verdmat.ai <' + $Matches[1] + '>' }
 
 $vika = $null
 if ($lifsmarkNu) { $vika = Get-Vikusamantekt }

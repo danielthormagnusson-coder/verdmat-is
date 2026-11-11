@@ -563,6 +563,12 @@ def hlada_upp(order_id, skyrsla_path):
     return {"bucket": BUCKET, "path": slod, "sha256": sha, "bytes": len(gogn)}
 
 
+def sendandi(fra):
+    """cc320 (11.11): sendandanafn er „verdmat.ai" í öllum pósti; ABENDING_FRA gefur aðeins netfangið."""
+    m = re.search(r"<([^<>\s]+@[^<>\s]+)>", fra or "") or re.fullmatch(r"\s*([^<>\s]+@[^<>\s]+)\s*", fra or "")
+    return f"verdmat.ai <{m.group(1)}>" if m else "verdmat.ai <onboarding@resend.dev>"
+
+
 def tilkynna_danna(efni, texti):
     """qa-línan. Best-effort: bregðist pósturinn stendur staðan samt."""
     key = env_ai("RESEND_API_KEY") or os.environ.get("RESEND_API_KEY")
@@ -574,8 +580,7 @@ def tilkynna_danna(efni, texti):
         r = requests.post("https://api.resend.com/emails",
                           headers={"Authorization": "Bearer %s" % key,
                                    "Content-Type": "application/json"},
-                          json={"from": env_ai("ABENDING_FRA")
-                                or "verdmat.ai <onboarding@resend.dev>",
+                          json={"from": sendandi(env_ai("ABENDING_FRA")),
                                 "to": [til], "subject": efni, "text": texti},
                           timeout=30)
         return r.ok
