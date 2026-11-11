@@ -4,6 +4,14 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-11 — Fallið `registur_utflutningur.virk_verk(sek)` fyrir afrit hluthafa (cc338)
+
+**Ákvörðun Danna og arkitekts 11.11 (leið (a), þrengd):** afrit hluthafa (`registur_afrit`) fær að vita hvort langar fyrirspurnir séu virkar án þess að sjá `pg_stat_activity` sjálft. Fallið er SECURITY DEFINER og STABLE, eigandi postgres (í `pg_read_all_stats`), með fast `search_path = pg_catalog, pg_temp`. Það skilar AÐEINS `(fjoldi integer, lengsta_sek integer)`, ENGUM fyrirspurnatexta. EXECUTE hefur aðeins `registur_afrit`; réttindin eru tekin af PUBLIC, anon, authenticated (og service_role). Tilgangurinn er að færa afritið af eigandalykilorði verdmat.
+
+Migration `supabase/migrations/20261111180000_cc338_virk_verk.sql`, rollback `supabase/rollback/20261111180000_cc338_virk_verk_rollback.sql`. **GO Danna 11.11 (beint í lotuglugga cc338):** „go“. Beitt 11.11 kl. 19:47 UTC. Próf og sannreyning: `D:\_audit\cc338_virk_verk\SKIL_CC338.md`.
+
+---
+
 ## 2026-11-11 — Afrit: vikulegt pg_dump á R2 og viðbætur í næturafrit (cc336b)
 
 GO Danna 11.11, orðrétt í lotu cc336b: „GO Danna: G1 og G2. parsed_mbl.db fer EKKI í vikulega afritið. G3 bíður þar til ég er við tölvuna; G4 og G5 eftir G3. Ekkert 01:00–07:30.“
@@ -15,6 +23,8 @@ GO Danna 11.11, orðrétt í lotu cc336b: „GO Danna: G1 og G2. parsed_mbl.db f
   * **Bannfærsla:** skriftan neitar að keyra 01:00–07:30 UTC.
 * **G2:** Sjö nýjar færslur í `scripts/backup_paths.json`: `D:\model_artifacts`, smíðaskriftur á D:\-rót, `precompute\support`, `precompute\*.py`, `D:\cc143`, `C:\verdmat_vakt` og smáskrár í `scraper_data`. Viðbótin er +0,62 GB, svo heildin verður 12,71 GB. Samhliða er galli lagaður: `exclude_filenames` og `exclude_paths` voru aldrei send til rclone. Þau fara nú sem `--filter`-reglur, ásamt `__pycache__/**`.
 * **Bíður:** G3 (lykilorðaskipti) bíður þar til Danni er við tölvuna. G4 (R2-hreinsun cc56/cc58) og G5 (DB_URL-línur) koma eftir G3. Áætlun: `D:\_audit\cc336b_afrit\AAETLUN_LYKILORDASKIPTI.md`.
+
+---
 
 ## 2026-11-10 — Vistuð leit: eigindi úr lýsingu í vöktunarpósti, endurbirting 90 d, skrá HMS fyrir bílskúr (cc329)
 
