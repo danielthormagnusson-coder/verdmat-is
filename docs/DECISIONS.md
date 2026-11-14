@@ -4,6 +4,21 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-14 — Söluvörn verðmats: aðeins söluauglýsingar, aukarými er ekki önnur eign, ≥2 eignar-matseiningar halda vörn (cc342)
+
+**Ákvörðun arkitekts 14.11 (flokkur A, GO á push), borin af master, orðrétt:** „Viðbótarskilyrðið (≥2 eignar-matseiningar, bílskúr/geymsla ekki talin, halda vörninni) er samþykkt. Gildandi tala: 131 af 228 opnast, 76 á sölu.“ Ákvörðun Danna og arkitekts 14.11 á undan: söluvörnin gildir við tvær eða fleiri söluauglýsingar af ólíkum stærðum, og **leiguauglýsingar kveikja hana ekki**. Stærðarpörun við matseiningar (iii) fylgir af því að handskoðun 10 slembieigna stóðst (1 af 10 vafasöm).
+
+Reglan eins og hún er útfærð (verdmat-ai `lib/fjoleining.js`, `erVerdmatsFjoleining`; kölluð aðeins innan cc27-hliðsins `public.v_fjoleining_fastnum`):
+* **Aðeins söluauglýsingar teljast.** Leigumatið heldur cc27-vörninni (`v_fjoleining_fastnum`, allar tegundir) óbreyttri.
+* **Aukarými er ekki önnur eign.** Stærð söluauglýsingar sem passar við íbúðarrými ± aukarými (notkun_kodi 504/529/530/525/522/372) eða einflm (vikmörk max(1 m², 2 %)) telst sama eign.
+* **Vörn gildir** ef ≥2 ólíkar sölustærðir eru og a.m.k. ein passar ekki, **eða** ≥2 eignar-matseiningar (íbúðir/atvinnurými, kóði ≥300, aukarými ekki talin) eru skráðar á fastanúmerið.
+* **Tölur 14.11:** af 228 fastanúmerum með falið mat opnast **131**, þar af **76 á sölu**. 2537511 (blokk á fastanúmeri byggingar) og Ásvallagata 22 (2003934) haldast falin. Heiðarlundur 4 (2070403) opnast.
+* **Textar (Danni 14.11):** ≥2 eignar-matseiningar: „Tvær eða fleiri íbúðir eru skráðar á þetta fastanúmer, svo ekki er hægt að meta hvora fyrir sig.“ Ein matseining: „Fleiri en ein íbúð er auglýst á þessu fastanúmeri, svo ekki er hægt að meta hverja fyrir sig.“
+
+verdmat-ai commit `63500de` (ofan á `674aba1`). Flokkur B: `scraper.leit_staerdir_fastnum_v2` (ber tenure), **GO Danna 14.11**, beitt 22:29 UTC. Migration og rollback eru í verdmat-ai `supabase/migrations/20261114080000_cc342_leit_staerdir_v2.sql`. SKIL: `D:\_audit\cc342_matseiningar\SKIL_CC342.md`.
+
+---
+
 ## 2026-11-11 — Fallið `registur_utflutningur.virk_verk(sek)` fyrir afrit hluthafa (cc338)
 
 **Ákvörðun Danna og arkitekts 11.11 (leið (a), þrengd):** afrit hluthafa (`registur_afrit`) fær að vita hvort langar fyrirspurnir séu virkar án þess að sjá `pg_stat_activity` sjálft. Fallið er SECURITY DEFINER og STABLE, eigandi postgres (í `pg_read_all_stats`), með fast `search_path = pg_catalog, pg_temp`. Það skilar AÐEINS `(fjoldi integer, lengsta_sek integer)`, ENGUM fyrirspurnatexta. EXECUTE hefur aðeins `registur_afrit`; réttindin eru tekin af PUBLIC, anon, authenticated (og service_role). Tilgangurinn er að færa afritið af eigandalykilorði verdmat.
