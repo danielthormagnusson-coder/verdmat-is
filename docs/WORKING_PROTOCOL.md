@@ -378,3 +378,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 
 **Áður en `D:\verdmat-is\app` main er flýtt áfram (ff) er staða `verdmat-daily-lifecycle-sweep` og `verdmat-nightly-delta` lesin í Task Scheduler sem sér skref. Keyri annað hvort er ekkert ff gert fyrr en það lýkur.** Athugun og ff fara aldrei í sömu skipun. Raundæmi: cc320 flýtti main áfram 08.11 kl. 09:53 í sömu skipun og athugun sem sýndi sópun í gangi; breytingin snerti aðeins skrá sem sópunin hleður ekki. Skrá: `D:\_audit\cc320_voktun\SKIL_CC320.md` §E.
 
+### (ai) AÐEINS ORÐIÐ GO FRÁ DANNA OPNAR PUSH EÐA BEITINGU (Danni + arkitekt 15.11)
+
+**Aðeins orðið GO frá Danna opnar push eða beitingu. Hrós eða samþykki á útliti („flott", „samþykkt útlitslega") er ekki GO. Lota sem er í vafa spyr: „Er þetta GO á push?"**
+
