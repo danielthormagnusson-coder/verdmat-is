@@ -8,7 +8,9 @@ Forskrift: D:\\_audit\\cc249_manadarsala\\SKIL_CC249.md §2 (m1), ákvörðun Da
   hbs        = SVFN 0000/1000/1100/1300/1400/1604/1606 (cc237 HOFUDB)
   fullnusta  = q11: miðgildi yfir þroskaða mánuði M ∈ T−15…T−4 af hlut samninga M sem var þinglýstur
                ≤ (lok M) + (data_through + 1 d − lok T); bil = lægsta/hæsta. Reiknað per svæði.
-  stada      = 'bradabirgda' ef fullnusta < 0,97, annars 'endanlegt'
+  stada      = 'bradabirgda' ef fullnusta < 0,97, annars 'endanlegt' — dæmt á fullnustu NÁMUNDAÐRI í 4
+               aukastafi, sama gildi og skrifað er í numeric(5,4); CHECK manadarsala_yoy_chk dæmir geymda
+               gildið og ræður (cc350: 17.11.2026 var 0,96997… → 'bradabirgda' en geymt 0,9700 → CheckViolation)
   sama töf   = T−12 talinn með sömu þinglýsingartöf: þinglýst ≤ (lok T−12) + (data_through + 1 d − lok T)
   mánuðir    = FYRSTI_MANUDUR … síðasti heili mánuður fyrir data_through (yfirstandandi mánuður aldrei)
 
@@ -38,6 +40,7 @@ HBS = {"0000", "1000", "1100", "1300", "1400", "1604", "1606"}
 IBUD = {"Fjölbýli", "Einbýli", "Sérbýli"}
 FYRSTI_MANUDUR = pd.Period("2024-01", "M")
 BRADABIRGDA_UNDIR = 0.97
+AUKASTAFIR = 4  # = kvarði semantic.manadarsala_yoy.fullnusta* (numeric(5,4)); skrifa() og stada() námunda eins
 # Hlið: kaupskráin þarf að vera fersk og heil áður en töflunni er skipt út.
 HAMARKS_ALDUR_DAGA = 7      # data_through má ekki vera eldri en þetta (dagar frá keyrsludegi)
 LAGMARK_SAMNINGA = 100_000  # nothæfir íbúðasamningar alls í skránni (16.10.2026: 161.942)
@@ -92,9 +95,23 @@ def reikna_svaedi(d: pd.DataFrame, data_through: pd.Timestamp, manudir: pd.Perio
             fullnusta_min=min(hl) if hl else None, fullnusta_max=max(hl) if hl else None,
         ))
     r = pd.DataFrame(rows)
-    r["stada"] = np.where(r.fullnusta.isna(), None,
-                          np.where(r.fullnusta < BRADABIRGDA_UNDIR, "bradabirgda", "endanlegt"))
+    r["stada"] = r.fullnusta.map(stada)
     return r
+
+
+def namunda(v):
+    """Námundun eins og skrifað er í grunninn (round(v, 4) í skrifa()); None/NaN → None."""
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return None
+    return round(float(v), AUKASTAFIR)
+
+
+def stada(fullnusta):
+    """Regla CHECK manadarsala_yoy_chk á GEYMDA gildinu: < 0,97 → 'bradabirgda', annars 'endanlegt'."""
+    f = namunda(fullnusta)
+    if f is None:
+        return None
+    return "bradabirgda" if f < BRADABIRGDA_UNDIR else "endanlegt"
 
 
 def reikna(s: pd.DataFrame, data_through: pd.Timestamp) -> pd.DataFrame:
@@ -128,7 +145,7 @@ def skrifa(r: pd.DataFrame, data_through: pd.Timestamp) -> int:
     cols = ["svaedi", "manudur", "n", "velta", "n_fyrra_nu", "velta_fyrra_nu", "n_fyrra_sama_tof",
             "velta_fyrra_sama_tof", "fullnusta", "fullnusta_min", "fullnusta_max", "stada"]
     vals = [(REGLA_VERSION, *[None if (isinstance(v, float) and np.isnan(v)) else
-                               (round(v, 4) if isinstance(v, float) else (int(v) if isinstance(v, np.integer) else v))
+                               (namunda(v) if isinstance(v, float) else (int(v) if isinstance(v, np.integer) else v))
                                for v in row], reiknad, data_through.date())
             for row in r[cols].itertuples(index=False, name=None)]
     c = psycopg2.connect(DBCONFIG.read_text(encoding="utf-8-sig").strip(), connect_timeout=15)
