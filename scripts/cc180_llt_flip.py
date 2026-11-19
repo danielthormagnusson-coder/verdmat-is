@@ -8,8 +8,8 @@ hleðsluna) er EKKI notað. Í staðinn:
 
   --stage  <csv> --tag r3 --expect-rows N --expect-status k=v,k=v
         1. DROP IF EXISTS + CREATE public.last_listing_text_new (8 dálkar, sami
-           PK (fastnum, sale_rank) + fastnum-vísir, RLS + public_read SELECT-only,
-           grants) — Í SÖMU txn og COPY úr CSV.
+           PK (fastnum, sale_rank) + fastnum-vísir, RLS án stefnu, aðeins
+           service_role-grants (cc347; áður public_read til anon) — Í SÖMU txn og COPY úr CSV.
         2. PARITY (read-only, eftir commit): rowcount == spá, pair_status-dreifing
            == spá, sale_rank samfelld ≤3 per fastnum, engin NULL lykil-/textareitur,
            sameiginlegar (fastnum, thinglyst_dagur, augl_id)-raðir stafrétt eins
@@ -143,9 +143,9 @@ def stage(args):
             cur.execute(f"CREATE INDEX idx_last_listing_new_fastnum ON public.{NEW} USING btree (fastnum)")
             # RLS + grants Í SÖMU txn og stofnun (CLAUDE.md-reglan; feedback_ny_public_tafla_kemur_med_anon_arwdDxtm)
             cur.execute(f"ALTER TABLE public.{NEW} ENABLE ROW LEVEL SECURITY")
-            cur.execute(f"REVOKE ALL ON TABLE public.{NEW} FROM anon, authenticated")
-            cur.execute(f"CREATE POLICY public_read ON public.{NEW} FOR SELECT TO anon, authenticated USING (true)")
-            cur.execute(f"GRANT SELECT ON TABLE public.{NEW} TO anon, authenticated")
+            # cc347: þjónninn les með service_role (cc345) — ENGIN anon/authenticated-réttindi né
+            # public_read-stefna; RLS virkt án stefnu (service_role sniðgengur RLS).
+            cur.execute(f"REVOKE ALL ON TABLE public.{NEW} FROM PUBLIC, anon, authenticated")
             cur.execute(f"GRANT ALL ON TABLE public.{NEW} TO service_role")
             cur.execute(f"COMMENT ON COLUMN public.{NEW}.augl_dagur IS "
                         "'RAUNVERULEGUR birtingardagur auglýsingarinnar (matched_listing_date úr pairs_v1; "
@@ -281,9 +281,8 @@ ALTER INDEX public.idx_last_listing_fastnum RENAME TO idx_last_listing_rolledbac
 ALTER TABLE public.{old} RENAME TO {LIVE};
 ALTER INDEX public.{old}_pkey RENAME TO {LIVE}_pkey;
 ALTER INDEX public.idx_last_listing_old_{args.tag}_fastnum RENAME TO idx_last_listing_fastnum;
--- endurheimta app-lestur á upprunalegu töflunni
-CREATE POLICY public_read ON public.{LIVE} FOR SELECT TO anon, authenticated USING (true);
-GRANT SELECT ON TABLE public.{LIVE} TO anon, authenticated;
+-- cc347: app-lestur er um service_role; anon/authenticated fá ekkert
+GRANT ALL ON TABLE public.{LIVE} TO service_role;
 -- loka þeirri sem tekin var úr umferð
 REVOKE ALL ON TABLE public.{LIVE}_rolledback_{args.tag} FROM anon, authenticated;
 DROP POLICY IF EXISTS public_read ON public.{LIVE}_rolledback_{args.tag};
