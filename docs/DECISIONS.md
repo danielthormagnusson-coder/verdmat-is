@@ -4,6 +4,16 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-19 — Réttindaregla opnu hlutverkanna og dagleg réttindavakt (cc350, B1.3 cc347)
+
+**Ákvörðun Danna og arkitekts 19.11 (flokkur A), orðrétt:** „réttindavakt í verdmat-daily-status-probe: anon og authenticated mega aðeins lesa semantic.fasteignasala_* ×3 og PostGIS-hlutina; annað → VAKT-VIDVORUN í vaktarpósti á mannamáli. Sama fyrir EXECUTE á föllum.“
+
+Útfærsla: `scripts/rettindavakt.py` (aðeins lestur; öll skemu nema kerfis- og Supabase-vettvangsskemu; USAGE á skema + réttindi á hlut; föll sem skila `trigger` ekki talin; föll viðbótanna postgis og pg_trgm leyfð). Kallað úr `verdmat_status_probe.ps1` (07:30 UTC, `rettindi=OK|FALL(n)` í status-línu, R-línur undir VAKT-VIDVORUN) og `vakt_kedja.ps1` (07:00, „ÞARF ATHYGLI – gagnagrunnur opnari en á að vera“ + texti fyrir master). Próf: `scripts/rettindavakt_prof.py [--lifandi]` (fölsun í bakfærðri færslu).
+
+**Þekkt frávik (BÍÐUR ÁKVÖRÐUNAR DANNA):** authenticated hefur 19.11 réttindi á 12 hlutum utan reglunnar (pro_users, property_attributes, saved_* ×4, scraper.listings_canonical + 5 v_*-sýnir) og EXECUTE á public.greining_eignar. Þau standa í `THEKKT` í rettindavakt.py svo vaktin hrópi ekki daglega á þekkt ástand; ný réttindi á þeim, eða nýr hlutur, fella vaktina. Bókstafleg regla = tæma `THEKKT` eða REVOKE á hlutunum.
+
+---
+
 ## 2026-11-19 — Stjörnumat, merkingar úr lýsingu, kveikja Fable-yfirferðar og einkunn A (arkitekt, eftir cc349)
 
 **Ákvarðanir arkitekts 19.11.2026, skráðar að ósk Danna (borið af master í cc351):**

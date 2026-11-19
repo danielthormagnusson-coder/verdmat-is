@@ -28,8 +28,10 @@
 #
 # Usage:  powershell -File scripts\verdmat_status_probe.ps1 [-DryRun]
 #   -DryRun: print the line(s) to stdout, write nothing.
+# cc350: + réttindavakt (scripts/rettindavakt.py) — `rettindi=OK|FALL(n)|MAELING_MISTOKST` í línunni; annað en OK
+#   er hávært og R-línurnar (á mannamáli) fylgja VAKT-VIDVORUN.
 
-param([switch]$DryRun)
+param([switch]$DryRun, [string]$RettindaSkra = '')   # cc350: -RettindaSkra = úttak réttindavaktar úr skrá (próf)
 
 $ErrorActionPreference = 'Stop'
 $statusFile = 'D:\verdmat_status.log'
@@ -80,12 +82,39 @@ $chainBits = @(
     (Get-ChainVerdict 'myigloo_night_*.log' 'myigloo')
 )
 
+# ── cc350 (B1.3 cc347): réttindavakt — anon/authenticated mega aðeins lesa semantic.fasteignasala_* ×3 + PostGIS ──
+# scripts/rettindavakt.py (aðeins lestur). FALL og mæling sem mistekst eru hávær; R-línurnar (mannamál) fara í
+# status-loggið undir VAKT-VIDVORUN. Sama skrifta keyrir í vaktarpóstinum (vakt_kedja.ps1, 07:00).
+$rettLinur = @()
+$rettBit = 'rettindi=?'
+if ($RettindaSkra) {
+    $rettUt = @(Get-Content -Encoding utf8 $RettindaSkra)
+    $rl = ($rettUt | Where-Object { $_ -like 'RETTINDAVAKT:*' } | Select-Object -Last 1)
+    $rettRc = $(if ($rl -like 'RETTINDAVAKT: OK*') { 0 } elseif ($rl -like 'RETTINDAVAKT: FALL*') { 1 } else { 3 })
+} else { try {
+    $fyrriKodun = [Console]::OutputEncoding; $fyrriPyUtf8 = $env:PYTHONUTF8
+    $env:PYTHONUTF8 = '1'
+    [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+    $rettUt = @(& 'C:\Python314\python.exe' (Join-Path $PSScriptRoot 'rettindavakt.py') 2>&1 | ForEach-Object { "$_" })
+    $rettRc = $LASTEXITCODE
+} catch { $rettUt = @('RETTINDAVAKT: MAELING MISTOKST (raesing)'); $rettRc = 3 }
+finally {
+    [Console]::OutputEncoding = $fyrriKodun
+    if ($null -eq $fyrriPyUtf8) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf8 }
+} }
+$rettBit = switch ($rettRc) { 0 { 'rettindi=OK' } 1 { 'rettindi=FALL(' + @($rettUt | Where-Object { $_ -like 'R *' }).Count + ')' } default { 'rettindi=MAELING_MISTOKST' } }
+if ($rettRc -ne 0) {
+    $offenders += $rettBit
+    $rettLinur = @($rettUt | Where-Object { $_ -like 'R *' -or $_ -like 'RETTINDAVAKT:*' })
+}
+
 # ── one summary line (+ loud line on trouble) ────────────────────────────────
 $utc  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 $flag = if ($offenders.Count) { 'VAKT' } else { 'OK  ' }
-$lines = @("$utc $flag tasks[$($taskBits -join ' ')] $($chainBits -join ' ')")
+$lines = @("$utc $flag tasks[$($taskBits -join ' ')] $($chainBits -join ' ') $rettBit")
 if ($offenders.Count) {
     $lines += "$utc !! VAKT-VIDVORUN: $($offenders -join ', ')"
+    foreach ($r in $rettLinur) { $lines += "$utc !! $r" }
 }
 
 if ($DryRun) {

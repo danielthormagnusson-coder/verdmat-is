@@ -39,6 +39,10 @@
 #       neðst undir „Fyrir lotur“, óbreyttar að efni (í „að jafna sig“ er K-merkið FALL ritað „á eftir“).
 #   -SopunSkra <skrá>: les úttak sópunarvaktar úr skrá í stað þess að keyra hana (próf og sýnishorn).
 #   -SopunKeyrslur <skrá>: lifecycle_sweep_runs.jsonl (framvinda yfirferðar).
+#   cc350 (B1.3 cc347): RÉTTINDAVAKT. scripts/rettindavakt.py (aðeins lestur) mælir hvað anon/authenticated mega í
+#       grunninum; reglan er að þau lesi aðeins semantic.fasteignasala_* ×3 + PostGIS. FALL → „þarf athygli“ á
+#       mannamáli (hver getur hvað í hvaða hlut) + texti fyrir master; mæling sem mistekst líka. -RettindaSkra <skrá>:
+#       les úttakið úr skrá (próf). Vaktarlínan ber rett=<rc>.
 #   -Lifsmark: þvingar lífsmarkið (hvaða dag sem er).  -Thurrt: prentar efni og meginmál, sendir EKKERT og skrifar
 #       EKKERT (hvorki status-logg né $VaktLog). Lykill aldrei prentaður, aðeins hvort hann fannst.
 param(
@@ -55,7 +59,8 @@ param(
     [string]$EnvRot = 'D:\env.local',
     [datetime]$Nu = (Get-Date),         # prófanir senda inn tíma; raunkeyrsla notar núið
     [string]$SopunSkra = '',
-    [string]$SopunKeyrslur = 'D:\verdmat-is\scraper_data\lifecycle_sweep_runs.jsonl'
+    [string]$SopunKeyrslur = 'D:\verdmat-is\scraper_data\lifecycle_sweep_runs.jsonl',
+    [string]$RettindaSkra = ''          # cc350: úttak réttindavaktar úr skrá (próf og sýnishorn)
 )
 
 function Get-KedjuStada {
@@ -290,13 +295,44 @@ try {
             Master = "verdmat-vakt $($dagur): $lb. Lestu D:\verdmat-is\logs\logbirting.log, finndu orsök og segðu mér hvað gerðist." }
     }
 } catch { $lb = 'Lögbirting: verk ekki skráð' }
+# cc350: réttindavakt — opnu hlutverkin (anon/authenticated) mega aðeins lesa semantic.fasteignasala_* ×3 + PostGIS.
+$rett = @(); $rettRc = 0
+if ($RettindaSkra) {
+    $rett = @(Get-Content -Encoding utf8 $RettindaSkra)
+    $rl = ($rett | Where-Object { $_ -like 'RETTINDAVAKT:*' } | Select-Object -Last 1)
+    $rettRc = $(if ($rl -like 'RETTINDAVAKT: OK*') { 0 } elseif ($rl -like 'RETTINDAVAKT: FALL*') { 1 } else { 3 })
+} else {
+    $fyrriKodun = [Console]::OutputEncoding; $fyrriPyUtf8 = $env:PYTHONUTF8
+    try {
+        $env:PYTHONUTF8 = '1'
+        [Console]::OutputEncoding = $Utf8
+        $rett = @(& 'C:\Python314\python.exe' (Join-Path $PSScriptRoot 'rettindavakt.py') 2>&1 | ForEach-Object { "$_" })
+        $rettRc = $LASTEXITCODE
+    } catch { $rett = @('RETTINDAVAKT: MÆLING MISTÓKST (ræsing)'); $rettRc = 3 }
+    finally {
+        [Console]::OutputEncoding = $fyrriKodun
+        if ($null -eq $fyrriPyUtf8) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf8 }
+    }
+}
+$rettFravik = @($rett | Where-Object { $_ -like 'R *' } | ForEach-Object { $_.Substring(2) })
+if ($rettRc -eq 1) {
+    $athygli += @{ Stutt = 'gagnagrunnur opnari en á að vera'
+        Hvad = ('Réttindavaktin fann {0} {1} í gagnagrunninum sem opni lykillinn eða innskráðir notendur eiga ekki að hafa: {2}' -f $rettFravik.Count, $(if ($rettFravik.Count -eq 1) { 'aðgang' } else { 'aðganga' }), ($rettFravik -join ' '))
+        Thydir = 'Hver sem er með lykilinn úr vafranum (hann er opinber) gæti lesið eða breytt þessum gögnum beint, framhjá vefnum. Vefurinn sjálfur virkar eðlilega.'
+        Master = "verdmat-vakt $($dagur): réttindavakt FALL ($($rettFravik.Count)): $($rettFravik -join ' ') Finndu hvaða skrifta eða migration veitti réttindin, leggðu til REVOKE og lagfæringu á orsökinni (HALT fyrir GO)." }
+} elseif ($rettRc -ne 0) {
+    $athygli += @{ Stutt = 'réttindavakt gat ekki mælt'
+        Hvad = 'Vaktin gat ekki mælt hvaða aðgang opni lykillinn hefur í gagnagrunninum (tenging eða fyrirspurn brást).'
+        Thydir = 'Óvíst hvort gagnagrunnurinn er opnari en hann á að vera; vefurinn sjálfur er ekki endilega fyrir áhrifum.'
+        Master = "verdmat-vakt $($dagur): réttindavakt MÆLING MISTÓKST (rc $rettRc). Keyrðu scripts/rettindavakt.py og segðu mér hvað brást." }
+}
 $stig = $(if ($athygli.Count) { 'athygli' } elseif ($jafna.Count) { 'jafna' } else { 'lagi' })
 
 $postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and $stig -ne 'lagi')
 
 function Skra-Vakt([int]$r) {
     if ($Prof -or $Thurrt) { return }
-    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc degr=$degrN lb=$(if ($lb -like 'Lögbirting: OK*' -or $lb -like '*ekki skráð') { 'ok' } else { 'FALL' })"
+    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc rett=$rettRc degr=$degrN lb=$(if ($lb -like 'Lögbirting: OK*' -or $lb -like '*ekki skráð') { 'ok' } else { 'FALL' })"
     try {
         $m = Split-Path -Parent $VaktLog
         if ($m -and -not (Test-Path $m)) { New-Item -ItemType Directory -Force $m | Out-Null }
@@ -369,6 +405,7 @@ if ($sopun.Count) {
     $m += ''; $m += 'Sópun (cc324):'; $m += $s2
 }
 if ($lb) { $m += ''; $m += $lb }
+if ($rett.Count) { $m += ''; $m += 'Réttindi (cc350):'; $m += $rett }
 if ($jafna.Count -and $keyrslur.Count) {
     $m += ''; $m += 'Síðustu keyrslur sópunar (lifecycle_sweep_runs.jsonl):'
     foreach ($r in $keyrslur) { $m += ('at={0} rent_cursor={1}/{2} sale_cursor={3}/{4} requests={5}' -f $r.at, $r.rent_cursor, $r.rent_total, $r.sale_cursor, $r.sale_total, $r.requests) }
