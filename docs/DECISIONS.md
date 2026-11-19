@@ -4,6 +4,19 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-19 — Stjörnumat, merkingar úr lýsingu, kveikja Fable-yfirferðar og einkunn A (arkitekt, eftir cc349)
+
+**Ákvarðanir arkitekts 19.11.2026, skráðar að ósk Danna (borið af master í cc351):**
+
+* **Stjörnumat:** birt verðmat má vera framreiknuð eigin sala eignar þegar stjarna-v0 á við. Stefnuskilyrðið (ásett verð ræður hvort beitt er) er samþykkt með tveimur skilyrðum: grunnmatið er alltaf geymt og sýnilegt einum smelli frá; allar nákvæmnismælingar líkansins reiknast á grunnmatinu, aldrei á stjörnumatinu.
+* **Gólfflötur, ástand, sérstaða og aukaíbúð** fá aðeins merkingu, enga krónutölu.
+* **Kveikja Fable-yfirferðar:** ásett verð utan 95 % bils eða meira en ±20 % frá verðmati.
+* **Einkunn A verður B** ef eigin sala innan 5 ára, framreiknuð, liggur utan 80 % bils.
+
+Röð verka samkvæmt arkitekt: (1) falsmerkt `size_mismatch` í kaupskrá (cc351), (2) hlið fyrir ósambærilegar auglýsingar, (3) stjarna-v0. Undanfari: `D:\_audit\cc349b_fravik_asett\SKIL_CC349.md`.
+
+---
+
 ## 2026-11-14 — Söluvörn verðmats: aðeins söluauglýsingar, aukarými er ekki önnur eign, ≥2 eignar-matseiningar halda vörn (cc342)
 
 **Ákvörðun arkitekts 14.11 (flokkur A, GO á push), borin af master, orðrétt:** „Viðbótarskilyrðið (≥2 eignar-matseiningar, bílskúr/geymsla ekki talin, halda vörninni) er samþykkt. Gildandi tala: 131 af 228 opnast, 76 á sölu.“ Ákvörðun Danna og arkitekts 14.11 á undan: söluvörnin gildir við tvær eða fleiri söluauglýsingar af ólíkum stærðum, og **leiguauglýsingar kveikja hana ekki**. Stærðarpörun við matseiningar (iii) fylgir af því að handskoðun 10 slembieigna stóðst (1 af 10 vafasöm).
