@@ -382,3 +382,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 
 **Aðeins orðið GO frá Danna opnar push eða beitingu. Hrós eða samþykki á útliti („flott", „samþykkt útlitslega") er ekki GO. Lota sem er í vafa spyr: „Er þetta GO á push?"**
 
+
+### (aj) VERK Í FLOKKI B KEYRIR Í LOTU MEÐ EIGIN GLUGGA, ALDREI SEM UNDIRLOTA Í MASTER (Danni 19.11.2026)
+
+**Verk í flokki B (migration, beiting á grunn, lyklar, Task Scheduler) keyrir alltaf í lotu með eigin glugga, aldrei sem undirlota inni í master.** Gildir frá lotunni á eftir cc351; cc351 klárar eins og hún er.
