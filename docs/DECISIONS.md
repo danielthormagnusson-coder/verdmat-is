@@ -4,6 +4,16 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-19 — Eigin sala sem akkeri í grunnmati kemur í stað stjarna-v0 (Danni, eftir cc353)
+
+**Ákvörðun Danna 19.11 (kemur í stað stjarna-v0 frá sama degi), borin af master:** engin stjarna og ekkert sérstakt „leiðrétt mat" í birtingu. Fyrri sala eignarinnar sjálfrar verður hluti af undirlaginu EF mæling stenst.
+
+**Skilyrði arkitekts:** ásett verð er aldrei inntak eða kveikja; akkerið gildir um allar eignir með gjaldgenga eigin sölu, á sölu eða ekki. Fasteignamat er aldrei inntak (regla 8). Engir handstuðlar: vægi akkeris kemur úr mælingu.
+
+Fyrri færsla 19.11 um stjörnumat (birt verðmat má vera framreiknuð eigin sala, stefnuskilyrði, A→B) er þar með úr gildi. cc353 áfangi 2 (verdmat-ai `cc353b` 414744d, app `cc353app` 6f6f888) er hvorki ýttur né beittur; áfangi 1 (hlið, b0e9e7f) stendur. Mæling: cc356, `D:\_audit\cc356_eigin_sala_akkeri\SKIL_CC356.md`; engin útfærsla án GO Danna.
+
+---
+
 ## 2026-11-19 — Réttindaregla opnu hlutverkanna og dagleg réttindavakt (cc350, B1.3 cc347)
 
 **Ákvörðun Danna og arkitekts 19.11 (flokkur A), orðrétt:** „réttindavakt í verdmat-daily-status-probe: anon og authenticated mega aðeins lesa semantic.fasteignasala_* ×3 og PostGIS-hlutina; annað → VAKT-VIDVORUN í vaktarpósti á mannamáli. Sama fyrir EXECUTE á föllum.“
