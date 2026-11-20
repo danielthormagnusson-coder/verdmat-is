@@ -386,3 +386,12 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 ### (aj) VERK Í FLOKKI B KEYRIR Í LOTU MEÐ EIGIN GLUGGA, ALDREI SEM UNDIRLOTA Í MASTER (Danni 19.11.2026)
 
 **Verk í flokki B (migration, beiting á grunn, lyklar, Task Scheduler) keyrir alltaf í lotu með eigin glugga, aldrei sem undirlota inni í master.** Gildir frá lotunni á eftir cc351; cc351 klárar eins og hún er.
+
+### (ak) SMART APP CONTROL HELST Á; SLÖKKT AÐEINS EF LOKUN FELLIR NÆTURKEÐJU EÐA SÓPUN ÞRÁTT FYRIR ENDURRÆSINGU (arkitekt 20.11.2026)
+
+**Smart App Control (Code Integrity-stefna `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`, `VerifiedAndReputablePolicyState = 1`) stendur óbreytt. Viðmið: slökkt verður aðeins ef lokun fellir næturkeðju eða sópun þrátt fyrir endurræsingu; sú ákvörðun er Danna.** SAC dæmir óundirritaðar `.pyd`/`.dll` eftir orðspori í skýi, svo sama óbreytta skrá getur verið leyfð einn daginn og lokuð þann næsta án nokkurrar breytingar á vélinni. Atvik:
+- 09.09.2026: numpy 2.5.3 (`_multiarray_umath`) lokað í nýju venv; lagað með numpy==2.4.4 (global-útgáfan).
+- 19.11.2026 12:00 UTC: `statsmodels\tsa\exponential_smoothing\_ets_smooth.cp314-win_amd64.pyd` í global-Python lokað (gekk aftur 20.11).
+- 20.11.2026 05:40 UTC: `libssl-3-x64-….dll` í `psycopg2_binary.libs` í `D:\verdmat-is\logbirting\.venv` lokað (skrá óbreytt síðan 11.11) → `verdmat-daily-logbirting` rc 4. Engin Windows-uppfærsla síðasta sólarhring. Innflutningur gekk 07:54 og handvirk keyrsla skilaði rc 0.
+
+Viðbragð: lesa `Microsoft-Windows-CodeIntegrity/Operational` (Id 3033/3077/3118) til að finna skrána; endurkeyra verkið einu sinni. Tillögur samþykktar af arkitekt 20.11, bíða GO Danna (flokkur B): (1) logbirting noti psycopg2 úr global-Python í stað sérútgáfu venv; (2) kedjuvakt endurræsir verk einu sinni við rc 4 með „Application Control" í villutexta.

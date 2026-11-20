@@ -1923,3 +1923,5 @@ sé endurvakinn á skoðun einni.
   - **Merki:** Danni valdi ekkert merki 06.11; nýtt merki krefst nýrrar ákvörðunar. Fundur: `D:\_audit\cc313_endurthjalfun\SKIL_CC313_HAED.md` §4 og §6; DECISIONS 2026-11-06.
 
 - **cc351 — LENGRI COMP-GLUGGI Á ÞUNNUM MÖRKUÐUM (bókað 20.11, arkitekt; 48 mánaða glugginn helst óbreyttur þar til mælt).** Mæla hvort lengri gluggi, t.d. 60 eða 72 mánuðir með vísitölu-framreikningi, á þunnum sellum (SUMMERHOUSE×Country, landsbyggð) heldur T1–T4 án þess að skekkja vaxi. Tilefni: 284 af 329 niðurfærslum 12.08 → 20.11 urðu þegar sölur féllu út úr 48 mánaða glugganum; 27 sumarhús í 356 fóru T2 → T5 (`D:\_audit\cc351_size_mismatch\SKIL_CC351.md` §00).
+
+- **cc354 — ÍBÚÐAREIGNIR MEÐ ÚTIHÚS: MÁ SKIPTA HÓPNUM EFTIR HLUTFALLI ÚTIHÚSA? (bókað 20.11, arkitekt).** 3.202 íbúðareignir með útihús fá stöðumerki í stað tölu þar til sérmæling liggur fyrir (skekkja 9,2 % á móti 5,9 % án ágreinings, n = 53). Mæla hvort hópnum megi skipta eftir hlutfalli útihúsa af summu matseininga þannig að hluti fái birt verðmat án þess að skekkja vaxi. Fundur: `D:\_audit\cc354_flatarmal\SKIL_CC354.md` §A4.
