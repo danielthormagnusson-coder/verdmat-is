@@ -6,9 +6,9 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ## 2026-11-20 — Flatarmál: regla F-v1 (summa HMS-matseininga ≥ 300), T5 utan 20–1000 m², stöðumerki á íbúðareignum með útihús (arkitekt, cc354)
 
-**Ákvarðanir arkitekts 20.11, bornar af master (liður b bíður staðfestingar Danna):**
+**Ákvarðanir arkitekts 20.11, bornar af master (liður b staðfestur af Danna 20.11):**
 * **a. Utan þjálfunarsviðs.** Eignir þar sem stærð samkvæmt F-v1 er undir 20 eða yfir 1000 m² fara í T5 með stöðumerki, en `einflm` HELST eins og F-v1 gefur það. NULL er aðeins fyrir óþekkta stærð (regla 10).
-* **b. Íbúðareignir með útihús (3.202).** Stöðumerki í stað tölu þar til sérmæling liggur fyrir; mælingin er í PLANNING_BACKLOG. *Bíður staðfestingar Danna.*
+* **b. Íbúðareignir með útihús (3.202).** Stöðumerki í stað tölu þar til sérmæling liggur fyrir; mælingin er í PLANNING_BACKLOG. *Staðfest af Danna 20.11: stöðumerki í stað tölu á 3.202 íbúðareignum með útihús, þar til sérmæling liggur fyrir.*
 * **c. F-v1 fer í lotu með eigin glugga EFTIR flipp liðar D hjá cc351.** Drögin eru uppfærð miðað við a og b, `--prof`, rollback fyrst, HALT fyrir GO Danna.
 * **d. Auglýsingagallar** fara í sér lotu á eftir F-v1, í röðinni B2 (rangt fastanúmer), B1 (tvítalning mbl), B4 (hlutaverð), B3 (búseturéttur).
 
