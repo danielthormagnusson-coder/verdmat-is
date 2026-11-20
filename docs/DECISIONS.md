@@ -4,6 +4,24 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-20 — Mánaðarleg endurbygging þrepa, comps og prior-akkera með stöðvunarskilyrðum; 48 mánaða comp-gluggi óbreyttur (arkitekt, cc351)
+
+**Ákvörðun Danna og arkitekts 20.11, borin af master:**
+* **Tíðni.** `valuation_tiers` og `comps_index_v2` eru endurbyggð mánaðarlega. Það gerist fyrsta sunnudag mánaðar eftir 19:00 UTC, eftir sópun og utan 01:00–07:30, og eftir græna `daily_sales_refresh` sama dag.
+* **Röð:** vísitölu-artifact → `build_comps_v2.py` + `cc143_prior.py` → staging (RLS á, REVOKE ALL frá PUBLIC/anon/authenticated) → parity → flipp í einni færslu, með `*_pre_<dags>`-afriti og rollback.
+* **Stöðvunarskilyrði.** Flipp stöðvast sjálfkrafa og bíður manns ef eitthvert eftirtalinna gildir:
+  * meira en 2 % eigna skipta um þrep;
+  * meira en 25 eignir fara niður í T5;
+  * einhver eign á sölu fer niður um meira en eitt þrep;
+  * fjöldi eigna með birt prior-akkeri fellur.
+* **Skýrsla.** Hver endurbygging skilar töflu yfir breytingar á þrepum (upp, niður, í og úr T5, söluhlið; á sölu sér) og lista yfir eignir sem fara niður.
+* **48 mánaða comp-gluggi er óbreyttur.** Mæling á lengri glugga á þunnum mörkuðum er í PLANNING_BACKLOG.
+* **Skráning í Task Scheduler er sér skref** og krefst GO Danna.
+
+Tilefni og mælingar: `D:\_audit\cc351_size_mismatch\SKIL_CC351.md` §00.
+
+---
+
 ## 2026-11-19 — Eigin sala sem akkeri í grunnmati kemur í stað stjarna-v0 (Danni, eftir cc353)
 
 **Ákvörðun Danna 19.11 (kemur í stað stjarna-v0 frá sama degi), borin af master:** engin stjarna og ekkert sérstakt „leiðrétt mat" í birtingu. Fyrri sala eignarinnar sjálfrar verður hluti af undirlaginu EF mæling stenst.

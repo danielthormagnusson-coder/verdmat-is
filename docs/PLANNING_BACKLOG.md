@@ -1921,3 +1921,5 @@ sé endurvakinn á skoðun einni.
   - **Tímasetning:** skriftan les `public.predictions`, svo hún mælir nýja líkanið aðeins eftir flipp. Fyrir flipp þarf að lesa kandídatsskorun úr staging eða CSV; það þarf að breyta skriftunni, og hún á þá að skrá `model_version`.
   - **Samhliða:** endurmæla sölur eftir hæð (`h\h01_haed_skekkja.py`), því ásett verð eitt sannar ekki ofmat. Ef halinn stendur en sölur staðfesta hann ekki enn: skýra hann (val auglýsinga, ástand) áður en nokkuð er birt.
   - **Merki:** Danni valdi ekkert merki 06.11; nýtt merki krefst nýrrar ákvörðunar. Fundur: `D:\_audit\cc313_endurthjalfun\SKIL_CC313_HAED.md` §4 og §6; DECISIONS 2026-11-06.
+
+- **cc351 — LENGRI COMP-GLUGGI Á ÞUNNUM MÖRKUÐUM (bókað 20.11, arkitekt; 48 mánaða glugginn helst óbreyttur þar til mælt).** Mæla hvort lengri gluggi, t.d. 60 eða 72 mánuðir með vísitölu-framreikningi, á þunnum sellum (SUMMERHOUSE×Country, landsbyggð) heldur T1–T4 án þess að skekkja vaxi. Tilefni: 284 af 329 niðurfærslum 12.08 → 20.11 urðu þegar sölur féllu út úr 48 mánaða glugganum; 27 sumarhús í 356 fóru T2 → T5 (`D:\_audit\cc351_size_mismatch\SKIL_CC351.md` §00).
