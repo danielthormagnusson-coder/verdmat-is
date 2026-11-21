@@ -122,20 +122,38 @@ def kedja_lokid() -> bool:
 
 # ---------- atburðir ----------
 def finna_ny(c):
-    """Ný lota á fastnúmeri: engin eldri auglýsing lifandi eða horfin innan 14 d. Auðkenni eitt er ekki atburður (43.204 auðkenni = 3.245 lotur)."""
+    """„Kemur á sölu" = nýtt söluferli eignar (cc364): ferli í scraper.soluferli (cc362, N = LOTU_BIL_DAGAR = 14) sem hófst síðustu
+    30 d með auglýsingu sem sókn fann síðustu 3 d. Sama skilgreining og merkið á /eign og leitin, svo atburðurinn og „N dagar á
+    sölu" segja það sama. Lykill óbreyttur (ny:{fastnum}:{upphaf dags}), svo ekkert tvísendist við skiptin: mælt 04.–21.11.2026
+    gáfu báðar reglur 517 sömu lykla; ferlareglan sleppir 3 auglýsingum á verði < 3 M (leiguverð merkt sala) og bætir við 16
+    endurbirtingum eftir þinglýsta sölu (sala skiptir ferli). SKIL_CC364 §C."""
     return les(c, """
-      select distinct on (n.fastnum) n.fastnum, n.first_seen_at, n.discovered_at, n.price_amount, n.is_price_on_request, n.source_listing_id,
-             p.heimilisfang, p.postnr, p.postheiti
-      from scraper.listings n join public.properties p on p.fastnum=n.fastnum and p.is_residential
-      where n.source='mbl' and n.tenure='sale' and n.category='residential' and n.fastnum is not null
-        and n.discovered_at > now() - interval '3 days' and n.first_seen_at > now() - interval '30 days'
-        and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=n.listing_id)
-        and not exists (select 1 from scraper.listings o where o.source='mbl' and o.tenure='sale' and o.fastnum=n.fastnum and o.listing_id<>n.listing_id
-            and o.first_seen_at<n.first_seen_at
-            and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=o.listing_id)
-            and coalesce((select min(e.event_at) from scraper.listing_lifecycle_events e where e.source=o.source and e.source_listing_id=o.source_listing_id and e.event_type='confirmed_absent_1'),
-                         o.withdrawn_at, case when o.status='inactive' then o.last_seen_at end, 'infinity'::timestamptz) > n.first_seen_at - interval '14 days')
-      order by n.fastnum, n.first_seen_at""", timeout=170)
+      with n as (
+        select n.listing_id, n.fastnum, n.first_seen_at, n.discovered_at, n.price_amount, n.is_price_on_request, n.source_listing_id
+        from scraper.listings n join public.properties p on p.fastnum=n.fastnum and p.is_residential
+        where n.source='mbl' and n.tenure='sale' and n.category='residential' and n.fastnum is not null
+          and n.discovered_at > now() - interval '3 days' and n.first_seen_at > now() - interval '30 days'
+          and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=n.listing_id)),
+      f as (
+        select s.fastnum, s.upphaf, s.upphaf_viss from scraper.soluferli(array(select distinct n.fastnum from n)) s
+        where s.upphaf > now() - interval '30 days')
+      select distinct on (f.fastnum) f.fastnum, f.upphaf as first_seen_at, f.upphaf_viss, n.discovered_at, n.price_amount, n.is_price_on_request,
+             n.source_listing_id, p.heimilisfang, p.postnr, p.postheiti
+      from f join n on n.fastnum=f.fastnum and n.first_seen_at=f.upphaf
+      join public.properties p on p.fastnum=f.fastnum
+      order by f.fastnum, f.upphaf, n.listing_id""", timeout=170)
+
+
+def ferli_lokid(c, fastnums):
+    """Dagar á sölu í síðasta LOKNA ferli hverrar eignar, úr sama lesfleti og /eign (scraper.soluferli, cc362).
+    dagar er NULL ef upphaf eða lok er óvíst; þá gildir dagar_minnst („í minnst N daga"), regla 13."""
+    if not fastnums:
+        return {}
+    r = les(c, """
+      select distinct on (s.fastnum) s.fastnum, s.upphaf, s.lok, s.dagar, s.dagar_minnst, s.upphaf_viss
+      from scraper.soluferli(%s::bigint[]) s where not s.opid
+      order by s.fastnum, s.lok desc""", (sorted(set(fastnums)),), timeout=170)
+    return {x["fastnum"]: x for x in r}
 
 
 def finna_verd(c):
@@ -199,9 +217,13 @@ def skra_atburdi(c, thurrt):
         if b is None or b > BENDILL_HAMARK_KLST:
             print(f"af_solu: sleppt, bendill {b} klst")
         else:
-            for r in finna_af_solu(c):
+            af = finna_af_solu(c)
+            fl = ferli_lokid(c, [r["fastnum"] for r in af])  # cc364: dagarnir úr lesfletinum, ekki úr auglýsingunni
+            for r in af:
+                f = fl.get(r["fastnum"]) or {}
                 radir.append((f"af_solu:{r['fastnum']}:{r['r']:%Y-%m-%d}", "af_solu", r["fastnum"], gata_lykill(r["heimilisfang"], r["postnr"]), r["postnr"],
-                              j(dict(heimilisfang=r["heimilisfang"], postheiti=r["postheiti"], fyrst_horfin=r["r"], dags=r["r"])), r["r"]))
+                              j(dict(heimilisfang=r["heimilisfang"], postheiti=r["postheiti"], fyrst_horfin=r["r"], dags=r["r"],
+                                     dagar_a_solu=f.get("dagar"), dagar_minnst=f.get("dagar_minnst"))), r["r"]))
     fj = {}
     for x in radir:
         fj[x[1]] = fj.get(x[1], 0) + 1
@@ -360,7 +382,12 @@ def lina(a, herferd):
         m = "" if g.get("nothaef") else " HMS telur samninginn ekki nothæfan til samanburðar."
         return f"{teng}: þinglýst sala, {p}, þinglýst {dags(g['dags'])}.{m}"
     if t == "af_solu":
-        return f"{teng}: engin auglýsing í {BIDTIMI_AF_SOLU} daga (fannst ekki {dags(g['dags'])}). Það þýðir ekki að eignin sé seld."
+        # cc364: dagafjöldi ferlisins úr lesfletinum; óvíst upphaf → „í minnst N daga" (regla 13); enginn ferill → engin tala
+        n = g.get("dagar_a_solu")
+        m = g.get("dagar_minnst")
+        lengd = (f" eftir {n} {'dag' if n % 10 == 1 and n % 100 != 11 else 'daga'} á sölu" if n is not None
+                 else f" eftir minnst {m} {'dag' if m % 10 == 1 and m % 100 != 11 else 'daga'} á sölu" if m is not None else "")
+        return f"{teng}: engin auglýsing í {BIDTIMI_AF_SOLU} daga{lengd} (fannst ekki {dags(g['dags'])}). Það þýðir ekki að eignin sé seld."
     return teng
 
 
