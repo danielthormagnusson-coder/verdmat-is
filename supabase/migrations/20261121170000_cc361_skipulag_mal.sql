@@ -43,7 +43,7 @@ COMMENT ON TABLE public.skipulag_mal IS
 -- Tvítekin lína (sama nefnd, dagur, málsnúmer, fyrirsögn) birtist einu sinni, lægsta id (A4).
 CREATE FUNCTION public.skipulag_saga(p_fastnum bigint)
 RETURNS TABLE (
-  id integer, dagsetning date, sveitarfelag text, nefnd text, malsnumer text, fyrirsogn text, malsflokkur text,
+  id integer, dagsetning date, sveitarfelag text, nefnd text, fundarnumer text, malsnumer text, fyrirsogn text, malsflokkur text,
   nidurstada text, lysing text, hreinsad boolean, slod_fundargerd text, landnr integer
 )
 LANGUAGE sql STABLE SECURITY INVOKER
@@ -55,7 +55,7 @@ AS $$
      WHERE p.fastnum = p_fastnum
   ), d AS (
     SELECT DISTINCT ON (m.dagsetning, m.nefnd, coalesce(m.malsnumer, ''), coalesce(m.fyrirsogn, ''))
-           m.id, m.dagsetning, m.sveitarfelag, m.nefnd, m.malsnumer, m.fyrirsogn, m.malsflokkur,
+           m.id, m.dagsetning, m.sveitarfelag, m.nefnd, m.fundarnumer, m.malsnumer, m.fyrirsogn, m.malsflokkur,
            m.nidurstada, m.lysing, m.hreinsad, m.slod_fundargerd, m.landnr
       FROM e JOIN public.skipulag_mal m ON m.landnr = e.landnr
      WHERE e.svfn IS NULL OR m.svfn IS NULL OR m.svfn = e.svfn

@@ -20,6 +20,9 @@ HLIÐ (öll verða að standast, annars stendur gamla taflan, rc 2, VAKT-VIDVORU
 SKIPTI: ein færsla á verdmat-grunni: COPY í pg_temp-staging -> talning -> DELETE + INSERT í public.skipulag_mal -> talning
   -> COMMIT. DELETE (ekki TRUNCATE): lesendur sjá gömlu gögnin þar til COMMIT, engin ACCESS EXCLUSIVE-læsing.
   Snertir engar töflur sópunar/næturkeðju; les ekki public.properties.
+TENGLAPRÓF: ein GET-beiðni (15 s, engin endurtilraun) á eina fasta fundargerð á gamli.rvk.is; svar (kóði / "timeout" /
+  villuflokkur) í pipeline_runs.summary->'gamli_rvk'. Fellir ALDREI hleðsluna. --beita sendir alltaf; --thurrt aðeins með
+  --profa-gamla-vef.
 KÓÐAR: 0 í lagi · 2 hlið féll (ekkert skrifað) · 3 villa · 4 heimild næst ekki.
 """
 from __future__ import annotations
@@ -45,6 +48,8 @@ TEXTADALKAR = ["sveitarfelag", "nefnd", "fundarnumer", "malsnumer", "heimilisfan
 TOFLU_DALKAR = ["id", "sveitarfelag", "svfn", "nefnd", "dagsetning", "fundarnumer", "malsnumer", "heimilisfang", "landnr",
                 "landnr_uppruni", "fyrirsogn", "malsflokkur", "lysing", "nidurstada", "slod_fundargerd", "hreinsad",
                 "hreinsun_utgafa", "heimild_keyrt", "heimild_utflutt"]
+# Tenglapróf (ákvörðun 21.11): mál sem vísa á gamla vef Reykjavíkur birtast án tengils meðan hann svarar ekki 200.
+GAMLI_RVK_SLOD = "https://gamli.rvk.is/vefur/owa/edutils.parse_page@nafn=BNF20562.html"
 FALL_HLUTFALL = 0.95
 FERSK_DAGAR = 10
 KT = re.compile(r"(?<!\d)(\d{6})[-\s.]?(\d{4})(?!\d)")
@@ -249,11 +254,33 @@ def skrifa(dbconfig: Path, ut: list[dict], prof: bool = False):
         c.close()
 
 
+def profa_gamla_vef() -> dict:
+    """Ein beiðni (GET, 15 s, engin endurtilraun) á eina fasta fundargerð á gamla vef Reykjavíkur. Fellir ALDREI hleðsluna:
+    allar villur verða að gildi. Niðurstaðan fer í pipeline_runs.summary->'gamli_rvk' (tengla-rofinn kveikist eftir 200 tvær vikur í röð)."""
+    r = {"slod": GAMLI_RVK_SLOD, "utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
+    try:
+        import requests
+        t = time.time()
+        with requests.get(GAMLI_RVK_SLOD, timeout=15, allow_redirects=False, stream=True,
+                          headers={"User-Agent": "Mozilla/5.0 (compatible; verdmat-tenglaprof/1.0)"}) as s:
+            r["svar"] = s.status_code
+        r["ms"] = int((time.time() - t) * 1000)
+    except Exception as e:  # noqa: BLE001
+        try:
+            import requests
+            r["svar"] = "timeout" if isinstance(e, requests.Timeout) else type(e).__name__
+        except Exception:  # noqa: BLE001
+            r["svar"] = type(e).__name__
+    return r
+
+
 def main():
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--thurrt", action="store_true"); g.add_argument("--beita", action="store_true")
     ap.add_argument("--leyfa-handvirka", action="store_true")
+    ap.add_argument("--profa-gamla-vef", action="store_true",
+                    help="þurrkeyrsla: senda tenglaprófið á gamla vef Reykjavíkur (--beita sendir það alltaf)")
     ap.add_argument("--ut", type=Path, default=None, help="þurrkeyrsla: mappa fyrir staging + hlið (parquet/json)")
     ap.add_argument("--dbconfig", type=Path, default=DBCONFIG)
     a = ap.parse_args()
@@ -268,20 +295,23 @@ def main():
     samantekt = {}
     rc = 0
     try:
+        if a.beita or a.profa_gamla_vef:
+            samantekt["gamli_rvk"] = profa_gamla_vef()
+            log("tenglapróf gamli.rvk.is:", samantekt["gamli_rvk"].get("svar"))
         try:
             nafn, radir, stada, lestur_s = lesa_heimild()
         except ConnectionError as e:
             log("HEIMILD NÆST EKKI:", e)
             vaktarpostur("heimild næst ekki", f"Tenging við heimild féll: {e}", senda=a.beita)
-            samantekt = {"villa": "heimild næst ekki"}; rc = 4; return rc
+            samantekt["villa"] = "heimild næst ekki"; rc = 4; return rc
         log(f"heimild: {len(radir)} raðir, stada {len(stada)} raðir, {lestur_s:.1f} s")
         n_lif, utfl_sidast = lesa_sidustu(a.dbconfig)
         utfl = max((s["utflutt"] for s in stada if s.get("utflutt")), default=None)
         ut, othekkt = umbreyta(radir, utfl)
         H, _ = hlid(nafn, radir, stada, ut, n_lif, utfl_sidast, a.leyfa_handvirka)
         allt_ok = all(h["ok"] for h in H.values())
-        samantekt = {"heimild_radir": len(radir), "med_landnr": len(ut), "othekkt_sveitarfelag": othekkt,
-                     "lestur_s": round(lestur_s, 1), "hlid": H, "utflutt": utfl.isoformat() if utfl else None}
+        samantekt.update({"heimild_radir": len(radir), "med_landnr": len(ut), "othekkt_sveitarfelag": othekkt,
+                     "lestur_s": round(lestur_s, 1), "hlid": H, "utflutt": utfl.isoformat() if utfl else None})
         for k, h in H.items():
             log(f"  {k}: {'OK' if h['ok'] else 'FALL'}  {json.dumps({x: y for x, y in h.items() if x != 'ok'}, ensure_ascii=False, default=str)[:200]}")
         if a.thurrt and a.ut:
