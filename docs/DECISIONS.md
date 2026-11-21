@@ -4,6 +4,25 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-21 — Suspect v2 (size_mismatch) í lifandi þrepum og comps: flipp D, fjórar V2-töflur í einni færslu (Danni + arkitekt, cc351/cc358)
+
+**Ákvörðun Danna og arkitekts, borin af master; beitt af master eftir GO Danna 21.11:**
+* **Efni.** `valuation_tiers`, `comps_index_v2`, `comps_t5_basis` og `comps_drift_diagnostics` eru endurbyggð á suspect v2. Það var beitt á `sales_history` 19.11 (cc351), með vísitölu-artifacti frá 12.08 og `deed_nfast` úr suspect-reglum (EMNR + SKJALANUMER).
+* **Allar fjórar eða engin.** Töflurnar flippast í EINNI færslu: afrit `*_pre_cc351` (RLS á, REVOKE ALL), DELETE + INSERT úr staging (ekki TRUNCATE), hlið inni í færslunni og ROLLBACK ef eitthvert bregst.
+* **Áhrif sem Danni samþykkti.**
+  * 6.647 eignir skipta um þrep (6.318 upp, 329 niður).
+  * 54 fara í T5 og missa birta tölu, engin þeirra á sölu.
+  * 5 eignir á sölu fara niður.
+  * Þrep T1–T5: 76.335 / 79.831 / 2.678 / 5.868 / 2.791.
+  * Þetta fer yfir stöðvunarskilyrði mánaðarlegrar endurbyggingar (2 % / 25 í T5) og var því beitt sem handvirkt flipp með sérstöku GO.
+* **Beiting 21.11 kl. 17:50 UTC:** `pipeline_runs` id 271 (`cc351_tiers_flip`). Öll hlið stóðust, þar á meðal pred_mean 167.503 af 167.503 paraðar með 0 frávikum, og Grettisgata 98 er T1.
+* **Afrit og staging.** Afritin `*_pre_cc351` standa til 21.12.2026. Staging-töflur `*_staging_cc351` verða ekki felldar strax; DROP verður lagt aftur fyrir Danna eftir viku (28.11).
+* **Neyðar-rollback:** `D:\_audit\cc358_flipp_d\cc351_flip.py --afturkalla`.
+
+Mælingar og keyrslur: `D:\_audit\cc351_size_mismatch\SKIL_CC351.md` og `D:\_audit\cc358_flipp_d\SKIL_CC358.md`.
+
+---
+
 ## 2026-11-20 — Flatarmál: regla F-v1 (summa HMS-matseininga ≥ 300), T5 utan 20–1000 m², stöðumerki á íbúðareignum með útihús (arkitekt, cc354)
 
 **Ákvarðanir arkitekts 20.11, bornar af master (liður b staðfestur af Danna 20.11):**
