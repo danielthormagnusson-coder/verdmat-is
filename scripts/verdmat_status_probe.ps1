@@ -110,7 +110,8 @@ if ($rettRc -ne 0) {
 
 # -- cc364: sidasta skref kedju/sopunar (endurnyjun scraper.soluferli_opin_mv), lesid ur pipeline_runs (adeins lestur).
 #    Flokkun i EINU falli (scripts/soluferli_mv_stada.py): OK = graent, SLEPPT = hvorki villa ne graent (fyrra skref
-#    feill og er havaert thar), VANTAR = hlutlaust, FALL = villa (offender). Bitinn: soluferli_mv=nott:X,sopun:Y.
+#    feill og er havaert thar), VANTAR = hlutlaust (aldrei skrad), FALL og VANTAR48 (skrad adur, ekkert i 48 klst.) =
+#    villa (offender). Bitinn: soluferli_mv=nott:X,sopun:Y.
 $solUt = @()
 if ($SoluferliSkra) { $solUt = @(Get-Content -Encoding utf8 $SoluferliSkra) } else { try {
     $fyrriKodun2 = [Console]::OutputEncoding; $fyrriPyUtf82 = $env:PYTHONUTF8
@@ -125,7 +126,7 @@ finally {
 $sl = ($solUt | Where-Object { $_ -like 'SOLUFERLI_MV:*' } | Select-Object -Last 1)
 $solBit = 'soluferli_mv=?'
 if ($sl -match 'nott=(\S+) sopun=(\S+)') { $solBit = "soluferli_mv=nott:$($Matches[1]),sopun:$($Matches[2])" }
-if ($solBit -match ':FALL') { $offenders += $solBit }   # SLEPPT og VANTAR eru hvorki villa ne graent
+if ($solBit -match ':(FALL|VANTAR48)') { $offenders += $solBit }   # cc364 21.11: SLEPPT og VANTAR (aldrei skrad) eru hlutlaus
 
 # ── one summary line (+ loud line on trouble) ────────────────────────────────
 $utc  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')

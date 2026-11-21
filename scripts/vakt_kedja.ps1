@@ -451,6 +451,29 @@ if ($rettRc -eq 1) {
         Thydir = 'Óvíst hvort gagnagrunnurinn er opnari en hann á að vera; vefurinn sjálfur er ekki endilega fyrir áhrifum.'
         Master = "verdmat-vakt $($dagur): réttindavakt MÆLING MISTÓKST (rc $rettRc). Keyrðu scripts/rettindavakt.py og segðu mér hvað brást." }
 }
+# cc364: lind leitar (síðasta skref keðju og sópunar), flokkuð í EINU falli (scripts/soluferli_mv_stada.py).
+# Ákvarðanir 21.11: OK = í lagi; SLEPPT = hvorki villa né grænt (fyrra skref féll og er hávært þar); FALL = „athygli“;
+# VANTAR = hlutlaust (aldrei skráð, t.d. fyrir fyrstu keyrslu); VANTAR48 = „athygli“ (hefur verið skráð, ekkert í 48 klst.).
+if ($SoluferliSkra) { $sol = @(Get-Content -Encoding utf8 $SoluferliSkra) } else {
+    $fyrriKodun3 = [Console]::OutputEncoding; $fyrriPyUtf83 = $env:PYTHONUTF8
+    try {
+        $env:PYTHONUTF8 = '1'; [Console]::OutputEncoding = $Utf8
+        $sol = @(& 'C:\Python314\python.exe' (Join-Path $PSScriptRoot 'soluferli_mv_stada.py') 2>&1 | ForEach-Object { "$_" })
+    } catch { $sol = @('SOLUFERLI_MV: nott=MAELING_MISTOKST sopun=MAELING_MISTOKST') }
+    finally {
+        [Console]::OutputEncoding = $fyrriKodun3
+        if ($null -eq $fyrriPyUtf83) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf83 }
+    }
+}
+$solLinur = @($sol | Where-Object { $_ -like 'L *' } | ForEach-Object {
+    $_.Substring(2) -replace '^(nott|sopun) OK ', '$1: í lagi, ' -replace '^(nott|sopun) SLEPPT ', '$1: sleppt, ' -replace '^(nott|sopun) FALL ', '$1: féll, ' -replace '^(nott|sopun) VANTAR48 ', '$1: vantar, ' })
+$solBitar = (($sol | Where-Object { $_ -like 'SOLUFERLI_MV:*' } | Select-Object -Last 1) -replace '^SOLUFERLI_MV: ', '')
+if ($solBitar -match '=(FALL|VANTAR48)' + [char]0x5C + 'b') {
+    $athygli += @{ Stutt = 'lind leitar ekki endurnýjuð'
+        Hvad = ('Endurnýjun á lista eigna á sölu sem leitin les féll eða hefur ekki keyrt í 48 klst.: {0}' -f ($solLinur -join ' · '))
+        Thydir = 'Leitin og „Nýtt í vikunni“ sýna stöðuna frá síðustu heppnuðu endurnýjun. Dagafjöldi er réttur, en nýjustu breytingar á því hvaða eignir eru á sölu geta vantað.'
+        Master = "verdmat-vakt $($dagur): soluferli_mv $solBitar. Lestu nýjustu raðir í public.pipeline_runs (run_type soluferli_mv_nott / soluferli_mv_sopun), finndu orsök og keyrðu scripts/endurnyja_soluferli_opin.py --thurrt áður en nokkuð er lagað (HALT fyrir GO)." }
+}
 $stig = $(if ($athygli.Count) { 'athygli' } elseif ($jafna.Count) { 'jafna' } else { 'lagi' })
 
 $postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and $stig -ne 'lagi')
@@ -531,22 +554,6 @@ if ($sopun.Count) {
 }
 if ($lb) { $m += ''; $m += $lb }
 if ($rett.Count) { $m += ''; $m += 'Réttindi (cc350):'; $m += $rett }
-# cc364: lind leitar (síðasta skref keðju og sópunar). Sýnt sem OK / SLEPPT / FALL / VANTAR; breytir EKKI stigi póstsins
-# (SLEPPT er afleiðing falls sem þegar er hávært; FALL fellir ekki keðjuna og leitin heldur fyrri fyllingu).
-$sol = @()
-if ($SoluferliSkra) { $sol = @(Get-Content -Encoding utf8 $SoluferliSkra) } else {
-    $fyrriKodun3 = [Console]::OutputEncoding; $fyrriPyUtf83 = $env:PYTHONUTF8
-    try {
-        $env:PYTHONUTF8 = '1'; [Console]::OutputEncoding = $Utf8
-        $sol = @(& 'C:\Python314\python.exe' (Join-Path $PSScriptRoot 'soluferli_mv_stada.py') 2>&1 | ForEach-Object { "$_" })
-    } catch { $sol = @('SOLUFERLI_MV: nott=MAELING_MISTOKST sopun=MAELING_MISTOKST') }
-    finally {
-        [Console]::OutputEncoding = $fyrriKodun3
-        if ($null -eq $fyrriPyUtf83) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf83 }
-    }
-}
-$solLinur = @($sol | Where-Object { $_ -like 'L *' } | ForEach-Object {
-    $_.Substring(2) -replace '^(nott|sopun) OK ', '$1: í lagi, ' -replace '^(nott|sopun) SLEPPT ', '$1: sleppt, ' -replace '^(nott|sopun) FALL ', '$1: féll, ' })
 if ($solLinur.Count) { $m += ''; $m += 'Lind leitar (cc364):'; $m += $solLinur }
 if ($jafna.Count -and $keyrslur.Count) {
     $m += ''; $m += 'Síðustu keyrslur sópunar (lifecycle_sweep_runs.jsonl):'

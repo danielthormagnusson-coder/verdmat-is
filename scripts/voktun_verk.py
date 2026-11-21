@@ -125,8 +125,9 @@ def finna_ny(c):
     """„Kemur á sölu" = nýtt söluferli eignar (cc364): ferli í scraper.soluferli (cc362, N = LOTU_BIL_DAGAR = 14) sem hófst síðustu
     30 d með auglýsingu sem sókn fann síðustu 3 d. Sama skilgreining og merkið á /eign og leitin, svo atburðurinn og „N dagar á
     sölu" segja það sama. Lykill óbreyttur (ny:{fastnum}:{upphaf dags}), svo ekkert tvísendist við skiptin: mælt 04.–21.11.2026
-    gáfu báðar reglur 517 sömu lykla; ferlareglan sleppir 3 auglýsingum á verði < 3 M (leiguverð merkt sala) og bætir við 16
-    endurbirtingum eftir þinglýsta sölu (sala skiptir ferli). SKIL_CC364 §C."""
+    gáfu báðar reglur 517 sömu lykla; ferlareglan sleppir 3 auglýsingum á verði < 3 M (leiguverð merkt sala) og bætir við 12
+    eignum sem koma aftur á sölu eftir þinglýsta sölu (sala skiptir ferli; 27 á 30 d), mælt eftir lagfæringu kjarnans í
+    cc365 (21.11.2026). SKIL_CC364 §C og „Vaktarstig 21.11"."""
     return les(c, """
       with n as (
         select n.listing_id, n.fastnum, n.first_seen_at, n.discovered_at, n.price_amount, n.is_price_on_request, n.source_listing_id
