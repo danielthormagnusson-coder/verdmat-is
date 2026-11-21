@@ -24,7 +24,7 @@
 #   (d) póstumferð/idempotens (email_sent_at) óbreytt.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy', 'voktun', 'logbirting')]
+    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy', 'voktun', 'logbirting', 'skipulag')]
     [string]$Verk,
     [switch]$Thurrt
 )
@@ -105,6 +105,17 @@ $Verkin = @{
         # cc357 (WP (ak)): psycopg2 úr global-Python (2.9.12, sú tvíund sem 02:30-verkin hlaða); allt annað úr venv.
         # sitecustomize.py í möppunni setur leitara sem svarar aðeins `psycopg2`. Erfist í undirferli keyra_dagleg.py.
         PyPath = 'D:\verdmat-is\app\scripts\cc357_psycopg2_global'
+    }
+    # cc361: vikulegur innlestur skipulagsmála -> public.skipulag_mal (mánudagur, register_skipulag_task.ps1). Les heimild
+    # (SKIPULAG_UT_LYKILORD úr D:\env.local, hlaðið hér að ofan) + skrifar í EINNI færslu; hlið í skriftunni (rc 2 = féll,
+    # gamla taflan stendur, vaktarpóstur). Biðhlið á sópunina: keyrir ekki ofan í hana.
+    skipulag = @{
+        Skrift  = 'D:\verdmat-is\app\scripts\skipulag_innlestur.py'
+        Rok     = @('--beita')
+        Thurr   = @('--thurrt')
+        WD      = 'D:\verdmat-is\app'
+        Bida    = $true
+        BidVerk = 'verdmat-daily-lifecycle-sweep'
     }
     nybygging_verkefni = @{
         Skrift = 'D:\verdmat-is\app\scripts\cc224_nybygging_verkefni.py'
