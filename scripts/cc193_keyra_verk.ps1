@@ -102,6 +102,9 @@ $Verkin = @{
         WD     = 'D:\verdmat-is\logbirting\scraper'
         Bida   = $false
         Python = 'D:\verdmat-is\logbirting\.venv\Scripts\python.exe'
+        # cc357 (WP (ak)): psycopg2 úr global-Python (2.9.12, sú tvíund sem 02:30-verkin hlaða); allt annað úr venv.
+        # sitecustomize.py í möppunni setur leitara sem svarar aðeins `psycopg2`. Erfist í undirferli keyra_dagleg.py.
+        PyPath = 'D:\verdmat-is\app\scripts\cc357_psycopg2_global'
     }
     nybygging_verkefni = @{
         Skrift = 'D:\verdmat-is\app\scripts\cc224_nybygging_verkefni.py'
@@ -197,6 +200,11 @@ if (-not (Test-Path $V.Skrift)) { Skrifa ('FALL: skrifta vantar ' + $V.Skrift); 
 Set-Location $V.WD
 $env:PYTHONIOENCODING = 'utf-8'
 $env:PYTHONUTF8 = '1'
+if ($V.ContainsKey('PyPath')) {   # cc357: aðeins verk sem bera PyPath (logbirting); ella óbreytt
+    if (-not (Test-Path (Join-Path $V.PyPath 'sitecustomize.py'))) { Skrifa ('FALL: sitecustomize vantar í ' + $V.PyPath); exit 3 }
+    $env:PYTHONPATH = $V.PyPath
+    Skrifa ('PYTHONPATH=' + $V.PyPath + ' (psycopg2 úr global-Python)')
+}
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $linur = & $Python $V.Skrift @rok 2>&1 | ForEach-Object { [string]$_ }

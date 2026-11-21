@@ -60,7 +60,8 @@ param(
     [datetime]$Nu = (Get-Date),         # prófanir senda inn tíma; raunkeyrsla notar núið
     [string]$SopunSkra = '',
     [string]$SopunKeyrslur = 'D:\verdmat-is\scraper_data\lifecycle_sweep_runs.jsonl',
-    [string]$RettindaSkra = ''          # cc350: úttak réttindavaktar úr skrá (próf og sýnishorn)
+    [string]$RettindaSkra = '',         # cc350: úttak réttindavaktar úr skrá (próf og sýnishorn)
+    [string]$EndurraesingHermun = ''    # cc357: falsuð verkstaða fyrir/eftir endurræsingu (aðeins með -Thurrt)
 )
 
 function Get-KedjuStada {
@@ -278,23 +279,146 @@ if ($sopunRc -eq 3) {
 }
 # cc340: dagleg Lögbirtingasókn (eigið verk verdmat-daily-logbirting, 05:40, ekki í keðjunni). Les aðeins Task
 # Scheduler-stöðu. Þarf athygli: keyrði ekki frá miðnætti, rc ekki 0, eða enn í gangi. Óskráð verk er aðeins nefnt.
-$lb = ''
+#
+# cc357 (WP (ak), GO Danna 20.11): EIN ENDURRÆSING við Smart App Control-lokun. Skilyrði, öll:
+#   (1) verkið er á hvítlista $EndurHeimild (nú aðeins verdmat-daily-logbirting); næturkeðja og sópun eru á
+#       bannlista og verða ALDREI endurræst héðan, hvað sem hvítlistinn segir;
+#   (2) LastTaskResult = 4, síðasta keyrsla í dag, verkið ekki Running;
+#   (3) „Application Control" í verkloggnum frá síðasta START-merki, EÐA CodeIntegrity-atburður 3077/3033 á
+#       verdmat-is-skrá frá LastRunTime-5 s til LastRunTime+16 mín (rc 4 eitt og sér endurræsir ekki);
+#   (4) ekki þegar endurræst í dag: ENDURRAESING-lína í $VaktLog fyrir dag+verk, eða fleiri en eitt START í
+#       verkloggnum í dag (einhver keyrði það aftur) -> aldrei lykkja;
+#   (5) tímaregla: á 01:00–07:30 UTC aðeins verk sem er sjálft næturverk á þeim tíma (NaeturVerk, logbirting 05:40),
+#       og aldrei meðan næturkeðjan er I_GANGI. Utan gluggans: leyft (handvirk vakt að degi).
+# Beðið er að hámarki $EndurBidSek eftir niðurstöðu (verkið er 2–30 s; vaktin ber 10 mín þak í Task Scheduler).
+# Endurræsing sem tekst -> engin athygli (lína í tæknilínum + lbr=ok). Endurræsing sem fellur -> ÞARF ATHYGLI.
+# -EndurraesingHermun <json> (aðeins með -Thurrt): falsar stöðu verksins fyrir/eftir og logg; kallar ALDREI
+#   Start-ScheduledTask. Snið: {"fyrir":{"State","LastRunTime","LastTaskResult"},"eftir":{...},"log":"<skrá>","ce":false}
+$EndurHeimild = @{ 'verdmat-daily-logbirting' = @{ Log = 'D:\verdmat-is\logs\logbirting.log'; Start = '=== START verk=logbirting '; NaeturVerk = $true } }
+$EndurBann = @('verdmat-nightly-delta', 'verdmat-daily-lifecycle-sweep')
+$EndurBidSek = 240
+$hermun = $null
+if ($EndurraesingHermun) {
+    if (-not $Thurrt) { Write-Output 'EndurraesingHermun krefst -Thurrt'; exit 6 }
+    $hermun = Get-Content -Raw -Encoding utf8 $EndurraesingHermun | ConvertFrom-Json
+    $EndurHeimild['verdmat-daily-logbirting'].Log = $hermun.log
+}
+$hermunRaest = $false
+function Get-VerkStada([string]$nafn) {
+    if ($hermun) {
+        $s = $(if ($hermunRaest) { $hermun.eftir } else { $hermun.fyrir })
+        return [pscustomobject]@{ State = $s.State; LastRunTime = [datetime]$s.LastRunTime; LastTaskResult = [uint32]$s.LastTaskResult }
+    }
+    $v = Get-ScheduledTask -TaskName $nafn -ErrorAction Stop
+    $i = $v | Get-ScheduledTaskInfo
+    [pscustomobject]@{ State = [string]$v.State; LastRunTime = $i.LastRunTime; LastTaskResult = [uint32]$i.LastTaskResult }
+}
+function Test-SacLokun([string]$nafn, $info) {
+    $h = $EndurHeimild[$nafn]
+    if ($h.Log -and (Test-Path $h.Log)) {
+        $linur = @(Get-Content -Encoding utf8 $h.Log -Tail 400)
+        $si = -1
+        for ($j = $linur.Count - 1; $j -ge 0; $j--) { if ($linur[$j].Contains($h.Start)) { $si = $j; break } }
+        if ($si -ge 0 -and @($linur[$si..($linur.Count - 1)] | Where-Object { $_ -match 'Application Control' }).Count) { return 'logg' }
+    }
+    if ($hermun) { if ($hermun.ce) { return 'CodeIntegrity' } else { return '' } }
+    try {
+        $ce = @(Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-CodeIntegrity/Operational'; Id = 3077, 3033
+                StartTime = $info.LastRunTime.AddSeconds(-5); EndTime = $info.LastRunTime.AddMinutes(16) } -ErrorAction Stop |
+            Where-Object { $_.Message -match 'verdmat-is' })
+        if ($ce.Count) { return 'CodeIntegrity' }
+    } catch { }
+    return ''
+}
+function Get-EndurBann([string]$nafn, $info) {
+    if ($EndurBann -contains $nafn -or -not $EndurHeimild.ContainsKey($nafn)) { return 'ekki á hvítlista' }
+    if ($info.State -eq 'Running') { return 'verkið í gangi' }
+    if ($info.LastRunTime -lt $Nu.Date) { return 'fallið ekki frá í dag' }
+    $d = $Nu.ToString('yyyyMMdd')
+    if ((Test-Path $VaktLog) -and @(Get-Content -Encoding utf8 $VaktLog | Where-Object { $_ -match " ENDURRAESING dags=$d verk=$([regex]::Escape($nafn)) " }).Count) { return 'þegar endurræst í dag' }
+    $h = $EndurHeimild[$nafn]
+    if ($h.Log -and (Test-Path $h.Log)) {
+        $dl = $Nu.ToString('yyyy-MM-dd')
+        if (@(Get-Content -Encoding utf8 $h.Log -Tail 400 | Where-Object { $_.StartsWith($dl) -and $_.Contains($h.Start) }).Count -gt 1) { return 'þegar keyrt aftur í dag' }
+    }
+    $u = $Nu.ToUniversalTime().TimeOfDay
+    if ($u -ge [timespan]'01:00' -and $u -lt [timespan]'07:30') {
+        if (-not $h.NaeturVerk) { return 'næturgluggi 01:00–07:30 UTC' }
+        if ($stada -eq 'I_GANGI') { return 'næturkeðjan í gangi' }
+    }
+    return ''
+}
+$lb = ''; $lbr = '-'
 try {
-    $lbVerk = Get-ScheduledTask -TaskName 'verdmat-daily-logbirting' -ErrorAction Stop
-    $lbInfo = $lbVerk | Get-ScheduledTaskInfo
+    $lbNafn = 'verdmat-daily-logbirting'
+    $lbInfo = Get-VerkStada $lbNafn
     $lbRc = [uint32]$lbInfo.LastTaskResult
     $lbHvad = $null
-    if ($lbVerk.State -eq 'Running') { $lb = 'Lögbirting: enn í gangi kl. ' + $Nu.ToString('HH:mm'); $lbHvad = "Sókn Lögbirtingablaðsins (05:40) var enn í gangi kl. $($Nu.ToString('HH:mm'))." }
+    if ($lbInfo.State -eq 'Running') { $lb = 'Lögbirting: enn í gangi kl. ' + $Nu.ToString('HH:mm'); $lbHvad = "Sókn Lögbirtingablaðsins (05:40) var enn í gangi kl. $($Nu.ToString('HH:mm'))." }
     elseif ($lbInfo.LastRunTime -lt $Nu.Date) { $lb = 'Lögbirting: keyrði ekki í dag (síðast ' + $lbInfo.LastRunTime.ToString('dd.MM HH:mm') + ')'; $lbHvad = 'Sókn Lögbirtingablaðsins (05:40) keyrði ekki í morgun.' }
-    elseif ($lbRc -ne 0) { $lb = ('Lögbirting: rc 0x{0:X} kl. {1:HH:mm} (logg D:\verdmat-is\logs\logbirting.log)' -f $lbRc, $lbInfo.LastRunTime); $lbHvad = "Sókn Lögbirtingablaðsins (05:40) mistókst (rc $lbRc)." }
+    elseif ($lbRc -ne 0) {
+        $lb = ('Lögbirting: rc 0x{0:X} kl. {1:HH:mm} (logg D:\verdmat-is\logs\logbirting.log)' -f $lbRc, $lbInfo.LastRunTime)
+        $lbHvad = "Sókn Lögbirtingablaðsins (05:40) mistókst (rc $lbRc)."
+        $sac = $(if ($lbRc -eq 4) { Test-SacLokun $lbNafn $lbInfo } else { '' })
+        if ($sac) {
+            $bann = Get-EndurBann $lbNafn $lbInfo
+            if ($bann) {
+                $lbr = 'bann'
+                $lb += " — Smart App Control ($sac); ekki endurræst: $bann"
+                $lbHvad = "Sókn Lögbirtingablaðsins (05:40) mistókst: Smart App Control lokaði skrá (rc 4). Vaktin endurræsti ekki ($bann)."
+                Write-Output "ENDURRÆSING: ekki — $bann (rc 4, $sac)"
+            } else {
+                $raestKl = Get-Date
+                if (-not $Thurrt) {
+                    [IO.File]::AppendAllText($VaktLog, "$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')) ENDURRAESING dags=$($Nu.ToString('yyyyMMdd')) verk=$lbNafn rc=$lbRc sac=$sac `r`n", $Utf8)
+                    Start-ScheduledTask -TaskName $lbNafn -ErrorAction Stop
+                    Start-Sleep -Seconds 3
+                    $nyr = $null
+                    while (((Get-Date) - $raestKl).TotalSeconds -lt $EndurBidSek) {
+                        $nyr = Get-VerkStada $lbNafn
+                        if ($nyr.State -ne 'Running' -and $nyr.LastRunTime -ge $raestKl.AddSeconds(-2)) { break }
+                        Start-Sleep -Seconds 5
+                    }
+                } elseif ($hermun) {
+                    $hermunRaest = $true
+                    Write-Output "ENDURRÆSING (hermun): Start-ScheduledTask $lbNafn yrði kallað EINU SINNI (ekki kallað)"
+                    $nyr = Get-VerkStada $lbNafn
+                } else {
+                    Write-Output "ENDURRÆSING (þurrt): myndi endurræsa $lbNafn einu sinni (rc 4, $sac) — ekkert kallað"
+                    $nyr = $null
+                }
+                $kl = $raestKl.ToString('HH:mm')
+                $nyrriEn = $(if ($hermun) { $lbInfo.LastRunTime.AddSeconds(1) } else { $raestKl.AddSeconds(-2) })
+                if ($null -eq $nyr) { $lbr = 'thurrt' }
+                elseif (($nyr.State -eq 'Running') -or ($nyr.LastRunTime -lt $nyrriEn)) {
+                    $lbr = 'igangi'
+                    $lb += " — Smart App Control ($sac); endurræst kl. $kl, ekki lokið eftir $EndurBidSek s"
+                    $lbHvad = "Sókn Lögbirtingablaðsins (05:40) mistókst (Smart App Control, rc 4). Vaktin endurræsti hana kl. $kl en niðurstaða lá ekki fyrir eftir $([int]($EndurBidSek / 60)) mín."
+                } elseif ([uint32]$nyr.LastTaskResult -eq 0) {
+                    $lbr = 'ok'; $lbHvad = $null
+                    $lb = "Lögbirting: OK eftir endurræsingu kl. $kl (05:40-keyrslan féll á rc 4, Smart App Control, $sac)"
+                } else {
+                    $lbr = 'fell'
+                    $lb += (" — Smart App Control ({0}); endurræst kl. {1} og féll AFTUR (rc 0x{2:X})" -f $sac, $kl, [uint32]$nyr.LastTaskResult)
+                    $lbHvad = "Sókn Lögbirtingablaðsins mistókst tvisvar: Smart App Control lokaði skrá kl. $($lbInfo.LastRunTime.ToString('HH:mm')) (rc 4) og endurræsing kl. $kl féll líka (rc $([uint32]$nyr.LastTaskResult))."
+                }
+                Write-Output "ENDURRÆSING: niðurstaða lbr=$lbr — $lb"
+            }
+        }
+    }
     else { $lb = 'Lögbirting: OK kl. ' + $lbInfo.LastRunTime.ToString('HH:mm') }
     if ($lbHvad) {
+        $mTexti = "verdmat-vakt $($dagur): $lb. Lestu D:\verdmat-is\logs\logbirting.log, finndu orsök og segðu mér hvað gerðist."
+        if ($lbr -in 'fell', 'bann', 'igangi') { $mTexti += ' Smart App Control: lestu Microsoft-Windows-CodeIntegrity/Operational (Id 3033/3077) og fylgdu WP (ak); engin breyting á SAC án ákvörðunar Danna.' }
         $athygli += @{ Stutt = 'Lögbirtingasókn mistókst'
             Hvad = $lbHvad
             Thydir = 'Nýjar auglýsingar úr Lögbirtingablaðinu vantar í lb_auglysingar (hluthafar nota þær). Næsta keyrsla sækir síðustu 21 dag, svo gatið lokast sjálft þegar sóknin virkar á ný.'
-            Master = "verdmat-vakt $($dagur): $lb. Lestu D:\verdmat-is\logs\logbirting.log, finndu orsök og segðu mér hvað gerðist." }
+            Master = $mTexti }
     }
-} catch { $lb = 'Lögbirting: verk ekki skráð' }
+} catch { if (-not $lb) { $lb = 'Lögbirting: verk ekki skráð' } else { $lb += ' — endurræsing brást: ' + $_.Exception.Message; $lbr = 'villa'
+        $athygli += @{ Stutt = 'Lögbirtingasókn mistókst'; Hvad = "Sókn Lögbirtingablaðsins mistókst (rc 4, Smart App Control) og endurræsing brást: $($_.Exception.Message)"
+            Thydir = 'Nýjar auglýsingar úr Lögbirtingablaðinu vantar í lb_auglysingar (hluthafar nota þær).'
+            Master = "verdmat-vakt $($dagur): $lb. Fylgdu WP (ak)." } } }
 # cc350: réttindavakt — opnu hlutverkin (anon/authenticated) mega aðeins lesa semantic.fasteignasala_* ×3 + PostGIS.
 $rett = @(); $rettRc = 0
 if ($RettindaSkra) {
@@ -332,7 +456,7 @@ $postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and $stig -ne 'lagi')
 
 function Skra-Vakt([int]$r) {
     if ($Prof -or $Thurrt) { return }
-    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc rett=$rettRc degr=$degrN lb=$(if ($lb -like 'Lögbirting: OK*' -or $lb -like '*ekki skráð') { 'ok' } else { 'FALL' })"
+    $lina = "$utc VAKT dags=$($Nu.ToString('yyyyMMdd')) kl=$($Nu.ToString('HH:mm')) stada=$stada frest=$($frestad.Count) rc=$r lifsmark=$lifsmarkStada sopun=$sopunRc rett=$rettRc degr=$degrN lb=$(if ($lb -like 'Lögbirting: OK*' -or $lb -like '*ekki skráð') { 'ok' } else { 'FALL' }) lbr=$lbr"
     try {
         $m = Split-Path -Parent $VaktLog
         if ($m -and -not (Test-Path $m)) { New-Item -ItemType Directory -Force $m | Out-Null }
