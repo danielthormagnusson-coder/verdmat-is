@@ -170,6 +170,8 @@ function FreshRow({ label, ts, cfg, note }) {
 function runLevel(r) {
   if (!r) return { level: "red", txt: "engin keyrsla" };
   if (r.exit_status === "success") return { level: "green", txt: "success" };
+  // cc364: „skipped" = skrefi sleppt af því fyrra skref féll — hvorki villa né grænt
+  if (r.exit_status === "skipped") return { level: "neutral", txt: "sleppt" };
   // monthly_cpi_reanchor failing on the sanity guard is intended behaviour, not a fault
   if (r.run_type === "monthly_cpi_reanchor" && r.summary?.reason && /column/i.test(r.summary.reason)) {
     return { level: "amber", txt: "sanity-halt (vörn virk)" };

@@ -61,6 +61,7 @@ param(
     [string]$SopunSkra = '',
     [string]$SopunKeyrslur = 'D:\verdmat-is\scraper_data\lifecycle_sweep_runs.jsonl',
     [string]$RettindaSkra = '',         # cc350: úttak réttindavaktar úr skrá (próf og sýnishorn)
+    [string]$SoluferliSkra = '',        # cc364: úttak soluferli_mv_stada.py úr skrá (próf)
     [string]$EndurraesingHermun = ''    # cc357: falsuð verkstaða fyrir/eftir endurræsingu (aðeins með -Thurrt)
 )
 
@@ -530,6 +531,23 @@ if ($sopun.Count) {
 }
 if ($lb) { $m += ''; $m += $lb }
 if ($rett.Count) { $m += ''; $m += 'Réttindi (cc350):'; $m += $rett }
+# cc364: lind leitar (síðasta skref keðju og sópunar). Sýnt sem OK / SLEPPT / FALL / VANTAR; breytir EKKI stigi póstsins
+# (SLEPPT er afleiðing falls sem þegar er hávært; FALL fellir ekki keðjuna og leitin heldur fyrri fyllingu).
+$sol = @()
+if ($SoluferliSkra) { $sol = @(Get-Content -Encoding utf8 $SoluferliSkra) } else {
+    $fyrriKodun3 = [Console]::OutputEncoding; $fyrriPyUtf83 = $env:PYTHONUTF8
+    try {
+        $env:PYTHONUTF8 = '1'; [Console]::OutputEncoding = $Utf8
+        $sol = @(& 'C:\Python314\python.exe' (Join-Path $PSScriptRoot 'soluferli_mv_stada.py') 2>&1 | ForEach-Object { "$_" })
+    } catch { $sol = @('SOLUFERLI_MV: nott=MAELING_MISTOKST sopun=MAELING_MISTOKST') }
+    finally {
+        [Console]::OutputEncoding = $fyrriKodun3
+        if ($null -eq $fyrriPyUtf83) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf83 }
+    }
+}
+$solLinur = @($sol | Where-Object { $_ -like 'L *' } | ForEach-Object {
+    $_.Substring(2) -replace '^(nott|sopun) OK ', '$1: í lagi, ' -replace '^(nott|sopun) SLEPPT ', '$1: sleppt, ' -replace '^(nott|sopun) FALL ', '$1: féll, ' })
+if ($solLinur.Count) { $m += ''; $m += 'Lind leitar (cc364):'; $m += $solLinur }
 if ($jafna.Count -and $keyrslur.Count) {
     $m += ''; $m += 'Síðustu keyrslur sópunar (lifecycle_sweep_runs.jsonl):'
     foreach ($r in $keyrslur) { $m += ('at={0} rent_cursor={1}/{2} sale_cursor={3}/{4} requests={5}' -f $r.at, $r.rent_cursor, $r.rent_total, $r.sale_cursor, $r.sale_total, $r.requests) }
