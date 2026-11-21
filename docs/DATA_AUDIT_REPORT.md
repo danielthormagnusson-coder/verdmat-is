@@ -268,6 +268,8 @@ Largest 10 matsvæði: Miðbær (20), Selfoss (8010), Kópavogur Austurbær (320
 
 ### Scrape gap (Áfangi 0 action)
 
+> **Framhald 2026-11-21 (cc362):** gatið mælt á auglýsingahlið og lok þess fundin (08./09.06.2026) — sjá `docs/DATA_AUDIT_REPORT_2026-11-21_auglysingagat.md`.
+
 Listings `effective_date` volume frá 2025-07-01:
 
 | Tímabil | Listings/mán |
