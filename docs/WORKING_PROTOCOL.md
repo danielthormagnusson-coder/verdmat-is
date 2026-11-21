@@ -397,3 +397,7 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 - 20.11.2026 05:40 UTC: `libssl-3-x64-….dll` í `psycopg2_binary.libs` í `D:\verdmat-is\logbirting\.venv` lokað (skrá óbreytt síðan 11.11) → `verdmat-daily-logbirting` rc 4. Engin Windows-uppfærsla síðasta sólarhring. Innflutningur gekk 07:54 og handvirk keyrsla skilaði rc 0.
 
 Viðbragð: lesa `Microsoft-Windows-CodeIntegrity/Operational` (Id 3033/3077/3118) til að finna skrána; endurkeyra verkið einu sinni. Tillögur samþykktar af arkitekt 20.11, bíða GO Danna (flokkur B): (1) logbirting noti psycopg2 úr global-Python í stað sérútgáfu venv; (2) kedjuvakt endurræsir verk einu sinni við rc 4 með „Application Control" í villutexta.
+
+### (al) UNDIRLOTA SEM SNERTIR VERDMAT-AI KEYRIR `npm run build` MEÐ FORPRÓFUNUM FYRIR HALT (Danni 21.11.2026)
+
+**Undirlota sem snertir verdmat-ai keyrir `npm run build` (sem keyrir forprófin `scripts/prof_*.mjs` á undan `next build`) fyrir HALT, aldrei aðeins `next build`, og setur úttakið í SKIL. Master staðfestir það áður en push er lagt fyrir Danna.** Raundæmi: cc360 keyrði aðeins `next build`; Vercel-bygging á ddff04d 21.11 féll á forprófunum U2 (`prof_cc343_hms`) og C1 (`prof_cc353_hlid`) sem festu `EIGN_CACHE_UTGAFA`. www stóð á fyrri útgáfu; lagfært í c623459.
