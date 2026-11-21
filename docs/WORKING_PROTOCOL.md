@@ -383,9 +383,11 @@ Task Scheduler keyrir úr `D:\verdmat-is\app` (harðkóðuð slóð), svo **push
 **Aðeins orðið GO frá Danna opnar push eða beitingu. Hrós eða samþykki á útliti („flott", „samþykkt útlitslega") er ekki GO. Lota sem er í vafa spyr: „Er þetta GO á push?"**
 
 
-### (aj) VERK Í FLOKKI B KEYRIR Í LOTU MEÐ EIGIN GLUGGA, ALDREI SEM UNDIRLOTA Í MASTER (Danni 19.11.2026)
+### (aj) VERK Í FLOKKI B: UNDIRLOTA UNDIRBÝR OG HALT-AR, MASTER BEITIR EFTIR GO DANNA Í MASTER-GLUGGANUM (Danni + arkitekt 21.11.2026; kemur í stað reglu 19.11)
 
-**Verk í flokki B (migration, beiting á grunn, lyklar, Task Scheduler) keyrir alltaf í lotu með eigin glugga, aldrei sem undirlota inni í master.** Gildir frá lotunni á eftir cc351; cc351 klárar eins og hún er.
+**Verk í flokki B (migration, beiting á grunn, lyklar, Task Scheduler) þarf ekki lengur lotu með eigin glugga. Undirlota hjá master undirbýr: skriftu, rollback fyrst, `--prof` sem endar á ROLLBACK, og SKIL. Síðan HALT-ar hún. Master leggur niðurstöðuna fyrir Danna. Eftir orðið GO frá Danna í master-glugganum beitir master sjálfur (`--beita`, migration, Task Scheduler, lyklar). Undirlota beitir aldrei.** Óbreytt: ein beiting í einu; ekkert 01:00–07:30 UTC; ekkert meðan `verdmat-daily-lifecycle-sweep` eða `verdmat-nightly-delta` keyrir; áframsent GO gildir ekki (sjá (ai)). Gildir strax, fyrst á cc357 (lögbirting) og cc358 (flipp D hjá cc351).
+
+*Eldri regla (19.11.2026, felld úr gildi 21.11):* flokkur B keyrði alltaf í lotu með eigin glugga, aldrei sem undirlota inni í master.
 
 ### (ak) SMART APP CONTROL HELST Á; SLÖKKT AÐEINS EF LOKUN FELLIR NÆTURKEÐJU EÐA SÓPUN ÞRÁTT FYRIR ENDURRÆSINGU (arkitekt 20.11.2026)
 
