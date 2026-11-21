@@ -38,13 +38,16 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.skipulag_mal TO service_role;
 COMMENT ON TABLE public.skipulag_mal IS
   'cc361: mál úr fundargerðum skipulags- og byggingarnefnda á lóð (landnr). Vikulegur innlestur (skipulag_innlestur.py). Aðeins service_role.';
 
--- Saga lóðar fyrir eina eign: öll mál á lóð eignarinnar (sama saga á öllum eignum lóðarinnar), nýjast fyrst.
+-- Saga lóðar fyrir eina eign: mál á lóð eignarinnar (sama saga á öllum eignum lóðarinnar), nýjast fyrst, í síðum.
+-- p_hlidrun = fjöldi mála sem sleppt er framan af; p_hamark = síðustærð, þakin við 100 HÉR (ekki aðeins í kallanda).
+-- heildarfjoldi (í hverri röð) = fjöldi mála á lóðinni eftir síur, óháð síðu: framendinn sýnir „Sjá öll N mál".
+-- /eign les fyrstu 25 (sjálfgefið); /api/skipulagssaga les restina í síðum af 100.
 -- Mál sem parað er við lóð í öðru sveitarfélagi en eignin er sleppt (pörunarvilla heimildar, A3).
 -- Tvítekin lína (sama nefnd, dagur, málsnúmer, fyrirsögn) birtist einu sinni, lægsta id (A4).
-CREATE FUNCTION public.skipulag_saga(p_fastnum bigint)
+CREATE FUNCTION public.skipulag_saga(p_fastnum bigint, p_hlidrun integer DEFAULT 0, p_hamark integer DEFAULT 25)
 RETURNS TABLE (
   id integer, dagsetning date, sveitarfelag text, nefnd text, fundarnumer text, malsnumer text, fyrirsogn text, malsflokkur text,
-  nidurstada text, lysing text, hreinsad boolean, slod_fundargerd text, landnr integer
+  nidurstada text, lysing text, hreinsad boolean, slod_fundargerd text, landnr integer, heildarfjoldi integer
 )
 LANGUAGE sql STABLE SECURITY INVOKER
 SET search_path = public, pg_temp
@@ -61,11 +64,15 @@ AS $$
      WHERE e.svfn IS NULL OR m.svfn IS NULL OR m.svfn = e.svfn
      ORDER BY m.dagsetning, m.nefnd, coalesce(m.malsnumer, ''), coalesce(m.fyrirsogn, ''), m.id
   )
-  SELECT * FROM d ORDER BY d.dagsetning DESC, d.id DESC
+  SELECT d.*, (count(*) OVER ())::integer AS heildarfjoldi
+    FROM d
+   ORDER BY d.dagsetning DESC, d.id DESC
+   LIMIT LEAST(GREATEST(coalesce(p_hamark, 25), 1), 100)
+  OFFSET GREATEST(coalesce(p_hlidrun, 0), 0)
 $$;
-REVOKE ALL ON FUNCTION public.skipulag_saga(bigint) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.skipulag_saga(bigint) TO service_role;
-COMMENT ON FUNCTION public.skipulag_saga(bigint) IS
-  'cc361: mál á lóð eignar (fastnum), nýjast fyrst. Aðeins service_role (þjónn). Engin mál = engar raðir.';
+REVOKE ALL ON FUNCTION public.skipulag_saga(bigint, integer, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.skipulag_saga(bigint, integer, integer) TO service_role;
+COMMENT ON FUNCTION public.skipulag_saga(bigint, integer, integer) IS
+  'cc361: mál á lóð eignar (fastnum), nýjast fyrst, í síðum (hliðrun, hámark mest 100); heildarfjoldi í hverri röð. Aðeins service_role (þjónn). Engin mál = engar raðir.';
 
 NOTIFY pgrst, 'reload schema';
