@@ -24,7 +24,7 @@
 #   (d) póstumferð/idempotens (email_sent_at) óbreytt.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy', 'voktun', 'logbirting', 'skipulag', 'soluferli_mv', 'soluferli_mv_sopun')]
+    [ValidateSet('worker_poll', 'llt_refresh', 'verdvakt_refresh', 'myndahledsla', 'fasteignasala_manudur', 'nybygging_verkefni', 'manadarsala_yoy', 'voktun', 'logbirting', 'skipulag')]
     [string]$Verk,
     [switch]$Thurrt
 )
@@ -112,24 +112,6 @@ $Verkin = @{
     skipulag = @{
         Skrift  = 'D:\verdmat-is\app\scripts\skipulag_innlestur.py'
         Rok     = @('--beita')
-        Thurr   = @('--thurrt')
-        WD      = 'D:\verdmat-is\app'
-        Bida    = $true
-        BidVerk = 'verdmat-daily-lifecycle-sweep'
-    }
-    # cc364: lind leitar — REFRESH CONCURRENTLY á scraper.soluferli_opin_mv (opin söluferli). Tvisvar á dag: eftir
-    # næturkeðju (07:40, ný auglýsingar) og eftir sópun (18:00, fjarvera). Hlið í skriftunni (fall > 25 % = ROLLBACK, rc 2).
-    # Skráning í Task Scheduler er sér skref með GO (flokkur B).
-    soluferli_mv = @{
-        Skrift = 'D:\verdmat-is\app\scripts\endurnyja_soluferli_opin.py'
-        Rok    = @()
-        Thurr  = @('--thurrt')
-        WD     = 'D:\verdmat-is\app'
-        Bida   = $true
-    }
-    soluferli_mv_sopun = @{
-        Skrift  = 'D:\verdmat-is\app\scripts\endurnyja_soluferli_opin.py'
-        Rok     = @()
         Thurr   = @('--thurrt')
         WD      = 'D:\verdmat-is\app'
         Bida    = $true

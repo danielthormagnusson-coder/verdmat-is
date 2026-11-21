@@ -384,6 +384,29 @@ run_revalidate() {
   return 0
 }
 
+# ── cc364: SÍÐASTA SKREF — endurnýjun scraper.soluferli_opin_mv (lind leitar), aldrei fall ──────
+# Ákvörðun 21.11.2026: ekki fastur klukkutími, heldur síðasta skref næturkeðjunnar og sópunarinnar.
+# Keyrir aðeins ef öll fyrri skref enduðu með rc 0 ($1 = 0); annars sleppt og skráð. Skriftan skráir
+# eina röð í public.pipeline_runs (soluferli_mv_nott: success / skipped / failed) og skilar ALLTAF 0;
+# hér er rc hennar auk þess hunsað (return 0), svo exit-kóði keðjunnar er óbreyttur hvað sem gerist.
+# --dry-run: prentar aðeins hvað yrði keyrt (engin grunntenging). SOLUFERLI_MV_THURRT=1 (aðeins
+# prófhermun, cc364 §F): keyrir skriftuna með --thurrt (ekkert skráð, ROLLBACK).
+SOLUFERLI_MV_TIMAMORK=300
+run_soluferli_mv() {             # $1 = rc fyrri skrefa, $2 = ástæða ef $1 ≠ 0
+  local margs=(--keyrsla nott --fyrri-rc "$1")
+  [ -n "$2" ] && margs+=(--astaeda "$2")
+  if [ $DRY -eq 1 ] && [ "${SOLUFERLI_MV_THURRT:-0}" != "1" ]; then
+    say "[dry-run] would run: python -m scripts.endurnyja_soluferli_opin ${margs[*]}"
+    return 0
+  fi
+  [ "${SOLUFERLI_MV_THURRT:-0}" = "1" ] && margs+=(--thurrt)
+  local out
+  out=$( cd "$APP" && timeout $SOLUFERLI_MV_TIMAMORK python -m scripts.endurnyja_soluferli_opin "${margs[@]}" 2>&1 \
+         | grep -E "^soluferli_mv|pipeline_runs|VIÐVÖRUN|HLIÐ" | tail -4 )
+  while IFS= read -r line; do say "  $line"; done <<< "${out:-soluferli_mv: <ekkert úttak (timeout $SOLUFERLI_MV_TIMAMORK s?)>}"
+  return 0
+}
+
 # ── extraction: forward 108-field condition extract + frozen valuation (EXTRACTION ÞREP 5) ──
 # Runs after promote (both layers fresh). mbl only — valuation needs a fastnum, which only mbl
 # resolves; myigloo (rent, no fastnum) has no valuation path, so it is intentionally not extracted
@@ -458,6 +481,7 @@ run_extract() {
 # ritað í næturloggið (áður hættu þau þögult og vaktarprófið las það sem ABORT
 # af FJARVERU CLEAN-línunnar — rétt niðurstaða, engin ástæða).
 chain_fail() {
+  run_soluferli_mv "$2" "$1 (exit $2)"   # cc364: sleppt og skráð (skipped); breytir ekki exit-kóðanum
   say "=== CHAIN FAIL ($1, exit $2) ==="
   exit "$2"
 }
@@ -501,6 +525,7 @@ run_revalidate || true
 run_extract || chain_fail "extraction" 1
 
 if [ $DRY -eq 1 ]; then
+  run_soluferli_mv 0 ""
   say "[dry-run] would append night totals + CHAIN CLEAN to $REPORT"
   exit 0
 fi
@@ -512,6 +537,9 @@ while IFS= read -r line; do say "  $line"; done <<< "$TOT"
 if [ $((FRESTAD + STYTT)) -gt 0 ]; then
   say "  FRESTUR-SAMANTEKT: $FRESTAD straumum sleppt, $STYTT styttir — bendlar halda, næsta nótt heldur áfram"
 fi
+# cc364: síðasta skref. Öll fyrri skref enduðu með rc 0 (annars hefði chain_fail hætt keðjunni). Á undan
+# CHAIN-línunni svo hún standi áfram síðust í næturlogginu (status-probe og biðhlið lesa hana).
+run_soluferli_mv 0 "" || true
 # cc94 — ÞRJÚ STIG. Keðjan kláraði í báðum tilvikum hér (exit 0); munurinn er
 # hvort eitthvað féll á leiðinni. DEGRADED er flagg, ekki bilun: gögnin sem
 # tókust eru rétt, en nóttin er ekki heil og biðröðin ber afganginn áfram.

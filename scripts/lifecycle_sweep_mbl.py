@@ -74,6 +74,7 @@ import csv
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -910,6 +911,36 @@ def enable_sale():
     return 0
 
 
+SOLUFERLI_MV_TIMAMORK_S = 300   # undir RUN_TIME_MARGIN_S (600): skrefið kemst fyrir innan þaks verksins
+
+
+def soluferli_mv_skref(fyrri_rc, astaeda, dry_run):
+    """cc364 (ákvörðun 21.11.2026): SÍÐASTA SKREF sópunarinnar — endurnýjun scraper.soluferli_opin_mv (lind leitar).
+
+    Keyrir aðeins ef run_scheduled endaði með rc 0; annars sleppt og skráð. Sér ferli (scripts.endurnyja_soluferli_opin
+    --keyrsla sopun) skráir eina röð í public.pipeline_runs (success / skipped / failed) og skilar alltaf 0. Hér er
+    allt gleypt (timeout, villa, rc), svo exit-kóði sópunarinnar er óbreyttur hvað sem endurnýjunin gerir.
+    --dry-run: prentar aðeins hvað yrði keyrt. SOLUFERLI_MV_THURRT=1 (aðeins prófhermun): skriftan fær --thurrt."""
+    rok = ["--keyrsla", "sopun", "--fyrri-rc", str(int(fyrri_rc) if isinstance(fyrri_rc, int) else 1)]
+    if astaeda:
+        rok += ["--astaeda", astaeda]
+    if dry_run and os.environ.get("SOLUFERLI_MV_THURRT") != "1":
+        print("[dry-run] would run: python -m scripts.endurnyja_soluferli_opin %s" % " ".join(rok))
+        return
+    if os.environ.get("SOLUFERLI_MV_THURRT") == "1":
+        rok.append("--thurrt")
+    try:
+        r = subprocess.run([sys.executable, "-m", "scripts.endurnyja_soluferli_opin"] + rok,
+                           cwd=str(Path(__file__).resolve().parent.parent), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=SOLUFERLI_MV_TIMAMORK_S,
+                           env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"})
+        for ln in (r.stdout or "").splitlines():
+            if ln.startswith(("soluferli_mv", "pipeline_runs", "[VIÐVÖRUN]", "[HLIÐ]", "[thurrt]")):
+                print(ln)
+    except Exception as e:  # aldrei fall úr síðasta skrefi
+        print("[VIÐVÖRUN] soluferli_mv: %s: %s; sópun heldur rc sínum" % (type(e).__name__, e))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tenure", choices=["sale", "rent", "both"], default="both")
@@ -933,9 +964,14 @@ def main():
     if args.scheduled:
         conn = ReconnectingConn(read_db_url())
         try:
-            return run_scheduled(conn, args.dry_run, budget_cap=args.budget_cap)
-        finally:
+            rc = run_scheduled(conn, args.dry_run, budget_cap=args.budget_cap)
+        except BaseException as e:
             conn.close()
+            soluferli_mv_skref(1, "run_scheduled: %s" % type(e).__name__, args.dry_run)
+            raise
+        conn.close()
+        soluferli_mv_skref(rc, None if rc == 0 else "run_scheduled rc %s" % rc, args.dry_run)
+        return rc
 
     if not (args.dry_run or args.confirm):
         print(__doc__)
