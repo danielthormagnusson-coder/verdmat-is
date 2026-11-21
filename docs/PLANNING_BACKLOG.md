@@ -1929,3 +1929,13 @@ sé endurvakinn á skoðun einni.
 - **cc360 — TEIKNINGAHNAPPUR Í FLEIRI SVEITARFÉLÖGUM (bókað 21.11, Danni/arkitekt).** Garðabær, Akranes, Mosfellsbær (map.is) og Hafnarfjörður (Granni) eru utan fyrstu útgáfu: skoða síðar hvort slóðarbreyta kveiki á teikningalaginu (map.is `?teikningar` kveikir það ekki hjá Garðabæ/Akranesi, fyrirvaragluggi hjá Mosfellsbæ, Granni svaraði ekki) — `D:\_audit\cc360_teikningar\SKIL_CC360.md`.
 
 - **cc362 — MÆLING Á ÖÐRUM SÖLUAUGLÝSINGAVEFJUM EN MBL (bókað 21.11, arkitekt).** Í dag er „á einhverjum vef“ í reynd aðeins mbl.is (lifandi frá 06.2026; eldri skráin ber mbl-auðkenni; myigloo er aðeins leiga; visir aðeins frumhleðsla 418 auglýsinga 05.–08.06.2026): mæla hve margar þinglýstar sölur án mbl-auglýsingar (cc339: 22,5 % eldri sölu í C) finnast auglýstar á visir.is/fasteignir.is o.fl., með nefnara, áður en sókn er smíðuð. Heimild: `D:\_audit\cc362_solusaga\SKIL_CC362.md`.
+
+- **cc363 — REIKNIVÉL: SVEITARFÉLÖG UTAN ÞEKJU OPINBERRA GJALDA (bókað 21.11, arkitekt).** Gjaldaliðurinn er auður reitur í þeim þar til gjaldskrá stenst; ein lína á hvert, með ástæðu. Heimild: `D:\_audit\cc363_reiknivel\SKIL_CC363.md`.
+  - **Sveitarfélagið Árborg:** vatnsgjald óstaðfest í frumheimild: álagning 2026 0,0806 %; gjaldskrá vatnsveitu 861/2026 (birt 27.7.2026) 0,085 %; fyrri gjaldskrá 1690/2025 ólæsileg (Stjórnartíðindi 403).
+  - **Fjarðabyggð:** fráveitugjald er % af HÚSMATI 2026, sem krefst lóðarmats 2026 (ekki til per eign).
+  - **Múlaþing:** hámark vatnsgjalds og grunnur fráveitu ófundin (texti í Stjórnartíðindum, 403).
+  - **Vestmannaeyjabær:** vatnsgjald aðeins úr verðskrá 1.7.2026 (janúarverðskrá ófundin); PDF fasteignagjalda 2026 svaraði 403.
+  - **Skagafjörður:** fráveitugjald 2026 óstaðfest (gjaldskrá 1444/2025 ólæsileg, 403); vatnsgjald á rúmmetra (rúmmál ekki í grunni).
+  - **Borgarbyggð:** vatnsgjald fer eftir veitu (Veitur / Álftaneshreppur / Hraunhreppur) — vörpun eignar á veitu ekki til.
+  - **Ísafjarðarbær:** vatnsgjaldskrá gildir frá 1.4.2026; óvíst hvort álagning í janúar 2026 byggði á eldri tölum.
+  - **Suðurnesjabær:** vatnsgjald í Garði ófundið (gjaldskrá bæjarins nær aðeins til Sandgerðis).
