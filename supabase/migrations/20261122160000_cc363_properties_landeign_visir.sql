@@ -1,0 +1,19 @@
+-- cc363: vísir á public.properties(landeign_nr) fyrir talningu íbúða á lóð (reiknivél á /eign, hólf hússjóðsáætlunar).
+--
+-- Fyrirspurnin (verdmat-ai lib/eign-queries.js, saekjaIbudirALod; PostgREST count=exact, head):
+--   select count(*) from public.properties
+--    where landeign_nr = $1 and is_residential = true and deregistered is not true;
+-- Enginn vísir er á landeign_nr, svo hver talning er raðskönnun á alla töfluna (232.887 raðir, 478 MB):
+-- 0,26–3,9 s mælt 22.11.2026 (EXPLAIN ANALYZE, 61.227 síður lesnar). Hún keyrir við hvern cache-miss á /eign í fjölbýli.
+--
+-- Vísirinn er óskilyrtur btree á landeign_nr (text):
+--   * 232.790 af 232.887 röðum bera landeign_nr og lóðir eru 117.237, svo hlutavísir sparar ekkert;
+--   * stærsta lóðin ber 325 íbúðareignir, svo síurnar is_residential og deregistered lesast af fáum röðum úr töflunni;
+--   * skilyrtur vísir (WHERE is_residential AND deregistered IS NOT TRUE) yrði ónothæfur ef fyrirspurnin kæmi með
+--     færibreytum í almennri áætlun; óskilyrtur vísir gildir alltaf og nýtist öðrum uppflettingum á lóð.
+--
+-- CREATE INDEX án CONCURRENTLY tekur SHARE-lás á properties meðan vísirinn er byggður (mælt í --prof): lestur (www)
+-- heldur áfram, skrif bíða. Beitt innan tímahliðs (utan 00:45–07:30 UTC, sópun og næturkeðja ekki í gangi), svo engin
+-- skrif eru í gangi. Sama aðferð og disk_io_read_indexes (07.2026). Engin gögn, engin réttindi, ekkert fall breytist.
+-- BEGIN/COMMIT eru ekki hér: beitingarskriftan stýrir færslunni (lock_timeout 5s).
+CREATE INDEX idx_properties_landeign_nr ON public.properties (landeign_nr);
