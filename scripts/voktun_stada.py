@@ -7,6 +7,7 @@
       K = póstar sendir síðasta sólarhring (einkvæm resend_id í public.voktun_sendur, sent_at > nú − 24 klst.;
           sama talning og sendir_i_dag í voktun_verk.py: einn póstur ber margar raðir)
     eða  VOKTUN: MAELING_MISTOKST <villutegund>    (lestur brást; ekkert netfang, enginn lykill prentaður)
+Tölur nást ekki (MAELING_MISTOKST eða ekkert úttak) = „athygli“ í vaktarpósti (svar Danna 22.11); tölur nást = stig óbreytt.
 Engin netföng eru lesin. rc alltaf 0.
 Próf: --nu <ISO> = viðmiðunartími (annars núið).
 """

@@ -478,7 +478,8 @@ if ($solBitar -match '=(FALL|VANTAR48|MAELING_MISTOKST)' + [char]0x5C + 'b') {
         Master = "verdmat-vakt $($dagur): soluferli_mv $solBitar. Lestu nýjustu raðir í public.pipeline_runs (run_type soluferli_mv_nott / soluferli_mv_sopun), finndu orsök og keyrðu scripts/endurnyja_soluferli_opin.py --thurrt áður en nokkuð er lagað (HALT fyrir GO)." }
 }
 # cc355 (ákvörðun 22.11 liður 5): ein lína „N áskriftir, M atburðir, K póstar“ síðasta sólarhring (scripts/voktun_stada.py,
-# aðeins lestur). Breytir ekki stigi póstsins; ólesanlegt = lína sem segir það, hlutlaust.
+# aðeins lestur). Tölur nást: stig óbreytt. Tölur nást ekki (lestur brestur eða ekkert úttak): „athygli“ (svar Danna 22.11,
+# sama mynstur og cc364 liður 7).
 if ($VoktunSkra) { $vok = @(Get-Content -Encoding utf8 $VoktunSkra) } else {
     $fyrriKodun4 = [Console]::OutputEncoding; $fyrriPyUtf84 = $env:PYTHONUTF8
     try {
@@ -494,6 +495,13 @@ $vokL = ($vok | Where-Object { $_ -like 'VOKTUN:*' } | Select-Object -Last 1)
 $voktunLina = $(if ($vokL -match 'askriftir=(\d+) atburdir=(\d+) postar=(\d+)') {
     'Vöktun síðasta sólarhring: {0} áskriftir, {1} atburðir, {2} póstar.' -f $Matches[1], $Matches[2], $Matches[3]
 } else { 'Vöktun síðasta sólarhring: staðan ólesanleg úr grunni.' })
+if (-not ($vokL -match 'askriftir=(\d+) atburdir=(\d+) postar=(\d+)')) {   # ekki -notmatch: það skilar engu á $null (ekkert úttak)
+    $vokAstaeda = $(if ($vokL) { ($vokL -replace '^VOKTUN: ', '') } else { 'ekkert úttak' })
+    $athygli += @{ Stutt = 'vöktunartölur nást ekki'
+        Hvad = ('Ekki tókst að lesa stöðu vöktunar (áskriftir, atburðir, póstar) úr grunninum: {0}.' -f $vokAstaeda)
+        Thydir = 'Ekki er hægt að sjá hvort vöktunarpóstar fóru út síðasta sólarhring. Vöktunin sjálf getur verið í lagi.'
+        Master = "verdmat-vakt $($dagur): voktun_stada $vokAstaeda. Keyrðu scripts/voktun_stada.py, segðu mér hvað brást og hvort verdmat-daily-voktun keyrði (logs\voktun.log). Ekkert sent eða lagað án GO." }
+}
 $stig = $(if ($athygli.Count) { 'athygli' } elseif ($jafna.Count) { 'jafna' } else { 'lagi' })
 
 $postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and $stig -ne 'lagi')
