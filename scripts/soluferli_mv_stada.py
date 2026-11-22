@@ -7,11 +7,12 @@ Les NÝJUSTU röð nokkru sinni í public.pipeline_runs fyrir run_type soluferli
     failed, crashed, halted, óþekkt gildi     -> FALL      (athygli)
     engin röð nokkru sinni                    -> VANTAR    (hlutlaust: fyrir fyrstu keyrslu eftir beitingu cc364)
     nýjasta röð eldri en 48 klst.             -> VANTAR48  (athygli: hefur verið skráð, en hvorug keyrslan náði skrefinu)
-ATHYGLI = {FALL, VANTAR48}: status-probe setur þá VAKT-viðvörun og vaktarpósturinn stigið „athygli".
+    lind ólesanleg úr grunni                  -> MAELING_MISTOKST (athygli, ákvörðun 22.11 liður 7)
+ATHYGLI = {FALL, VANTAR48, MAELING_MISTOKST}: status-probe setur þá VAKT-viðvörun og vaktarpósturinn stigið „athygli".
 Úttak (stdout, UTF-8):
     SOLUFERLI_MV: nott=<FLOKKUR> sopun=<FLOKKUR>
     L <keyrsla> <FLOKKUR> <DD.MM HH:MM> <skýring á mannamáli>     (ein lína á keyrslu sem einhvern tíma hefur verið skráð)
-rc alltaf 0; fall í lestri gefur „SOLUFERLI_MV: nott=MAELING_MISTOKST sopun=MAELING_MISTOKST" (hlutlaust).
+rc alltaf 0; fall í lestri gefur „SOLUFERLI_MV: nott=MAELING_MISTOKST sopun=MAELING_MISTOKST" (athygli, 22.11).
 Próf: --radir-ur-skra <json> [{run_type, exit_status, ended_at, summary}] í stað grunns, --nu <ISO> = viðmiðunartími.
 """
 import argparse, datetime as dt, json, sys
@@ -21,7 +22,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 KEYRSLUR = ("nott", "sopun")
 HEITI = {"nott": "eftir næturkeðju", "sopun": "eftir sópun"}
 GLUGGI = dt.timedelta(hours=48)
-ATHYGLI = {"FALL", "VANTAR48"}
+ATHYGLI = {"FALL", "VANTAR48", "MAELING_MISTOKST"}  # 22.11 liður 7: staða ólesanleg úr grunni = „athygli"
 
 
 def flokka(exit_status, ended_at=None, nu=None):

@@ -124,9 +124,9 @@ finally {
     if ($null -eq $fyrriPyUtf82) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf82 }
 } }
 $sl = ($solUt | Where-Object { $_ -like 'SOLUFERLI_MV:*' } | Select-Object -Last 1)
-$solBit = 'soluferli_mv=?'
+$solBit = 'soluferli_mv=nott:MAELING_MISTOKST,sopun:MAELING_MISTOKST'   # 22.11 lidur 7: ekkert uttak = olesanlegt = villa
 if ($sl -match 'nott=(\S+) sopun=(\S+)') { $solBit = "soluferli_mv=nott:$($Matches[1]),sopun:$($Matches[2])" }
-if ($solBit -match ':(FALL|VANTAR48)') { $offenders += $solBit }   # cc364 21.11: SLEPPT og VANTAR (aldrei skrad) eru hlutlaus
+if ($solBit -match ':(FALL|VANTAR48|MAELING_MISTOKST)') { $offenders += $solBit }   # 22.11 lidur 7: MAELING_MISTOKST (olesanlegt ur grunni) = villa   # cc364 21.11: SLEPPT og VANTAR (aldrei skrad) eru hlutlaus
 
 # ── one summary line (+ loud line on trouble) ────────────────────────────────
 $utc  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')

@@ -454,6 +454,7 @@ if ($rettRc -eq 1) {
 # cc364: lind leitar (síðasta skref keðju og sópunar), flokkuð í EINU falli (scripts/soluferli_mv_stada.py).
 # Ákvarðanir 21.11: OK = í lagi; SLEPPT = hvorki villa né grænt (fyrra skref féll og er hávært þar); FALL = „athygli“;
 # VANTAR = hlutlaust (aldrei skráð, t.d. fyrir fyrstu keyrslu); VANTAR48 = „athygli“ (hefur verið skráð, ekkert í 48 klst.).
+# 22.11 liður 7: MAELING_MISTOKST (staða ólesanleg úr grunni, eða ekkert SOLUFERLI_MV-úttak) = „athygli“.
 if ($SoluferliSkra) { $sol = @(Get-Content -Encoding utf8 $SoluferliSkra) } else {
     $fyrriKodun3 = [Console]::OutputEncoding; $fyrriPyUtf83 = $env:PYTHONUTF8
     try {
@@ -466,11 +467,12 @@ if ($SoluferliSkra) { $sol = @(Get-Content -Encoding utf8 $SoluferliSkra) } else
     }
 }
 $solLinur = @($sol | Where-Object { $_ -like 'L *' } | ForEach-Object {
-    $_.Substring(2) -replace '^(nott|sopun) OK ', '$1: í lagi, ' -replace '^(nott|sopun) SLEPPT ', '$1: sleppt, ' -replace '^(nott|sopun) FALL ', '$1: féll, ' -replace '^(nott|sopun) VANTAR48 ', '$1: vantar, ' })
+    $_.Substring(2) -replace '^(nott|sopun) OK ', '$1: í lagi, ' -replace '^(nott|sopun) SLEPPT ', '$1: sleppt, ' -replace '^(nott|sopun) FALL ', '$1: féll, ' -replace '^(nott|sopun) VANTAR48 ', '$1: vantar, ' -replace '^lestur MAELING_MISTOKST ', 'lestur: staðan ólesanleg úr grunni, ' })
 $solBitar = (($sol | Where-Object { $_ -like 'SOLUFERLI_MV:*' } | Select-Object -Last 1) -replace '^SOLUFERLI_MV: ', '')
-if ($solBitar -match '=(FALL|VANTAR48)' + [char]0x5C + 'b') {
+if (-not $solBitar) { $solBitar = 'nott=MAELING_MISTOKST sopun=MAELING_MISTOKST' }   # ekkert úttak = ólesanlegt (22.11 liður 7)
+if ($solBitar -match '=(FALL|VANTAR48|MAELING_MISTOKST)' + [char]0x5C + 'b') {
     $athygli += @{ Stutt = 'lind leitar ekki endurnýjuð'
-        Hvad = ('Endurnýjun á lista eigna á sölu sem leitin les féll eða hefur ekki keyrt í 48 klst.: {0}' -f ($solLinur -join ' · '))
+        Hvad = ('Endurnýjun á lista eigna á sölu sem leitin les féll, hefur ekki keyrt í 48 klst. eða staða hennar er ólesanleg úr grunni: {0}' -f ($solLinur -join ' · '))
         Thydir = 'Leitin og „Nýtt í vikunni“ sýna stöðuna frá síðustu heppnuðu endurnýjun. Dagafjöldi er réttur, en nýjustu breytingar á því hvaða eignir eru á sölu geta vantað.'
         Master = "verdmat-vakt $($dagur): soluferli_mv $solBitar. Lestu nýjustu raðir í public.pipeline_runs (run_type soluferli_mv_nott / soluferli_mv_sopun), finndu orsök og keyrðu scripts/endurnyja_soluferli_opin.py --thurrt áður en nokkuð er lagað (HALT fyrir GO)." }
 }

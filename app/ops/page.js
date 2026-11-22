@@ -72,6 +72,8 @@ async function loadOps() {
   ]);
 
   const runsData = val(runs)?.data || [];
+  // 22.11 (cc364 liður 7): staða ólesanleg úr grunni = „athygli", ekki „engin keyrsla".
+  const runsErr = runs.status === "rejected" || !!val(runs)?.error;
   const latestByType = {};
   for (const r of runsData) if (!latestByType[r.run_type]) latestByType[r.run_type] = r;
 
@@ -92,6 +94,7 @@ async function loadOps() {
 
   return {
     scsErr,
+    runsErr,
     latestByType,
     chain,
     fresh: {
@@ -167,7 +170,8 @@ function FreshRow({ label, ts, cfg, note }) {
   );
 }
 
-function runLevel(r) {
+function runLevel(r, runsErr = false) {
+  if (runsErr) return { level: "red", txt: "ólesanlegt úr grunni" };
   if (!r) return { level: "red", txt: "engin keyrsla" };
   if (r.exit_status === "success") return { level: "green", txt: "success" };
   // cc364: „skipped" = skrefi sleppt af því fyrra skref féll — hvorki villa né grænt
@@ -197,7 +201,7 @@ export default async function OpsPage() {
     );
   }
 
-  const { latestByType, chain, fresh, predMeta, extraction, backlog, sources, model, core, segs, evalSummary, scsErr } = data;
+  const { latestByType, chain, fresh, predMeta, extraction, backlog, sources, model, core, segs, evalSummary, scsErr, runsErr } = data;
   const head = core || model;   // lead with the core market (capital apts); fall back to overall
   const predAge = ageHours(fresh.predictions);
   const predRed = freshLevel(predAge, OPS_CONFIG.monthly) === "red";
@@ -254,7 +258,7 @@ export default async function OpsPage() {
           <tbody>
             {runTypes.map((rt) => {
               const r = latestByType[rt];
-              const { level, txt } = runLevel(r);
+              const { level, txt } = runLevel(r, runsErr);
               const dur = r?.ended_at && r?.started_at ? Math.round((new Date(r.ended_at) - new Date(r.started_at)) / 1000) : null;
               const sum = r?.summary || {};
               const keys = Object.keys(sum).filter((k) => typeof sum[k] !== "object").slice(0, 3);
