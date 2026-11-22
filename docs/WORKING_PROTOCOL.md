@@ -401,3 +401,7 @@ Viðbragð: lesa `Microsoft-Windows-CodeIntegrity/Operational` (Id 3033/3077/311
 ### (al) UNDIRLOTA SEM SNERTIR VERDMAT-AI KEYRIR `npm run build` MEÐ FORPRÓFUNUM FYRIR HALT (Danni 21.11.2026)
 
 **Undirlota sem snertir verdmat-ai keyrir `npm run build` (sem keyrir forprófin `scripts/prof_*.mjs` á undan `next build`) fyrir HALT, aldrei aðeins `next build`, og setur úttakið í SKIL. Master staðfestir það áður en push er lagt fyrir Danna.** Raundæmi: cc360 keyrði aðeins `next build`; Vercel-bygging á ddff04d 21.11 féll á forprófunum U2 (`prof_cc343_hms`) og C1 (`prof_cc353_hlid`) sem festu `EIGN_CACHE_UTGAFA`. www stóð á fyrri útgáfu; lagfært í c623459.
+
+### (am) TVEIR MASTERAR: AÐEINS VERDMAT-MASTER BEITIR, ÝTIR OG BREYTIR TASK SCHEDULER (Danni + arkitekt 22.11.2026)
+
+**Aðeins verdmat-masterinn beitir í grunn, ýtir á repo og breytir Task Scheduler. Hin master-lotan („Master CC lota heimasvæði") vinnur eingöngu á diski (undirbúningur, mælingar, SKIL) og leggur allt sem þarf beitingu eða push fyrir verdmat-masterinn, sem leggur það fyrir Danna til GO samkvæmt (ai) og (aj).** Verði verdmat-masterinn þess var að hin lotan hafi beitt, ýtt eða breytt verki lætur hann Danna vita strax. Staða við setningu reglunnar 22.11 15:20 UTC: engin beiting, push eða verkbreyting frá hinni lotunni (migrations, origin/main á app og verdmat-ai og Task Scheduler skoðuð).
