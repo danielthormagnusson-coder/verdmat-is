@@ -62,6 +62,7 @@ param(
     [string]$SopunKeyrslur = 'D:\verdmat-is\scraper_data\lifecycle_sweep_runs.jsonl',
     [string]$RettindaSkra = '',         # cc350: úttak réttindavaktar úr skrá (próf og sýnishorn)
     [string]$SoluferliSkra = '',        # cc364: úttak soluferli_mv_stada.py úr skrá (próf)
+    [string]$VoktunSkra = '',           # cc355: úttak voktun_stada.py úr skrá (próf)
     [string]$EndurraesingHermun = ''    # cc357: falsuð verkstaða fyrir/eftir endurræsingu (aðeins með -Thurrt)
 )
 
@@ -476,6 +477,23 @@ if ($solBitar -match '=(FALL|VANTAR48|MAELING_MISTOKST)' + [char]0x5C + 'b') {
         Thydir = 'Leitin og „Nýtt í vikunni“ sýna stöðuna frá síðustu heppnuðu endurnýjun. Dagafjöldi er réttur, en nýjustu breytingar á því hvaða eignir eru á sölu geta vantað.'
         Master = "verdmat-vakt $($dagur): soluferli_mv $solBitar. Lestu nýjustu raðir í public.pipeline_runs (run_type soluferli_mv_nott / soluferli_mv_sopun), finndu orsök og keyrðu scripts/endurnyja_soluferli_opin.py --thurrt áður en nokkuð er lagað (HALT fyrir GO)." }
 }
+# cc355 (ákvörðun 22.11 liður 5): ein lína „N áskriftir, M atburðir, K póstar“ síðasta sólarhring (scripts/voktun_stada.py,
+# aðeins lestur). Breytir ekki stigi póstsins; ólesanlegt = lína sem segir það, hlutlaust.
+if ($VoktunSkra) { $vok = @(Get-Content -Encoding utf8 $VoktunSkra) } else {
+    $fyrriKodun4 = [Console]::OutputEncoding; $fyrriPyUtf84 = $env:PYTHONUTF8
+    try {
+        $env:PYTHONUTF8 = '1'; [Console]::OutputEncoding = $Utf8
+        $vok = @(& 'C:\Python314\python.exe' (Join-Path $PSScriptRoot 'voktun_stada.py') 2>&1 | ForEach-Object { "$_" })
+    } catch { $vok = @('VOKTUN: MAELING_MISTOKST raesing') }
+    finally {
+        [Console]::OutputEncoding = $fyrriKodun4
+        if ($null -eq $fyrriPyUtf84) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $fyrriPyUtf84 }
+    }
+}
+$vokL = ($vok | Where-Object { $_ -like 'VOKTUN:*' } | Select-Object -Last 1)
+$voktunLina = $(if ($vokL -match 'askriftir=(\d+) atburdir=(\d+) postar=(\d+)') {
+    'Vöktun síðasta sólarhring: {0} áskriftir, {1} atburðir, {2} póstar.' -f $Matches[1], $Matches[2], $Matches[3]
+} else { 'Vöktun síðasta sólarhring: staðan ólesanleg úr grunni.' })
 $stig = $(if ($athygli.Count) { 'athygli' } elseif ($jafna.Count) { 'jafna' } else { 'lagi' })
 
 $postur = $Prof -or $lifsmarkNu -or (($Senda -or $Thurrt) -and $stig -ne 'lagi')
@@ -544,6 +562,8 @@ if ($lifsmarkNu) {
     $m += "- Næturuppfærslan kláraðist $okDagar af síðustu 7 nóttum."
     $m += '- Þessi póstur kemur alla mánudagsmorgna, líka þegar allt er í lagi. Komi hann ekki er vaktin sjálf biluð: segðu master frá því.'
 }
+$m += ''
+$m += $voktunLina   # cc355 liður 5
 # Fyrir lotur: tæknilínur, óbreyttar að efni.
 $m += ''
 $m += '______________________________'

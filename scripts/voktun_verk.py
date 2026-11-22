@@ -300,6 +300,15 @@ def kr(v):
     return f"{int(v):,}".replace(",", ".") + " kr."
 
 
+def mkr(v):
+    """Milljónir með einum aukastaf og kommu: 113.900.000 -> „113,9 M kr." Sama regla og formatMillions í verdmat-ai
+    lib/format.js (toFixed(1), punkti skipt í kommu); hálfu námundað upp (ROUND_HALF_UP), eins og toFixed á heilum krónum.
+    cc355 (ákvörðun 22.11 liður 4): notað í „fór af sölu"-línunni; aðrar línur halda kr()."""
+    from decimal import Decimal, ROUND_HALF_UP
+    m = (Decimal(int(v)) / Decimal(1_000_000)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    return f"{m}".replace(".", ",") + " M kr."
+
+
 def dags(s):
     d = s if isinstance(s, (dt.date, dt.datetime)) else dt.datetime.fromisoformat(str(s).replace("Z", "+00:00"))
     return f"{d:%d.%m.%Y}"
@@ -410,7 +419,7 @@ def lina(a, herferd):
         dg = lambda x: "dag" if x % 10 == 1 and x % 100 != 11 else "daga"
         lengd = f"á sölu í {n} {dg(n)}" if n is not None else f"á sölu í minnst {m} {dg(m)}" if m is not None else ""
         v = g.get("verd")
-        asett = f"Síðast ásett {kr(v)}" if v and v > 1 else ""
+        asett = f"Síðast ásett {mkr(v)}" if v and v > 1 else ""
         aftan = ", ".join(x for x in (asett, lengd) if x)
         aftan = (aftan[0].upper() + aftan[1:] + ". ") if aftan else ""
         return (f"{teng}: fór af sölu {dags(g['dags'])}. {aftan}"
