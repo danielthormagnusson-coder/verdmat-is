@@ -8,8 +8,9 @@ Keyrir eftir næturkeðju (05:30), Verðvakt (06:45) og vakt (07:00). Engin vinn
   python scripts/voktun_verk.py --synishorn      # eitt sýnishorn af hverri pósttegund á móttakanda eiganda; ekkert skrifað
 
 HVÍTLISTI (hörð regla): sendi() neitar öllum öðrum en ABENDING_MOTTAKANDI nema VOKTUN_OPID=1 sé í umhverfi. Það er sett
-aðeins við opnun, með GO Danna. „Fer af sölu" er óvirkt nema AF_SOLU_VIRKT = True: sópun er ekki staðfest (SKIL_CC320 §3).
-Tala og hlið koma úr mælingu: BIDTIMI_AF_SOLU = 7 d, ny-lota X = 14 d (SKIL §1, §4).
+aðeins við opnun, með GO Danna. „Fer af sölu" (cc355) = söluferli (scraper.soluferli, cc362/cc365) sem lauk án sölu: engin
+auglýsing í LOTU_BIL_DAGAR = 14 d, engin þinglýst sala frá upphafi ferlis. Biðtíminn 14 d er mældur (SKIL_CC355 §2: 1/2/3 d gefa
+43/37/31 % falskar, 7 d 2,5 %, 14 d 0 %; n = 1.948 / 1.141 / 1.112 íbúðaatburðir), og sama N og „Kemur á sölu", svo atburðirnir tveir útiloka hvor annan.
 
 Reglur sem gilda í pósti (regla 13, cc60/cc69): staðreynd, dagsetning, heimild, tengill; engin hvatning, engin prósenta milli
 ásetts verðs og mats, verð aldrei án dagsetningar, pakkasamningur merktur sem heildarverð. UTM ber aðeins tegund pósts.
@@ -21,12 +22,14 @@ import psycopg2, psycopg2.extras, requests
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 BOTN = Path(r"D:\verdmat-is")
-AF_SOLU_VIRKT = False
-# cc324 §7: R á uppsöfnunardögum sópunar er dagur athugunar, ekki hvarfs. Aðeins R eftir þennan dag má verða „fer af sölu".
-# Sett um leið og AF_SOLU_VIRKT, þegar cc324 hefur staðfest sópun (regla þar: 3 morgnar í röð og ekkert kort-auðkenni óathugað > 7 d).
-AF_SOLU_KLUKKA_FRA = None
-BIDTIMI_AF_SOLU = 7
+AF_SOLU_VIRKT = True
+# cc324 §7: lok á uppsöfnunardögum sópunar (28.10–12.11.2026) er dagur athugunar, ekki hvarfs. Aðeins ferli sem lauk eftir þennan
+# tíma má verða „fer af sölu" (cc355: síðasti uppsöfnunardagur 12.11; fyrsti mögulegi atburður því 27.11).
+AF_SOLU_KLUKKA_FRA = dt.datetime(2026, 11, 13, tzinfo=dt.timezone.utc)
 LOTU_BIL_DAGAR = 14
+BIDTIMI_AF_SOLU = LOTU_BIL_DAGAR  # cc355: atburður fer þegar ferlinu lýkur (N = 14), ekki fyrr
+AF_SOLU_GLUGGI_DAGAR = 3          # lok ferlis á [nú-14-3 d, nú-14 d]: missd keyrsla nær upp, sama og 3 d gluggi hinna atburðanna
+AF_SOLU_HAMARK = 150              # vörn: fleiri frambjóðendur en þetta í einni keyrslu = sópun/sókn biluð; ekkert skráð (mælt hám. 50/d, q90 43)
 DAGSTHAK = 80            # sendingarþak á dag (UTC), talið yfir allar keyrslur dagsins; afgangur fer næsta dag (Resend Free: 100/dag, deilt með vakt og ábendingum)
 VIDVORUN_VID = 60        # viðvörun í log og D:\verdmat_status.log (rás status-probe og kedjuvaktar) þegar sendir póstar dagsins ná þessu
 STATUS_LOG = Path(r"D:\verdmat_status.log")
@@ -145,18 +148,6 @@ def finna_ny(c):
       order by f.fastnum, f.upphaf, n.listing_id""", timeout=170)
 
 
-def ferli_lokid(c, fastnums):
-    """Dagar á sölu í síðasta LOKNA ferli hverrar eignar, úr sama lesfleti og /eign (scraper.soluferli, cc362).
-    dagar er NULL ef upphaf eða lok er óvíst; þá gildir dagar_minnst („í minnst N daga"), regla 13."""
-    if not fastnums:
-        return {}
-    r = les(c, """
-      select distinct on (s.fastnum) s.fastnum, s.upphaf, s.lok, s.dagar, s.dagar_minnst, s.upphaf_viss
-      from scraper.soluferli(%s::bigint[]) s where not s.opid
-      order by s.fastnum, s.lok desc""", (sorted(set(fastnums)),), timeout=170)
-    return {x["fastnum"]: x for x in r}
-
-
 def finna_verd(c):
     return les(c, """
       select v.listing_id, v.fastnum, v.fyrra_verd, v.nytt_verd, v.nytt_sast, v.stefna, v.teg, p.heimilisfang, p.postnr, p.postheiti
@@ -174,20 +165,40 @@ def finna_solur(c, dagar=45):
 
 
 def finna_af_solu(c):
-    """Eignarhvarf: fyrsta fjarvera fyrir ≥ BIDTIMI dögum, engin önnur auglýsing lifandi og engin ný síðan. Aðeins kallað ef AF_SOLU_VIRKT."""
+    """„Fer af sölu" (cc355) = síðasta söluferli íbúðar í scraper.soluferli (cc362/cc365, sama lesflötur og /eign og „Kemur á sölu")
+    sem LAUK fyrir BIDTIMI_AF_SOLU = 14 til 17 dögum: engin auglýsing hefur sést síðan, svo ekkert getur lengur bæst í ferlið.
+    Ekki ef: (a) nýtt ferli er hafið (naesta_upphaf; þá gildir „Kemur á sölu"), (b) þinglýst sala á eigninni frá upphafi ferlis
+    („Selst" á við, mælt: 63 % sölu-tilvika eru þinglýst á útsendingardegi), (c) sópun fann auglýsingu eignarinnar lifandi eftir lok
+    (sidast_fundin_at > lok: kjarninn lokar auglýsingu við fyrstu fjarveru og opnar hana ekki aftur; vörn, 0 tilvik í mælingu),
+    (d) lok fyrir AF_SOLU_KLUKKA_FRA (uppsöfnunardagar). Frambjóðendur: fjarvera/afskráning skráð í kringum lokagluggann.
+    Aðeins kallað ef AF_SOLU_VIRKT. SKIL_CC355 §2–§3."""
     return les(c, """
-      with h as (
-        select l.listing_id, l.fastnum, min(e.event_at) as r from scraper.listings l
-        join scraper.listing_lifecycle_events e on e.source=l.source and e.source_listing_id=l.source_listing_id and e.event_type='confirmed_absent_1'
-        where l.source='mbl' and l.tenure='sale' and l.category='residential' and l.fastnum is not null
-          and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=l.listing_id)
-        group by 1,2)
-      select h.fastnum, h.r, p.heimilisfang, p.postnr, p.postheiti from h join public.properties p on p.fastnum=h.fastnum and p.is_residential
-      where h.r < now() - make_interval(days => %s) and h.r > now() - make_interval(days => %s + 3) and h.r >= %s
-        and not exists (select 1 from scraper.listings o where o.source='mbl' and o.tenure='sale' and o.fastnum=h.fastnum and o.listing_id<>h.listing_id
-          and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=o.listing_id)
-          and (o.first_seen_at > h.r or (o.status='active' and not exists (select 1 from scraper.listing_lifecycle_events e2 where e2.source=o.source and e2.source_listing_id=o.source_listing_id and e2.event_type='confirmed_absent_1'))))""",
-                (BIDTIMI_AF_SOLU, BIDTIMI_AF_SOLU, AF_SOLU_KLUKKA_FRA))
+      with k as (
+        -- frambjóðendur: söluauglýsing sem hvarf (fyrsta fjarvera, annars afskráning) um lokagluggann, á eign sem hefur enga lifandi
+        -- auglýsingu núna (nauðsynlegt skilyrði lokaðs ferlis; 1.293 -> 185 eignir 22.11, svo soluferli keyrir á fáum)
+        select distinct l.fastnum from scraper.listing_lifecycle_events e
+        join scraper.listings l on l.source=e.source and l.source_listing_id=e.source_listing_id and l.tenure='sale' and l.fastnum is not null
+        where e.source='mbl' and e.event_type='confirmed_absent_1'
+          and e.event_at > now() - make_interval(days => %(n)s + %(v)s) - interval '2 hours' and e.event_at <= now() - make_interval(days => %(n)s) + interval '2 hours'
+        union
+        select distinct l.fastnum from scraper.listings l
+        where l.source='mbl' and l.tenure='sale' and l.fastnum is not null
+          and l.withdrawn_at > now() - make_interval(days => %(n)s + %(v)s) - interval '2 hours' and l.withdrawn_at <= now() - make_interval(days => %(n)s) + interval '2 hours'),
+      kk as (select k.fastnum from k join public.properties p on p.fastnum=k.fastnum and p.is_residential
+             where not exists (select 1 from scraper.listings o where o.source='mbl' and o.tenure='sale' and o.fastnum=k.fastnum and o.status='active'
+               and not exists (select 1 from scraper.listing_lifecycle_events e2 where e2.source=o.source and e2.source_listing_id=o.source_listing_id
+                                 and e2.event_type in ('confirmed_absent_1','withdrawn_confirmed')))),
+      f as (
+        select distinct on (s.fastnum) s.* from scraper.soluferli(array(select fastnum from kk)) s
+        order by s.fastnum, s.upphaf desc)
+      select f.fastnum, f.upphaf, f.lok, f.dagar, f.dagar_minnst, f.upphaf_viss, f.sidasta_verd, p.heimilisfang, p.postnr, p.postheiti
+      from f join public.properties p on p.fastnum=f.fastnum
+      where not f.opid and f.naesta_upphaf is null
+        and f.lok <= now() - make_interval(days => %(n)s) and f.lok > now() - make_interval(days => %(n)s + %(v)s) and f.lok >= %(klukka)s
+        and not exists (select 1 from public.sales_history s where s.fastnum=f.fastnum and s.thinglystdags >= f.upphaf::date)
+        and not exists (select 1 from scraper.listings o where o.source='mbl' and o.tenure='sale' and o.fastnum=f.fastnum and o.sidast_fundin_at > f.lok
+          and not exists (select 1 from scraper.tvitok_falin t where t.listing_id=o.listing_id))
+      order by f.fastnum""", {"n": BIDTIMI_AF_SOLU, "v": AF_SOLU_GLUGGI_DAGAR, "klukka": AF_SOLU_KLUKKA_FRA}, timeout=170)
 
 
 def bendill_klst(c):
@@ -219,12 +230,22 @@ def skra_atburdi(c, thurrt):
             print(f"af_solu: sleppt, bendill {b} klst")
         else:
             af = finna_af_solu(c)
-            fl = ferli_lokid(c, [r["fastnum"] for r in af])  # cc364: dagarnir úr lesfletinum, ekki úr auglýsingunni
+            if len(af) > AF_SOLU_HAMARK:
+                # cc355: bunki = sópun/sókn biluð (t.d. delta fann ekki endurbirtingar); ekkert skráð, næsta keyrsla reynir aftur innan gluggans
+                lina_ = f"{dt.datetime.now(dt.timezone.utc):%Y-%m-%dT%H:%M:%SZ} !! VOKTUN-VIDVORUN: af_solu {len(af)} frambjóðendur > {AF_SOLU_HAMARK}; ekkert skráð"
+                print(lina_)
+                if not thurrt:
+                    try:
+                        with open(STATUS_LOG, "a", encoding="utf-8") as fh:
+                            fh.write(lina_ + "\n")
+                    except OSError as e:
+                        print("status-log skrifaðist ekki:", e)
+                af = []
             for r in af:
-                f = fl.get(r["fastnum"]) or {}
-                radir.append((f"af_solu:{r['fastnum']}:{r['r']:%Y-%m-%d}", "af_solu", r["fastnum"], gata_lykill(r["heimilisfang"], r["postnr"]), r["postnr"],
-                              j(dict(heimilisfang=r["heimilisfang"], postheiti=r["postheiti"], fyrst_horfin=r["r"], dags=r["r"],
-                                     dagar_a_solu=f.get("dagar"), dagar_minnst=f.get("dagar_minnst"))), r["r"]))
+                # dagar/dagar_minnst úr ferlinu sjálfu (upphaf → lok); óvíst upphaf → „minnst N" (regla 13). Lykill á lokadegi ferlis.
+                radir.append((f"af_solu:{r['fastnum']}:{r['lok']:%Y-%m-%d}", "af_solu", r["fastnum"], gata_lykill(r["heimilisfang"], r["postnr"]), r["postnr"],
+                              j(dict(heimilisfang=r["heimilisfang"], postheiti=r["postheiti"], dags=r["lok"], upphaf=r["upphaf"],
+                                     dagar_a_solu=r["dagar"], dagar_minnst=r["dagar_minnst"], verd=r["sidasta_verd"])), r["lok"]))
     fj = {}
     for x in radir:
         fj[x[1]] = fj.get(x[1], 0) + 1
@@ -383,12 +404,17 @@ def lina(a, herferd):
         m = "" if g.get("nothaef") else " HMS telur samninginn ekki nothæfan til samanburðar."
         return f"{teng}: þinglýst sala, {p}, þinglýst {dags(g['dags'])}.{m}"
     if t == "af_solu":
-        # cc364: dagafjöldi ferlisins úr lesfletinum; óvíst upphaf → „í minnst N daga" (regla 13); enginn ferill → engin tala
+        # cc355: dagsetning = lok söluferlis; dagafjöldi ferlisins úr lesfletinum; óvíst upphaf → „minnst N" (regla 13)
         n = g.get("dagar_a_solu")
         m = g.get("dagar_minnst")
-        lengd = (f" eftir {n} {'dag' if n % 10 == 1 and n % 100 != 11 else 'daga'} á sölu" if n is not None
-                 else f" eftir minnst {m} {'dag' if m % 10 == 1 and m % 100 != 11 else 'daga'} á sölu" if m is not None else "")
-        return f"{teng}: engin auglýsing í {BIDTIMI_AF_SOLU} daga{lengd} (fannst ekki {dags(g['dags'])}). Það þýðir ekki að eignin sé seld."
+        dg = lambda x: "dag" if x % 10 == 1 and x % 100 != 11 else "daga"
+        lengd = f"á sölu í {n} {dg(n)}" if n is not None else f"á sölu í minnst {m} {dg(m)}" if m is not None else ""
+        v = g.get("verd")
+        asett = f"Síðast ásett {kr(v)}" if v and v > 1 else ""
+        aftan = ", ".join(x for x in (asett, lengd) if x)
+        aftan = (aftan[0].upper() + aftan[1:] + ". ") if aftan else ""
+        return (f"{teng}: fór af sölu {dags(g['dags'])}. {aftan}"
+                f"Engin auglýsing hefur sést í {BIDTIMI_AF_SOLU} daga og engri sölu hefur verið þinglýst.")
     return teng
 
 
@@ -396,8 +422,10 @@ def heimild(atb):
     h = []
     if {"ny", "verd", "af_solu"} & atb:
         h.append("söluauglýsingar á mbl.is (nætursókn verdmat.ai); ásett verð er ekki söluverð")
-    if "sala" in atb:
+    if "sala" in atb or "af_solu" in atb:
         h.append("kaupskrá HMS; síðustu þinglýsingardagar geta átt eftir að bætast við")
+    if "af_solu" in atb:
+        h.append("„fór af sölu“ segir að auglýsingin hvarf, ekki hvort eignin seldist; sala kemur sér þegar henni er þinglýst")
     return f"<p {HEIM}>Heimild: {'; '.join(h)}.</p>" if h else ""
 
 
@@ -432,6 +460,15 @@ def hluti_askriftar(s, atb):
     return ut
 
 
+def af_solu_eftir_val(s, a):
+    """cc355: „Fer af sölu" bætist við eldri áskrift aðeins þegar áskrifandi hakar við hann í stillingum (breytt). Atburður sem
+    fannst áður en valið var gert fer ekki út, svo áskrift fær ekki gamla bunka við breytinguna. Aðrir atburðir: óbreytt (True)."""
+    if a.get("tegund") != "af_solu":
+        return True
+    fra = max(x for x in (s.get("stadfest_at"), s.get("breytt")) if x is not None)
+    return a.get("fundid_at") is None or a["fundid_at"] > fra
+
+
 def velja(s, allt_t, leitargogn=None):
     """Atburðir sem eiga við áskrift, ósendir, fundnir eftir staðfestingu. Einn samningur = einn atburður á götu og póstnúmeri.
     Leit (cc329): aðeins ný lota, ekki endurbirt, hvert fastnúmer einu sinni á áskrift; _passar segir hvort öll skilyrði eru þekkt."""
@@ -441,7 +478,7 @@ def velja(s, allt_t, leitargogn=None):
     if t == "eign":
         v = {"a_solu": {"ny"}, "verd": {"verd"}, "selst": {"sala"}, "af_solu": {"af_solu"} if AF_SOLU_VIRKT else set()}
         teg = set().union(*[v.get(x, set()) for x in val])
-        ut = [a for a in allt_t if a["fastnum"] == int(lyk) and a["tegund"] in teg]
+        ut = [a for a in allt_t if a["fastnum"] == int(lyk) and a["tegund"] in teg and af_solu_eftir_val(s, a)]
     elif t in ("gata", "postnr"):
         samn = set()
         for a in allt_t:
@@ -456,6 +493,8 @@ def velja(s, allt_t, leitargogn=None):
                 if f not in samn:
                     samn.add(f)
                     ut.append(a)
+            elif a["tegund"] == "af_solu" and "af_solu" in val and AF_SOLU_VIRKT and af_solu_eftir_val(s, a):
+                ut.append(a)
     elif t == "leit":
         sk = s["skilyrdi"]
         sent = set(s.get("_sent_fastnum") or ())
