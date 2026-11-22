@@ -4,6 +4,23 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-22 — Vísitölu-akkeri og comps nota síðasta liðna og fullnaða ársfjórðung (Danni + arkitekt, cc369)
+
+**Ákvörðun Danna og arkitekts, borin af master:**
+* **Regla.** Akkeri (`cc143_prior`) og comps (`build_comps_v2`) miða við síðasta LIÐNA og fullnaða ársfjórðung. Það er sama regla og bráðabirgðamerking vefvísitölunnar (cc218-v1): fjórðungurinn er liðinn og fullnusta ≥ 90 %. Við setningu reglunnar 22.11 er það 2026Q3.
+* **Útfærsla.** Reglan er í keðjunni sjálfri, með prófi. Fjórðungurinn er ekki handvalinn með `--at-q` í hvert sinn.
+* **Rök.** Þurrkeyrsla cc369 sýndi að án reglunnar festist akkerið við hálfan 2026Q4 hvar sem sella hefur ≥ 10 pör:
+  * miðgildi |Δ| akkeris 1,55 %;
+  * 3.761 af 83.228 eignum yfir 10 %;
+  * sumarhús á landsbyggð +20 %, ris í Reykjavík +14 %.
+  * Með Q3 sem viðmið: miðgildi 0,83 %.
+* **Vísitölu-artifactið** (`D:\cc143\rs_live_kaupskra*`, endurbyggt á kaupskrá 22.11) er beitt sér með GO Danna. Ekkert lifandi breytist við það.
+* **Röð.** Ekkert sér flipp fyrir vísitöluna. Hún fer inn með F-v1 (cc354, ákvarðanir a og b): migration á einflm → endurskor spáa → `build_comps_v2` og `cc143_prior` á nýju vísitölunni með reglunni → staging → parity → flipp, með stöðvunarskilyrðum mánaðarkeðjunnar. es1 (cc359) kemur á eftir og endurmetur vægin á nýju vísitölunni.
+
+Mælingar: `D:\_audit\cc369_rs_live_endurbygging\SKIL_CC369.md`.
+
+---
+
 ## 2026-11-21 — Suspect v2 (size_mismatch) í lifandi þrepum og comps: flipp D, fjórar V2-töflur í einni færslu (Danni + arkitekt, cc351/cc358)
 
 **Ákvörðun Danna og arkitekts, borin af master; beitt af master eftir GO Danna 21.11:**
