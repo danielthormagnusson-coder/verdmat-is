@@ -1939,3 +1939,4 @@ sé endurvakinn á skoðun einni.
   - **Borgarbyggð:** vatnsgjald fer eftir veitu (Veitur / Álftaneshreppur / Hraunhreppur) — vörpun eignar á veitu ekki til.
   - **Ísafjarðarbær:** vatnsgjaldskrá gildir frá 1.4.2026; óvíst hvort álagning í janúar 2026 byggði á eldri tölum.
   - **Suðurnesjabær:** vatnsgjald í Garði ófundið (gjaldskrá bæjarins nær aðeins til Sandgerðis).
+- **cc363 — RAFMAGN ÍBÚÐAR Í GARÐABÆ (bókað 22.11, Danni/arkitekt).** Dreifiveita Garðabæjar er ekki staðfest fyrir einstaka eign: Veitur og HS Veitur segja mörkin vera Hraunsholtslæk og póstnúmer 210 nær yfir bæði svæðin. Reiturinn stendur auður í Reiknivél þar til hægt er að staðsetja eign gagnvart mörkunum með frumheimild, til dæmis með hnitum og dreifisvæðakorti veitnanna. Heimild: `D:\_audit\cc363_reiknivel\SKIL_CC363C.md`.
