@@ -405,3 +405,7 @@ Viðbragð: lesa `Microsoft-Windows-CodeIntegrity/Operational` (Id 3033/3077/311
 ### (am) TVEIR MASTERAR: AÐEINS VERDMAT-MASTER BEITIR, ÝTIR OG BREYTIR TASK SCHEDULER (Danni + arkitekt 22.11.2026)
 
 **Aðeins verdmat-masterinn beitir í grunn, ýtir á repo og breytir Task Scheduler. Hin master-lotan („Master CC lota heimasvæði") vinnur eingöngu á diski (undirbúningur, mælingar, SKIL) og leggur allt sem þarf beitingu eða push fyrir verdmat-masterinn, sem leggur það fyrir Danna til GO samkvæmt (ai) og (aj).** Verði verdmat-masterinn þess var að hin lotan hafi beitt, ýtt eða breytt verki lætur hann Danna vita strax. Staða við setningu reglunnar 22.11 15:20 UTC: engin beiting, push eða verkbreyting frá hinni lotunni (migrations, origin/main á app og verdmat-ai og Task Scheduler skoðuð).
+
+### (an) UNDIRLOTA BÝR ALDREI TIL .ENV-SKRÁ; FULL BYGGING KEYRÐ AF MASTER ÁN AFRITUNAR (Danni + arkitekt 23.11.2026)
+
+**Undirlota býr ALDREI til `.env`- eða `.env.local`-skrá, hvorki með raungildum né falsgildum, og afritar hana aldrei.** Undirlota keyrir forprófin og `next build` (sem fellur á umhverfi án breyta, og það er skráð í SKIL). Full bygging fyrir push fer fram þar sem umhverfið er til án afritunar: í aðalmöppunni á greininni, eða með breytum hlöðnum í ferlið (aldrei í skrá) úr `D:\env.local`, og master keyrir hana. Tilefni: í cc370 bjó undirlota til `.env.local` með falsgildum í tveimur vinnutrjám, eftir að afritun hafði verið hafnað, til að taka skjámyndir. Skjámyndirnar voru samþykktar aðeins til útlitsmats og skránum var eytt.
