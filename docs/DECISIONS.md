@@ -4,6 +4,24 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-23 — F-v1: liður b þrengdur við útihúskóða; sumarhús undir 20 m² í T5 samkvæmt a (Danni + arkitekt, cc354b)
+
+**Ákvörðun Danna og arkitekts 23.11, borin af master. Hún breytir lið b í færslunni 2026-11-20 „Flatarmál: regla F-v1“; liður a stendur.**
+* **b, ný skilgreining.** Stöðumerki í stað tölu nær AÐEINS til íbúðareigna sem bera matseiningu með útihúskóða (400–499). Garðskálar, sólstofur, hótelíbúðir og ósamþykktar íbúðir falla EKKI undir b.
+  * cc354b mældi að af 3.202 eignum í upphaflegu skilgreiningunni bera aðeins 1.495 útihúskóða.
+  * Kosturinn „a og þröngt b“ gaf 1.926 eignir á T5-lista. Af þeim skipta 1,30 % um þrep, 1.679 fara í T5, og 10 eignir á sölu falla um meira en eitt þrep.
+* **Sumarhús undir 20 m²** (231 í mælingu cc354b) fara í T5 samkvæmt a, með vísun í reglu 6.
+* **Stöðumerki.** Flipp bíður ekki eftir ástæðudálki í `valuation_tiers`. Dálkurinn og birting á verdmat-ai koma í næstu lotu, með textunum „Utan gildissviðs verðmats: eign með útihúsum“ og „Utan gildissviðs verðmats: óvenjuleg stærð“.
+* **Áður en flipp er lagt fyrir** (aðeins lestur):
+  1. Flatarmál eigna á sölu sem falla um meira en eitt þrep, Bakkagerði 2 þar með talið, er borið saman við auglýsingu og matseiningar.
+  2. 30 eignir af handahófi úr þeim sem fá nýtt mat eru bornar saman við ásett verð eða síðustu sölu.
+  3. Finnist kerfisbundin villa er hún lagfærð og --prof keyrt aftur, en ekki flippað.
+* **Flipp með `--yfir-stodvun`** krefst skilyrts GO í sama sniði og flipp D. Það fer ekki fram eftir 00:30 UTC.
+
+Mælingar: `D:\_audit\cc354b_fv1\SKIL_CC354B.md`.
+
+---
+
 ## 2026-11-22 — Vísitölu-akkeri og comps nota síðasta liðna og fullnaða ársfjórðung (Danni + arkitekt, cc369)
 
 **Ákvörðun Danna og arkitekts, borin af master:**
