@@ -12,6 +12,11 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
   * cc354b mældi að af 3.202 eignum í upphaflegu skilgreiningunni bera aðeins 1.495 útihúskóða.
   * Kosturinn „a og þröngt b“ gaf 1.926 eignir á T5-lista. Af þeim skipta 1,30 % um þrep, 1.679 fara í T5, og 10 eignir á sölu falla um meira en eitt þrep.
 * **Sumarhús undir 20 m²** (231 í mælingu cc354b) fara í T5 samkvæmt a, með vísun í reglu 6.
+* **b nær líka til sumarhúsa með útihúskóða** (Danni 23.11 kl. 23:54 UTC), með vísun í reglu 6. Dæmi er Syðri-Tunga, sumarhús á jörð með fjárhúsi og hlöðu. Undanþágan fyrir smáhýsi í garði gildir eins.
+* **Þinglýst sala ræður þar sem hún stangast á við F-v1** (Danni 23.11 kl. 23:54 UTC). `einflm` helst óbreytt þar sem sala með þinglýsingu eftir 01.01.2021 staðfestir gömlu stærðina (innan 15 %) en F-v1 víkur meira. F-v1 gildir aðeins þar sem engin slík sala stangast á við hana. Þetta er regla, ekki handval; í mælingu cc354b áttu 83 eignir með birt mat hlut að máli. Handlestur á 10 þeirra (hvers vegna summa matseininga víkur frá kaupskrá) fer í PLANNING_BACKLOG sem efni í F-v2.
+* **Skilyrði (ii) endurskilgreint sem (ii')**, því gamla útgáfan mældi líkanið en ekki F-v1. Úrtak 30 eigna úr þeim sem fá nýtt mat. Viðmiðið er sala eftir 01.01.2021, framreiknuð með nýju vísitölunni (cc369), eða gildandi ásett verð. Skilyrðið stenst ef:
+  * miðgildi |frávik| nýja matsins er undir 15 %, OG
+  * nýja matið er ekki verra en það gamla á sömu eignum, mælt á miðgildi og fjölda yfir 30 %, þar sem gamalt mat var til.
 * **Stöðumerki.** Flipp bíður ekki eftir ástæðudálki í `valuation_tiers`. Dálkurinn og birting á verdmat-ai koma í næstu lotu, með textunum „Utan gildissviðs verðmats: eign með útihúsum“ og „Utan gildissviðs verðmats: óvenjuleg stærð“.
 * **Áður en flipp er lagt fyrir** (aðeins lestur):
   1. Flatarmál eigna á sölu sem falla um meira en eitt þrep, Bakkagerði 2 þar með talið, er borið saman við auglýsingu og matseiningar.
@@ -23,6 +28,15 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
   * nýjar T5 eru innan ±10 % af væntri tölu, og engar óvæntar tegundir eða svæði í hópnum;
   * (i) engin kerfisbundin villa í F-v1. Eignir þar sem F-v1 reynist röng eru teknar út með skráðri ástæðu;
   * (ii) miðgildi fráviks nýja matsins frá ásettu verði eða síðustu sölu er undir 15 %, og færri en 5 af 30 víkja meira en 30 %.
+  * Bregðist skilyrði: STOPP og skil til Danna.
+  * **Fyrra GO féll 23.11 kl. 23:44 UTC** þegar (ii) brást: 9 af 30 eignum viku meira en 30 %.
+* **Nýtt skilyrt GO Danna (23.11 kl. 23:54 UTC)** gildir 24.11 eftir að sópun lýkur með rc 0, og ekkert skref fer fram eftir 00:30 UTC.
+  * (i), (ii') og --prof eru endurtekin á uppfærðum lista.
+  * Skrefin fjögur eru beitt eitt í einu, með `--yfir-stodvun`, aðeins ef ÖLL skilyrði standast:
+    * --prof stenst öll hlið nema þau stöðvunarskilyrði sem vitað er að brotna;
+    * nýjar T5 eru ekki fleiri en 1.700 og engar óvæntar tegundir eða svæði eru í hópnum;
+    * ekki fleiri en 5 eignir á sölu falla um meira en eitt þrep, og hver þeirra er skoðuð og rétt;
+    * (i) engin kerfisbundin villa, og (ii') stenst.
   * Bregðist skilyrði: STOPP og skil til Danna.
 
 Mælingar: `D:\_audit\cc354b_fv1\SKIL_CC354B.md`.
