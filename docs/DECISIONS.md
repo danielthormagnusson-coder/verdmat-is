@@ -8,6 +8,7 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 **Ákvörðun Danna og arkitekts 23.11, borin af master. Hún breytir lið b í færslunni 2026-11-20 „Flatarmál: regla F-v1“; liður a stendur.**
 * **b, ný skilgreining.** Stöðumerki í stað tölu nær AÐEINS til íbúðareigna sem bera matseiningu með útihúskóða (400–499). Garðskálar, sólstofur, hótelíbúðir og ósamþykktar íbúðir falla EKKI undir b.
+  * **Smáhýsi í görðum eru undanskilin (Danni 23.11, kl. 23:35 UTC).** Eignir þar sem öll útihús eru undir 40 m² og eingöngu með garðkóða (t.d. gróðurhús, hjallur) falla ekki undir b. Í mælingu cc354b voru það 125 eignir, 8 þeirra á sölu. Nákvæm kóðaskilgreining er í SKIL_CC354B §8.
   * cc354b mældi að af 3.202 eignum í upphaflegu skilgreiningunni bera aðeins 1.495 útihúskóða.
   * Kosturinn „a og þröngt b“ gaf 1.926 eignir á T5-lista. Af þeim skipta 1,30 % um þrep, 1.679 fara í T5, og 10 eignir á sölu falla um meira en eitt þrep.
 * **Sumarhús undir 20 m²** (231 í mælingu cc354b) fara í T5 samkvæmt a, með vísun í reglu 6.
@@ -17,6 +18,12 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
   2. 30 eignir af handahófi úr þeim sem fá nýtt mat eru bornar saman við ásett verð eða síðustu sölu.
   3. Finnist kerfisbundin villa er hún lagfærð og --prof keyrt aftur, en ekki flippað.
 * **Flipp með `--yfir-stodvun`** krefst skilyrts GO í sama sniði og flipp D. Það fer ekki fram eftir 00:30 UTC.
+* **Skilyrt GO Danna (23.11 kl. 23:35 UTC) á fjögur skref** — migration, pkl-skipti, staging og flipp með `--yfir-stodvun`. Beitt 24.11 eftir að sópun lýkur með rc 0, og aðeins ef ÖLL eftirfarandi standast:
+  * nýtt --prof stenst öll hlið nema þau stöðvunarskilyrði sem vitað er að brotna;
+  * nýjar T5 eru innan ±10 % af væntri tölu, og engar óvæntar tegundir eða svæði í hópnum;
+  * (i) engin kerfisbundin villa í F-v1. Eignir þar sem F-v1 reynist röng eru teknar út með skráðri ástæðu;
+  * (ii) miðgildi fráviks nýja matsins frá ásettu verði eða síðustu sölu er undir 15 %, og færri en 5 af 30 víkja meira en 30 %.
+  * Bregðist skilyrði: STOPP og skil til Danna.
 
 Mælingar: `D:\_audit\cc354b_fv1\SKIL_CC354B.md`.
 
