@@ -409,3 +409,11 @@ Viðbragð: lesa `Microsoft-Windows-CodeIntegrity/Operational` (Id 3033/3077/311
 ### (an) UNDIRLOTA BÝR ALDREI TIL .ENV-SKRÁ; FULL BYGGING KEYRÐ AF MASTER ÁN AFRITUNAR (Danni + arkitekt 23.11.2026)
 
 **Undirlota býr ALDREI til `.env`- eða `.env.local`-skrá, hvorki með raungildum né falsgildum, og afritar hana aldrei.** Undirlota keyrir forprófin og `next build` (sem fellur á umhverfi án breyta, og það er skráð í SKIL). Full bygging fyrir push fer fram þar sem umhverfið er til án afritunar: í aðalmöppunni á greininni, eða með breytum hlöðnum í ferlið (aldrei í skrá) úr `D:\env.local`, og master keyrir hana. Tilefni: í cc370 bjó undirlota til `.env.local` með falsgildum í tveimur vinnutrjám, eftir að afritun hafði verið hafnað, til að taka skjámyndir. Skjámyndirnar voru samþykktar aðeins til útlitsmats og skránum var eytt.
+
+### (ao) BYGGINGARTÍMI SÍÐU > 45 S STAÐBUNDIÐ = HALT; PUSH AÐEINS Í SÉR SKIPUN EFTIR HREINA LYKLASKÖNNUN (Danni + arkitekt 24.11.2026)
+
+**Ef ein síða tekur meira en 45 s í staðbundinni fullri byggingu er það HALT, ekki push.** Viðmiðið er bygging með jafnmörgum vinnslum og Vercel notar (3). Vercel fellir síðu sem tekur meira en 60 s eftir þrjár tilraunir, og bilið niður í 45 s er öryggisbil. Síður sem lesa stór gagnamengi (veftré, yfirlit) eru dynamic með revalidate eða lesa forreiknaðan lista, ekki byggðar við build.
+
+**Push fer aðeins fram í sér skipun, á eftir hreinni lyklaskönnun.** Skönnun og push eru aldrei í sömu skipunarkeðju, svo push geti ekki farið þótt skönnunin finni eitthvað.
+
+Tilefni: cc374 (7c60ae0) féll á Vercel 24.11, því `/eign/sitemap/3–10.xml` fóru yfir 60 s í öllum þremur tilraunum. Staðbundið tók sama skref 61 s. Sama kvöld fór push í sömu keðju og lyklaskönnun. Samsvaranirnar reyndust vera bannorð í prófum, en push hefði ekki átt að fara fyrr en þær höfðu verið skoðaðar.
