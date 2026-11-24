@@ -12,8 +12,8 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
   * cc354b mældi að af 3.202 eignum í upphaflegu skilgreiningunni bera aðeins 1.495 útihúskóða.
   * Kosturinn „a og þröngt b“ gaf 1.926 eignir á T5-lista. Af þeim skipta 1,30 % um þrep, 1.679 fara í T5, og 10 eignir á sölu falla um meira en eitt þrep.
 * **Sumarhús undir 20 m²** (231 í mælingu cc354b) fara í T5 samkvæmt a, með vísun í reglu 6.
-* **b nær líka til sumarhúsa með útihúskóða** (Danni 23.11 kl. 23:54 UTC), með vísun í reglu 6. Dæmi er Syðri-Tunga, sumarhús á jörð með fjárhúsi og hlöðu. Undanþágan fyrir smáhýsi í garði gildir eins.
-* **Þinglýst sala ræður þar sem hún stangast á við F-v1** (Danni 23.11 kl. 23:54 UTC). `einflm` helst óbreytt þar sem sala með þinglýsingu eftir 01.01.2021 staðfestir gömlu stærðina (innan 15 %) en F-v1 víkur meira. F-v1 gildir aðeins þar sem engin slík sala stangast á við hana. Þetta er regla, ekki handval; í mælingu cc354b áttu 83 eignir með birt mat hlut að máli. Handlestur á 10 þeirra (hvers vegna summa matseininga víkur frá kaupskrá) fer í PLANNING_BACKLOG sem efni í F-v2.
+* **Sumarhús í b (Danni 24.11, kemur í stað ákvörðunar 23.11 kl. 23:54 UTC).** Sumarhús falla EKKI undir b, nema þau sem bera landbúnaðarkóða (dæmi: Syðri-Tunga, sumarhús á jörð með fjárhúsi og hlöðu). Sumarhús fá sjálfstætt módel (grunnregla 6) og eiga ekki að ýta T5 upp í aðalmatinu. *Fallið út:* viðbótin 23.11 sem setti öll sumarhús með útihúskóða í b. Í mælingu cc354b 24.11 fóru sumarhús í T5 þá úr 110 í 322, 4 eignir á sölu fóru í T5 aðeins vegna bátaskýlis eða aðstöðuhúss, og bæði hámörk skilyrta GO-sins (T5 ≤ 1.700, á sölu ≤ 5) brustu.
+* **Sölureglan fellur niður (Danni 24.11, R1 a).** F-v1 gildir. *Fallið út:* reglan frá 23.11 kl. 23:54 UTC, um að þinglýst sala eftir 01.01.2021 sem staðfestir gömlu stærðina haldi `einflm`. Ástæða: reglan hélt gömlu stærðinni á 11 eignum á sölu, og á 10 þeirra staðfestir auglýst stærð F-v1. Kaupskrárstærð ber oft heildartölu byggingar eða verkefnis, t.d. Bakkagerði 2 (155,5 → 76,5 m², auglýst 76,5). Handlestur á 10 af 83 eignum (3 bílskúr/geymsla í F-v1 en ekki í samningi, 2 ný matseining eftir sölu, 1 nýbygging með brúttóstærð, 4 óskýrar) fer í PLANNING_BACKLOG sem efni í F-v2.
 * **Skilyrði (ii) endurskilgreint sem (ii')**, því gamla útgáfan mældi líkanið en ekki F-v1. Úrtak 30 eigna úr þeim sem fá nýtt mat. Viðmiðið er sala eftir 01.01.2021, framreiknuð með nýju vísitölunni (cc369), eða gildandi ásett verð. Skilyrðið stenst ef:
   * miðgildi |frávik| nýja matsins er undir 15 %, OG
   * nýja matið er ekki verra en það gamla á sömu eignum, mælt á miðgildi og fjölda yfir 30 %, þar sem gamalt mat var til.
@@ -30,7 +30,7 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
   * (ii) miðgildi fráviks nýja matsins frá ásettu verði eða síðustu sölu er undir 15 %, og færri en 5 af 30 víkja meira en 30 %.
   * Bregðist skilyrði: STOPP og skil til Danna.
   * **Fyrra GO féll 23.11 kl. 23:44 UTC** þegar (ii) brást: 9 af 30 eignum viku meira en 30 %.
-* **Nýtt skilyrt GO Danna (23.11 kl. 23:54 UTC)** gildir 24.11 eftir að sópun lýkur með rc 0, og ekkert skref fer fram eftir 00:30 UTC.
+* **Nýtt skilyrt GO Danna (23.11 kl. 23:54 UTC; staðfest óbreytt 24.11 með R1 a og S1 a)** gildir 24.11 eftir að sópun lýkur með rc 0, og ekkert skref fer fram eftir 00:30 UTC. Mæling 24.11 kl. 00:11 UTC (með sölureglu og sumarhúsum í b) braut liði 2–4 og var STOPP; svörin R1/S1 leysa það.
   * (i), (ii') og --prof eru endurtekin á uppfærðum lista.
   * Skrefin fjögur eru beitt eitt í einu, með `--yfir-stodvun`, aðeins ef ÖLL skilyrði standast:
     * --prof stenst öll hlið nema þau stöðvunarskilyrði sem vitað er að brotna;
