@@ -29,6 +29,20 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
   * (i) engin kerfisbundin villa í F-v1. Eignir þar sem F-v1 reynist röng eru teknar út með skráðri ástæðu;
   * (ii) miðgildi fráviks nýja matsins frá ásettu verði eða síðustu sölu er undir 15 %, og færri en 5 af 30 víkja meira en 30 %.
   * Bregðist skilyrði: STOPP og skil til Danna.
+  * **BEITT 24.11 kl. 18:16–18:30 UTC af master** (eftir sópun rc 0; gátlistinn í fimm liðum stóðst):
+    * Listi v5: 1.829 eignir (a 787, b 1.404, bæði 362), sha16 849cfc1d71ca7cdb.
+    * Mæling á listanum: nýjar T5 1.573 (≤ 1.700); á sölu niður > 1 þrep 3, allar réttar (Bakkagerði 2, Hæringsstaðir, Suðurbraut 758); (ii') miðgildi nýja matsins 7,6 % á móti 8,5 % gamla, > 30 %: 4 á móti 6 af 30.
+    * Skref 1, migration 20261123190000: 5.592 raðir; einflm NULL fór úr 28.436 í 23.525; afrit `properties_einflm_pre_cc354b` er lokað.
+    * Skref 2, pkl: F7C101F5FA9F5B0B → EF2D2710B468606E; afrit `D:\properties_v2_pre_cc354b.pkl`.
+    * Skref 3, staging: sex lokaðar töflur `*_staging_cc354b`.
+    * Skref 4, flipp sex taflna í einni færslu með `--yfir-stodvun`: pipeline_runs 287.
+      * Þrep T1–T5: 76.285 / 80.136 / 2.591 / 4.127 / 4.364.
+      * 2.083 eignir (1,24 %) skipta um þrep og 1.573 eru nýjar í T5.
+      * Akkeri: 83.224 → 83.238.
+      * AT_Q 2026Q3.
+    * s90 stóðst eftir migration og eftir flipp.
+    * Stöðvunarskilyrðin „> 25 í T5“ og „á sölu niður > 1 þrep“ brustu eins og vitað var, og beitt var yfir þau samkvæmt GO.
+    * Rollback-leið: `cc354b_flip.py --afturkalla`, síðan pkl-afrit, síðan `supabase/rollback/20261123190000_cc354b_f1_einflm_rollback.sql`.
   * **Fyrra GO féll 23.11 kl. 23:44 UTC** þegar (ii) brást: 9 af 30 eignum viku meira en 30 %.
 * **Nýtt skilyrt GO Danna (23.11 kl. 23:54 UTC; staðfest óbreytt 24.11 með R1 a og S1 a)** gildir 24.11 eftir að sópun lýkur með rc 0, og ekkert skref fer fram eftir 00:30 UTC. Mæling 24.11 kl. 00:11 UTC (með sölureglu og sumarhúsum í b) braut liði 2–4 og var STOPP; svörin R1/S1 leysa það.
   * (i), (ii') og --prof eru endurtekin á uppfærðum lista.
