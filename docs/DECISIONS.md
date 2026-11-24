@@ -4,6 +4,23 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-24 — Gólfflötur umfram skráða stærð: merki og flokkur (Danni + arkitekt, cc376)
+
+**Ákvörðun Danna og arkitekts 24.11, borin af master:**
+* **C1. Merki** „Gólfflötur meiri en skráð stærð“ fer á eignir þar sem gólfflötur í texta auglýsingar er minnst 1,15 sinnum skráð stærð (`einflm`).
+  * Eignir sem nefna stærri gólfflöt án tölu (163 fastnúmer í mælingu cc376) fá merkið líka, en án flokkabreytingar.
+* **C2. Flokkur** fer úr A í B þegar hlutfallið er minnst 1,30.
+  * Þrep, punktmat og bil haldast óbreytt (grunnregla 9).
+  * Engin krónuleiðrétting (grunnregla 11).
+* **Samspil við stærðarhlið cc353:** eitt merki á hverja eign. Gólfflatarmerkið ræður þegar bæði eiga við.
+* **Útfærsla:** undirlota undirbýr keðju og framenda, með forprófum og --prof, og HALT-ar. Beiting og push krefjast sér GO.
+* **Fyrirvari um mælinguna:** OOS í cc376 er fimmföld endurþjálfun þar sem hver eign er utan þjálfunar þess brots sem skorar hana. Það er ekki mat reiknað fyrir söludag, og aðrar eignir seldar eftir söludaginn eru í þjálfun. Mat reiknað fyrir söludag er ekki til í núverandi gögnum.
+* **Næst:** bakprófun á virkri stærð (cc376b), þar sem virk stærð = skráð + k × (gólfflötur − skráð). Hún er aðeins lestur. Beiting kemur aðeins til greina ef skekkjan fer undir 2 %, hlutfall utan bils í flokki A færist marktækt að væntu, og enginn undirhópur versnar.
+
+Mælingar: `D:\_audit\cc376_rishaedir\SKIL_CC376.md`.
+
+---
+
 ## 2026-11-23 — F-v1: liður b þrengdur við útihúskóða; sumarhús undir 20 m² í T5 samkvæmt a (Danni + arkitekt, cc354b)
 
 **Ákvörðun Danna og arkitekts 23.11, borin af master. Hún breytir lið b í færslunni 2026-11-20 „Flatarmál: regla F-v1“; liður a stendur.**
