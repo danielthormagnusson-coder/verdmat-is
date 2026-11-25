@@ -1962,3 +1962,10 @@ Danni 25.11: „ekki núna“. 22 Task Scheduler-verk keyra með WorkingDirector
 * Rollback: WorkingDirectory sett aftur á D:\verdmat-is\app.
 
 Þangað til gildir WP (ah): ff á app main bíður þar til sópun og næturkeðja hafa lokið.
+
+## Gólfflatarmerki: skörun við aðrar hliðar og mynstur v5 (cc376d, 25.11.2026)
+* Skörun við hliðin búseturétt, hluta, `staerd_vantar` og `staerd_skrar` á við 1 eign í dag. Þangað til gildir C2: gólfflatarmerkið ræður.
+* Mynstur v5 fyrir villugerðirnar sem eftir standa: `D:\_audit\cc376d_mynstur_v4\SKIL_CC376D.md`.
+
+## Grunnmat við fyrstu sýn: leiðréttingatafla (cc382, 25.11.2026)
+Leiðréttingar á frosnu mati fara aldrei í frosna reitinn. Þær fara síðar í sér append-only töflu: `D:\_audit\cc382_frysting_grunnmats\SKIL_CC382.md` §2.

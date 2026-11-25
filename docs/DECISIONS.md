@@ -4,6 +4,51 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-25 — Röð beitinga í kvöld; cc376d, cc382, cc380 og cc384 (Danni + arkitekt)
+
+**Röð:**
+1. Byggár (cc381b), samkvæmt skilyrta GO-inu.
+2. cc376c/d.
+3. cc382.
+
+Liðir 2 og 3 fara inn í kvöld ef tími gefst fyrir 00:30 UTC, annars á morgun að degi undir (aq). Eitt í einu.
+
+**cc376d:** túlkunin er samþykkt: skilyrði D2 gildir um v4 og D3 saman.
+* GO á beitingarröðina (migration → fylling → push á app-greinina) EFTIR að byggár er komið inn og sannprófað.
+* Framendinn fer á Fable og fær sér GO.
+* Skörun við aðrar hliðar (1 eign) og mynstur v5 fara í PLANNING_BACKLOG.
+
+**cc382:** GO á beitingu EFTIR byggár og cc376c/d.
+* Bakfyllingargluggi 48 klst. samþykktur.
+* 278 nýjustu auglýsingarnar fá EKKI mat dagsins.
+* Gluggi 7 dagar og þak 3.000 á nótt.
+* NULL á bili, flokki og þrepi í sögulegum röðum er samþykkt.
+* Umfang: allar söluauglýsingar.
+* Leiðréttingatafla fer í PLANNING_BACKLOG.
+* Keðjuskrefið má ekki frysta mat fyrr en byggársflippið er inni.
+
+**cc380:**
+1. Leið A: útdrátturinn (`EXTRACT_FORWARD=0`, cc317) stendur slökktur og er skráður í vaktinni sem ætluð stöðvun.
+   * Lykkjan (cc377 B2/B7/C8) byggir á aprílsafninu og `lysing_eigindi`, og les aðeins flaggaðar A/B-eignir (um 20–34 á dag, innan $2-þaksins).
+   * C8 (`fravik_bidrod`) má undirbúa: HALT, sér GO.
+2. Ferskleikavakt (f6dac94): já. Skráning undirbúin, HALT, sér GO á Task Scheduler-breytinguna.
+3. `verdvakt_refresh` keyrir úr úreltri `D:\verdmat-is\verdmat-ai`. Leslota kannar kóðann, muninn frá origin/main og hvort afurðin er rétt.
+4. `weekly-skipulag` (0x41303): næsti ræsitími staðfestur. Ef fyrsta vikulega keyrslan er einfaldlega ókomin er það ekki frávik.
+5. `voktun_sendur` er tóm frá upphafi. Kanna þarf áskrifendur og vaktir sem hefðu átt að fá póst. Ef þær eru til: bilun, HALT.
+
+**cc384:**
+* **D2a:** þekja er mæld aðeins á mati sama líkans og bilið.
+* **D2d:** byggár 0 eða autt fer úr kvörðunarmenginu.
+* **D2e:** |f| ≤ 10 % er ekki mælikvarði á kvörðun bils.
+* **D2b:** lagfæringin á heima í stigi punktmatsins (tímanleiki vísitölunnar), ekki í bilinu.
+  * Hún fellur undir es1 (cc359).
+  * Engin eftirá-hliðrun á bili eða mati.
+* **D2c:** leslota finnur hvort 1,29 prósentustigin (kaupverð fært til 2026-09, mat á verðlagi 2026-07) eru skráð ákvörðun eða ósamræmi í mæliramma.
+* es1 (cc359) fer næst á eftir byggári í matsröðinni.
+  * Áður en hún ræsist fær Danni stutta lýsingu: hvað es1 gerir, hvaða mælingu cc384 bætir við og hvaða hlið gilda.
+* Endurkvörðun bils kemur fyrst eftir byggár og es1, á mati sama líkans.
+* Mæling: `D:\_audit\cc384_bil_a\SKIL_CC384.md`.
+
 ## 2026-11-25 — Byggár lagað í gagnalaginu (cc381, skilyrt GO); C10 hafnað; bil A greint fyrst (cc383) (Danni + arkitekt)
 
 **cc381, byggár 0 eða autt (ákvarðanir 1–7):**
