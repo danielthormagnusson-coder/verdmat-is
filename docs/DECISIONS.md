@@ -4,6 +4,22 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-25 — Leslotur leyfðar á meðan sópun keyrir; verkefni ganga fyrir sópun (Danni + arkitekt, cc378)
+
+**Ákvörðun Danna og arkitekts 25.11:**
+1. Regla WP (ap) samþykkt eins og lögð var til í SKIL_CC378:
+   * leslotur kl. 07:30–17:00 UTC, með tímamörkum og hámarki 2 tenginga;
+   * skrif, --prof, migration, flipp, REFRESH og ff á app bíða áfram;
+   * push á verdmat-ai er leyft nema frá 17:00 þar til sópun lýkur;
+   * næturgluggi óbreyttur;
+   * enginn I/O-þröskuldur að sinni.
+2. GO á ræsingu cc377, cc376b og cc376c 25.11. --prof cc376c bíður þess að sópun ljúki.
+3. Ný stefna Danna um forgang: „verkefnin á borðinu ganga fyrir. Þegar skrif þurfa að komast að um miðjan dag má sópunin víkja: stöðvast og halda áfram, eða færast til.“
+   * Áður en það verður regla: mæling á lestri kóða og keyrsluskráa (cc379), stutt SKIL.
+   * Engin breyting á Task Scheduler eða kóða án GO.
+
+Mæling: `D:\_audit\cc378_sopunaralag\SKIL_CC378.md`.
+
 ## 2026-11-24 — Gólfflötur umfram skráða stærð: merki og flokkur (Danni + arkitekt, cc376)
 
 **Ákvörðun Danna og arkitekts 24.11, borin af master:**

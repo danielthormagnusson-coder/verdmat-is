@@ -417,3 +417,24 @@ Viðbragð: lesa `Microsoft-Windows-CodeIntegrity/Operational` (Id 3033/3077/311
 **Push fer aðeins fram í sér skipun, á eftir hreinni lyklaskönnun.** Skönnun og push eru aldrei í sömu skipunarkeðju, svo push geti ekki farið þótt skönnunin finni eitthvað.
 
 Tilefni: cc374 (7c60ae0) féll á Vercel 24.11, því `/eign/sitemap/3–10.xml` fóru yfir 60 s í öllum þremur tilraunum. Staðbundið tók sama skref 61 s. Sama kvöld fór push í sömu keðju og lyklaskönnun. Samsvaranirnar reyndust vera bannorð í prófum, en push hefði ekki átt að fara fyrr en þær höfðu verið skoðaðar.
+
+### (ap) LESLOTUR LEYFÐAR Á MEÐAN SÓPUN KEYRIR, 07:30–17:00 UTC (Danni + arkitekt 25.11.2026)
+
+**Lestur úr grunninum (aðeins SELECT) er leyfður á meðan `verdmat-daily-lifecycle-sweep` keyrir, kl. 07:30–17:00 UTC, með þessum skilyrðum:**
+* statement_timeout 60 s og lock_timeout 2 s í hverri tengingu;
+* hámark 2 samhliða tengingar fyrir allar lotur samtals. Raufin er `D:\_audit\cc378_sopunaralag\grunnrauf.py`;
+* engin færsla haldin opin milli fyrirspurna;
+* engin ný grunnfyrirspurn frá 17:00 UTC fyrr en sópun lýkur, því þá hefst lokaskref hennar (endurnýjun `scraper.soluferli_opin_mv`);
+* ef `pg_blocking_pids` sýnir að annað ferli bíður eftir leslotunni er fyrirspurninni hætt og það skráð.
+
+**Óbreytt og bíður áfram þar til sópun og næturkeðja hafa lokið:** skrif, `--prof` (jafnvel með ROLLBACK), migration, flipp, REFRESH og ff á `D:\verdmat-is\app` (WP (ah)).
+
+**Push á verdmat-ai er leyft á meðan sópun keyrir, nema frá 17:00 UTC þar til hún lýkur.** verdmat-ai er sér repo og sópunin keyrir ekki kóða úr því.
+
+Næturglugginn 01:00–07:30 UTC og „ekkert eftir 00:45 UTC“ eru óbreytt. Enginn I/O-þröskuldur að sinni.
+
+Tilefni: mæling cc378 25.11 kl. 12:18–12:22 UTC (`D:\_audit\cc378_sopunaralag\SKIL_CC378.md`).
+* Sóknarhluti sópunar heldur einni tengingu, enga opna færslu og enga læsingu.
+* Hann skrifar um 30 smáfærslur á klst. (16 auðkenni, 120 s bil) og bíður um 99 % tímans eftir mbl.
+* Diskles var ≈0, og engar hægar fyrirspurnir voru á sóknartíma.
+* Þungi hlutinn er lokaskrefið um 17:30–17:50.
