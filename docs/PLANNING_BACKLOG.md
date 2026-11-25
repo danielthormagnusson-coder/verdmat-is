@@ -1944,3 +1944,12 @@ sé endurvakinn á skoðun einni.
 - **F-v2 — summa matseininga á móti kaupskrá (bókað 24.11, Danni/arkitekt, cc354b).** Handlestur á 10 af 83 eignum þar sem sala eftir 2021 staðfesti gamla einflm en F-v1 vék meira en 15 %. Skýringar: bílskúr eða geymsla talin í F-v1 en ekki í samningi (3), ný matseining eftir sölu, t.d. gestahús eða bílskúr 2026 (2), nýbygging þar sem samningsstærð er brúttó (1), óskýrt, líklega sameign, endurmæling eða skipting (4). Efni í F-v2. Línur og fastnúmer: `D:\_audit\cc354b_fv1\SKIL_CC354B.md` §9.2.
 - **Skilmálar um sjálfvirka söfnun (bókað 24.11, Danni, cc373).** Drög að viðbót við /skilmalar (bann við sjálfvirkri söfnun, skrapun og endurbirtingu án skriflegs leyfis; vísað til verndar gagnagrunna) eru í `D:\_audit\cc373_gildra\skilmalar_drog.md`. Ekki birt; bíða lögfræðiyfirferðar. Lagagreinin var skrifuð eftir minni og er ósótt.
 - **Götusíður, umferð 2 (bókað 24.11, Danni/arkitekt, cc374 B2).** /svaedi/PNR/gata er til og skilar hlut smella (282 síður, 62 af 246 smellum, staða 8,5). Vantar: samantekt götu (miðgildi m²-verðs með n, síðustu sölur, skipulagsmál), tengla á nágrannagötur og Place/ItemList-schema. Úttekt: `D:\_audit\cc374_synileiki\SKIL_CC374.md` (B2).
+
+## Sópun: hreint stöðvunarmerki og dagsúthlutun (verklag B, cc379, frestað 25.11.2026)
+
+Danni 25.11: „ekki núna“. Tillaga cc379 (`D:\_audit\cc379_sopun_hle\SKIL_CC379.md` §c):
+* `lifecycle_sweep_mbl` lesi merkið `STOPP_SOPUN` milli skammta og hætti hreint;
+* framhald sama dag fái aðeins afgang dagskammtsins (dagsúthlutun í state-skrá);
+* frestur 00:30 UTC.
+
+Í dag gildir verklag A sem neyðarúrræði (WP (aq)).

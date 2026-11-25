@@ -4,6 +4,27 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-25 — Skrif yfir daginn án hlés á sópun (WP (aq)); verklag A sem neyðarúrræði (Danni + arkitekt, cc379)
+
+**Ákvörðun Danna og arkitekts 25.11:**
+1. **Verklag A** gildir sem NEYÐARÚRRÆÐI fyrir skrif sem þurfa langa læsingu: stöðva → skrifa → ræsa með `--budget-cap N`, þar sem N er afgangur dagsins, og aðeins ef keyrslan lýkur fyrir 00:30 UTC.
+   * Aldrei endurræsing án `--budget-cap`.
+   * Aldrei stöðvun eftir 17:15 UTC.
+2. **Verklag B** (STOPP_SOPUN, dagsúthlutun): ekki núna. Fer í PLANNING_BACKLOG.
+3. **Ræsitími sópunar:** óbreyttur.
+4. **Endurnýjun Verðvaktar (18:15):** óbreytt.
+5. **Ný regla WP (aq)** tekur við af banninu í (aj) á skrifum meðan sópun keyrir:
+   * migration, flipp og beiting kl. 07:30–17:00 UTC án hlés, ef lock_timeout ≤ 3 s (mest 5 endurtekningar), statement_timeout er sett, `--prof` stóðst áður, ein breyting í einu og rollback er skrifað fyrst;
+   * staðfesting í pg_stat_activity fyrir skrif og á næsta skammti sópunar eftir skrif, hvort tveggja í SKIL;
+   * ACCESS EXCLUSIVE lengur en ~10 s eða endurskrifun stórrar töflu fer í kvöldglugga eða með verklagi A;
+   * 17:00 UTC þar til sópun lýkur: engin skrif, REFRESH eða push;
+   * GO-reglan er óbreytt.
+6. **ff á app main (WP (ah))** bíður áfram sópunar. Tillaga um fast vinnutré fyrir sópunina: aðeins lýsing, sér GO.
+7. **25.11:** `--prof` á migration cc376c má keyra fyrir 17:00 undir (aq).
+
+Mælingar:
+* `D:\_audit\cc379_sopun_hle\SKIL_CC379.md`: dráp milli skammta tvítelur ekki; Start-ScheduledTask tekur fullan dagskammt aftur.
+
 ## 2026-11-25 — Leslotur leyfðar á meðan sópun keyrir; verkefni ganga fyrir sópun (Danni + arkitekt, cc378)
 
 **Ákvörðun Danna og arkitekts 25.11:**

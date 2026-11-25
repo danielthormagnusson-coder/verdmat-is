@@ -438,3 +438,34 @@ Tilefni: mæling cc378 25.11 kl. 12:18–12:22 UTC (`D:\_audit\cc378_sopunaralag
 * Hann skrifar um 30 smáfærslur á klst. (16 auðkenni, 120 s bil) og bíður um 99 % tímans eftir mbl.
 * Diskles var ≈0, og engar hægar fyrirspurnir voru á sóknartíma.
 * Þungi hlutinn er lokaskrefið um 17:30–17:50.
+
+### (aq) SKRIF YFIR DAGINN ÁN HLÉS Á SÓPUN, 07:30–17:00 UTC (Danni + arkitekt 25.11.2026)
+
+**Tekur við af banninu í (aj) og (ap) á skrifum meðan `verdmat-daily-lifecycle-sweep` keyrir.** Migration, flipp og beiting mega fara inn kl. 07:30–17:00 UTC á meðan sópun keyrir, án hlés, ef öll þessi skilyrði halda:
+* lock_timeout ≤ 3 s með mest 5 endurtekningum og 30–60 s bið á milli;
+* statement_timeout er sett;
+* `--prof` með ROLLBACK stóðst áður (`--prof` sjálft fellur undir sömu skilyrði);
+* ein breyting í einu, og rollback skrifað fyrst.
+
+**Fyrir skrif:** staðfest í `pg_stat_activity` að sópunin sé ekki í færslu.
+**Eftir skrif:** staðfest að næsti skammtur sópunar hafi farið í gegn, með mtime á `lifecycle_sweep_state.json` eða keyrsluskránni.
+Hvort tveggja er skráð í SKIL.
+
+**Ekki undir þessari reglu:** skrif sem halda ACCESS EXCLUSIVE lengur en ~10 s eða endurskrifa stóra töflu. Þau fara í kvöldgluggann eða með verklagi A.
+
+**Verklag A (neyðarúrræði fyrir skrif sem þurfa langa læsingu):**
+1. Stop-ScheduledTask.
+2. Skrif.
+3. Handræsing `python -m scripts.lifecycle_sweep_mbl --scheduled --budget-cap N`, þar sem N er afgangur dagsins. Aðeins ef keyrslan lýkur fyrir 00:30 UTC.
+* Aldrei endurræsing án `--budget-cap`. Start-ScheduledTask tekur fullan dagskammt aftur (cc379).
+* Aldrei stöðvun eftir 17:15 UTC.
+
+**17:00 UTC þar til sópun lýkur:** engin skrif, REFRESH eða push, því þá stendur lokaskref hennar yfir.
+
+Óbreytt:
+* næturgluggi 01:00–07:30 UTC og „ekkert eftir 00:45 UTC“;
+* ff á app main bíður sópunar (ah);
+* ekkert meðan `verdmat-nightly-delta` keyrir;
+* aðeins orðið GO frá Danna opnar beitingu og push.
+
+Tilefni: `D:\_audit\cc378_sopunaralag\SKIL_CC378.md` og `D:\_audit\cc379_sopun_hle\SKIL_CC379.md`.
