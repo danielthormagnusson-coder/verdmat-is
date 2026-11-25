@@ -1969,3 +1969,11 @@ Danni 25.11: „ekki núna“. 22 Task Scheduler-verk keyra með WorkingDirector
 
 ## Grunnmat við fyrstu sýn: leiðréttingatafla (cc382, 25.11.2026)
 Leiðréttingar á frosnu mati fara aldrei í frosna reitinn. Þær fara síðar í sér append-only töflu: `D:\_audit\cc382_frysting_grunnmats\SKIL_CC382.md` §2.
+
+## Skilgreining nýbyggingar (is_new_build) í spá (cc381c, 25.11.2026)
+* is_new_build út frá FULLBUID = 0 óháð aldri merkir fullbúin hús sem nýbyggingar.
+* Mæling cc381c:
+  * 6 hús 5–19 ára, með −8 til −21 m.kr. í mati;
+  * 1.532 eignir með neikvætt SHAP-framlag;
+  * á 690 með byggár ≤ 2023 er miðgildið −9,1 m.kr.
+* Sér mælilota: `D:\_audit\cc381c_lestur25\SKIL_CC381C.md`.

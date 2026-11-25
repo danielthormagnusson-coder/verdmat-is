@@ -4,6 +4,46 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-25 (kvöld) — Byggár: svör við cc381b/c; cc382 leið (a); cc386 í es1; cc385 (Danni + arkitekt)
+
+**Byggár (cc381b/c):**
+1. 7 óvæntu T5-eignirnar eru samþykktar: Hringtún 11B, 15, 17A og 17B, Sæbakki 17, og Borgartún 1 og 2.
+   * Þær eru rökrétt afleiðing rétts byggárs, og engin þeirra er á sölu.
+   * Gátlistaliður 4 orðast nú: nýjar T5 = byggár vantar + nýbyggingar sem falla á þunnt svæði vegna rétts byggárs, taldar upp með nafni. Ef EINHVER þeirra er á sölu = STOPP.
+2. Innsláttarvillurnar 4 (201, 201, 208 og 1224) eru lagaðar: HMS-ár þar sem það er til, annars NULL.
+3. **is_new_build er ÓSNERT. Ákvörðun 6 frá 25.11 er afturkölluð.**
+   * Mæling cc381c: 6 fullbúin hús 5–19 ára yrðu nýbyggingar, sem lækkar mat um 8–21 m.kr.
+   * Skilgreining nýbyggingar í spá fær sér mælilotu síðar (PLANNING_BACKLOG).
+4. Keðjan skrifar `byggar_vantar` strax. Framendacommit fer á Fable, með sér GO, sem fyrst á eftir.
+* Skilyrta GO-ið stendur með þessum breytingum.
+  * Gátlisti 1–5 er keyrður aftur. Í lið 3 mega 6 eignir cc381c ekki lækka vegna is_new_build.
+  * Beiting fyrir 00:30 UTC. Annars á morgun eftir 07:30 undir (aq), ef læsingar flippsins standast kröfur (aq), eða annað kvöld.
+
+**cc382:** leið (a): `verdlag_ym` fyllist úr `predicted_at` (2026-07).
+* Nýtt --prof.
+* Beiting á morgun, EFTIR byggár og cc376c/d.
+
+**cc386:**
+* Tillögur 1–6 fara í lýsingu es1:
+  1. eitt verðlag á hverja lotu spáa;
+  2. verðlag punktmats sett á akkerið í es1;
+  3. engin hliðrun á bili;
+  4. akkerishlið;
+  5. cc382 (leið (a) að ofan);
+  6. bókun mælinga.
+* Mælingar fram að es1 eru bókaðar „akkerisrammi, +1,29 pp“.
+* es1 RÆSIST EKKI enn. Fyrst kemur leslota cc388, eftir byggár:
+  * (a) kaupverð/mat eftir sölumánuði jan.–nóv. 2026 í samkvæmum ramma;
+  * (b) sundurliðun reksins;
+  * (c) áhrif es1-a á rekið;
+  * (d) `sales_history_anchor_ym = 2026-12`: ætlað eða villa?
+* Engin tillaga að hliðrun.
+
+**cc385:**
+* `verdvakt_refresh` leið A: skriftan fer í app-repo. Undirbúið, HALT, sér GO.
+* DROP á gömlu v1-MV: undirbúið (flokkur B, með rollback), sér GO.
+* 0x41303 telst hlutlaust til 30.11.
+
 ## 2026-11-25 — Röð beitinga í kvöld; cc376d, cc382, cc380 og cc384 (Danni + arkitekt)
 
 **Röð:**
