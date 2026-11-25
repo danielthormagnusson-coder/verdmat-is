@@ -4,6 +4,53 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-25 — Ákvarðanir um cc376b, cc376c og cc377 (Danni + arkitekt)
+
+**cc376b, virk stærð:**
+* STOPP samþykkt. Engin full endurþjálfun núna.
+* Virk stærð = skráð + k × (gólfflötur − skráð), k ≈ 0,21 (95 % bil 0,10–0,40), er skráð sem **breytukandídat fyrir iter5**.
+  * Mæling OOS (fimm FASTNUM-brot cc226b, 275 sölur): skekkja +5,8 % → −0,7 %.
+  * Flokkur A utan bils 27/93 → 20/93, ekki marktækt (p = 0,14).
+  * `D:\_audit\cc376b_virk_staerd\SKIL_CC376B.md`.
+* Liðir 3–5 falla niður.
+
+**cc376c, gólfflatarmerki (C1) og flokkur A→B (C2):**
+* **D1:** merkið fellur þegar auglýsing hverfur; síðasta gildi er geymt.
+* **D2:** mynstur v4 er mælt ÁÐUR en beitt er:
+  * nákvæmni á öllum 40 merkjum með tölu og 30 nýjum úr sögunni;
+  * staðfest að Digranesvegur 50 lækki ekki.
+* **D3:** „fleiri eignir“ og „í byggingu“ ráða yfir gólfflatarmerkinu. Gólfflatarmerkið ræður yfir stærðarhliðinu.
+* **D4:** skýring flokks B á þessum eignum (úr config): „Gólfflötur er meiri en skráð stærð, svo óvissan er meiri en bilið sýnir.“
+* **D5:** merki án tölu orðast „Gólfflötur meiri en skráð stærð samkvæmt auglýsingu“.
+* **D6:** takmarkað við íbúðir.
+* Eftir D2: GO-beiðni á beitingarröðina (migration undir (aq), fylling, push, framendi á Fable).
+
+**cc377, frávikalykkja:**
+* **C1:** útdráttur í `scraper.listing_extractions` hefur staðið síðan 05.11 kl. 06:08 UTC, þótt næturverkin skili rc 0. Leslota finnur orsökina og leggur til lagfæringu og vakt sem fellur ef 0 nýjar færslur koma í 48 klst. þrátt fyrir rc 0. Sama athugun á öðrum næturverkum.
+* **C2:** grunnmat fryst við fyrstu sýn fyrir allar auglýsingar: já. Undirbúið (migration og rollback, keðjuskref). Bakfylling EKKI með mati dagsins á eldri auglýsingar. HALT, sér GO.
+* **C3:** byggár 0 eða autt er lagað í gagnalaginu, enginn bráðabirgðamerkimiði. Leslota fyrst:
+  * fjöldi;
+  * HMS-lind;
+  * meðferð í þjálfun;
+  * OOS;
+  * skref eins og F-v1 (0 → NULL samkvæmt grunnreglu 10).
+* **C4–C6 samþykkt:**
+  * skýringalistinn `fravik_v0` (13 kóðar);
+  * þröskuldur B4 (N ≥ 30, q < 0,05, |áhrif| ≥ 3 % tvo mánuði í röð);
+  * OOS-M1 sem fasti mánaðarlegi mælikvarðinn.
+* **C7:** rekstrarhams-OOF endurreiknað á aprílsafninu, aðeins á diski.
+* **C8:** taflan `fravik_bidrod` er undirbúin eftir að C1 er leyst.
+* **C9 (v0.3):** bíður.
+* **C10 (aðeins mæling):** regla sem lækkar flokk þegar ásett verð víkur > 10 % (og > 20 %) frá mati. Mælt verður:
+  * hlutfall utan bils í hverjum flokki eftir reglunni;
+  * hve margar eignir á sölu færast;
+  * hvort B/C verði rétt kvörðuð.
+  * Punktmat og bil eru ósnert.
+
+**Annað:**
+* Fast vinnutré fyrir sópun: ekki núna, því 22 verk keyra úr app. Fer í PLANNING_BACKLOG.
+* Lærdómur við (aq): sópunin heldur stundum opinni lesfærslu (`idle in transaction`, sást 13:29–13:30 í --prof cc376c). Biðin með endurtekningu virkaði.
+
 ## 2026-11-25 — Skrif yfir daginn án hlés á sópun (WP (aq)); verklag A sem neyðarúrræði (Danni + arkitekt, cc379)
 
 **Ákvörðun Danna og arkitekts 25.11:**

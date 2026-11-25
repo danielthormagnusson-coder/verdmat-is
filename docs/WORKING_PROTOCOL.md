@@ -469,3 +469,5 @@ Hvort tveggja er skráð í SKIL.
 * aðeins orðið GO frá Danna opnar beitingu og push.
 
 Tilefni: `D:\_audit\cc378_sopunaralag\SKIL_CC378.md` og `D:\_audit\cc379_sopun_hle\SKIL_CC379.md`.
+
+**Lærdómur 25.11 (cc376c --prof kl. 13:30 UTC):** sópunin heldur stundum opinni lesfærslu (`idle in transaction`) milli fyrirspurna. Athugunin í pg_stat_activity fyrir skrif er því nauðsynleg. Biðin með endurtekningu (45 s, tvisvar) virkaði, og --prof fór inn þegar tengingin var laus.

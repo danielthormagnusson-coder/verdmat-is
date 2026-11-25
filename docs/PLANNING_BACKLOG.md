@@ -1953,3 +1953,12 @@ Danni 25.11: „ekki núna“. Tillaga cc379 (`D:\_audit\cc379_sopun_hle\SKIL_CC
 * frestur 00:30 UTC.
 
 Í dag gildir verklag A sem neyðarúrræði (WP (aq)).
+
+## Verk keyri úr föstu vinnutré, ekki úr D:\verdmat-is\app (frestað 25.11.2026)
+
+Danni 25.11: „ekki núna“. 22 Task Scheduler-verk keyra með WorkingDirectory D:\verdmat-is\app. Tillagan: `D:\_audit\cc378_sopunaralag\TILLAGA_FAST_VINNUTRE_SOPUN.md`.
+* Fast vinnutré `wt_keyrsla`, uppfært 00:00–00:40 UTC.
+* Sópunin flyst fyrst.
+* Rollback: WorkingDirectory sett aftur á D:\verdmat-is\app.
+
+Þangað til gildir WP (ah): ff á app main bíður þar til sópun og næturkeðja hafa lokið.
