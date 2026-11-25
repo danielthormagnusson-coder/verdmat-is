@@ -449,6 +449,10 @@ def main() -> int:
 
     # Hold-out funnel — only rows that pass ALL gates get scored.
     is_scorable = ins["is_residential"] | ins["is_summerhouse"]
+    # cc381b: hlið (4) fellir keyrsluna ef byggár utan NULL/[1700, ár+2] (0 slapp áður gegnum notna)
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from byggar_hlid import byggar_hlid
+    byggar_hlid(ins["byggar"], "D3 insert-frambjóðendur", ins["fastnum"])
     has_byggar = ins["byggar"].notna()
     is_confident = ins["matsvaedi_confident"].fillna(False).astype(bool)
 

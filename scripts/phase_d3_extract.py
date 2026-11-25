@@ -36,6 +36,8 @@ sys.stdout.reconfigure(encoding="utf-8") if hasattr(sys.stdout, "reconfigure") e
 
 from classify_property import classify_property, segment_family  # noqa: E402
 from rules import is_new_build  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from byggar_hlid import byggar_ur_hms  # noqa: E402  (cc381b)
 from geography import region_tier  # noqa: E402
 
 STAGING_DB = Path(r"D:\verdmat-is\app\audit\hms_archive_staging.db")
@@ -265,7 +267,8 @@ def extract_one(payload: dict, fastnum: int, sf_lookup: dict,
     # Primary matseining → byggar, fullbuid, byggingarstig, skodags, gerd, matsstig
     primary, all_ms = pick_primary_matseining(payload.get("notkunareiningar") or [])
     if primary:
-        byggar = coerce_numeric(primary.get("byggingarar"))
+        # cc381b (ákv. 1, 2, 7): ár aðaleiningar ef innan [1700, ár + 2], annars None; 0-sentinel -> None, aldrei 0
+        byggar = byggar_ur_hms(primary.get("byggingarar"))
         fullbuid = coerce_numeric(primary.get("fullbuid"))
         byggingarstig = coerce_text(primary.get("byggingarstig"))
         skodags = coerce_date(primary.get("skodags"))

@@ -233,6 +233,10 @@ def get_db_url() -> str:
 
 def apply_properties(conn, df: pd.DataFrame) -> int:
     """INSERT properties in batches of BATCH. Returns total rows affected."""
+    # cc381b hlið (4)/ákv. 7: ekkert byggár utan NULL/[1700, ár+2] (þ.m.t. 0) fer í properties — fellir hleðsluna
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from byggar_hlid import byggar_hlid
+    byggar_hlid(df["byggar"], "properties-hleðsla (D3)", df["fastnum"])
     total = 0
     n_batches = (len(df) + BATCH - 1) // BATCH
     t_start = time.time()
