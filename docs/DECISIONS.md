@@ -4,6 +4,34 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-25 — Byggár BEITT (cc381d): úrskurður um lið 4 og beiting 23:05–23:13 UTC (Danni + arkitekt; beitt af master)
+
+**Úrskurður Danna um gátlistalið 4:** STOPP-ákvæðið „á sölu“ átti við nýbyggingar sem falla á þunnt svæði vegna rétts byggárs. Þær eru 7 samþykktar, 0 á sölu, og liðurinn STENST. 27 eignir á sölu sem fara í T5 með `byggar_vantar` eru samþykktar samkvæmt ákvörðun 3 (ekkert verðmat án byggárs).
+
+**Beiting eftir GO Danna, eitt skref í einu, sannprófað eftir hvert:**
+1. **Migration byggar** (schema_migrations 20261125210000), 23:05–23:06 UTC.
+   * 20.536 raðir: 20.410 fylltar úr HMS-aðaleiningu og 126 → NULL. Innsláttarvillurnar 4 lagaðar.
+   * is_new_build ósnert (md5 eins).
+   * Afrit í `properties_byggar_pre_cc381d`.
+   * Engin sterk læsing; færslan tók 10,4 s.
+2. **CHECK** víkkuð um `byggar_vantar` (20261125210100). AccessExclusive stóð 0,4 s og VALIDATE 0,6 s.
+3. **Staging:** 6 lokaðar töflur `*_staging_cc381d`.
+4. **Flipp** (pipeline_runs 293, success), 23:09–23:13 UTC.
+   * 15.378 spár breyttust, 0 utan lista. 327 eignir skiptu um þrep.
+   * T5 4.364 → 4.579 (215 nýjar = vænt mengi: 208 `byggar_vantar` + 7 nafngreindar nýbyggingar).
+   * Eftirhlið standast.
+
+**Gátlisti á lifandi grunni fyrir beitingu:**
+* (2) 0 aðrar spár breytast;
+* (3) miðgildi fráviks á eignunum 344: +41,7 % → +1,7 %;
+* (3b) 6 eignir cc381c lækka ekki;
+* (4) stenst samkvæmt úrskurði;
+* (5) 1,50 %.
+
+**Eftir:**
+* Framendatexti fyrir `byggar_vantar` fer á Fable, sér GO. Þangað til sýna þessar eignir texta þunns svæðis.
+* Rollback: `D:\_audit\cc381d_byggar_v2\SKIL_CC381D.md` §6 (röð 4 → 2 → 1).
+
 ## 2026-11-25 (kvöld) — Byggár: svör við cc381b/c; cc382 leið (a); cc386 í es1; cc385 (Danni + arkitekt)
 
 **Byggár (cc381b/c):**
