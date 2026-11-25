@@ -4,6 +4,37 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-25 — Byggár lagað í gagnalaginu (cc381, skilyrt GO); C10 hafnað; bil A greint fyrst (cc383) (Danni + arkitekt)
+
+**cc381, byggár 0 eða autt (ákvarðanir 1–7):**
+1. Lindin er aðalmatseining HMS (`properties.matseiningar`).
+2. 0 → NULL í properties. Spárkeðjan fer með autt byggár sem NaN, aldrei 0 (`rebuild_predictions_iter4.py:347` og allir aðrir staðir þar sem autt verður 0).
+3. Spár sem enn vantar byggár eftir fyllingu (um 237) fara í þrep 5 með `t5_astaeda` „byggingarár vantar“. Textinn er „Utan gildissviðs verðmats: byggingarár vantar“, úr config, með sömu vörpun og cc375.
+4. Nýtt hlið: byggar er NULL eða 1700 ≤ byggar ≤ líðandi ár + 2. Hliðið fellir keðjuna.
+5. Fer næst í matsröðinni, á undan es1 og cc376c.
+6. is_new_build er endurreiknað eftir fyllingu (grunnregla 5), og breytingar eru taldar fram.
+7. Sama hlið gildir við hleðslu nýrra eigna.
+
+**SKILYRT GO á beitingu 25.11** eftir að sópun lýkur með rc 0 og fyrir kl. 00:30 UTC.
+* Master keyrir endurskor af diski og fer yfir gátlistann áður en nokkuð er beitt:
+  1. --prof (migration, staging, flipp) endar á ROLLBACK;
+  2. aðeins eignir sem fá nýtt byggár eða NULL breytast;
+  3. miðgildi fráviks ásetts verðs frá mati á eignunum 344 fer úr +41,7 % undir +10 %, og hver eign yfir +25 % er lesin;
+  4. hver eign sem færist um meira en eitt þrep er skoðuð, og nýjar T5 eru aðeins þær sem vantar byggár;
+  5. HMS-ár sem stangast á við sölusögu yfir 5 % = STOPP.
+* Beitt einu skrefi í einu.
+* Framendatextinn fyrir nýja T5-lykilinn fer í sér commit með sér GO. Þangað til má lykillinn ekki ná til /eign.
+
+Mæling: `D:\_audit\cc381_byggar\SKIL_CC381.md`. OOS á 2.097 seldum: kaupverð/mat +27,1 % → +0,3 %, MdAPE 21,8 % → 4,6 %.
+
+**cc383:**
+* **D1:** C10 (flokkslækkun við frávik ásetts verðs) fer EKKI inn.
+  * Mæling: ekkert þrep er við 10 % eða 20 %.
+  * Eignir sem færast úr A bera utan-bils-hlutfall sitt inn í B (48–76 %).
+  * `D:\_audit\cc383_flokkur_asett\SKIL_CC383.md`.
+* **D2:** bil 80 % í flokki A er greint fyrst, aðeins með lestri (cc384): kaupverð er undir bili í 21–23 % tilvika en yfir í 0,3 %. Engin tillaga að kvörðun fyrr en orsökin liggur fyrir.
+* **D4:** byggár er lagað á undan öllum flokksreglum.
+
 ## 2026-11-25 — Ákvarðanir um cc376b, cc376c og cc377 (Danni + arkitekt)
 
 **cc376b, virk stærð:**
