@@ -4,6 +4,36 @@ Skrá yfir lokaðar ákvarðanir með dagsetningu og rökstuðningi. Nýjar ákv
 
 ---
 
+## 2026-11-28 — Skráning í leitarvélum: aðeins kjarnamengið er index; dagsetningarlína Verðvaktar (Danni + arkitekt, cc390/cc391)
+
+**Ástæða:** birtingar í Search Console féllu úr 550–916 á dag (29.10–7.11) í 0–7 frá 9.11. Engin refsing var skráð, 99 % skriðs fékk 200 og Googlebot sá efnið. **Líkleg orsök** er tvítekið efni á /leiguverd/[fastnum] með eigið canonical frá 02.11. Googlebot sótti 1.161 slíka síðu 09.11 og sóknin hrundi daginn eftir. Þetta er ályktun af tímasetningu (cc390 liður d), ekki staðfest í Search Console. Engin eigin breyting á robots, veftré, canonical eða hausum 6.–9.11 og ekkert 403 á eignasíðum 28.10–19.11. Lagfært 24.11 (canonical á /eign) og nú (noindex).
+
+**Ákvarðanir (cc390):**
+1. **Kjarnamengið er index, follow og í veftrénu:**
+   * eignir á sölu;
+   * götusíður með ≥ 3 eignir eða eign á sölu;
+   * svæðasíður;
+   * /skyrslur og hver skýrsla;
+   * /markadur;
+   * /nybyggingar og verkefnasíður;
+   * /verdvaktin og /verdvaktin/[flokkur];
+   * /verdmat, /fasteignasolur og /fasteignasolur/[mánuður];
+   * greiningin;
+   * /adferdafraedi, /um og forsíða.
+
+   Allt annað fær `noindex, follow` og fer úr veftrénu, þar á meðal /skyrslur/[timabil]/heimildir og /leiguverd/[fastnum] (canonical áfram á /eign). Engin breyting á robots.txt.
+2. **Ríkar eignir sem eru ekki á sölu:** noindex og úr veftrénu. **Þetta tekur við af ákvörðun 24.11 (cc374)** um ríkar eignasíður í veftré. Kjarninn er byggður upp fyrst eftir hrunið 9.11.
+3. **„Á sölu“ ræðst af einni lind** (`lib/skraning-asolu.ts` `aSoluMengi()`), sem bæði robots-merkingin og veftréð lesa. Eign sem fer á sölu verður index samdægurs, og eign sem fer af sölu verður noindex.
+
+**Ákvarðanir (cc391), /verdvaktin:**
+* Dagsetningarlínan er ein lína.
+  * „Lækkað <dagur>“ / „Hækkað <dagur>“ ef bil milli síðustu sýnar gamla verðs og fyrstu sýnar nýja verðs er ≤ 3 dagar.
+  * Annars „Lækkað 11.–22. nóvember“, og yfir mánaðamót „28. okt.–5. nóv.“.
+  * „Endurbirt <dagur> · var áður á sölu til <dagur>“ er óbreytt.
+* Litla flokksmerkið fer af línunni.
+* Merkið „lækkað í auglýsingu“ helst, því í 205 af 205 tilvikum er þetta sama auglýsingin og bilið er sóknarbil, ekki endurbirting.
+* Reiknivélarlínan á forsíðu fer neðst, á eftir síðasta kassa.
+
 ## 2026-11-25 — Byggár BEITT (cc381d): úrskurður um lið 4 og beiting 23:05–23:13 UTC (Danni + arkitekt; beitt af master)
 
 **Úrskurður Danna um gátlistalið 4:** STOPP-ákvæðið „á sölu“ átti við nýbyggingar sem falla á þunnt svæði vegna rétts byggárs. Þær eru 7 samþykktar, 0 á sölu, og liðurinn STENST. 27 eignir á sölu sem fara í T5 með `byggar_vantar` eru samþykktar samkvæmt ákvörðun 3 (ekkert verðmat án byggárs).
